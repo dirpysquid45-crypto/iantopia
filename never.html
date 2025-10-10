@@ -9,110 +9,62 @@
   html,body{ height:100%; }
   body{
     margin:0;background:var(--bg);overflow:hidden;position:relative;
-    font-family: "Comic Sans MS", "Comic Sans", cursive;
+    font-family:"Comic Sans MS","Comic Sans",cursive;
   }
-
-  /* Rainbow animated gradient as text fill */
   .marquee{
     position:absolute;white-space:nowrap;top:50%;left:100%;
     transform:translateY(-50%);
-    font-size:clamp(48px, 12vw, 160px);font-weight:900;line-height:1.05;
-    background:linear-gradient(90deg,
-      #ff0040, #ff8a00, #ffe600, #4cff00, #00e0ff, #6a00ff, #ff00d4, #ff0040);
+    font-size:clamp(48px,12vw,160px);font-weight:900;line-height:1.05;
+    background:linear-gradient(90deg,#ff0040,#ff8a00,#ffe600,#4cff00,#00e0ff,#6a00ff,#ff00d4,#ff0040);
     background-size:200% 100%;
     -webkit-background-clip:text;background-clip:text;color:transparent;
-    animation: slide 12s linear infinite, hue 3s linear infinite;
-    text-shadow: 0 0 12px rgba(255,255,255,.25);
+    animation:slide 12s linear infinite, hue 3s linear infinite;
+    text-shadow:0 0 12px rgba(255,255,255,.25);
   }
+  @keyframes slide{0%{left:100%}100%{left:-200%}}
+  @keyframes hue{0%{background-position:0% 50%}100%{background-position:200% 50%}}
 
-  @keyframes slide{
-    0% { left: 100%; }
-    100% { left: -200%; }
-  }
-  @keyframes hue{
-    0%{ background-position:0% 50%; }
-    100%{ background-position:200% 50%; }
-  }
-
-  /* Flashing clown emojis */
-  .clowns{
-    position:absolute;inset:0;pointer-events:none;overflow:hidden;
-  }
-  .clown{
-    position:absolute;font-size:clamp(24px, 6vw, 60px);
-    animation: flash 1.2s steps(2,end) infinite;
-    filter: drop-shadow(0 0 6px rgba(255,255,255,.35));
-  }
-  @keyframes flash{
-    0%,100%{ opacity:1; transform:scale(1) rotate(0deg); }
-    50%{ opacity:.15; transform:scale(1.1) rotate(5deg); }
-  }
-
-  /* A tiny help bar for starting audio (autoplay policies) */
-  .bar{
-    position:fixed;left:50%;bottom:14px;transform:translateX(-50%);
-    background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
-    color:#eee;padding:10px 14px;border-radius:12px;font-size:14px;
-    display:flex;gap:10px;align-items:center;backdrop-filter: blur(6px);
-  }
-  .bar button{
-    all:unset;cursor:pointer;padding:6px 10px;border-radius:10px;
-    background:#1f2736;border:1px solid #2c3650
-  }
-
-  /* Accessibility: respect reduced motion */
-  @media (prefers-reduced-motion: reduce){
-    .marquee{ animation: none; left: 50%; transform:translate(-50%,-50%); }
-    .clown{ animation: none; }
-  }
+  .clowns{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+  .clown{position:absolute;font-size:clamp(24px,6vw,60px);animation:flash 1.2s steps(2,end) infinite;filter:drop-shadow(0 0 6px rgba(255,255,255,.35))}
+  @keyframes flash{0%,100%{opacity:1;transform:scale(1) rotate(0)}50%{opacity:.15;transform:scale(1.1) rotate(5deg)}}
 </style>
 </head>
 <body>
   <div class="clowns" id="clowns"></div>
-
   <div class="marquee">That shit is NEVER GETTING DONE!</div>
 
-
-
-  <audio id="music" src="/Circus.mp3" loop></audio>
+  <!-- File lives at the repo root as Circus.mp3 (case sensitive) -->
+  <audio id="music" src="/Circus.mp3" preload="auto" autoplay muted loop playsinline></audio>
 
 <script>
-  // Populate lots of clown emojis at random spots
+  // clowns
   const container = document.getElementById('clowns');
-  const count = 80; // adjust for more/less chaos
-  for (let i=0;i<count;i++){
-    const s = document.createElement('div');
-    s.className = 'clown';
-    s.textContent = '🤡';
-    s.style.left = Math.random()*100 + 'vw';
-    s.style.top  = Math.random()*100 + 'vh';
-    s.style.animationDelay = (Math.random()*1.2).toFixed(2) + 's';
+  for (let i=0;i<80;i++){
+    const s=document.createElement('div');
+    s.className='clown'; s.textContent='🤡';
+    s.style.left=Math.random()*100+'vw';
+    s.style.top=Math.random()*100+'vh';
+    s.style.animationDelay=(Math.random()*1.2).toFixed(2)+'s';
     container.appendChild(s);
   }
 
-  // Audio controls (autoplay usually blocked, so start on user click)
+  // autoplay: start muted, then unmute on first interaction if blocked
   const music = document.getElementById('music');
-  const playBtn = document.getElementById('play');
-  const pauseBtn = document.getElementById('pause');
 
-  playBtn.addEventListener('click', async () => {
-    try {
-      await music.play();
-      playBtn.style.display='none'; pauseBtn.style.display='inline-block';
-    } catch(e){ console.log('Autoplay blocked:', e); }
-  });
-  pauseBtn.addEventListener('click', () => {
-    music.pause();
-    pauseBtn.style.display='none'; playBtn.style.display='inline-block';
-  });
+  (async () => {
+    try { await music.play(); music.muted=false; } catch(e) { /* fallback below */ }
+  })();
 
-  // Also try to start on first page interaction
-  ['click','pointerdown','keydown'].forEach(evt=>{
-    window.addEventListener(evt, async function kick(){
-      try{ await music.play(); playBtn.style.display='none'; pauseBtn.style.display='inline-block'; }
-      catch(e){} window.removeEventListener(evt, kick);
-    }, { once:true });
-  });
+  const unlock = async () => {
+    music.muted = false;
+    try { if (music.paused) await music.play(); } catch(e) {}
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('keydown', unlock);
+    window.removeEventListener('touchstart', unlock);
+  };
+  window.addEventListener('pointerdown', unlock);
+  window.addEventListener('keydown', unlock);
+  window.addEventListener('touchstart', unlock);
 </script>
 </body>
 </html>
