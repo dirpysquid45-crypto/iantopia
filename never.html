@@ -10,31 +10,33 @@
     background:#000;
     overflow:hidden;
     position:relative;
-    font-family:"Comic Sans MS", "Comic Sans", cursive;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    font-family:"Comic Sans MS","Comic Sans",cursive;
   }
 
-  /* Moving rainbow text */
-  .marquee {
-    position:absolute;
-    white-space:nowrap;
-    top:50%; left:100%;
-    transform:translateY(-50%);
-    font-size:clamp(48px, 12vw, 160px);
+  /* Rainbow animated text, centered */
+  .headline {
+    font-size:clamp(48px,12vw,160px);
     font-weight:900;
     background:linear-gradient(90deg,
       red, orange, yellow, lime, cyan, blue, magenta, red);
     background-size:200% 100%;
     -webkit-background-clip:text;
     color:transparent;
-    animation: slide 12s linear infinite, hue 3s linear infinite;
+    text-align:center;
+    animation: hue 3s linear infinite, bounce 2s ease-in-out infinite;
   }
-  @keyframes slide {
-    0% { left:100%; }
-    100% { left:-200%; }
-  }
+
   @keyframes hue {
     0% { background-position:0% 50%; }
     100% { background-position:200% 50%; }
+  }
+  @keyframes bounce {
+    0%,100% { transform:translateY(0); }
+    50% { transform:translateY(-20px); }
   }
 
   /* Flashing clowns */
@@ -54,13 +56,13 @@
 </head>
 <body>
   <div class="clowns" id="clowns"></div>
-  <div class="marquee">That shit is NEVER GETTING DONE!</div>
+  <div class="headline">That shit is NEVER GETTING DONE!</div>
 
-  <!-- Autoplay music -->
+  <!-- Autoplay circus music -->
   <audio id="music" src="/assets/circus.mp3" autoplay loop></audio>
 
 <script>
-  // fill screen with clowns
+  // populate clown emojis
   const container = document.getElementById('clowns');
   for (let i=0;i<80;i++){
     const c=document.createElement('div');
@@ -71,12 +73,11 @@
     container.appendChild(c);
   }
 
-  // try forcing autoplay if blocked
+  // force autoplay (fallback)
   const music=document.getElementById('music');
   music.play().catch(()=>{
-    // if blocked, play on first click/keypress
     const kick=()=>{ music.play(); window.removeEventListener('click',kick); window.removeEventListener('keydown',kick); };
-    window.addEventListener('click',kick); 
+    window.addEventListener('click',kick);
     window.addEventListener('keydown',kick);
   });
 </script>
