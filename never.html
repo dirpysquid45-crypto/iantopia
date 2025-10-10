@@ -21,75 +21,51 @@
   .headline {
     font-size:clamp(48px,12vw,160px);
     font-weight:900;
-    background:linear-gradient(90deg,
-      red, orange, yellow, lime, cyan, blue, magenta, red);
+    background:linear-gradient(90deg, red, orange, yellow, lime, cyan, blue, magenta, red);
     background-size:200% 100%;
     -webkit-background-clip:text;
     color:transparent;
     text-align:center;
     animation: hue 3s linear infinite, bounce 2s ease-in-out infinite;
   }
-
-  @keyframes hue {
-    0% { background-position:0% 50%; }
-    100% { background-position:200% 50%; }
-  }
-  @keyframes bounce {
-    0%,100% { transform:translateY(0); }
-    50% { transform:translateY(-20px); }
-  }
+  @keyframes hue { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
 
   /* Flashing clowns */
-  .clowns {
-    position:absolute; inset:0; pointer-events:none;
-  }
-  .clown {
-    position:absolute;
-    font-size:clamp(24px,6vw,60px);
-    animation: flash 1s steps(2,end) infinite;
-  }
-  @keyframes flash {
-    0%,100% { opacity:1; }
-    50% { opacity:0; }
-  }
+  .clowns { position:absolute; inset:0; pointer-events:none; }
+  .clown { position:absolute; font-size:clamp(24px,6vw,60px); animation: flash 1s steps(2,end) infinite; }
+  @keyframes flash { 0%,100%{opacity:1} 50%{opacity:0} }
 </style>
 </head>
 <body>
   <div class="clowns" id="clowns"></div>
   <div class="headline">That shit is NEVER GETTING DONE!</div>
 
-  <!-- Autoplay circus music -->
-  <audio id="music" src="Circus Theme Song.mp3" preload="auto" autoplay muted loop playsinline></audio>
+  <!-- Autoplay circus music (file lives at /assets/circus.mp3) -->
+  <audio id="music" src="/assets/Circus Theme Song.mp3" preload="auto" autoplay muted loop playsinline></audio>
 
 <script>
   // populate clown emojis
   const container = document.getElementById('clowns');
-  for (let i=0;i<80;i++){
-    const c=document.createElement('div');
-    c.className='clown'; c.textContent='🤡';
-    c.style.left=Math.random()*100+'vw';
-    c.style.top=Math.random()*100+'vh';
-    c.style.animationDelay=(Math.random()*1).toFixed(2)+'s';
+  for (let i = 0; i < 80; i++) {
+    const c = document.createElement('div');
+    c.className = 'clown'; c.textContent = '🤡';
+    c.style.left = Math.random()*100 + 'vw';
+    c.style.top  = Math.random()*100 + 'vh';
+    c.style.animationDelay = (Math.random()*1).toFixed(2) + 's';
     container.appendChild(c);
   }
 
-  // Autoplay handling
+  // Robust autoplay: start muted, then unmute on first interaction if needed
   const music = document.getElementById('music');
 
-  // Try to start right away
   (async () => {
-    try {
-      await music.play();
-      music.muted = false;
-    } catch(e) {
-      // ignore, fallback below
-    }
+    try { await music.play(); music.muted = false; } catch (e) { /* fallback below */ }
   })();
 
-  // Unmute and play on first interaction if blocked
   const unlock = async () => {
     music.muted = false;
-    try { await music.play(); } catch(e) {}
+    try { if (music.paused) await music.play(); } catch (e) {}
     window.removeEventListener('pointerdown', unlock);
     window.removeEventListener('keydown', unlock);
     window.removeEventListener('touchstart', unlock);
