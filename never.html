@@ -6,34 +6,21 @@
 <title>That shit is NEVER GETTING DONE!</title>
 <style>
   body {
-    margin:0;
-    background:#000;
-    overflow:hidden;
-    position:relative;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    height:100vh;
+    margin:0; background:#000; overflow:hidden; position:relative;
+    display:flex; justify-content:center; align-items:center; height:100vh;
     font-family:"Comic Sans MS","Comic Sans",cursive;
   }
-
-  /* Rainbow animated text, centered */
   .headline {
-    font-size:clamp(48px,12vw,160px);
-    font-weight:900;
-    background:linear-gradient(90deg, red, orange, yellow, lime, cyan, blue, magenta, red);
-    background-size:200% 100%;
-    -webkit-background-clip:text;
-    color:transparent;
-    text-align:center;
-    animation: hue 3s linear infinite, bounce 2s ease-in-out infinite;
+    font-size:clamp(48px,12vw,160px); font-weight:900;
+    background:linear-gradient(90deg,red,orange,yellow,lime,cyan,blue,magenta,red);
+    background-size:200% 100%; -webkit-background-clip:text; color:transparent;
+    text-align:center; animation:hue 3s linear infinite, bounce 2s ease-in-out infinite;
   }
   @keyframes hue { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
   @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
 
-  /* Flashing clowns */
   .clowns { position:absolute; inset:0; pointer-events:none; }
-  .clown { position:absolute; font-size:clamp(24px,6vw,60px); animation: flash 1s steps(2,end) infinite; }
+  .clown  { position:absolute; font-size:clamp(24px,6vw,60px); animation:flash 1s steps(2,end) infinite; }
   @keyframes flash { 0%,100%{opacity:1} 50%{opacity:0} }
 </style>
 </head>
@@ -41,8 +28,8 @@
   <div class="clowns" id="clowns"></div>
   <div class="headline">That shit is NEVER GETTING DONE!</div>
 
-  <!-- Autoplay circus music (file lives at /assets/circus.mp3) -->
-  <audio id="audio" src="https://github.com/dirpysquid45-crypto/iantopia/blob/main/Circus.mp3></audio>
+  <!-- Use the real deployed file path, not a GitHub page -->
+  <audio id="music" src="/assets/circus.mp3" preload="auto" autoplay muted loop playsinline></audio>
 
 <script>
   // populate clown emojis
@@ -56,16 +43,75 @@
     container.appendChild(c);
   }
 
-  // Robust autoplay: start muted, then unmute on first interaction if needed
+  // robust autoplay: start muted, then unmute on first interaction if needed
   const music = document.getElementById('music');
-
-  (async () => {
-    try { await music.play(); music.muted = false; } catch (e) { /* fallback below */ }
-  })();
+  (async () => { try { await music.play(); music.muted = false; } catch (_) {} })();
 
   const unlock = async () => {
     music.muted = false;
-    try { if (music.paused) await music.play(); } catch (e) {}
+    try { if (music.paused) await music.play(); } catch (_) {}
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('keydown', unlock);
+    window.removeEventListener('touchstart', unlock);
+  };
+  window.addEventListener('pointerdown', unlock);
+  window.addEventListener('keydown', unlock);
+  window.addEventListener('touchstart', unlock);
+</script>
+</body>
+</html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>That shit is NEVER GETTING DONE!</title>
+<style>
+  body {
+    margin:0; background:#000; overflow:hidden; position:relative;
+    display:flex; justify-content:center; align-items:center; height:100vh;
+    font-family:"Comic Sans MS","Comic Sans",cursive;
+  }
+  .headline {
+    font-size:clamp(48px,12vw,160px); font-weight:900;
+    background:linear-gradient(90deg,red,orange,yellow,lime,cyan,blue,magenta,red);
+    background-size:200% 100%; -webkit-background-clip:text; color:transparent;
+    text-align:center; animation:hue 3s linear infinite, bounce 2s ease-in-out infinite;
+  }
+  @keyframes hue { 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-20px)} }
+
+  .clowns { position:absolute; inset:0; pointer-events:none; }
+  .clown  { position:absolute; font-size:clamp(24px,6vw,60px); animation:flash 1s steps(2,end) infinite; }
+  @keyframes flash { 0%,100%{opacity:1} 50%{opacity:0} }
+</style>
+</head>
+<body>
+  <div class="clowns" id="clowns"></div>
+  <div class="headline">That shit is NEVER GETTING DONE!</div>
+
+  <!-- Use the real deployed file path, not a GitHub page -->
+  <audio id="music" src="/assets/circus.mp3" preload="auto" autoplay muted loop playsinline></audio>
+
+<script>
+  // populate clown emojis
+  const container = document.getElementById('clowns');
+  for (let i = 0; i < 80; i++) {
+    const c = document.createElement('div');
+    c.className = 'clown'; c.textContent = '🤡';
+    c.style.left = Math.random()*100 + 'vw';
+    c.style.top  = Math.random()*100 + 'vh';
+    c.style.animationDelay = (Math.random()*1).toFixed(2) + 's';
+    container.appendChild(c);
+  }
+
+  // robust autoplay: start muted, then unmute on first interaction if needed
+  const music = document.getElementById('music');
+  (async () => { try { await music.play(); music.muted = false; } catch (_) {} })();
+
+  const unlock = async () => {
+    music.muted = false;
+    try { if (music.paused) await music.play(); } catch (_) {}
     window.removeEventListener('pointerdown', unlock);
     window.removeEventListener('keydown', unlock);
     window.removeEventListener('touchstart', unlock);
