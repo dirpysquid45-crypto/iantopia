@@ -59,7 +59,7 @@
   <div class="headline">That shit is NEVER GETTING DONE!</div>
 
   <!-- Autoplay circus music -->
-  <audio id="music" src="/assets/circus.mp3" autoplay loop></audio>
+  <audio id="music" src="/assets/circus.mp3" preload="auto" autoplay muted loop playsinline></audio>
 
 <script>
   // populate clown emojis
@@ -73,13 +73,30 @@
     container.appendChild(c);
   }
 
-  // force autoplay (fallback)
-  const music=document.getElementById('music');
-  music.play().catch(()=>{
-    const kick=()=>{ music.play(); window.removeEventListener('click',kick); window.removeEventListener('keydown',kick); };
-    window.addEventListener('click',kick);
-    window.addEventListener('keydown',kick);
-  });
+  // Autoplay handling
+  const music = document.getElementById('music');
+
+  // Try to start right away
+  (async () => {
+    try {
+      await music.play();
+      music.muted = false;
+    } catch(e) {
+      // ignore, fallback below
+    }
+  })();
+
+  // Unmute and play on first interaction if blocked
+  const unlock = async () => {
+    music.muted = false;
+    try { await music.play(); } catch(e) {}
+    window.removeEventListener('pointerdown', unlock);
+    window.removeEventListener('keydown', unlock);
+    window.removeEventListener('touchstart', unlock);
+  };
+  window.addEventListener('pointerdown', unlock);
+  window.addEventListener('keydown', unlock);
+  window.addEventListener('touchstart', unlock);
 </script>
 </body>
 </html>
