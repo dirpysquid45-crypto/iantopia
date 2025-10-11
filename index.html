@@ -1,18 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Glorious Iantopia</title>
   <style>
     body{
       margin:0;
       min-height:100vh;
-      display:grid;
-      place-items:center;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       background:#0f1115;
       color:#ffffff;
+    }
+
+    img {
+      max-width: 400px;
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    h1 {
+      font-size: 3rem;
+      margin: 20px 0 10px 0;
+      color: #ffffff;
     }
 
     a.big {
@@ -28,40 +45,45 @@
     }
     a.big:hover{ transform:translateY(-1px); }
 
-    /* Topia Timer styles */
-    #topia-timer {
-      position: fixed;
-      top: 15px;
-      right: 20px;
-      font-size: 1rem;
-      font-weight: 600;
-      background: rgba(0,0,0,0.6);
-      padding: 8px 14px;
-      border-radius: 10px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    /* Topia Timer (top-right corner) */
+    #topia-timer{
+      position:fixed;
+      top:15px;
+      right:20px;
+      font-size:1rem;
+      font-weight:600;
+      background:rgba(0,0,0,0.6);
+      padding:8px 14px;
+      border-radius:10px;
+      box-shadow:0 2px 6px rgba(0,0,0,0.25);
     }
   </style>
 </head>
 <body>
-  <!-- Main button link -->
+  <!-- Image + title -->
+  <img src="Iantopia.webp" alt="Iantopia Image">
+  <h1>Glorious Iantopia</h1>
+
+  <!-- Link to the chaos page -->
   <a class="big" href="/never.html">Is Iantopia Done Yet????</a>
 
-  <!-- Timer -->
+  <!-- Topia Timer -->
   <div id="topia-timer">Loading…</div>
 
   <script>
-    // Start date: Sept 1, 2025 midnight
-    const TOPIA_START = new Date(2025, 8, 1, 0, 0, 0); // 8 = September
+    // Start: September 1, 2025 (month index 8 = September)
+    const TOPIA_START = new Date(2025, 8, 1, 0, 0, 0);
 
     function renderTopiaTimer(){
       const now = new Date();
 
-      // months difference
+      // whole months since start
       let months = (now.getFullYear() - TOPIA_START.getFullYear()) * 12 +
                    (now.getMonth() - TOPIA_START.getMonth());
       let anchor = new Date(TOPIA_START);
       anchor.setMonth(TOPIA_START.getMonth() + months);
 
+      // if overshot, step back a month
       if (anchor > now) {
         months--;
         anchor = new Date(TOPIA_START);
@@ -69,17 +91,17 @@
       }
 
       let ms = now - anchor;
-      const DAY = 24*60*60*1000;
+      const DAY  = 24*60*60*1000;
       const HOUR = 60*60*1000;
-      const MIN = 60*1000;
+      const MIN  = 60*1000;
 
-      const days = Math.floor(ms / DAY); ms %= DAY;
-      const hours = Math.floor(ms / HOUR); ms %= HOUR;
-      const minutes = Math.floor(ms / MIN); ms %= MIN;
+      const days    = Math.floor(ms / DAY);  ms %= DAY;
+      const hours   = Math.floor(ms / HOUR); ms %= HOUR;
+      const minutes = Math.floor(ms / MIN);  ms %= MIN;
       const seconds = Math.floor(ms / 1000);
 
-      const el = document.getElementById('topia-timer');
-      el.textContent = `${months}m ${days}d ${hours}h ${minutes}m ${seconds}s`;
+      document.getElementById('topia-timer').textContent =
+        `${months} months, ${days} days, ${hours} hours, ${minutes} minutes, ${seconds} seconds`;
     }
 
     renderTopiaTimer();
