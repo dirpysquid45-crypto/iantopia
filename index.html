@@ -32,7 +32,7 @@
       color: #ffffff;
     }
 
-    a.big {
+    a.big, button.big {
       text-decoration:none;
       padding:18px 26px;
       border-radius:14px;
@@ -42,8 +42,9 @@
       font-size:clamp(20px,4vw,34px);
       letter-spacing:.3px;
       color:#ffffff;
+      cursor:pointer;
     }
-    a.big:hover{ transform:translateY(-1px); }
+    a.big:hover, button.big:hover{ transform:translateY(-1px); }
 
     /* Topia Timer (top-right corner) */
     #topia-timer{
@@ -73,6 +74,12 @@
       font-weight:700;
     }
     #strubles-badge img{ width:28px; height:28px; border-radius:6px; }
+
+    /* Earn panel layout */
+    #earn-panel{
+      display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; justify-content:center;
+    }
+    #earn-panel button.big{ padding:12px 16px; font-size:clamp(16px,3vw,22px); }
   </style>
 
   <!-- Preload the Struble image for a snappy badge -->
@@ -89,6 +96,13 @@
   <!-- Link to the blackjack page -->
   <br />
   <a class="big" href="blackjack.html">🎲 Gamburing </a>
+
+  <!-- Earn Strubles (starter + daily) -->
+  <br />
+  <div id="earn-panel">
+    <button id="btn-starter" class="big">💰 Claim Starter +100</button>
+    <button id="btn-daily" class="big">🗓️ Daily +500</button>
+  </div>
 
   <!-- Topia Timer -->
   <div id="topia-timer">Loading…</div>
@@ -137,13 +151,37 @@
     setInterval(renderTopiaTimer, 1000);
   </script>
 
-  <!-- Strubles balance logic -->
+  <!-- Strubles balance + earn logic -->
   <script src="/strubles.js"></script>
   <script>
     const amtEl = document.getElementById('strubles-amt');
-    amtEl.textContent = Strubles.get();
-    // keep in sync if another tab changes it
-    window.addEventListener('storage', () => amtEl.textContent = Strubles.get());
+    function refreshBadge(){ amtEl.textContent = Strubles.get(); }
+
+    // Earn panel
+    function refreshEarnUI(){
+      const starterBtn = document.getElementById('btn-starter');
+      const dailyBtn   = document.getElementById('btn-daily');
+      if (!starterBtn || !dailyBtn) return;
+      starterBtn.disabled = !Strubles.canClaimStarter?.() ? true : !Strubles.canClaimStarter();
+      dailyBtn.disabled   = !Strubles.canDailyClaim?.() ? true : !Strubles.canDailyClaim();
+    }
+
+    document.getElementById('btn-starter').addEventListener('click', () => {
+      if (Strubles.claimStarter?.(100)) {
+        refreshBadge(); refreshEarnUI();
+      }
+    });
+
+    document.getElementById('btn-daily').addEventListener('click', () => {
+      if (Strubles.dailyClaim?.(500)) {
+        refreshBadge(); refreshEarnUI();
+      }
+    });
+
+    refreshBadge();
+    refreshEarnUI();
+    // Keep badge in sync if another tab changes it
+    window.addEventListener('storage', () => { refreshBadge(); refreshEarnUI(); });
   </script>
 </body>
 </html>
