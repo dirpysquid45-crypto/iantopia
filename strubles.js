@@ -1,6 +1,7 @@
+// strubles.js — site-wide currency helper (persistent via localStorage)
 (function () {
   const KEY = "strubles_balance_v1";
-  const START = 100; // starting amount
+  const START = 100; // starting bankroll
 
   function _load() {
     const v = Number(localStorage.getItem(KEY));
@@ -10,11 +11,17 @@
     localStorage.setItem(KEY, String(Math.max(0, Math.floor(v))));
   }
 
+  // Core API
   window.Strubles = {
-    get() { return _load(); },
+    get()  { return _load(); },
     set(v) { _save(v); return _load(); },
-    add(n) { const v = _load() + n; _save(v); return v; },
-    spend(n) { const bal = _load(); if (n > bal) return false; _save(bal - n); return true; }
+    add(n) { const v = _load() + Number(n||0); _save(v); return v; },
+    spend(n) {
+      const need = Math.max(0, Math.floor(Number(n||0)));
+      const bal = _load();
+      if (need > bal) return false;
+      _save(bal - need); return true;
+    }
   };
 })();
 
@@ -28,7 +35,7 @@
     return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
   }
 
-  // Can claim starter? (never claimed)
+  // Starter: one-time grant
   function canClaimStarter() {
     return !localStorage.getItem(STARTER_KEY);
   }
@@ -39,7 +46,7 @@
     return true;
   }
 
-  // Can claim daily today?
+  // Daily: once per UTC day
   function canDailyClaim() {
     return localStorage.getItem(DAILY_KEY) !== todayUTC();
   }
@@ -50,7 +57,7 @@
     return true;
   }
 
-  // Optional: ensure a minimum bankroll (useful for testing)
+  // Optional dev helper
   function ensureMin(min = 0) {
     if (Strubles.get() < min) Strubles.set(min);
     return Strubles.get();
