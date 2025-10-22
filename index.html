@@ -152,36 +152,64 @@
   </script>
 
   <!-- Strubles balance + earn logic -->
-  <script src="/strubles.js"></script>
-  <script>
-    const amtEl = document.getElementById('strubles-amt');
-    function refreshBadge(){ amtEl.textContent = Strubles.get(); }
+  <!-- cache-bust to ensure latest file loads -->
+  <script src="/strubles.js?v=2"></script>
 
-    // Earn panel
-    function refreshEarnUI(){
-      const starterBtn = document.getElementById('btn-starter');
-      const dailyBtn   = document.getElementById('btn-daily');
-      if (!starterBtn || !dailyBtn) return;
-      starterBtn.disabled = !Strubles.canClaimStarter?.() ? true : !Strubles.canClaimStarter();
-      dailyBtn.disabled   = !Strubles.canDailyClaim?.() ? true : !Strubles.canDailyClaim();
+  <!-- Fallback shim + UI wiring -->
+  <script>
+  (function () {
+    if (typeof Strubles !== 'object') return;
+
+    // --- Shim helpers if missing (prevents "nothing happens") ---
+    if (typeof Strubles.canClaimStarter !== 'function' || typeof Strubles.claimStarter !== 'function') {
+      const STARTER_KEY = 'strubles_starter_claimed_v1';
+      Strubles.canClaimStarter = () => !localStorage.getItem(STARTER_KEY);
+      Strubles.claimStarter = (amt=100) => {
+        if (!Strubles.canClaimStarter()) return false;
+        Strubles.add(amt);
+        localStorage.setItem(STARTER_KEY,'1');
+        return true;
+      };
+    }
+    if (typeof Strubles.canDailyClaim !== 'function' || typeof Strubles.dailyClaim !== 'function') {
+      const DAILY_KEY = 'strubles_last_daily_utc_v1';
+      const todayUTC = () => {
+        const d = new Date();
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+      };
+      Strubles.canDailyClaim = () => localStorage.getItem(DAILY_KEY) !== todayUTC();
+      Strubles.dailyClaim = (amt=500) => {
+        if (!Strubles.canDailyClaim()) return false;
+        Strubles.add(amt);
+        localStorage.setItem(DAILY_KEY, todayUTC());
+        return true;
+      };
     }
 
-    document.getElementById('btn-starter').addEventListener('click', () => {
-      if (Strubles.claimStarter?.(100)) {
-        refreshBadge(); refreshEarnUI();
-      }
+    const amtEl = document.getElementById('strubles-amt');
+    const starterBtn = document.getElementById('btn-starter');
+    const dailyBtn   = document.getElementById('btn-daily');
+
+    function refreshBadge(){ if (amtEl) amtEl.textContent = Strubles.get(); }
+    function refreshEarnUI(){
+      if (starterBtn) starterBtn.disabled = !Strubles.canClaimStarter();
+      if (dailyBtn)   dailyBtn.disabled   = !Strubles.canDailyClaim();
+    }
+
+    starterBtn?.addEventListener('click', () => {
+      if (Strubles.claimStarter(100)) { refreshBadge(); refreshEarnUI(); }
+    });
+    dailyBtn?.addEventListener('click', () => {
+      if (Strubles.dailyClaim(500))   { refreshBadge(); refreshEarnUI(); }
     });
 
-    document.getElementById('btn-daily').addEventListener('click', () => {
-      if (Strubles.dailyClaim?.(500)) {
-        refreshBadge(); refreshEarnUI();
-      }
-    });
+    // Update on balance changes & cross-tab changes
+    window.addEventListener('strubles:change', () => { refreshBadge(); refreshEarnUI(); });
+    window.addEventListener('storage',          () => { refreshBadge(); refreshEarnUI(); });
 
     refreshBadge();
     refreshEarnUI();
-    // Keep badge in sync if another tab changes it
-    window.addEventListener('storage', () => { refreshBadge(); refreshEarnUI(); });
+  })();
   </script>
 </body>
 </html>
