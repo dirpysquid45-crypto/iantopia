@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Iantopia Blackjack</title>
-<link rel="preload" as="image" href="/assets/struble.png">
+<link rel="preload" as="image" href="/strubles.png">
 <style>
   :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --accent:#22d3ee; --danger:#ff6b6b; }
   * { box-sizing:border-box; }
@@ -50,7 +50,10 @@
 </head>
 <body>
   <!-- Balance badge -->
-  <div id="strubles-badge"><img src="/assets/struble.png" alt="Struble"><span id="bal">0</span></div>
+  <div id="strubles-badge">
+    <img src="/strubles.png" alt="Struble">
+    <span id="bal">0</span>
+  </div>
 
   <main class="table">
     <header>
@@ -87,7 +90,9 @@
     <div class="status" id="status">Welcome! Set a bet and press Deal.</div>
   </main>
 
-<script src="/assets/strubles.js"></script>
+<!-- ✅ Correct Strubles script path -->
+<script src="/strubles.js"></script>
+
 <script>
 (() => {
   const suits = ['♠','♥','♦','♣'];
@@ -173,23 +178,19 @@
   }
 
   function settle(result){
-    // result: 'win' | 'blackjack' | 'push' | 'lose'
     let payout = 0;
-    if (result === 'win')       payout = currentBet * 2;     // stake + win
+    if (result === 'win') payout = currentBet * 2;
     else if (result === 'blackjack') payout = Math.floor(currentBet * 2.5);
-    else if (result === 'push') payout = currentBet;         // return stake
-    // lose => payout 0 (stake already taken)
+    else if (result === 'push') payout = currentBet;
     if (payout) Strubles.add(payout);
     syncBalance();
   }
 
   function deal(){
-    // validate bet
     const bet = Math.max(1, Math.floor(Number(betInput.value || 0)));
     const bal = Strubles.get();
     if (bet > bal) { statusEl.textContent = "Not enough Strubles for that bet."; return; }
 
-    // take stake
     if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles."; return; }
     syncBalance();
     currentBet = bet;
@@ -209,95 +210,4 @@
     betPlus.disabled = true;
 
     const pv = handValue(player);
-    const dv = handValue([dealer[0]]); // exposed card only for info
-
-    if (pv === 21) {
-      holeRevealed = true;
-      renderHand(dealer, dealerEl, false);
-
-      // dealer draws to 17 for natural blackjack tie rules
-      while (handValue(dealer) < 17) { dealer.push(drawCard()); }
-      const dvFull = handValue(dealer);
-
-      if (dvFull === 21) { // push
-        settle('push');
-        endRound('Push (both blackjack).');
-      } else {
-        settle('blackjack');
-        endRound('Blackjack! You win 🎉');
-      }
-    } else {
-      statusEl.textContent = 'Hit or Stand?';
-      btnDeal.disabled = true;
-      btnHit.disabled = false;
-      btnStand.disabled = false;
-      btnRestart.disabled = false;
-    }
-  }
-
-  function hit(){
-    if (!inRound) return;
-    player.push(drawCard());
-    renderHand(player, playerEl, false);
-    updateTotals();
-
-    const pv = handValue(player);
-    if (pv > 21){
-      holeRevealed = true;
-      renderHand(dealer, dealerEl, false);
-      endRound('Bust! Dealer wins 💀'); // stake already taken
-    }
-  }
-
-  function stand(){
-    if (!inRound) return;
-    holeRevealed = true;
-    renderHand(dealer, dealerEl, false);
-
-    while (handValue(dealer) < 17) {
-      dealer.push(drawCard());
-      renderHand(dealer, dealerEl, false);
-    }
-
-    const pv = handValue(player);
-    const dv = handValue(dealer);
-
-    if (dv > 21)      { settle('win'); endRound('Dealer busts — You win 🎉'); }
-    else if (dv > pv) { endRound('Dealer wins 😔'); }         // lose
-    else if (dv < pv) { settle('win'); endRound('You win 🎉'); }
-    else              { settle('push'); endRound('Push 🤝'); }
-  }
-
-  function restart(){
-    player = [];
-    dealer = [];
-    inRound = false;
-    holeRevealed = false;
-    dealerEl.innerHTML = '';
-    playerEl.innerHTML = '';
-    totalsEl.textContent = 'Total: —';
-    statusEl.textContent = 'Welcome! Set a bet and press Deal.';
-    btnDeal.disabled = false;
-    btnHit.disabled = true;
-    btnStand.disabled = true;
-    btnRestart.disabled = true;
-    betInput.disabled = false;
-    betMinus.disabled = false;
-    betPlus.disabled = false;
-  }
-
-  // bet adjusters
-  betMinus.addEventListener('click', () => betInput.value = Math.max(1, Math.floor(betInput.value || 1) - 1));
-  betPlus .addEventListener('click', () => betInput.value = Math.max(1, Math.floor(betInput.value || 1) + 1));
-
-  // buttons
-  btnDeal.addEventListener('click', deal);
-  btnHit.addEventListener('click', hit);
-  btnStand.addEventListener('click', stand);
-  btnRestart.addEventListener('click', restart);
-
-  restart();
-})();
-</script>
-</body>
-</html>
+    if (pv ==
