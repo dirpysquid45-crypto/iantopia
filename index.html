@@ -57,7 +57,26 @@
       border-radius:10px;
       box-shadow:0 2px 6px rgba(0,0,0,0.25);
     }
+
+    /* Strubles badge (top-left corner) */
+    #strubles-badge{
+      position:fixed;
+      top:15px;
+      left:20px;
+      display:flex;
+      align-items:center;
+      gap:8px;
+      background:rgba(0,0,0,.6);
+      padding:8px 12px;
+      border-radius:12px;
+      box-shadow:0 2px 6px rgba(0,0,0,.25);
+      font-weight:700;
+    }
+    #strubles-badge img{ width:28px; height:28px; border-radius:6px; }
   </style>
+
+  <!-- Preload the Struble image for a snappy badge -->
+  <link rel="preload" as="image" href="/strubles.png" />
 </head>
 <body>
   <!-- Image + title -->
@@ -67,13 +86,18 @@
   <!-- Link to the chaos page -->
   <a class="big" href="/never.html">Is Iantopia Done Yet????</a>
 
-  
   <!-- Link to the blackjack page -->
   <br />
-<a class="big" href="blackjack.html">🎲 Gamburing </a>
+  <a class="big" href="blackjack.html">🎲 Gamburing </a>
 
   <!-- Topia Timer -->
   <div id="topia-timer">Loading…</div>
+
+  <!-- Strubles badge (shows current balance) -->
+  <div id="strubles-badge">
+    <img src="/strubles.png" alt="Struble">
+    <span id="strubles-amt">0</span>
+  </div>
 
   <script>
     // Start: September 1, 2025 (month index 8 = September)
@@ -111,6 +135,15 @@
 
     renderTopiaTimer();
     setInterval(renderTopiaTimer, 1000);
+  </script>
+
+  <!-- Strubles balance logic -->
+  <script src="/strubles.js"></script>
+  <script>
+    const amtEl = document.getElementById('strubles-amt');
+    amtEl.textContent = Strubles.get();
+    // keep in sync if another tab changes it
+    window.addEventListener('storage', () => amtEl.textContent = Strubles.get());
   </script>
 </body>
 </html>
