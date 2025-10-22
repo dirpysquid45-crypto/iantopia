@@ -90,12 +90,12 @@
     <div class="status" id="status">Welcome! Set a bet and press Deal.</div>
   </main>
 
-<!-- ✅ Correct Strubles script path -->
-<script src="/strubles.js"></script>
+<!-- ✅ Load same Strubles file as Home, with cache-buster -->
+<script src="/strubles.js?v=2"></script>
 
 <script>
 (() => {
-  const suits = ['♠','♥','♦','♣'];
+  const suits  = ['♠','♥','♦','♣'];
   const values = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 
   let deck = [];
@@ -110,21 +110,24 @@
   const playerEl = $('player-hand');
   const statusEl = $('status');
   const totalsEl = $('totals');
-  const balEl = $('bal');
+  const balNumEl = $('bal');
 
   const betInput = $('bet');
   const betMinus = $('bet-minus');
-  const betPlus = $('bet-plus');
+  const betPlus  = $('bet-plus');
 
-  const btnDeal = $('btn-deal');
-  const btnHit = $('btn-hit');
-  const btnStand = $('btn-stand');
+  const btnDeal    = $('btn-deal');
+  const btnHit     = $('btn-hit');
+  const btnStand   = $('btn-stand');
   const btnRestart = $('btn-restart');
 
-  function syncBalance(){ balEl.textContent = Strubles.get(); }
+  // --- Balance badge sync ---
+  function syncBalance(){ try { balNumEl.textContent = Strubles.get(); } catch {} }
   syncBalance();
-  window.addEventListener('storage', syncBalance);
+  window.addEventListener('strubles:change', syncBalance);
+  window.addEventListener('storage',          syncBalance);
 
+  // --- Deck / values ---
   function makeDeck() {
     const d = [];
     for (const s of suits) for (const v of values) d.push({s,v});
@@ -145,17 +148,16 @@
     while (total > 21 && aces > 0){ total -= 10; aces--; }
     return total;
   }
-  function drawCard(faceDown=false){ if (deck.length===0) deck = makeDeck(); const c=deck.pop(); c.faceDown=!!faceDown; return c; }
+  function drawCard(){ if (deck.length===0) deck = makeDeck(); return deck.pop(); }
 
+  // --- Rendering ---
   function renderHand(hand, el, hideHole=false){
     el.innerHTML = '';
     hand.forEach((c, i) => {
       const div = document.createElement('div');
       div.className = 'card' + ((c.s==='♥'||c.s==='♦') ? ' red':'');
-
       if (hideHole && i===1 && !holeRevealed) div.textContent = '🂠';
       else div.textContent = `${c.v}${c.s}`;
-
       el.appendChild(div);
     });
   }
@@ -174,14 +176,16 @@
     currentBet = 0;
     betInput.disabled = false;
     betMinus.disabled = false;
-    betPlus.disabled = false;
+    betPlus.disabled  = false;
   }
 
   function settle(result){
+    // result: 'win' | 'blackjack' | 'push' | 'lose'
     let payout = 0;
-    if (result === 'win') payout = currentBet * 2;
+    if (result === 'win')            payout = currentBet * 2;          // stake + win
     else if (result === 'blackjack') payout = Math.floor(currentBet * 2.5);
-    else if (result === 'push') payout = currentBet;
+    else if (result === 'push')      payout = currentBet;               // return stake
+    // lose => payout 0 (stake already taken)
     if (payout) Strubles.add(payout);
     syncBalance();
   }
@@ -195,19 +199,101 @@
     syncBalance();
     currentBet = bet;
 
-    deck = makeDeck();
+    deck   = makeDeck();
     player = [drawCard(), drawCard()];
-    dealer = [drawCard(), drawCard(true)];
+    dealer = [drawCard(), drawCard()];
     inRound = true;
     holeRevealed = false;
 
-    renderHand(dealer, dealerEl, true);
+    renderHand(dealer, dealerEl, true);   // hide dealer hole
     renderHand(player, playerEl, false);
     updateTotals();
 
     betInput.disabled = true;
     betMinus.disabled = true;
-    betPlus.disabled = true;
+    betPlus.disabled  = true;
 
     const pv = handValue(player);
-    if (pv ==
+    if (pv === 21) {
+      // check dealer for blackjack
+      holeRevealed = true;
+      renderHand(dealer, dealerEl, false);
+      while (handValue(dealer) < 17) dealer.push(drawCard());
+      const dv = handValue(dealer);
+      if (dv === 21) { settle('push'); endRound('Push (both blackjack).'); }
+      else { settle('blackjack'); endRound('Blackjack! You win 🎉'); }
+      return;
+    }
+
+    statusEl.textContent = 'Hit or Stand?';
+    btnDeal.disabled   = true;
+    btnHit.disabled    = false;
+    btnStand.disabled  = false;
+    btnRestart.disabled= false;
+  }
+
+  function hit(){
+    if (!inRound) return;
+    player.push(drawCard());
+    renderHand(player, playerEl, false);
+    updateTotals();
+    const pv = handValue(player);
+    if (pv > 21){
+      holeRevealed = true;
+      renderHand(dealer, dealerEl, false);
+      endRound('Bust! Dealer wins 💀'); // stake already taken
+    }
+  }
+
+  function stand(){
+    if (!inRound) return;
+    holeRevealed = true;
+    renderHand(dealer, dealerEl, false);
+
+    while (handValue(dealer) < 17) {
+      dealer.push(drawCard());
+      renderHand(dealer, dealerEl, false);
+    }
+
+    const pv = handValue(player);
+    const dv = handValue(dealer);
+
+    if (dv > 21)      { settle('win');       endRound('Dealer busts — You win 🎉'); }
+    else if (dv > pv) {                       endRound('Dealer wins 😔'); }         // lose
+    else if (dv < pv) { settle('win');       endRound('You win 🎉'); }
+    else              { settle('push');      endRound('Push 🤝'); }
+  }
+
+  function restart(){
+    player = [];
+    dealer = [];
+    inRound = false;
+    holeRevealed = false;
+    dealerEl.innerHTML = '';
+    playerEl.innerHTML = '';
+    totalsEl.textContent = 'Total: —';
+    statusEl.textContent = 'Welcome! Set a bet and press Deal.';
+    btnDeal.disabled = false;
+    btnHit.disabled  = true;
+    btnStand.disabled= true;
+    btnRestart.disabled = true;
+    betInput.disabled = false;
+    betMinus.disabled = false;
+    betPlus.disabled  = false;
+  }
+
+  // bet adjusters
+  betMinus.addEventListener('click', () => betInput.value = Math.max(1, Math.floor(betInput.value || 1) - 1));
+  betPlus .addEventListener('click', () => betInput.value = Math.max(1, Math.floor(betInput.value || 1) + 1));
+
+  // buttons
+  btnDeal.addEventListener('click', deal);
+  btnHit.addEventListener('click', hit);
+  btnStand.addEventListener('click', stand);
+  btnRestart.addEventListener('click', restart);
+
+  restart();
+})();
+</script>
+</body>
+</html>
