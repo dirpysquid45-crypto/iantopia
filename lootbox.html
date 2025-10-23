@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Iantopia Lootbox</title>
+<link rel="preload" as="image" href="/strubles.png">
+<style>
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --accent:#22d3ee; }
+  *{box-sizing:border-box}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+        min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .wrap{ width:min(720px,95vw); background:var(--panel); border:1px solid #233049; border-radius:18px; padding:20px;
+         box-shadow:0 20px 50px rgba(0,0,0,.45); }
+  header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px }
+  header a{ color:var(--muted); text-decoration:none; border:1px solid #2a3854; padding:8px 12px; border-radius:10px; }
+  h1{ margin:0; font-size:clamp(22px,3.5vw,28px) }
+  .badge{ position:fixed; top:15px; left:20px; display:flex; align-items:center; gap:8px; background:rgba(0,0,0,.6);
+          padding:8px 12px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,.25); font-weight:700; }
+  .badge img{ width:28px; height:28px; border-radius:6px; }
+  .panel{ display:grid; gap:14px; place-items:center; text-align:center; padding:10px 0; }
+  button.primary{ all:unset; cursor:pointer; padding:14px 20px; border-radius:12px; border:1px solid #2a3854;
+                  background:#122231; color:var(--ink); font-weight:800; box-shadow:0 8px 24px rgba(0,0,0,.35); }
+  .result{ margin-top:10px; font-size:1.1rem; min-height:1.4em; }
+  .small{ color:var(--muted); font-size:.95rem }
+</style>
+</head>
+<body>
+  <div class="badge"><img src="/strubles.png" alt="Struble"><span id="bal">0</span></div>
+
+  <main class="wrap">
+    <header>
+      <a href="/">← Home</a>
+      <h1>Lootbox</h1>
+      <div style="width:86px"></div>
+    </header>
+
+    <section class="panel">
+      <div class="small">Cost: <strong id="cost">—</strong> Strubles</div>
+      <button id="open" class="primary">🎁 Open Lootbox</button>
+      <div id="result" class="result"></div>
+      <div class="small">Prizes are random. Some unlock themes, badges, or hidden pages.</div>
+    </section>
+  </main>
+
+  <!-- currency + data + logic -->
+  <script src="/strubles.js?v=2"></script>
+  <script src="/lootbox-data.js?v=1"></script>
+  <script src="/lootbox.js?v=1"></script>
+  <script>
+    const balEl = document.getElementById('bal');
+    const costEl = document.getElementById('cost');
+    const resultEl = document.getElementById('result');
+    const btn = document.getElementById('open');
+
+    function syncBal(){ balEl.textContent = Strubles.get(); }
+    syncBal();
+    window.addEventListener('strubles:change', syncBal);
+    window.addEventListener('storage', syncBal);
+
+    costEl.textContent = window.LOOTBOX?.cost ?? 1000;
+
+    btn.addEventListener('click', () => {
+      const res = IantopiaLoot.openBox();
+      if (!res.ok) {
+        resultEl.textContent = res.message || "Not enough Strubles.";
+        return;
+      }
+      const p = res.prize;
+      const bonus = p.type === "rng_strubles" ? ` (+${p._amount})` : "";
+      resultEl.textContent = `You got: ${p.label}${bonus}`;
+      syncBal();
+    });
+  </script>
+</body>
+</html>
