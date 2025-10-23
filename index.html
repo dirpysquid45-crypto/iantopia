@@ -359,4 +359,15 @@
   </script>
   <!-- ===== /INVENTORY ===== -->
 </body>
+  <script>
+  (function(){
+    const m = location.hash.match(/#bank=(\d+)/);
+    if (m) {
+      Strubles.set(parseInt(m[1],10));
+      window.dispatchEvent(new Event('strubles:change'));
+      console.log('Strubles set to', Strubles.get());
+    }
+  })();
+</script>
+
 </html>
