@@ -80,6 +80,33 @@
       display:flex; gap:10px; margin-top:10px; flex-wrap:wrap; justify-content:center;
     }
     #earn-panel button.big{ padding:12px 16px; font-size:clamp(16px,3vw,22px); }
+
+    /* ===== INVENTORY: styles (added) ===== */
+    #inv-btn{
+      position:fixed; top:58px; left:20px;
+      background:rgba(0,0,0,.6); color:#fff;
+      border:1px solid #2a3245; border-radius:10px;
+      padding:6px 10px; font-weight:600; cursor:pointer;
+      box-shadow:0 2px 6px rgba(0,0,0,.25);
+    }
+    #inv-btn:hover{ transform:translateY(-1px) }
+    #inv-backdrop{
+      position:fixed; inset:0; background:rgba(0,0,0,.5);
+      display:none; align-items:center; justify-content:center; z-index:50;
+    }
+    #inv-modal{
+      width:min(640px,95vw); background:#161c27; color:#e9eef9;
+      border:1px solid #233049; border-radius:16px; padding:16px;
+      box-shadow:0 20px 50px rgba(0,0,0,.55);
+    }
+    #inv-modal header{ display:flex; justify-content:space-between; align-items:center; }
+    #inv-modal h3{ margin:0; font-size:1.2rem }
+    #inv-modal button{ all:unset; cursor:pointer; padding:8px 12px; border-radius:10px;
+      border:1px solid #2a3245; background:#1c2434; font-weight:700; }
+    .inv-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; margin-top:12px }
+    .inv-chip{ background:#111826; border:1px solid #233049; border-radius:10px; padding:10px; }
+    .inv-chip small{ color:#9fb0cf; display:block; margin-top:6px }
+    /* ===== /INVENTORY ===== */
   </style>
 
   <!-- Preload the Struble image for a snappy badge -->
@@ -98,8 +125,7 @@
   <a class="big" href="blackjack.html">🎲 Gamburing </a>
 
   <br />
-<a class="big" href="/lootbox.html">🎁 루트박스 🫧 𓇼𓏲*ੈ✩‧₊˚🎐</a>
-
+  <a class="big" href="/lootbox.html">🎁 루트박스 🫧 𓇼𓏲*ੈ✩‧₊˚🎐</a>
 
   <!-- Earn Strubles (starter + daily) -->
   <br />
@@ -116,6 +142,43 @@
     <img src="/strubles.png" alt="Struble">
     <span id="strubles-amt">0</span>
   </div>
+
+  <!-- ===== INVENTORY: launcher + modal (added) ===== -->
+  <button id="inv-btn">📦 Inventory</button>
+  <div id="inv-backdrop">
+    <div id="inv-modal">
+      <header>
+        <h3>Your Inventory</h3>
+        <button id="inv-close">Close</button>
+      </header>
+
+      <div class="inv-section">
+        <h4>Badges</h4>
+        <div id="inv-badges" class="inv-grid"></div>
+      </div>
+
+      <div class="inv-section">
+        <h4>Themes</h4>
+        <div id="inv-themes" class="inv-grid"></div>
+      </div>
+
+      <div class="inv-section">
+        <h4>Sound Effects</h4>
+        <div id="inv-sfx" class="inv-grid"></div>
+      </div>
+
+      <div class="inv-section">
+        <h4>Items</h4>
+        <div id="inv-items" class="inv-grid"></div>
+      </div>
+
+      <div class="inv-section">
+        <h4>Powerups</h4>
+        <div id="inv-powerups" class="inv-grid"></div>
+      </div>
+    </div>
+  </div>
+  <!-- ===== /INVENTORY ===== -->
 
   <script>
     // Start: September 1, 2025 (month index 8 = September)
@@ -215,5 +278,85 @@
     refreshEarnUI();
   })();
   </script>
+
+  <!-- ===== INVENTORY: logic (added) ===== -->
+  <script>
+    // Audio map (root-level file, no /assets folder)
+    const SFX_MAP = { cursed: "/cursed.mp3" };
+
+    const invBtn = document.getElementById('inv-btn');
+    const invBackdrop = document.getElementById('inv-backdrop');
+    const invClose = document.getElementById('inv-close');
+
+    function loadJSON(k, fb){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fb; }catch{return fb;} }
+    function invState(){
+      return loadJSON("strubles_inventory_v1",
+        { items:[], powerups:[], sfx:[], themes:[], badges:[] });
+    }
+
+    function renderInventory(){
+      const inv = invState();
+
+      const m = (id, arr, renderFn) => {
+        const el = document.getElementById(id); el.innerHTML = "";
+        if (!arr || !arr.length){ el.innerHTML = '<div class="inv-chip">Nothing here…</div>'; return; }
+        arr.forEach(item => el.appendChild(renderFn(item)));
+      };
+
+      const chip = (title, sub='') => {
+        const d = document.createElement('div');
+        d.className = 'inv-chip';
+        d.innerHTML = `<div>${title}</div>${sub?`<small>${sub}</small>`:''}`;
+        return d;
+      };
+
+      // badges / themes / items / powerups
+      m("inv-badges",   inv.badges,   k => chip(k));
+      m("inv-themes",   inv.themes,   k => chip(k, "Theme unlocked"));
+      m("inv-items",    inv.items,    k => chip(k));
+      m("inv-powerups", inv.powerups, k => chip(k, "One-time use"));
+
+      // sfx with play buttons
+      const sfxGrid = document.getElementById('inv-sfx');
+      sfxGrid.innerHTML = "";
+      if (!inv.sfx.length){
+        sfxGrid.innerHTML = '<div class="inv-chip">Nothing here…</div>';
+      } else {
+        inv.sfx.forEach(k => {
+          const d = document.createElement('div');
+          d.className = 'inv-chip';
+          const nice = (k === 'cursed' ? 'Cursed Audio File' : k);
+          d.innerHTML = `<div>${nice}</div><small>${k}</small>`;
+          const btn = document.createElement('button');
+          btn.textContent = "Play";
+          btn.style.marginTop = "8px";
+          btn.onclick = () => {
+            const src = SFX_MAP[k];
+            if (!src) return;
+            try { new Audio(src).play(); } catch {}
+          };
+          d.appendChild(btn);
+          sfxGrid.appendChild(d);
+        });
+      }
+    }
+
+    function openInventory(){
+      renderInventory();
+      invBackdrop.style.display = "flex";
+    }
+    function closeInventory(){
+      invBackdrop.style.display = "none";
+    }
+
+    invBtn.addEventListener('click', openInventory);
+    invClose.addEventListener('click', closeInventory);
+    invBackdrop.addEventListener('click', e => { if (e.target === invBackdrop) closeInventory(); });
+
+    // auto-refresh if inventory changes (lootbox opened elsewhere)
+    window.addEventListener('inventory:changed', () => { if (invBackdrop.style.display === 'flex') renderInventory(); });
+    window.addEventListener('storage', (e) => { if (e.key === 'strubles_inventory_v1' && invBackdrop.style.display === 'flex') renderInventory(); });
+  </script>
+  <!-- ===== /INVENTORY ===== -->
 </body>
 </html>
