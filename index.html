@@ -81,7 +81,7 @@
     }
     #earn-panel button.big{ padding:12px 16px; font-size:clamp(16px,3vw,22px); }
 
-    /* ===== INVENTORY: styles (added) ===== */
+    /* ===== INVENTORY: styles ===== */
     #inv-btn{
       position:fixed; top:58px; left:20px;
       background:rgba(0,0,0,.6); color:#fff;
@@ -90,6 +90,7 @@
       box-shadow:0 2px 6px rgba(0,0,0,.25);
     }
     #inv-btn:hover{ transform:translateY(-1px) }
+
     #inv-backdrop{
       position:fixed; inset:0; background:rgba(0,0,0,.5);
       display:none; align-items:center; justify-content:center; z-index:50;
@@ -106,46 +107,65 @@
     .inv-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; margin-top:12px }
     .inv-chip{ background:#111826; border:1px solid #233049; border-radius:10px; padding:10px; }
     .inv-chip small{ color:#9fb0cf; display:block; margin-top:6px }
-    /* ===== /INVENTORY ===== */
+
+    /* ===== Small MP3 button ===== */
+    #ytmp3-btn {
+      position: fixed;
+      top: 92px;
+      left: 20px;
+      padding: 6px 10px;
+      font-size: 0.75rem;
+      background: #1d2330;
+      border: 1px solid #2a3245;
+      border-radius: 8px;
+      color: #fff;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,.25);
+      opacity: 0.85;
+      z-index: 30;
+    }
+    #ytmp3-btn:hover {
+      opacity: 1;
+      transform: translateY(-1px);
+    }
   </style>
 
-  <!-- Preload the Struble image for a snappy badge -->
   <link rel="preload" as="image" href="/strubles.png" />
 </head>
 <body>
-  <!-- Image + title -->
+
   <img src="Iantopia.webp" alt="Iantopia Image">
   <h1>Glorious Iantopia</h1>
 
-  <!-- Link to the chaos page -->
   <a class="big" href="/never.html">Is Iantopia Done Yet????</a>
 
-  <!-- Link to the blackjack page -->
   <br />
   <a class="big" href="blackjack.html">🎲 Gamburing </a>
 
   <br />
   <a class="big" href="/lootbox.html">🎁 루트박스 🫧 𓇼𓏲*ੈ✩‧₊˚🎐</a>
 
-  <!-- Earn Strubles (starter + daily) -->
   <br />
   <div id="earn-panel">
     <button id="btn-starter" class="big">💰 Claim Starter +100</button>
     <button id="btn-daily" class="big">🗓️ Daily +500</button>
   </div>
-<a class="big" href="/ytmp3.html">🎧 YouTube → MP3 Converter</a>
 
-  <!-- Topia Timer -->
+  <a class="big" href="/ytmp3.html">🎧 YouTube → MP3 Converter</a>
+
   <div id="topia-timer">Loading…</div>
 
-  <!-- Strubles badge (shows current balance) -->
   <div id="strubles-badge">
     <img src="/strubles.png" alt="Struble">
     <span id="strubles-amt">0</span>
   </div>
 
-  <!-- ===== INVENTORY: launcher + modal (added) ===== -->
+  <!-- Inventory -->
   <button id="inv-btn">📦 Inventory</button>
+
+  <!-- Small MP3 button -->
+  <button id="ytmp3-btn">🎧 MP3</button>
+
   <div id="inv-backdrop">
     <div id="inv-modal">
       <header>
@@ -179,27 +199,17 @@
       </div>
     </div>
   </div>
-  <!-- ===== /INVENTORY ===== -->
 
   <script>
-    // Start: September 1, 2025 (month index 8 = September)
     const TOPIA_START = new Date(2025, 8, 1, 0, 0, 0);
 
     function renderTopiaTimer(){
       const now = new Date();
-
-      // whole months since start
       let months = (now.getFullYear() - TOPIA_START.getFullYear()) * 12 +
                    (now.getMonth() - TOPIA_START.getMonth());
       let anchor = new Date(TOPIA_START);
       anchor.setMonth(TOPIA_START.getMonth() + months);
-
-      // if overshot, step back a month
-      if (anchor > now) {
-        months--;
-        anchor = new Date(TOPIA_START);
-        anchor.setMonth(TOPIA_START.getMonth() + months);
-      }
+      if (anchor > now) { months--; anchor.setMonth(TOPIA_START.getMonth() + months); }
 
       let ms = now - anchor;
       const DAY  = 24*60*60*1000;
@@ -219,34 +229,32 @@
     setInterval(renderTopiaTimer, 1000);
   </script>
 
-  <!-- Strubles balance + earn logic -->
-  <!-- cache-bust to ensure latest file loads -->
   <script src="/strubles.js?v=2"></script>
 
-  <!-- Fallback shim + UI wiring -->
+  <!-- Strubles UI wiring -->
   <script>
   (function () {
     if (typeof Strubles !== 'object') return;
 
-    // --- Shim helpers if missing (prevents "nothing happens") ---
-    if (typeof Strubles.canClaimStarter !== 'function' || typeof Strubles.claimStarter !== 'function') {
-      const STARTER_KEY = 'strubles_starter_claimed_v1';
+    const STARTER_KEY = 'strubles_starter_claimed_v1';
+    if (!Strubles.canClaimStarter) {
       Strubles.canClaimStarter = () => !localStorage.getItem(STARTER_KEY);
-      Strubles.claimStarter = (amt=100) => {
+      Strubles.claimStarter = amt => {
         if (!Strubles.canClaimStarter()) return false;
         Strubles.add(amt);
         localStorage.setItem(STARTER_KEY,'1');
         return true;
       };
     }
-    if (typeof Strubles.canDailyClaim !== 'function' || typeof Strubles.dailyClaim !== 'function') {
-      const DAILY_KEY = 'strubles_last_daily_utc_v1';
-      const todayUTC = () => {
-        const d = new Date();
-        return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
-      };
+
+    const DAILY_KEY = 'strubles_last_daily_utc_v1';
+    const todayUTC = () => {
+      const d = new Date();
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+    };
+    if (!Strubles.canDailyClaim) {
       Strubles.canDailyClaim = () => localStorage.getItem(DAILY_KEY) !== todayUTC();
-      Strubles.dailyClaim = (amt=500) => {
+      Strubles.dailyClaim = amt => {
         if (!Strubles.canDailyClaim()) return false;
         Strubles.add(amt);
         localStorage.setItem(DAILY_KEY, todayUTC());
@@ -258,31 +266,29 @@
     const starterBtn = document.getElementById('btn-starter');
     const dailyBtn   = document.getElementById('btn-daily');
 
-    function refreshBadge(){ if (amtEl) amtEl.textContent = Strubles.get(); }
+    function refreshBadge(){ amtEl.textContent = Strubles.get(); }
     function refreshEarnUI(){
-      if (starterBtn) starterBtn.disabled = !Strubles.canClaimStarter();
-      if (dailyBtn)   dailyBtn.disabled   = !Strubles.canDailyClaim();
+      starterBtn.disabled = !Strubles.canClaimStarter();
+      dailyBtn.disabled   = !Strubles.canDailyClaim();
     }
 
-    starterBtn?.addEventListener('click', () => {
+    starterBtn.addEventListener('click', () => {
       if (Strubles.claimStarter(100)) { refreshBadge(); refreshEarnUI(); }
     });
-    dailyBtn?.addEventListener('click', () => {
+    dailyBtn.addEventListener('click', () => {
       if (Strubles.dailyClaim(500))   { refreshBadge(); refreshEarnUI(); }
     });
 
-    // Update on balance changes & cross-tab changes
-    window.addEventListener('strubles:change', () => { refreshBadge(); refreshEarnUI(); });
-    window.addEventListener('storage',          () => { refreshBadge(); refreshEarnUI(); });
+    window.addEventListener('strubles:change', refreshBadge);
+    window.addEventListener('storage',          refreshBadge);
 
     refreshBadge();
     refreshEarnUI();
   })();
   </script>
 
-  <!-- ===== INVENTORY: logic (added) ===== -->
+  <!-- Inventory logic -->
   <script>
-    // Audio map (root-level file, no /assets folder)
     const SFX_MAP = { cursed: "/cursed.mp3" };
 
     const invBtn = document.getElementById('inv-btn');
@@ -311,13 +317,11 @@
         return d;
       };
 
-      // badges / themes / items / powerups
       m("inv-badges",   inv.badges,   k => chip(k));
       m("inv-themes",   inv.themes,   k => chip(k, "Theme unlocked"));
       m("inv-items",    inv.items,    k => chip(k));
       m("inv-powerups", inv.powerups, k => chip(k, "One-time use"));
 
-      // sfx with play buttons
       const sfxGrid = document.getElementById('inv-sfx');
       sfxGrid.innerHTML = "";
       if (!inv.sfx.length){
@@ -354,12 +358,32 @@
     invClose.addEventListener('click', closeInventory);
     invBackdrop.addEventListener('click', e => { if (e.target === invBackdrop) closeInventory(); });
 
-    // auto-refresh if inventory changes (lootbox opened elsewhere)
     window.addEventListener('inventory:changed', () => { if (invBackdrop.style.display === 'flex') renderInventory(); });
     window.addEventListener('storage', (e) => { if (e.key === 'strubles_inventory_v1' && invBackdrop.style.display === 'flex') renderInventory(); });
   </script>
-  <!-- ===== /INVENTORY ===== -->
-</body>
+
+  <!-- 100-Struble MP3 Button Logic -->
+  <script>
+  document.getElementById("ytmp3-btn").addEventListener("click", () => {
+    const cost = 100;
+
+    if (typeof Strubles !== 'object') {
+      alert("Strubles system not loaded.");
+      return;
+    }
+
+    if (!Strubles.spend(cost)) {
+      alert("Not enough Strubles, you broke king 😭");
+      return;
+    }
+
+    document.getElementById("strubles-amt").textContent = Strubles.get();
+
+    window.open("https://y2mate.gg/en/youtube-to-mp3", "_blank");
+  });
+  </script>
+
+  <!-- Bank override for debugging -->
   <script>
   (function(){
     const m = location.hash.match(/#bank=(\d+)/);
@@ -369,6 +393,7 @@
       console.log('Strubles set to', Strubles.get());
     }
   })();
-</script>
+  </script>
 
+</body>
 </html>
