@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Iantopia OS — Engine Mode</title>
 
-  <!-- Later these can be real CSS files in src/ui -->
+  <!-- ============================
+       INTERNAL TEMPORARY STYLES
+       (Will move to /src/ui later)
+       ============================ -->
   <style>
     :root {
       --bg: #020617;
@@ -26,11 +29,14 @@
       overflow:hidden;
     }
 
+    /* Entire OS shell */
     #engine-shell {
       display:flex;
       width:100%;
+      height:100vh;
     }
 
+    /* Left Sidebar Navigation */
     #engine-sidebar {
       width:230px;
       padding:18px;
@@ -55,6 +61,7 @@
       letter-spacing:.16em;
       color:var(--text-muted);
       margin-top:4px;
+      margin-bottom:4px;
     }
 
     .nav-btn {
@@ -80,6 +87,7 @@
       border:1px solid rgba(56,189,248,0.5);
     }
 
+    /* Main dynamic-view container */
     #engine-main {
       flex:1;
       padding:22px 26px;
@@ -90,6 +98,7 @@
       margin-top:0;
     }
 
+    /* Responsive Mode */
     @media (max-width: 800px) {
       #engine-shell {
         flex-direction:column;
@@ -106,8 +115,17 @@
     }
   </style>
 </head>
+
 <body>
+
+  <!-- ============================
+       MAIN OS SHELL
+       ============================ -->
   <div id="engine-shell">
+
+    <!-- ============================
+         SIDEBAR / NAVIGATION
+         ============================ -->
     <aside id="engine-sidebar">
       <h1>Iantopia OS</h1>
 
@@ -129,15 +147,22 @@
       </button>
     </aside>
 
+    <!-- ============================
+         MAIN RENDER VIEW
+         (router.js swaps the content)
+       ============================ -->
     <main id="engine-main">
-      <!-- JS will fill this -->
       <div id="app-view">
         <h2>Loading Iantopia OS…</h2>
       </div>
     </main>
+
   </div>
 
-  <!-- Boot the modular app -->
+  <!-- ============================
+       BOOT THE ENGINE
+       ============================ -->
   <script type="module" src="/src/app.js"></script>
+
 </body>
 </html>
