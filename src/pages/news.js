@@ -14,38 +14,39 @@ export async function render() {
     <div id="news-feed"></div>
   `;
 
-  const articles = await fetchAllNews();
+  let articles = [];
+  try {
+    articles = await fetchAllNews();
+  } catch (err) {
+    console.error("News Engine Error:", err);
+  }
 
   const feed = document.getElementById("news-feed");
   const loading = document.getElementById("news-loading");
-  loading.remove();
+  if (loading) loading.remove();
 
-  if (!articles.length) {
+  if (!articles || !articles.length) {
     feed.innerHTML = `<div class="card"><p>No articles found.</p></div>`;
     return;
   }
 
-  // Process and render articles
-  feed.innerHTML = articles.map(a => {
-    const bias = scoreBias(a.title + " " + a.description);
-    const sentiment = scoreSentiment(a.title + " " + a.description);
+  feed.innerHTML = articles
+    .map(a => {
+      const bias = scoreBias(a.title + " " + (a.description || ""));
+      const sentiment = scoreSentiment(a.title + " " + (a.description || ""));
 
-    return `
-      <div class="card" style="margin-bottom:16px;">
-        <h3>${a.title}</h3>
-        <p>${a.description || ""}</p>
-        <p><small>${a.source} — ${new Date(a.pubDate).toLocaleString()}</small></p>
+      return `
+        <div class="card" style="margin-bottom:16px;">
+          <h3>${a.title}</h3>
+          <p>${a.description || ""}</p>
+          <p><small>${a.source || "Unknown Source"} — ${new Date(a.pubDate).toLocaleString()}</small></p>
 
-        <div style="margin-top:10px;">
-          <strong>Bias:</strong> ${bias.label} (${bias.score})
-          <br>
-          <strong>Sentiment:</strong> ${sentiment.label} (${sentiment.score})
+          <div style="margin-top:10px;">
+            <strong>Bias:</strong> ${bias.label} (${bias.score})<br>
+            <strong>Sentiment:</strong> ${sentiment.label} (${sentiment.score})
+          </div>
         </div>
-
-        <a href="${a.link}" target="_blank" style="color:#38bdf8; display:inline-block; margin-top:10px;">
-          Read full article →
-        </a>
-      </div>
-    `;
-  }).join("");
+      `;
+    })
+    .join("");
 }
