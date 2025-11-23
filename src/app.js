@@ -1,33 +1,17 @@
-// placeholder// src/app.js
+// src/app.js
 // Main bootloader for Iantopia OS (Engine Mode)
+// Clean, modular architecture — sidebar + router boot
 
-import { initRouter, navigateTo } from "./router.js";
+import { initRouter } from "./router.js";
+import { renderNavbar } from "./components/navbar.js";
 
-function setupNav() {
-  const buttons = document.querySelectorAll(".nav-btn");
-  buttons.forEach(btn => {
-    btn.addEventListener("click", () => {
-      const route = btn.dataset.route || "home";
-      navigateTo(route);
-      buttons.forEach(b => b.classList.toggle("active", b === btn));
-    });
-  });
+export function initApp() {
+  // Insert navbar/sidebar HTML into engine.html
+  renderNavbar();
 
-  // mark "home" active by default
-  const homeBtn = document.querySelector('.nav-btn[data-route="home"]');
-  if (homeBtn) homeBtn.classList.add("active");
-}
-
-export function startApp() {
-  const view = document.getElementById("app-view");
-  if (!view) {
-    console.error("No #app-view element found in engine.html");
-    return;
-  }
-
-  setupNav();
+  // Boot the client-side router
   initRouter();
 }
 
-// auto-start
-window.addEventListener("DOMContentLoaded", startApp);
+// Start automatically when DOM is ready
+window.addEventListener("DOMContentLoaded", initApp);

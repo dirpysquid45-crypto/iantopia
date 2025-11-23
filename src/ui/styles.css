@@ -1,1 +1,76 @@
-/* placeholder */
+/* --- IantopiaOS Neon Sidebar --- */
+
+#os-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 210px;
+  height: 100vh;
+  background: rgba(10, 12, 18, 0.92);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(14px);
+  box-shadow: 4px 0 12px rgba(0,0,0,0.4);
+  padding-top: 20px;
+  z-index: 100;
+  color: #dbe4ff;
+  font-family: system-ui, sans-serif;
+}
+
+.nav-inner {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.nav-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.nav-title {
+  font-size: 1rem;
+  letter-spacing: 1px;
+  opacity: 0.8;
+}
+
+.nav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 15px;
+}
+
+.nav-links button {
+  background: none;
+  border: none;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: #cdd9f3;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: 0.15s ease;
+}
+
+.nav-links button:hover {
+  background: rgba(255,255,255,0.06);
+}
+
+.nav-links button.active {
+  background: #5b21ff;
+  color: white;
+  box-shadow: 0 0 8px #5b21ff;
+}
+
+.nav-footer {
+  margin-top: auto;
+  text-align: center;
+  padding: 10px;
+  opacity: 0.4;
+}
+
+/* Move main page right of navbar */
+#app-view {
+  margin-left: 230px;
+  padding: 20px;
+}
