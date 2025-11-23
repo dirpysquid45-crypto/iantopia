@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>YouTube → MP3 | Iantopia</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <style>
+    body {
+      background:#0f1115; color:#fff; font-family:system-ui;
+      display:flex; flex-direction:column; align-items:center;
+      padding:40px 20px;
+    }
+
+    h1 { font-size:2rem; margin-bottom:20px; }
+
+    input {
+      width:90%; max-width:450px;
+      padding:12px;
+      border-radius:10px;
+      border:1px solid #2a3245;
+      background:#1d2330; color:#fff;
+      margin-bottom:20px;
+      font-size:1rem;
+    }
+
+    button {
+      padding:12px 20px;
+      background:#22d3ee;
+      border:none;
+      border-radius:10px;
+      font-size:1.1rem;
+      cursor:pointer;
+      color:#000;
+      font-weight:bold;
+    }
+
+    button:hover { opacity:0.9; }
+
+    a { color:#22d3ee; margin-top:20px; text-decoration:none; }
+  </style>
+</head>
+
+<body>
+  <h1>YouTube → MP3 Converter</h1>
+
+  <input id="yturl" placeholder="Paste YouTube link here">
+  <button onclick="convert()">Convert to MP3</button>
+
+  <a href="/">← Back to Iantopia</a>
+
+<script>
+  function extractID(url) {
+    try {
+      const u = new URL(url);
+      return u.searchParams.get("v");
+    } catch { return null; }
+  }
+
+  function convert() {
+    const url = document.getElementById("yturl").value.trim();
+    const id = extractID(url);
+
+    if (!id) {
+      alert("Invalid YouTube URL.");
+      return;
+    }
+
+    const target = `https://loader.to/api/button/mp3/${id}`;
+    window.open(target, "_blank");
+  }
+</script>
+
+</body>
+</html>
+
