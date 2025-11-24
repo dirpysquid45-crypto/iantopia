@@ -17,8 +17,8 @@ export async function render() {
   let articles = [];
   try {
     articles = await fetchAllNews();
-  } catch (err) {
-    console.error("News Engine Error:", err);
+  } catch (e) {
+    console.error("News fetch error:", e);
   }
 
   const feed = document.getElementById("news-feed");
@@ -30,23 +30,23 @@ export async function render() {
     return;
   }
 
-  feed.innerHTML = articles
-    .map(a => {
-      const bias = scoreBias(a.title + " " + (a.description || ""));
-      const sentiment = scoreSentiment(a.title + " " + (a.description || ""));
+  // Render news
+  feed.innerHTML = articles.map(a => {
+    const text = `${a.title} ${a.description || ""}`;
+    const bias = scoreBias(text);
+    const sentiment = scoreSentiment(text);
 
-      return `
-        <div class="card" style="margin-bottom:16px;">
-          <h3>${a.title}</h3>
-          <p>${a.description || ""}</p>
-          <p><small>${a.source || "Unknown Source"} — ${new Date(a.pubDate).toLocaleString()}</small></p>
+    return `
+      <div class="card" style="margin-bottom:16px;">
+        <h3>${a.title}</h3>
+        <p>${a.description || ""}</p>
+        <p><small>${a.source} — ${new Date(a.pubDate).toLocaleString()}</small></p>
 
-          <div style="margin-top:10px;">
-            <strong>Bias:</strong> ${bias.label} (${bias.score})<br>
-            <strong>Sentiment:</strong> ${sentiment.label} (${sentiment.score})
-          </div>
+        <div style="margin-top:10px;">
+          <strong>Bias:</strong> ${bias.label} (${bias.score})<br/>
+          <strong>Sentiment:</strong> ${sentiment.label} (${sentiment.score})
         </div>
-      `;
-    })
-    .join("");
+      </div>
+    `;
+  }).join("");
 }
