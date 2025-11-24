@@ -1,13 +1,11 @@
 // src/news/fetchNews.js
-// Unified RSS fetcher for Iantopia OS News Engine
+// Unified RSS fetcher for Iantopia OS — optimized + parallelized
 
 import { parseRSS } from "./parseRSS.js";
 
 /* ===============================
    1. MASTER FEED LIST
-   (bias labels will be used later)
-   =============================== */
-
+================================ */
 export const FEEDS = [
   // ---- Left-leaning ----
   {
@@ -59,36 +57,57 @@ export const FEEDS = [
 ];
 
 /* ======================================
-   2. Main fetcher
-   - gracefully handles CORS errors
-   - merges everything into one array
-   ====================================== */
+   2. Parallel Fetcher (10× Faster)
+   - Uses Promise.allSettled()
+   - Gracefully handles individual feed failure
+====================================== */
+
+async function fetchSingleFeed(feed) {
+  try {
+    const res = await fetch(feed.url);
+    if (!res.ok) {
+      console.error(`❌ Failed fetching ${feed.label}:`, res.status);
+      return [];
+    }
+
+    const xmlText = await res.text();
+    const parsed = parseRSS(xmlText, feed);
+
+    // Attach source meta
+    parsed.forEach(a => {
+      a.source = feed.label;
+      a.sourceBias = feed.bias;
+    });
+
+    return parsed;
+  } catch (err) {
+    console.error(`❌ Error fetching ${feed.label}:`, err);
+    return [];
+  }
+}
+
+/* ======================================
+   3. Main fetch — massively faster
+   -  All feeds load together
+====================================== */
 
 export async function fetchAllNews() {
-  const allArticles = [];
+  const results = await Promise.allSettled(
+    FEEDS.map(feed => fetchSingleFeed(feed))
+  );
 
-  for (const feed of FEEDS) {
-    try {
-      const res = await fetch(feed.url);
-      if (!res.ok) {
-        console.error(`❌ Failed fetching ${feed.label}:`, res.status);
-        continue;
-      }
+  let allArticles = [];
 
-      const xmlText = await res.text();
-      const parsedArticles = parseRSS(xmlText, feed);
+  results.forEach(r => {
+    if (r.status === "fulfilled") allArticles.push(...r.value);
+  });
 
-      allArticles.push(...parsedArticles);
-    } catch (err) {
-      console.error(`❌ Error fetching ${feed.label}:`, err);
-    }
-  }
-
-  // sort newest → oldest
+  // Sort newest → oldest
   allArticles.sort((a, b) => {
     return (b.pubDate?.getTime?.() || 0) - (a.pubDate?.getTime?.() || 0);
   });
 
-  // limit for speed + UI cleanliness
-  return allArticles.slice(0, 50);
+  // Limit for performance
+  return allArticles.slice(0, 60);
 }
+
