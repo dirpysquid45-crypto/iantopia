@@ -1,113 +1,114 @@
 // src/news/fetchNews.js
-// Unified RSS fetcher for Iantopia OS — optimized + parallelized
+// CORS-safe RSS fetching using AllOrigins proxy
+// Works entirely client-side with zero backend
 
 import { parseRSS } from "./parseRSS.js";
 
-/* ===============================
-   1. MASTER FEED LIST
-================================ */
-export const FEEDS = [
+/* =====================================
+   AllOrigins free CORS proxy wrapper
+   ===================================== */
+
+function wrap(url) {
+  return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+}
+
+/* =====================================
+   FEED LIST (Left, Center, Right)
+   ===================================== */
+
+const RSS_FEEDS = [
   // ---- Left-leaning ----
   {
-    id: "guardian",
-    label: "The Guardian",
-    bias: "left",
+    source: "The Guardian",
+    bias: -2,
     url: "https://www.theguardian.com/us-news/rss"
   },
   {
-    id: "huffpost",
-    label: "HuffPost",
-    bias: "left",
+    source: "HuffPost",
+    bias: -2,
     url: "https://www.huffpost.com/section/politics/feed"
   },
 
-  // ---- Center / wire services ----
+  // ---- Center / Wire ----
   {
-    id: "reuters",
-    label: "Reuters",
-    bias: "center",
+    source: "Reuters",
+    bias: 0,
     url: "https://feeds.reuters.com/reuters/topNews"
   },
   {
-    id: "apnews",
-    label: "Associated Press",
-    bias: "center",
+    source: "AP News",
+    bias: 0,
     url: "https://rsshub.app/apnews/topics/apf-topnews"
   },
   {
-    id: "bbc",
-    label: "BBC World",
-    bias: "center",
+    source: "BBC World",
+    bias: 0,
     url: "https://feeds.bbci.co.uk/news/world/rss.xml"
   },
 
   // ---- Right-leaning ----
   {
-    id: "fox",
-    label: "Fox News",
-    bias: "right",
+    source: "Fox News",
+    bias: 2,
     url: "https://moxie.foxnews.com/google-publisher/politics.xml"
   },
   {
-    id: "nypost",
-    label: "New York Post",
-    bias: "right",
+    source: "New York Post",
+    bias: 2,
     url: "https://nypost.com/news/feed/"
   }
 ];
 
-/* ======================================
-   2. Parallel Fetcher (10× Faster)
-   - Uses Promise.allSettled()
-   - Gracefully handles individual feed failure
-====================================== */
+/* =====================================
+   Fetch + Parse one feed
+   ===================================== */
 
 async function fetchSingleFeed(feed) {
   try {
-    const res = await fetch(feed.url);
+    const proxied = wrap(feed.url);
+    const res = await fetch(proxied);
+
     if (!res.ok) {
-      console.error(`❌ Failed fetching ${feed.label}:`, res.status);
+      console.warn(`Feed failed: ${feed.source}`, res.status);
       return [];
     }
 
     const xmlText = await res.text();
-    const parsed = parseRSS(xmlText, feed);
+    const articles = parseRSS(xmlText);
 
-    // Attach source meta
-    parsed.forEach(a => {
-      a.source = feed.label;
-      a.sourceBias = feed.bias;
-    });
-
-    return parsed;
+    // Attach meta
+    return articles.map(item => ({
+      ...item,
+      source: feed.source,
+      sourceBias: feed.bias
+    }));
   } catch (err) {
-    console.error(`❌ Error fetching ${feed.label}:`, err);
+    console.error(`Error fetching ${feed.source}:`, err);
     return [];
   }
 }
 
-/* ======================================
-   3. Main fetch — massively faster
-   -  All feeds load together
-====================================== */
+/* =====================================
+   Fetch all feeds in parallel
+   ===================================== */
 
-export async function fetchAllNews() {
-  const results = await Promise.allSettled(
-    FEEDS.map(feed => fetchSingleFeed(feed))
-  );
+export async function fetchAllNews(limit = 50) {
+  try {
+    // Fetch everything simultaneously
+    const results = await Promise.all(RSS_FEEDS.map(feed => fetchSingleFeed(feed)));
 
-  let allArticles = [];
+    // Flatten
+    const all = results.flat();
 
-  results.forEach(r => {
-    if (r.status === "fulfilled") allArticles.push(...r.value);
-  });
+    // Sort newest → oldest
+    const sorted = all.sort((a, b) => {
+      return (b.pubDate || 0) - (a.pubDate || 0);
+    });
 
-  // Sort newest → oldest
-  allArticles.sort((a, b) => {
-    return (b.pubDate?.getTime?.() || 0) - (a.pubDate?.getTime?.() || 0);
-  });
-
-  // Limit for performance
-  return allArticles.slice(0, 60);
+    // Limit for performance
+    return sorted.slice(0, limit);
+  } catch (err) {
+    console.error("fetchAllNews failed:", err);
+    return [];
+  }
 }
-
