@@ -1,23 +1,35 @@
 // src/news/fetchNews.js
-// CORS-safe RSS fetching using AllOrigins proxy
-// Works entirely client-side with zero backend
+// Triple-fallback RSS fetching for IantopiaOS
+// Order: CORS.bridged.cc → thingproxy → direct
+// 100% client-side, no backend, no paid APIs.
 
 import { parseRSS } from "./parseRSS.js";
 
 /* =====================================
-   AllOrigins free CORS proxy wrapper
+   PROXY WRAPPERS
    ===================================== */
 
-function wrap(url) {
-  return `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+// Primary (fastest)
+function wrapBridged(url) {
+  return `https://cors.bridged.cc/${encodeURIComponent(url)}`;
+}
+
+// Secondary (most permissive)
+function wrapThingProxy(url) {
+  return `https://thingproxy.freeboard.io/fetch/${url}`;
+}
+
+// Tertiary (last resort — usually blocked by CORS)
+function wrapDirect(url) {
+  return url;
 }
 
 /* =====================================
-   FEED LIST (Left, Center, Right)
+   FEED LIST
    ===================================== */
 
 const RSS_FEEDS = [
-  // ---- Left-leaning ----
+  // ---- Left ----
   {
     source: "The Guardian",
     bias: -2,
@@ -29,7 +41,7 @@ const RSS_FEEDS = [
     url: "https://www.huffpost.com/section/politics/feed"
   },
 
-  // ---- Center / Wire ----
+  // ---- Center ----
   {
     source: "Reuters",
     bias: 0,
@@ -46,7 +58,7 @@ const RSS_FEEDS = [
     url: "https://feeds.bbci.co.uk/news/world/rss.xml"
   },
 
-  // ---- Right-leaning ----
+  // ---- Right ----
   {
     source: "Fox News",
     bias: 2,
@@ -60,55 +72,75 @@ const RSS_FEEDS = [
 ];
 
 /* =====================================
-   Fetch + Parse one feed
+   Attempt a fetch with fallback chain
    ===================================== */
 
-async function fetchSingleFeed(feed) {
-  try {
-    const proxied = wrap(feed.url);
-    const res = await fetch(proxied);
+async function tryFetch(urlVariants) {
+  for (const variant of urlVariants) {
+    try {
+      const res = await fetch(variant);
 
-    if (!res.ok) {
-      console.warn(`Feed failed: ${feed.source}`, res.status);
-      return [];
+      if (res.ok) {
+        return res.text(); // success
+      }
+
+      console.warn("Fetch failed:", variant, res.status);
+    } catch (err) {
+      console.warn("Proxy error:", variant, err.message);
     }
-
-    const xmlText = await res.text();
-    const articles = parseRSS(xmlText);
-
-    // Attach meta
-    return articles.map(item => ({
-      ...item,
-      source: feed.source,
-      sourceBias: feed.bias
-    }));
-  } catch (err) {
-    console.error(`Error fetching ${feed.source}:`, err);
-    return [];
   }
+
+  return null; // all attempts failed
 }
 
 /* =====================================
-   Fetch all feeds in parallel
+   Fetch & parse a single feed
+   ===================================== */
+
+async function fetchSingleFeed(feed) {
+  const { url, source, bias } = feed;
+
+  // Build fallback chain
+  const attempts = [
+    wrapBridged(url),
+    wrapThingProxy(url),
+    wrapDirect(url)
+  ];
+
+  const xmlText = await tryFetch(attempts);
+
+  if (!xmlText) {
+    console.error(`❌ Completely failed: ${source}`);
+    return [];
+  }
+
+  const parsed = parseRSS(xmlText);
+
+  return parsed.map(item => ({
+    ...item,
+    source,
+    sourceBias: bias
+  }));
+}
+
+/* =====================================
+   Fetch ALL feeds in parallel
    ===================================== */
 
 export async function fetchAllNews(limit = 50) {
   try {
-    // Fetch everything simultaneously
-    const results = await Promise.all(RSS_FEEDS.map(feed => fetchSingleFeed(feed)));
+    const lists = await Promise.all(RSS_FEEDS.map(feed => fetchSingleFeed(feed)));
 
-    // Flatten
-    const all = results.flat();
+    const all = lists.flat();
 
     // Sort newest → oldest
     const sorted = all.sort((a, b) => {
       return (b.pubDate || 0) - (a.pubDate || 0);
     });
 
-    // Limit for performance
     return sorted.slice(0, limit);
   } catch (err) {
-    console.error("fetchAllNews failed:", err);
+    console.error("fetchAllNews crashed:", err);
     return [];
   }
 }
