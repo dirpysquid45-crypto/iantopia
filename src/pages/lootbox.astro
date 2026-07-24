@@ -8,36 +8,96 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Iantopia Lootbox</title>
 <link rel="preload" as="image" href="/strubles.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --accent:#22d3ee; }
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --accent:#22d3ee; --gold:#ffd700; --money:#39ff14; }
   *{box-sizing:border-box}
-  body{ margin:0; background: linear-gradient(135deg, #1a0a2e 0%, #3d1a5f 15%, #5a2d7f 30%, #8b4da6 45%, #d4746b 60%, #ff9a56 75%, #ffb84d 90%, #ffc470 100%);
-        color:var(--ink); font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-        min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
-        cursor: none; position:relative; overflow:hidden; }
+  body{
+    margin:0;
+    background-image:url('/nyskyline.gif');
+    background-size:cover; background-position:center; background-attachment:fixed;
+    color:var(--ink); font-family:'Press Start 2P', ui-monospace, 'Courier New', monospace;
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+    cursor: none; position:relative; overflow:hidden;
+  }
   body::before {
     content:''; position:fixed; top:0; left:0; width:100%; height:100%;
-    background-image:url('/taiwan-skyline.svg');
-    background-size:cover; background-position:bottom; background-repeat:no-repeat; background-attachment:fixed; pointer-events:none; z-index:0;
+    background-image:url('/raining-money.gif');
+    background-size:cover; background-position:center; background-attachment:fixed;
+    pointer-events:none; z-index:0;
+  }
+  body::after {
+    content:''; position:fixed; top:0; left:0; width:100%; height:100%;
+    background: rgba(0,0,0,0.4);
+    pointer-events:none; z-index:0;
   }
   main { position:relative; z-index:1; }
-  .wrap{ width:min(720px,95vw); background:var(--panel); border:1px solid #233049; border-radius:18px; padding:20px;
-         box-shadow:0 20px 50px rgba(0,0,0,.45); }
-  header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px }
-  header a{ color:var(--muted); text-decoration:none; border:1px solid #2a3854; padding:8px 12px; border-radius:10px; }
-  h1{ margin:0; font-size:clamp(22px,3.5vw,28px) }
-  .badge{ position:fixed; top:15px; left:20px; display:flex; align-items:center; gap:8px; background:rgba(0,0,0,.6);
-          padding:8px 12px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,.25); font-weight:700; }
-  .badge img{ width:28px; height:28px; border-radius:6px; }
-  .panel{ display:grid; gap:14px; place-items:center; text-align:center; padding:10px 0; }
-  button.primary{ all:unset; cursor:pointer; padding:14px 20px; border-radius:0; border:1px solid #2a3854;
-                  background:#122231; color:var(--ink); font-weight:800; box-shadow:0 8px 24px rgba(0,0,0,.35); }
-  .result{ margin-top:10px; font-size:1.1rem; min-height:1.4em; }
-  .small{ color:var(--muted); font-size:.95rem }
+  .wrap{
+    width:min(720px,95vw);
+    background:#0a0a0a;
+    border:4px solid var(--gold);
+    border-radius:0;
+    padding:24px;
+    box-shadow:0 20px 50px rgba(0,0,0,.5), 0 0 20px rgba(255,215,0,.4), 0 0 40px rgba(255,215,0,.25), 0 0 80px rgba(57,255,20,.12);
+    animation: wrapFloat 4s ease-in-out infinite;
+  }
+  @keyframes wrapFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; border-bottom:3px solid var(--gold); padding-bottom:12px; }
+  header a{ color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; background:#000; font-weight:400; font-size:10px; transition:background .2s; cursor:none; }
+  header a:hover{ background:var(--gold); color:#000; }
+  h1{
+    margin:0; font-size:clamp(16px,3vw,22px); letter-spacing:1px; color:var(--gold); font-weight:400;
+    text-transform:uppercase; text-align:center;
+    text-shadow: 0 0 5px var(--gold), 0 0 12px var(--gold), 0 0 24px rgba(255,215,0,.6);
+  }
+  .badge{
+    position:fixed; top:15px; left:20px; display:flex; align-items:center; gap:8px;
+    background:#000; border:3px solid var(--gold); padding:8px 12px; font-weight:700; z-index:20;
+    box-shadow: 0 0 10px rgba(255,215,0,.3);
+  }
+  .badge img{ width:28px; height:28px; }
+
+  #mute-btn {
+    position:fixed; top:15px; right:20px; z-index:20;
+    background:#000; border:3px solid var(--gold); color:#fff;
+    font-size:18px; padding:8px 12px; cursor:none; line-height:1;
+  }
+
+  .panel{ display:grid; gap:16px; place-items:center; text-align:center; padding:14px 0; }
+  .small{ color:var(--muted); font-size:10px; line-height:1.6; }
+  .small strong{ color:var(--money); }
+
+  button.primary{
+    all:unset; cursor:none; padding:16px 26px; border:3px solid var(--money);
+    background:#0a2e0a; color:var(--money); font-weight:400; font-size:13px;
+    font-family:'Press Start 2P', ui-monospace, monospace; text-transform:uppercase; letter-spacing:1px;
+    --glow-color: var(--money);
+    animation: neonBtnPulse 2s ease-in-out infinite;
+    transition: transform .1s, background .15s;
+  }
+  button.primary:hover{ background:#0f3d0f; }
+  button.primary:active{ transform: translateY(2px); }
+  @keyframes neonBtnPulse {
+    0%, 100% { box-shadow: 0 0 4px var(--glow-color), 0 0 10px var(--glow-color); text-shadow: 0 0 4px var(--glow-color); }
+    50% { box-shadow: 0 0 10px var(--glow-color), 0 0 24px var(--glow-color), 0 0 38px var(--glow-color); text-shadow: 0 0 8px var(--glow-color); }
+  }
+
+  .result{ margin-top:4px; font-size:12px; min-height:1.6em; color:#fff; text-shadow:0 0 6px rgba(255,255,255,.4); }
+
+  @media (max-width:600px){
+    .wrap{ padding:16px; }
+    h1{ font-size:14px; }
+  }
 </style>
 </head>
 <body>
   <div class="badge"><img src="/strubles.png" alt="Struble"><span id="bal">0</span></div>
+  <button id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
 
   <main class="wrap">
     <header>
@@ -53,6 +113,8 @@
       <div class="small">Prizes are random. Some unlock themes, badges, or hidden pages.</div>
     </section>
   </main>
+
+  <audio id="theme-music" src="/lootbox-theme.mp3" preload="none" loop></audio>
 
   <script is:inline src="/strubles.js?v=2"></script>
   <script is:inline src="/lootbox-data.js?v=1"></script>
@@ -71,7 +133,51 @@
 
     costEl.textContent = window.LOOTBOX?.cost ?? 1000;
 
+    // --- Audio manager (additive; does not read or affect lootbox logic) ---
+    const AUDIO_BASE = '/assets/casino/audio/';
+    let audioEnabled = true;
+    const audioCache = {};
+    function playSound(name){
+      if (!audioEnabled) return;
+      let audio = audioCache[name];
+      if (!audio) {
+        audio = new Audio(`${AUDIO_BASE}${name}.ogg`);
+        audio.volume = 0.5;
+        audioCache[name] = audio;
+      }
+      audio.currentTime = 0;
+      audio.play().catch(() => {});
+    }
+    function playRandomSound(base, count){
+      playSound(`${base}-${1 + Math.floor(Math.random() * count)}`);
+    }
+
+    const themeMusic = document.getElementById('theme-music');
+    themeMusic.volume = 0.3;
+    function tryPlayTheme(){
+      if (!audioEnabled) return;
+      themeMusic.play().catch(() => {});
+    }
+    tryPlayTheme();
+    const unlockTheme = () => {
+      tryPlayTheme();
+      window.removeEventListener('pointerdown', unlockTheme);
+      window.removeEventListener('keydown', unlockTheme);
+    };
+    window.addEventListener('pointerdown', unlockTheme);
+    window.addEventListener('keydown', unlockTheme);
+
+    const muteBtn = document.getElementById('mute-btn');
+    muteBtn.addEventListener('click', () => {
+      audioEnabled = !audioEnabled;
+      muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
+      if (audioEnabled) tryPlayTheme();
+      else themeMusic.pause();
+    });
+
     btn.addEventListener('click', () => {
+      playRandomSound('cards-pack-open', 2);
+
       const res = IantopiaLoot.openBox();
       if (!res.ok) {
         resultEl.textContent = res.message || "Not enough Strubles.";
@@ -81,6 +187,10 @@
       const bonus = p.type === "rng_strubles" ? ` (+${p._amount})` : "";
       resultEl.textContent = `You got: ${p.label}${bonus}`;
       syncBal();
+
+      if (p.type === "strubles" || p.type === "rng_strubles") {
+        playRandomSound('chips-stack', 6);
+      }
     });
   </script>
 </body>

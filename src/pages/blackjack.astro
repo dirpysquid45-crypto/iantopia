@@ -15,7 +15,11 @@
   :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --accent:#22d3ee; --danger:#ff6b6b; --felt:#1a472a; }
   * { box-sizing:border-box; }
   body {
-    margin:0; background: linear-gradient(135deg, #1a0a2e 0%, #3d1a5f 15%, #5a2d7f 30%, #8b4da6 45%, #d4746b 60%, #ff9a56 75%, #ffb84d 90%, #ffc470 100%);
+    margin:0;
+    background-image: url('/casino-entrance.gif');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
     color:var(--ink);
     font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
     min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
@@ -24,18 +28,23 @@
   }
   body::before {
     content:''; position:fixed; top:0; left:0; width:100%; height:100%;
-    background-image:url('/taiwan-skyline.svg');
-    background-size:cover; background-position:bottom; background-repeat:no-repeat; background-attachment:fixed; pointer-events:none; z-index:0;
+    background: rgba(0,0,0,0.45);
+    pointer-events:none; z-index:0;
   }
   main { position:relative; z-index:1; }
   .table {
     width:min(900px, 95vw);
     background: linear-gradient(135deg, var(--felt) 0%, #235c3a 50%, var(--felt) 100%);
-    border:4px solid #000;
+    border:4px solid #ffd700;
     border-radius:0;
     padding:20px;
-    box-shadow:0 20px 50px rgba(0,0,0,.5);
+    box-shadow:0 20px 50px rgba(0,0,0,.5), 0 0 20px rgba(255,215,0,.4), 0 0 40px rgba(255,215,0,.25), 0 0 80px rgba(255,215,0,.15);
     position:relative;
+    animation: tableFloat 4s ease-in-out infinite;
+  }
+  @keyframes tableFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
   }
   .table::before {
     content:'';
@@ -55,7 +64,8 @@
     text-shadow: 2px 2px 0 #000;
     text-align:center;
   }
-  .row { margin-top:16px; padding:14px; border:3px solid #000; background:rgba(0,0,0,0.35); position:relative; z-index:1; }
+  .row { margin-top:16px; padding:14px; border:3px solid #8b7a1a; background:rgba(0,0,0,0.35); box-shadow:0 0 10px rgba(255,215,0,.2), inset 0 0 12px rgba(255,215,0,.08); position:relative; z-index:1; transition: border-color .2s, box-shadow .2s; }
+  .row.active-hand { border-color:#ffeb3b; box-shadow:0 0 16px rgba(255,235,59,.6), inset 0 0 14px rgba(255,235,59,.15); }
   .label { color:#ffd700; font-size:10px; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; }
   .hand { display:flex; gap:8px; flex-wrap:wrap; align-items:center; min-height:96px; }
 
@@ -93,12 +103,19 @@
   }
   button:hover:not(:disabled) { background:#6a8fc5; }
   button:active:not(:disabled) { transform: translateY(2px); }
-  button.primary { background:#2c5f8a; }
+  button.primary { background:#2c5f8a; --glow-color: #3d9bff; }
   button.primary:hover:not(:disabled) { background:#3d7cae; }
-  button.accent { background:#22757a; }
+  button.accent { background:#22757a; --glow-color: #22d3ee; }
   button.accent:hover:not(:disabled) { background:#2f9aa1; }
-  button.danger { background:#7a2222; }
+  button.danger { background:#7a2222; --glow-color: #ff6b6b; }
   button.danger:hover:not(:disabled) { background:#a13030; }
+  button.primary:not(:disabled), button.accent:not(:disabled), button.danger:not(:disabled) {
+    animation: neonBtnPulse 2s ease-in-out infinite;
+  }
+  @keyframes neonBtnPulse {
+    0%, 100% { box-shadow: 0 0 4px var(--glow-color), 0 0 10px var(--glow-color); text-shadow: 0 0 4px var(--glow-color); }
+    50% { box-shadow: 0 0 10px var(--glow-color), 0 0 24px var(--glow-color), 0 0 38px var(--glow-color); text-shadow: 0 0 8px var(--glow-color); }
+  }
   button:disabled { opacity:.5; cursor:not-allowed; }
 
   #earn-panel {
@@ -130,6 +147,46 @@
   .betbox input{ width:70px; padding:8px 10px; border:3px solid #000; background:#0f1523; color:var(--ink); font-weight:700; border-radius:0; font-family:inherit; font-size:11px; }
   .betbox button { padding:8px 14px; }
 
+  /* Blackjack celebration overlay */
+  #bj-money-overlay {
+    display:none;
+    position:fixed; inset:0; z-index:199;
+    background-image:url('/raining-money.gif');
+    background-size:cover; background-position:center;
+    pointer-events:none;
+  }
+  #bj-money-overlay.show { display:block; }
+
+  #bj-celebration {
+    display:none;
+    position:fixed; inset:0; z-index:200;
+    align-items:center; justify-content:center;
+    pointer-events:none;
+    background: rgba(0,0,0,0.35);
+  }
+  #bj-celebration.show { display:flex; }
+  #bj-celebration span {
+    font-family:'Press Start 2P', cursive;
+    font-size:clamp(32px, 11vw, 120px);
+    letter-spacing:4px;
+    text-align:center;
+    padding:0 10px;
+    text-shadow: 4px 4px 0 #000, -4px -4px 0 #000, 4px -4px 0 #000, -4px 4px 0 #000, 0 0 40px currentColor;
+    animation: bjFlash 3.5s steps(1) forwards;
+  }
+  @keyframes bjFlash {
+    0%   { color:#ffeb3b; }
+    8%   { color:#000; }
+    16%  { color:#fff; }
+    24%  { color:#ffeb3b; }
+    32%  { color:#000; }
+    40%  { color:#fff; }
+    48%  { color:#ffeb3b; }
+    56%  { color:#000; }
+    64%  { color:#fff; }
+    72%, 100% { color:#ffeb3b; }
+  }
+
   @media (max-width:600px){
     .table { padding:12px; }
     h1 { font-size:12px; }
@@ -149,10 +206,14 @@
 
   <button id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
 
+  <!-- Blackjack celebration overlay -->
+  <div id="bj-money-overlay"></div>
+  <div id="bj-celebration"><span>BLACKJACK</span></div>
+
   <main class="table">
     <header>
       <a href="/" title="Back to Iantopia">← Home</a>
-      <h1>BLACKJACK IANTOPIA</h1>
+      <h1>BLACKJACK AT IANTOPIA</h1>
       <div style="width:86px;"></div>
     </header>
 
@@ -162,10 +223,16 @@
       <div class="score-display" id="dealer-score"></div>
     </section>
 
-    <section class="row">
+    <section class="row" id="player-row-1">
       <div class="label">You</div>
       <div class="hand" id="player-hand"></div>
       <div class="chips" id="totals">Total: —</div>
+    </section>
+
+    <section class="row" id="player-row-2" style="display:none;">
+      <div class="label">You (Hand 2)</div>
+      <div class="hand" id="player-hand-2"></div>
+      <div class="chips" id="totals-2">Total: —</div>
     </section>
 
     <div class="controls">
@@ -179,6 +246,8 @@
       <button id="btn-deal"   class="primary">Deal</button>
       <button id="btn-hit"    class="accent"  disabled>Hit</button>
       <button id="btn-stand"  class="accent"  disabled>Stand</button>
+      <button id="btn-double" class="accent"  disabled>Double</button>
+      <button id="btn-split"  class="accent"  disabled>Split</button>
       <button id="btn-restart" class="danger" disabled>Restart</button>
     </div>
 
@@ -201,18 +270,27 @@
   const suits  = ['♠','♥','♦','♣'];
   const values = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 
+  // playerHands is an array of hands so Split can create a second hand.
+  // Normally length 1. handBets/handDone are parallel arrays, one entry per hand.
   let deck = [];
-  let player = [];
+  let playerHands = [[]];
+  let handBets = [0];
+  let handDone = [false];
+  let activeHand = 0;
+  let hasSplit = false;
   let dealer = [];
   let inRound = false;
   let holeRevealed = false;
-  let currentBet = 0;
 
   const $ = id => document.getElementById(id);
   const dealerEl = $('dealer-hand');
   const playerEl = $('player-hand');
+  const playerEl2 = $('player-hand-2');
+  const playerRow1 = $('player-row-1');
+  const playerRow2 = $('player-row-2');
   const statusEl = $('status');
   const totalsEl = $('totals');
+  const totals2El = $('totals-2');
   const balNumEl = $('bal');
   const dealerScoreEl = $('dealer-score');
 
@@ -223,6 +301,8 @@
   const btnDeal    = $('btn-deal');
   const btnHit     = $('btn-hit');
   const btnStand   = $('btn-stand');
+  const btnDouble  = $('btn-double');
+  const btnSplit   = $('btn-split');
   const btnRestart = $('btn-restart');
 
   // --- Audio manager (additive; does not read or affect game state) ---
@@ -317,6 +397,22 @@
       const j = Math.floor(Math.random()*(i+1));
       [d[i],d[j]] = [d[j],d[i]];
     }
+    // House rule (player-favoring): sometimes stack the deck so the
+    // player's first two draws (from the end, since drawCard() pops)
+    // form a natural blackjack, boosting blackjack frequency a bit.
+    if (Math.random() < 0.15) {
+      const aceIdx = d.findIndex(c => c.v === 'A');
+      if (aceIdx !== -1) {
+        const [ace] = d.splice(aceIdx, 1);
+        const tenIdx = d.findIndex(c => ['10','J','Q','K'].includes(c.v));
+        if (tenIdx !== -1) {
+          const [ten] = d.splice(tenIdx, 1);
+          d.push(ten, ace);
+        } else {
+          d.push(ace);
+        }
+      }
+    }
     return d;
   }
   function cardValue(c) {
@@ -370,6 +466,20 @@
     });
   }
 
+  const handEls = [
+    { el: playerEl, totalsEl: totalsEl, row: playerRow1 },
+    { el: playerEl2, totalsEl: totals2El, row: playerRow2 },
+  ];
+  function renderHandN(i, autoSound=true){
+    renderHand(playerHands[i], handEls[i].el, false, autoSound);
+    const bet = handBets[i];
+    handEls[i].totalsEl.textContent = `Total: ${handValue(playerHands[i])}` + (bet ? ` · Bet: ${bet}` : '');
+  }
+  function updateActiveHighlight(){
+    handEls[0].row.classList.toggle('active-hand', hasSplit && inRound && activeHand===0 && !handDone[0]);
+    handEls[1].row.classList.toggle('active-hand', hasSplit && inRound && activeHand===1 && !handDone[1]);
+  }
+
   function updateDealerScore(){
     if (!dealerScoreEl) return;
     if (!holeRevealed && dealer.length > 1) {
@@ -379,32 +489,68 @@
     }
   }
 
-  function updateTotals(){
-    const pv = handValue(player);
-    totalsEl.textContent = `Total: ${pv}`;
+  function updateActionButtons(){
+    const hand = playerHands[activeHand];
+    const bet = handBets[activeHand];
+    const canAct = inRound && !handDone[activeHand];
+    btnHit.disabled = !canAct;
+    btnStand.disabled = !canAct;
+
+    const isFirstDecision = canAct && hand.length === 2;
+    const bal = Strubles.get();
+    btnDouble.disabled = !(isFirstDecision && bal >= bet);
+    const canSplit = isFirstDecision && !hasSplit && playerHands.length === 1 &&
+                      hand[0].v === hand[1].v && bal >= bet;
+    btnSplit.disabled = !canSplit;
   }
 
   function endRound(message){
     inRound = false;
     btnHit.disabled = true;
     btnStand.disabled = true;
+    btnDouble.disabled = true;
+    btnSplit.disabled = true;
     btnRestart.disabled = false;
     btnDeal.disabled = false;
     statusEl.textContent = message;
-    currentBet = 0;
     betInput.disabled = false;
     betMinus.disabled = false;
     betPlus.disabled = false;
+    updateActiveHighlight();
   }
 
-  function settle(result){
+  function settle(result, bet){
     let payout = 0;
-    if (result === 'win') payout = currentBet * 2;
-    else if (result === 'blackjack') payout = Math.floor(currentBet * 2.5);
-    else if (result === 'push') payout = currentBet;
+    if (result === 'win') payout = bet * 2;
+    else if (result === 'blackjack') payout = Math.floor(bet * 2.5);
+    else if (result === 'push') payout = bet;
     if (payout) Strubles.add(payout);
     syncBalance();
     if (result === 'win' || result === 'blackjack') playRandomSound('chips-stack', 6);
+  }
+
+  // --- Blackjack celebration: flashing overlay + trimmed jackpot sound + money gif ---
+  const bjCelebration = $('bj-celebration');
+  const bjMoneyOverlay = $('bj-money-overlay');
+  function celebrateBlackjack(){
+    bjCelebration.classList.remove('show');
+    void bjCelebration.offsetWidth; // restart the CSS animation if triggered twice in a row
+    bjCelebration.classList.add('show');
+    bjMoneyOverlay.classList.add('show');
+
+    let jackpotAudio = null;
+    if (audioEnabled) {
+      jackpotAudio = new Audio('/jackpot-win.mp3');
+      jackpotAudio.volume = 0.6;
+      jackpotAudio.play().catch(() => {});
+    }
+
+    const DURATION = 3500; // trimmed down from the 11s source clip
+    setTimeout(() => {
+      bjCelebration.classList.remove('show');
+      bjMoneyOverlay.classList.remove('show');
+      if (jackpotAudio) jackpotAudio.pause();
+    }, DURATION);
   }
 
   function deal(){
@@ -413,92 +559,207 @@
     if (bet > bal) { statusEl.textContent = "Not enough Strubles for that bet."; return; }
     if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles."; return; }
     syncBalance();
-    currentBet = bet;
 
     deck = makeDeck();
-    player = [drawCard(), drawCard()];
+    playerHands = [[drawCard(), drawCard()]];
+    handBets = [bet];
+    handDone = [false];
+    activeHand = 0;
+    hasSplit = false;
     dealer = [drawCard(), drawCard()];
     inRound = true;
     holeRevealed = false;
 
     renderHand(dealer, dealerEl, true);
-    renderHand(player, playerEl, false);
-    updateTotals();
     updateDealerScore();
+    renderHandN(0, true);
+    playerRow2.style.display = 'none';
+    playerRow1.classList.remove('active-hand');
+    playerRow2.classList.remove('active-hand');
 
     betInput.disabled = true;
     betMinus.disabled = true;
     betPlus.disabled = true;
 
-    const pv = handValue(player);
+    const pv = handValue(playerHands[0]);
     if (pv === 21) {
       holeRevealed = true;
       renderHand(dealer, dealerEl, false);
       updateDealerScore();
       while (handValue(dealer) < 17) { dealer.push(drawCard()); renderHand(dealer, dealerEl, false); updateDealerScore(); }
       const dv = handValue(dealer);
-      if (dv === 21) { settle('push'); endRound('Push (both blackjack).'); }
-      else { settle('blackjack'); endRound('Blackjack! You win 🎉'); }
+      // Standard rule: only a dealer NATURAL blackjack (their first two
+      // cards, no hits) pushes against the player's natural blackjack.
+      // A dealer 21 built up via hits loses to a natural player blackjack.
+      const dealerNatural = dealer.length === 2 && dv === 21;
+      if (dealerNatural) {
+        settle('push', bet);
+        playRandomSound('chips-handle', 6);
+        endRound('Push (both blackjack).');
+      } else {
+        settle('blackjack', bet);
+        celebrateBlackjack();
+        endRound('Blackjack! You win 🎉');
+      }
       return;
     }
 
     statusEl.textContent = 'Hit or Stand?';
     btnDeal.disabled = true;
-    btnHit.disabled = false;
-    btnStand.disabled = false;
     btnRestart.disabled = false;
+    updateActionButtons();
+    updateActiveHighlight();
+  }
+
+  function advanceOrResolve(){
+    if (hasSplit && activeHand === 0 && !handDone[1]) {
+      activeHand = 1;
+      updateActionButtons();
+      updateActiveHighlight();
+      statusEl.textContent = 'Playing Hand 2 — Hit or Stand?';
+      return;
+    }
+    resolveDealer();
   }
 
   function hit(){
-    if (!inRound) return;
-    player.push(drawCard());
-    renderHand(player, playerEl, false, false);
+    if (!inRound || handDone[activeHand]) return;
+    playerHands[activeHand].push(drawCard());
+    renderHandN(activeHand, false);
     playRandomSound('card-slide', 8);
-    updateTotals();
-    const pv = handValue(player);
-    if (pv > 21){
-      holeRevealed = true;
-      renderHand(dealer, dealerEl, false);
-      updateDealerScore();
+    const pv = handValue(playerHands[activeHand]);
+    if (pv > 21) {
+      handDone[activeHand] = true;
       playSound('card-shove-1');
-      endRound('Bust! Dealer wins 💀');
+      advanceOrResolve();
+      return;
     }
+    updateActionButtons();
   }
 
   function stand(){
-    if (!inRound) return;
+    if (!inRound || handDone[activeHand]) return;
+    handDone[activeHand] = true;
+    advanceOrResolve();
+  }
+
+  function doubleDown(){
+    if (!inRound || handDone[activeHand]) return;
+    const hand = playerHands[activeHand];
+    if (hand.length !== 2) return;
+    const bet = handBets[activeHand];
+    if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles to double down."; return; }
+    handBets[activeHand] = bet * 2;
+    syncBalance();
+    hand.push(drawCard());
+    renderHandN(activeHand, false);
+    playRandomSound('card-slide', 8);
+    handDone[activeHand] = true;
+    if (handValue(hand) > 21) playSound('card-shove-1');
+    advanceOrResolve();
+  }
+
+  function split(){
+    if (!inRound || hasSplit || playerHands.length !== 1) return;
+    const hand = playerHands[0];
+    if (hand.length !== 2 || hand[0].v !== hand[1].v) return;
+    const bet = handBets[0];
+    if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles to split."; return; }
+    syncBalance();
+
+    const isAceSplit = hand[0].v === 'A';
+    playerHands = [[hand[0], drawCard()], [hand[1], drawCard()]];
+    handBets = [bet, bet];
+    handDone = [false, false];
+    hasSplit = true;
+    activeHand = 0;
+
+    playerRow2.style.display = '';
+    // Clear both hand elements first: playerHands was just replaced wholesale
+    // (not grown incrementally), so renderHand's stale-DOM-count "is this a
+    // new card" heuristic would otherwise silently miss hand 1's new card.
+    playerEl.innerHTML = '';
+    playerEl2.innerHTML = '';
+    renderHandN(0, true);
+    renderHandN(1, true);
+    playRandomSound('cards-pack-open', 2);
+
+    if (isAceSplit) {
+      // Standard rule: split aces get exactly one extra card each, no further hitting.
+      handDone = [true, true];
+      resolveDealer();
+      return;
+    }
+
+    updateActionButtons();
+    updateActiveHighlight();
+    statusEl.textContent = 'Playing Hand 1 — Hit or Stand?';
+  }
+
+  function resolveDealer(){
+    inRound = false;
     holeRevealed = true;
     renderHand(dealer, dealerEl, false);
     updateDealerScore();
 
-    while (handValue(dealer) < 17) {
-      dealer.push(drawCard());
-      renderHand(dealer, dealerEl, false);
-      updateDealerScore();
+    const anyHandAlive = playerHands.some(h => handValue(h) <= 21);
+    if (anyHandAlive) {
+      while (handValue(dealer) < 17) {
+        dealer.push(drawCard());
+        renderHand(dealer, dealerEl, false);
+        updateDealerScore();
+      }
     }
-
-    const pv = handValue(player);
     const dv = handValue(dealer);
 
-    if (dv > 21) { settle('win'); endRound('Dealer busts — You win 🎉'); }
-    else if (dv > pv) { playRandomSound('card-slide', 8); endRound('Dealer wins 😔'); }
-    else if (dv < pv) { settle('win'); endRound('You win 🎉'); }
-    else { settle('push'); endRound('Push 🤝'); }
+    let anyWin = false;
+    const messages = [];
+    playerHands.forEach((hand, i) => {
+      const pv = handValue(hand);
+      const bet = handBets[i];
+      const tag = hasSplit ? `H${i + 1}: ` : '';
+      if (pv > 21) {
+        messages.push(`${tag}Bust 💀`);
+      } else if (dv > 21) {
+        settle('win', bet); anyWin = true; messages.push(`${tag}Dealer busts — Win 🎉`);
+      } else if (dv > pv) {
+        messages.push(`${tag}Dealer wins 😔`);
+      } else if (dv < pv) {
+        settle('win', bet); anyWin = true; messages.push(`${tag}Win 🎉`);
+      } else {
+        // House rule: ties pay the player instead of pushing.
+        settle('win', bet); anyWin = true; messages.push(`${tag}Push pays out — Win 🎉`);
+      }
+    });
+    if (!anyWin) playRandomSound('card-slide', 8);
+
+    endRound(messages.join('   |   '));
   }
 
   function restart(){
-    player = [];
+    playerHands = [[]];
+    handBets = [0];
+    handDone = [false];
+    activeHand = 0;
+    hasSplit = false;
     dealer = [];
     inRound = false;
     holeRevealed = false;
     dealerEl.innerHTML = '';
     playerEl.innerHTML = '';
+    playerEl2.innerHTML = '';
     totalsEl.textContent = 'Total: —';
+    totals2El.textContent = 'Total: —';
+    playerRow2.style.display = 'none';
+    playerRow1.classList.remove('active-hand');
+    playerRow2.classList.remove('active-hand');
     if (dealerScoreEl) dealerScoreEl.textContent = '';
     statusEl.textContent = 'Welcome! Set a bet and press Deal.';
     btnDeal.disabled = false;
     btnHit.disabled = true;
     btnStand.disabled = true;
+    btnDouble.disabled = true;
+    btnSplit.disabled = true;
     btnRestart.disabled = true;
     betInput.disabled = false;
     betMinus.disabled = false;
@@ -511,6 +772,8 @@
   btnDeal.addEventListener('click', deal);
   btnHit.addEventListener('click', hit);
   btnStand.addEventListener('click', stand);
+  btnDouble.addEventListener('click', doubleDown);
+  btnSplit.addEventListener('click', split);
   btnRestart.addEventListener('click', restart);
 
   restart();

@@ -38,7 +38,7 @@ function animate() {
   if (!isLoaded) return;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (cursorImage) {
-    ctx.drawImage(cursorImage, mouseX - 12, mouseY - 12, 24, 24);
+    ctx.drawImage(cursorImage, mouseX - 17, mouseY - 17, 34, 34);
   }
   requestAnimationFrame(animate);
 }

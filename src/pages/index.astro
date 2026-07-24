@@ -161,6 +161,44 @@
       transform: translateY(-1px);
     }
 
+    /* Neon sign buttons */
+    a.big.neon-yt {
+      background: #200000;
+      border: 2px solid #ff1a1a;
+      color: #ffffff;
+      text-shadow: 0 0 5px #ffffff, 0 0 10px #ffffff, 0 0 20px rgba(255, 255, 255, 0.6);
+      box-shadow: 0 0 6px #ff1a1a, 0 0 16px #ff1a1a, 0 0 32px rgba(255, 26, 26, 0.5), inset 0 0 10px rgba(255, 26, 26, 0.2);
+      text-transform: uppercase;
+    }
+    a.big.neon-yt:hover {
+      text-shadow: 0 0 6px #ffffff, 0 0 14px #ffffff, 0 0 28px rgba(255, 255, 255, 0.7);
+      box-shadow: 0 0 10px #ff1a1a, 0 0 24px #ff1a1a, 0 0 48px rgba(255, 26, 26, 0.6), inset 0 0 14px rgba(255, 26, 26, 0.3);
+    }
+
+    a.big.neon-gamble {
+      background: #0a1128;
+      border: 2px solid #2979ff;
+      color: #ff0000;
+      text-shadow: 0 0 5px #ff0000, 0 0 10px #ff0000, 0 0 20px #ff0000, 0 0 40px rgba(255, 0, 0, 0.6);
+      box-shadow: 0 0 6px #2979ff, 0 0 16px #2979ff, 0 0 32px rgba(41, 121, 255, 0.5), inset 0 0 10px rgba(41, 121, 255, 0.15);
+    }
+    a.big.neon-gamble:hover {
+      text-shadow: 0 0 6px #ff0000, 0 0 14px #ff0000, 0 0 28px #ff0000, 0 0 56px rgba(255, 0, 0, 0.7);
+      box-shadow: 0 0 10px #2979ff, 0 0 24px #2979ff, 0 0 48px rgba(41, 121, 255, 0.6), inset 0 0 14px rgba(41, 121, 255, 0.2);
+    }
+
+    a.big.neon-never {
+      background: #332800;
+      border: 2px solid #fff176;
+      color: #fff176;
+      text-shadow: 0 0 5px #e6a700, 0 0 10px #e6a700, 0 0 20px #e6a700, 0 0 40px rgba(230, 167, 0, 0.6);
+      box-shadow: 0 0 6px #e6a700, 0 0 16px #e6a700, 0 0 32px rgba(230, 167, 0, 0.5), inset 0 0 10px rgba(230, 167, 0, 0.15);
+    }
+    a.big.neon-never:hover {
+      text-shadow: 0 0 6px #e6a700, 0 0 14px #e6a700, 0 0 28px #e6a700, 0 0 56px rgba(230, 167, 0, 0.7);
+      box-shadow: 0 0 10px #e6a700, 0 0 24px #e6a700, 0 0 48px rgba(230, 167, 0, 0.6), inset 0 0 14px rgba(230, 167, 0, 0.2);
+    }
+
     /* Topia Timer */
     #topia-timer {
       position: fixed;
@@ -201,9 +239,50 @@
       border-radius: 6px;
     }
 
-    #mute-btn {
+    #now-playing {
       position: fixed;
       top: 85px;
+      right: 20px;
+      z-index: 20;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 235, 59, 0.5);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 10px;
+      padding: 8px 12px;
+      line-height: 1.4;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      cursor: none;
+      max-width: 170px;
+      text-align: right;
+    }
+    #now-playing .np-eyebrow {
+      display: block;
+      color: #ffeb3b;
+      font-weight: 700;
+      font-size: 8px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+    #now-playing:hover { transform: translateY(-1px); }
+
+    #amsa-quote {
+      position: fixed;
+      top: 148px;
+      right: 20px;
+      z-index: 20;
+      font-size: 7px;
+      color: rgba(255, 255, 255, 0.45);
+      text-align: right;
+      max-width: 170px;
+      font-style: italic;
+      line-height: 1.4;
+    }
+
+    #mute-btn {
+      position: fixed;
+      top: 182px;
       right: 20px;
       z-index: 20;
       background: rgba(0, 0, 0, 0.6);
@@ -217,19 +296,51 @@
       cursor: none;
     }
 
-    /* Earn panel */
-    #earn-panel {
-      display: flex;
-      gap: 10px;
-      margin-top: 10px;
-      flex-wrap: wrap;
+    /* Playlist / Inventory modal */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 100;
+      align-items: center;
       justify-content: center;
     }
-
-    #earn-panel button.big {
-      padding: 12px 16px;
-      font-size: clamp(16px, 3vw, 22px);
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #0a0a0f;
+      border: 2px solid #ffd700;
+      padding: 20px;
+      width: min(380px, 90vw);
+      max-height: 70vh;
+      overflow-y: auto;
+      box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
     }
+    .modal-box h2 {
+      margin: 0 0 14px;
+      color: #ffd700;
+      font-size: 16px;
+      font-family: 'Press Start 2P', cursive;
+    }
+    .modal-track, .modal-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid #333;
+      margin-bottom: 8px;
+      cursor: none;
+      background: rgba(255, 255, 255, 0.03);
+      font-size: 13px;
+    }
+    .modal-track.active { border-color: #ffeb3b; background: rgba(255, 235, 59, 0.1); }
+    .modal-track:hover { background: rgba(255, 255, 255, 0.08); }
+    .modal-empty { color: #888; font-size: 12px; padding: 8px 0 4px; }
+    .modal-close {
+      all: unset; cursor: none; margin-top: 14px; padding: 8px 16px;
+      border: 1px solid #2a3245; background: #1d2330; color: #fff; display: inline-block;
+    }
+    .inv-category { color: #ffeb3b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 6px; }
+    .inv-category:first-child { margin-top: 0; }
 
     /* Inventory button */
     #inv-btn {
@@ -250,6 +361,43 @@
       transform: translateY(-1px);
     }
 
+    #bg-btn {
+      position: fixed;
+      top: 101px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      border: 1px solid #2a3245;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      z-index: 20;
+    }
+    #bg-btn:hover { transform: translateY(-1px); }
+
+    #bg-video {
+      display: none;
+      position: fixed; inset: 0; width: 100vw; height: 100vh;
+      object-fit: cover; z-index: -1;
+    }
+    #bg-video.show { display: block; }
+
+    /* Earn panel */
+    #earn-panel {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    #earn-panel button.big {
+      padding: 12px 16px;
+      font-size: clamp(16px, 3vw, 22px);
+    }
+
   </style>
 
   <link rel="preload" as="image" href="/strubles.png" />
@@ -267,9 +415,9 @@
   </div>
   <h1>Glorious Iantopia</h1>
 
-  <a class="big" href="/never">Is Iantopia Done Yet????</a>
-  <a class="big" href="/blackjack">🎲 Gamburing</a>
-  <a class="big" href="http://localhost:3000" target="_blank">📹 YouTube Transcripts</a>
+  <a class="big neon-never" href="/never">Is Iantopia Done Yet????</a>
+  <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
+  <a class="big neon-yt" href="http://localhost:3000" target="_blank">YouTube Transcripts</a>
 
   <!-- Timer -->
   <div id="topia-timer">Loading…</div>
@@ -280,8 +428,48 @@
     <span id="strubles-amt">0</span>
   </div>
 
+  <button id="inv-btn" title="Inventory">🎒 Inventory</button>
+  <button id="bg-btn" title="Change background">🖼️ Background</button>
+  <video id="bg-video" autoplay muted loop playsinline></video>
+
+  <button id="now-playing" title="Change track">
+    <span class="np-eyebrow">Now Playing</span>
+    <span id="np-label">Home Theme</span>
+  </button>
+  <div id="amsa-quote">"I play to win."<br>— AMSA</div>
+
   <button id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
   <audio id="theme-music" src="/home-theme.mp3" preload="none" loop></audio>
+
+  <!-- Playlist modal -->
+  <div class="modal-overlay" id="playlist-overlay">
+    <div class="modal-box">
+      <h2>Playlist</h2>
+      <div id="playlist-list"></div>
+      <button class="modal-close" id="playlist-close">Close</button>
+    </div>
+  </div>
+
+  <!-- Inventory modal -->
+  <div class="modal-overlay" id="inventory-overlay">
+    <div class="modal-box">
+      <h2>Inventory</h2>
+      <div id="inventory-list"></div>
+      <button class="modal-close" id="inventory-close">Close</button>
+    </div>
+  </div>
+
+  <!-- Background modal -->
+  <div class="modal-overlay" id="background-overlay">
+    <div class="modal-box">
+      <h2>Background</h2>
+      <div id="background-list"></div>
+      <button class="modal-close" id="background-close">Close</button>
+    </div>
+  </div>
+
+  <script is:inline src="/music-library.js"></script>
+  <script is:inline src="/background-library.js"></script>
 
   <!-- Timer Script -->
   <script>
@@ -374,12 +562,43 @@
   <!-- Custom Cursor Implementation (Canvas-based, shared across pages) -->
   <script is:inline src="/cursor.js"></script>
 
-  <!-- Home theme music -->
+  <!-- Home theme music, Now Playing / playlist, and Inventory -->
   <script>
     (() => {
+      const ACTIVE_TRACK_KEY = 'home_active_track_v1';
+      const INV_KEY = 'strubles_inventory_v1';
+      const LIBRARY = window.MUSIC_LIBRARY || { default: { label: 'Home Theme', src: '/home-theme.mp3' } };
+
+      function loadInventory() {
+        try {
+          const v = localStorage.getItem(INV_KEY);
+          return v ? JSON.parse(v) : {};
+        } catch { return {}; }
+      }
+
+      function getActiveTrackKey() {
+        const key = localStorage.getItem(ACTIVE_TRACK_KEY);
+        return (key && LIBRARY[key]) ? key : 'default';
+      }
+
       let audioEnabled = true;
       const themeMusic = document.getElementById('theme-music');
       const muteBtn = document.getElementById('mute-btn');
+      const npLabel = document.getElementById('np-label');
+      const nowPlayingBtn = document.getElementById('now-playing');
+
+      let activeTrackKey = getActiveTrackKey();
+
+      function applyActiveTrack(restart) {
+        const track = LIBRARY[activeTrackKey] || LIBRARY.default;
+        themeMusic.src = track.src;
+        npLabel.textContent = track.label;
+        if (restart) {
+          themeMusic.currentTime = 0;
+          tryPlayTheme();
+        }
+      }
+      applyActiveTrack(false);
 
       function tryPlayTheme() {
         if (!audioEnabled) return;
@@ -399,6 +618,162 @@
         muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
         if (audioEnabled) tryPlayTheme();
         else themeMusic.pause();
+      });
+
+      // --- Playlist popup ---
+      const playlistOverlay = document.getElementById('playlist-overlay');
+      const playlistList = document.getElementById('playlist-list');
+      const playlistClose = document.getElementById('playlist-close');
+
+      function renderPlaylist() {
+        const inv = loadInventory();
+        const unlockedTracks = Array.isArray(inv.tracks) ? inv.tracks : [];
+        let html = '';
+        html += playlistRow('default', LIBRARY.default.label);
+        if (unlockedTracks.length === 0) {
+          html += '<div class="modal-empty">No extra tracks unlocked yet — try the Lootbox!</div>';
+        } else {
+          unlockedTracks.forEach((key) => {
+            if (!LIBRARY[key]) return;
+            html += playlistRow(key, LIBRARY[key].label);
+          });
+        }
+        playlistList.innerHTML = html;
+        playlistList.querySelectorAll('.modal-track').forEach((row) => {
+          row.addEventListener('click', () => {
+            activeTrackKey = row.dataset.key;
+            localStorage.setItem(ACTIVE_TRACK_KEY, activeTrackKey);
+            applyActiveTrack(true);
+            playlistOverlay.classList.remove('open');
+            renderPlaylist();
+          });
+        });
+      }
+      function playlistRow(key, label) {
+        const activeClass = key === activeTrackKey ? ' active' : '';
+        return `<div class="modal-track${activeClass}" data-key="${key}"><span>${label}</span>${key === activeTrackKey ? '<span>▶</span>' : ''}</div>`;
+      }
+
+      nowPlayingBtn.addEventListener('click', () => {
+        renderPlaylist();
+        playlistOverlay.classList.add('open');
+      });
+      playlistClose.addEventListener('click', () => playlistOverlay.classList.remove('open'));
+      playlistOverlay.addEventListener('click', (e) => {
+        if (e.target === playlistOverlay) playlistOverlay.classList.remove('open');
+      });
+
+      // --- Inventory popup ---
+      const invBtn = document.getElementById('inv-btn');
+      const inventoryOverlay = document.getElementById('inventory-overlay');
+      const inventoryList = document.getElementById('inventory-list');
+      const inventoryClose = document.getElementById('inventory-close');
+
+      const INV_CATEGORIES = [
+        { key: 'items', label: 'Items' },
+        { key: 'badges', label: 'Badges' },
+        { key: 'themes', label: 'Themes' },
+        { key: 'powerups', label: 'Powerups' },
+        { key: 'sfx', label: 'Sounds' },
+        { key: 'tracks', label: 'Music Tracks' },
+      ];
+
+      function renderInventory() {
+        const inv = loadInventory();
+        const hasAny = INV_CATEGORIES.some((c) => Array.isArray(inv[c.key]) && inv[c.key].length > 0);
+        if (!hasAny) {
+          inventoryList.innerHTML = '<div class="modal-empty">Nothing unlocked yet — open a Lootbox to start collecting!</div>';
+          return;
+        }
+        let html = '';
+        INV_CATEGORIES.forEach((c) => {
+          const entries = Array.isArray(inv[c.key]) ? inv[c.key] : [];
+          if (entries.length === 0) return;
+          html += `<div class="inv-category">${c.label}</div>`;
+          entries.forEach((entry) => {
+            const label = (c.key === 'tracks' && LIBRARY[entry]) ? LIBRARY[entry].label : entry;
+            html += `<div class="modal-item"><span>${label}</span></div>`;
+          });
+        });
+        inventoryList.innerHTML = html;
+      }
+
+      invBtn.addEventListener('click', () => {
+        renderInventory();
+        inventoryOverlay.classList.add('open');
+      });
+      inventoryClose.addEventListener('click', () => inventoryOverlay.classList.remove('open'));
+      inventoryOverlay.addEventListener('click', (e) => {
+        if (e.target === inventoryOverlay) inventoryOverlay.classList.remove('open');
+      });
+
+      // --- Background switcher ---
+      const ACTIVE_BG_KEY = 'home_active_bg_v1';
+      const BG_LIBRARY = window.BACKGROUND_LIBRARY || { default: { label: 'Taipei', type: 'gif', src: '/taipei.gif', position: 'center' } };
+      const bgBtn = document.getElementById('bg-btn');
+      const bgVideo = document.getElementById('bg-video');
+      const backgroundOverlay = document.getElementById('background-overlay');
+      const backgroundList = document.getElementById('background-list');
+      const backgroundClose = document.getElementById('background-close');
+
+      let activeBgKey = 'default';
+      function getActiveBgKey() {
+        const key = localStorage.getItem(ACTIVE_BG_KEY);
+        return (key && BG_LIBRARY[key]) ? key : 'default';
+      }
+      function applyBackground(key) {
+        const bg = BG_LIBRARY[key] || BG_LIBRARY.default;
+        activeBgKey = key;
+        if (bg.type === 'video') {
+          document.body.style.backgroundImage = 'none';
+          bgVideo.src = bg.src;
+          bgVideo.classList.add('show');
+          bgVideo.play().catch(() => {});
+        } else {
+          bgVideo.classList.remove('show');
+          bgVideo.pause();
+          bgVideo.removeAttribute('src');
+          document.body.style.backgroundImage = `url('${bg.src}')`;
+          document.body.style.backgroundPosition = bg.position || 'center';
+        }
+      }
+      applyBackground(getActiveBgKey());
+
+      function renderBackgroundList() {
+        const inv = loadInventory();
+        const unlocked = Array.isArray(inv.backgrounds) ? inv.backgrounds : [];
+        let html = bgRow('default', BG_LIBRARY.default.label);
+        if (unlocked.length === 0) {
+          html += '<div class="modal-empty">No extra backgrounds unlocked yet — try the Lootbox!</div>';
+        } else {
+          unlocked.forEach((key) => {
+            if (!BG_LIBRARY[key]) return;
+            html += bgRow(key, BG_LIBRARY[key].label);
+          });
+        }
+        backgroundList.innerHTML = html;
+        backgroundList.querySelectorAll('.modal-track').forEach((row) => {
+          row.addEventListener('click', () => {
+            const key = row.dataset.key;
+            localStorage.setItem(ACTIVE_BG_KEY, key);
+            applyBackground(key);
+            backgroundOverlay.classList.remove('open');
+            renderBackgroundList();
+          });
+        });
+      }
+      function bgRow(key, label) {
+        const activeClass = key === activeBgKey ? ' active' : '';
+        return `<div class="modal-track${activeClass}" data-key="${key}"><span>${label}</span>${key === activeBgKey ? '<span>▶</span>' : ''}</div>`;
+      }
+
+      bgBtn.addEventListener('click', () => {
+        renderBackgroundList();
+        backgroundOverlay.classList.add('open');
+      });
+      backgroundClose.addEventListener('click', () => backgroundOverlay.classList.remove('open'));
+      backgroundOverlay.addEventListener('click', (e) => {
+        if (e.target === backgroundOverlay) backgroundOverlay.classList.remove('open');
       });
     })();
   </script>
