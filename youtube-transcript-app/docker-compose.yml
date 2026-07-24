@@ -5,8 +5,9 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8001:8000"
     volumes:
       - transcripts:/app/transcripts
       - downloads:/app/downloads
@@ -14,20 +15,27 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
     container_name: yt-transcript-backend
+    networks:
+      - yt-network
 
   frontend:
-    image: node:20-alpine
-    working_dir: /app
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    restart: unless-stopped
     ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-    command: sh -c "npm install && npm run dev"
+      - "3001:3000"
     environment:
       - HOST=0.0.0.0
     depends_on:
       - backend
     container_name: yt-transcript-frontend
+    networks:
+      - yt-network
+
+networks:
+  yt-network:
+    driver: bridge
 
 volumes:
   transcripts:

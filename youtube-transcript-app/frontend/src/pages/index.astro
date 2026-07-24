@@ -629,7 +629,7 @@
 
     <div class="content-wrapper">
       <div class="container">
-        <a href="http://localhost:4321/" id="homeLink" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; font-family:'Courier New', monospace;">&larr; HOME</a>
+        <a href="/" id="homeLink" onclick="goHome(event)" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; font-family:'Courier New', monospace; cursor:pointer;">&larr; HOME</a>
         <h1>> YT-TRANSCRIPT_PLUS</h1>
         <p class="subtitle">>> Download transcripts & videos from YouTube</p>
         <p style="color: #006600; font-size: 11px; margin-top: 5px; margin-bottom: 30px; letter-spacing: 1px; text-align: right;">a widget by EEN</p>
@@ -806,6 +806,23 @@
       }
 
       console.log('Script loaded');
+
+      // Home button handler - determines home server dynamically
+      function goHome(e) {
+        e.preventDefault();
+        const hostname = window.location.hostname;
+        const port = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? '5500'
+          : '5500';
+        const homeUrl = `http://${hostname}:${port}/`;
+        window.location.href = homeUrl;
+      }
+
+      // Set home link handler
+      const homeLink = document.getElementById('homeLink');
+      if (homeLink) {
+        homeLink.addEventListener('click', goHome);
+      }
 
       // Wait for DOM to be fully loaded
       if (document.readyState === 'loading') {
