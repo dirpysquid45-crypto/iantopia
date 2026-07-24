@@ -65,18 +65,6 @@
     }
 
 
-    @keyframes flip {
-      0% {
-        transform: perspective(1000px) rotateY(0deg);
-      }
-      50% {
-        transform: perspective(1000px) rotateY(180deg);
-      }
-      100% {
-        transform: perspective(1000px) rotateY(360deg);
-      }
-    }
-
     @keyframes bob {
       0%, 100% {
         transform: translateY(0px);
@@ -90,8 +78,8 @@
       position: relative;
       perspective: 1000px;
       animation: bob 3s ease-in-out infinite;
-      width: 360px;
-      height: 270px;
+      width: min(202px, 85vw);
+      aspect-ratio: 629 / 839;
       margin-bottom: 20px;
     }
 
@@ -99,9 +87,13 @@
       position: relative;
       width: 100%;
       height: 100%;
-      animation: flip 4s linear infinite;
       transform-style: preserve-3d;
       filter: drop-shadow(0 0 30px rgba(255, 235, 59, 0.6)) drop-shadow(0 0 60px rgba(255, 152, 86, 0.4));
+    }
+    .image-container:focus-visible {
+      outline: 3px solid #ffeb3b;
+      outline-offset: 6px;
+      border-radius: 8px;
     }
 
     .flip-card-front,
@@ -202,8 +194,8 @@
     /* Topia Timer */
     #topia-timer {
       position: fixed;
-      top: 15px;
-      right: 20px;
+      top: calc(15px + env(safe-area-inset-top));
+      right: calc(20px + env(safe-area-inset-right));
       font-size: 0.75rem;
       font-weight: 700;
       font-family: 'Press Start 2P', cursive;
@@ -216,13 +208,14 @@
       text-transform: uppercase;
       letter-spacing: 1px;
       line-height: 1.4;
+      max-width: min(280px, 60vw);
     }
 
     /* Strubles badge */
     #strubles-badge {
       position: fixed;
-      top: 15px;
-      left: 20px;
+      top: calc(15px + env(safe-area-inset-top));
+      left: calc(20px + env(safe-area-inset-left));
       display: flex;
       align-items: center;
       gap: 8px;
@@ -241,8 +234,8 @@
 
     #now-playing {
       position: fixed;
-      top: 85px;
-      right: 20px;
+      top: calc(130px + env(safe-area-inset-top));
+      right: calc(20px + env(safe-area-inset-right));
       z-index: 20;
       background: rgba(0, 0, 0, 0.6);
       border: 1px solid rgba(255, 235, 59, 0.5);
@@ -256,7 +249,7 @@
       max-width: 170px;
       text-align: right;
     }
-    #now-playing .np-eyebrow {
+    #now-playing #np-eyebrow {
       display: block;
       color: #ffeb3b;
       font-weight: 700;
@@ -265,12 +258,18 @@
       text-transform: uppercase;
       margin-bottom: 3px;
     }
+    #now-playing #np-label {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
     #now-playing:hover { transform: translateY(-1px); }
 
     #amsa-quote {
       position: fixed;
-      top: 148px;
-      right: 20px;
+      top: calc(195px + env(safe-area-inset-top));
+      right: calc(20px + env(safe-area-inset-right));
       z-index: 20;
       font-size: 7px;
       color: rgba(255, 255, 255, 0.45);
@@ -280,20 +279,28 @@
       line-height: 1.4;
     }
 
-    #mute-btn {
-      position: fixed;
-      top: 182px;
-      right: 20px;
-      z-index: 20;
-      background: rgba(0, 0, 0, 0.6);
-      border: 1px solid rgba(255, 235, 59, 0.5);
-      border-radius: 12px;
-      color: #fff;
-      font-size: 18px;
-      padding: 6px 10px;
-      line-height: 1;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    /* Volume + mute controls inside the Playlist popup */
+    .volume-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+    }
+    .volume-row input[type="range"] {
+      flex: 1;
+      accent-color: #ffeb3b;
       cursor: none;
+    }
+    .volume-mute-btn {
+      all: unset;
+      cursor: none;
+      font-size: 16px;
+      padding: 4px 8px;
+      border: 1px solid #2a3245;
+      border-radius: 8px;
+      background: #1d2330;
     }
 
     /* Playlist / Inventory modal */
@@ -345,8 +352,8 @@
     /* Inventory button */
     #inv-btn {
       position: fixed;
-      top: 58px;
-      left: 20px;
+      top: calc(80px + env(safe-area-inset-top));
+      left: calc(20px + env(safe-area-inset-left));
       background: rgba(0, 0, 0, 0.6);
       color: #fff;
       border: 1px solid #2a3245;
@@ -363,8 +370,8 @@
 
     #bg-btn {
       position: fixed;
-      top: 101px;
-      left: 20px;
+      top: calc(130px + env(safe-area-inset-top));
+      left: calc(20px + env(safe-area-inset-left));
       background: rgba(0, 0, 0, 0.6);
       color: #fff;
       border: 1px solid #2a3245;
@@ -398,13 +405,19 @@
       font-size: clamp(16px, 3vw, 22px);
     }
 
+    @media (max-width: 480px) {
+      #topia-timer { font-size: 0.6rem; padding: 10px 12px; }
+      #now-playing, #amsa-quote { max-width: 140px; }
+      a.big, button.big { padding: 14px 18px; }
+    }
+
   </style>
 
   <link rel="preload" as="image" href="/strubles.png" />
 </head>
 <body>
-  <div class="image-container">
-    <div class="flip-card">
+  <div class="image-container" id="image-container" role="button" tabindex="0" aria-label="Spin the Iantopia image faster">
+    <div class="flip-card" id="flip-card">
       <div class="flip-card-front">
         <img src="/Iantopia.webp" alt="Iantopia Image" />
       </div>
@@ -413,11 +426,76 @@
       </div>
     </div>
   </div>
+
+  <!-- Spin: continuous rotation, driven by JS so a click can smoothly
+       speed it up then ease back to normal instead of a CSS animation
+       hard-cutting between two fixed durations. -->
+  <script is:inline>
+    (() => {
+      const imageContainer = document.getElementById('image-container');
+      const flipCard = document.getElementById('flip-card');
+
+      const NORMAL_SPEED = 360 / 4000; // deg/ms -- matches the old 4s-per-rotation
+      const FAST_SPEED = 360 / 400;    // deg/ms -- matches the old 0.4s-per-rotation
+      const HOLD_MS = 500;             // how long to stay at full speed after a click
+      const DECEL_MS = 700;            // how long the ease back to normal takes
+
+      let angle = 0;
+      let speed = NORMAL_SPEED;
+      let lastTime = null;
+      let phase = 'normal'; // 'normal' | 'fast' | 'decelerating'
+      let holdUntil = 0;
+      let decelStart = 0;
+      let decelFromSpeed = NORMAL_SPEED;
+
+      function boostSpin() {
+        phase = 'fast';
+        speed = FAST_SPEED;
+        holdUntil = performance.now() + HOLD_MS;
+      }
+
+      function tick(now) {
+        if (lastTime === null) lastTime = now;
+        const dt = now - lastTime;
+        lastTime = now;
+
+        if (phase === 'fast' && now >= holdUntil) {
+          phase = 'decelerating';
+          decelStart = now;
+          decelFromSpeed = speed;
+        }
+
+        if (phase === 'decelerating') {
+          const t = Math.min((now - decelStart) / DECEL_MS, 1);
+          const eased = 1 - Math.pow(1 - t, 3); // ease-out cubic
+          speed = decelFromSpeed + (NORMAL_SPEED - decelFromSpeed) * eased;
+          if (t >= 1) {
+            speed = NORMAL_SPEED;
+            phase = 'normal';
+          }
+        }
+
+        angle += speed * dt;
+        flipCard.style.transform = `perspective(1000px) rotateY(${angle}deg)`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+
+      imageContainer.addEventListener('click', boostSpin);
+      imageContainer.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          boostSpin();
+        }
+      });
+    })();
+  </script>
+
   <h1>Glorious Iantopia</h1>
 
   <a class="big neon-never" href="/never">Is Iantopia Done Yet????</a>
   <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
-  <a class="big neon-yt" href="http://localhost:3000" target="_blank">YouTube Transcripts</a>
+  <a class="big neon-yt" href="/youtube-transcript-app/frontend" target="_blank">YouTube Transcripts</a>
 
   <!-- Timer -->
   <div id="topia-timer">Loading…</div>
@@ -432,47 +510,51 @@
   <button id="bg-btn" title="Change background">🖼️ Background</button>
   <video id="bg-video" autoplay muted loop playsinline></video>
 
-  <button id="now-playing" title="Change track">
-    <span class="np-eyebrow">Now Playing</span>
+  <button id="now-playing" title="Music options" aria-haspopup="dialog" aria-controls="playlist-overlay">
+    <span id="np-eyebrow">🔊 Now Playing</span>
     <span id="np-label">Home Theme</span>
   </button>
   <div id="amsa-quote">"I play to win."<br>— AMSA</div>
 
-  <button id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
   <audio id="theme-music" src="/home-theme.mp3" preload="none" loop></audio>
 
   <!-- Playlist modal -->
-  <div class="modal-overlay" id="playlist-overlay">
+  <div class="modal-overlay" id="playlist-overlay" role="dialog" aria-modal="true" aria-labelledby="playlist-title">
     <div class="modal-box">
-      <h2>Playlist</h2>
+      <h2 id="playlist-title">Playlist</h2>
+      <div class="volume-row">
+        <button class="volume-mute-btn" id="modal-mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
+        <input type="range" id="volume-slider" min="0" max="100" value="30" aria-label="Music volume" />
+      </div>
       <div id="playlist-list"></div>
       <button class="modal-close" id="playlist-close">Close</button>
     </div>
   </div>
 
   <!-- Inventory modal -->
-  <div class="modal-overlay" id="inventory-overlay">
+  <div class="modal-overlay" id="inventory-overlay" role="dialog" aria-modal="true" aria-labelledby="inventory-title">
     <div class="modal-box">
-      <h2>Inventory</h2>
+      <h2 id="inventory-title">Inventory</h2>
       <div id="inventory-list"></div>
       <button class="modal-close" id="inventory-close">Close</button>
     </div>
   </div>
 
   <!-- Background modal -->
-  <div class="modal-overlay" id="background-overlay">
+  <div class="modal-overlay" id="background-overlay" role="dialog" aria-modal="true" aria-labelledby="background-title">
     <div class="modal-box">
-      <h2>Background</h2>
+      <h2 id="background-title">Background</h2>
       <div id="background-list"></div>
       <button class="modal-close" id="background-close">Close</button>
     </div>
   </div>
 
   <script is:inline src="/music-library.js"></script>
+  <script is:inline src="/music-position.js"></script>
   <script is:inline src="/background-library.js"></script>
 
   <!-- Timer Script -->
-  <script>
+  <script is:inline>
     const TOPIA_START = new Date(2025, 8, 1, 0, 0, 0);
     function renderTopiaTimer() {
       const now = new Date();
@@ -508,7 +590,7 @@
   <script is:inline src="/strubles.js?v=2"></script>
 
   <!-- Earn UI wiring -->
-  <script>
+  <script is:inline>
     (function () {
       if (typeof Strubles !== "object") return;
 
@@ -563,7 +645,7 @@
   <script is:inline src="/cursor.js"></script>
 
   <!-- Home theme music, Now Playing / playlist, and Inventory -->
-  <script>
+  <script is:inline>
     (() => {
       const ACTIVE_TRACK_KEY = 'home_active_track_v1';
       const INV_KEY = 'strubles_inventory_v1';
@@ -583,11 +665,24 @@
 
       let audioEnabled = true;
       const themeMusic = document.getElementById('theme-music');
-      const muteBtn = document.getElementById('mute-btn');
+      const npEyebrow = document.getElementById('np-eyebrow');
       const npLabel = document.getElementById('np-label');
       const nowPlayingBtn = document.getElementById('now-playing');
+      const modalMuteBtn = document.getElementById('modal-mute-btn');
+      const volumeSlider = document.getElementById('volume-slider');
+
+      const VOLUME_KEY = 'home_theme_volume_v1';
+      const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
+      themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.3;
+      volumeSlider.value = Math.round(themeMusic.volume * 100);
+      volumeSlider.addEventListener('input', () => {
+        themeMusic.volume = volumeSlider.value / 100;
+        localStorage.setItem(VOLUME_KEY, themeMusic.volume);
+      });
 
       let activeTrackKey = getActiveTrackKey();
+
+      const MUSIC_POS_KEY = 'home_theme_pos_v1';
 
       function applyActiveTrack(restart) {
         const track = LIBRARY[activeTrackKey] || LIBRARY.default;
@@ -596,9 +691,13 @@
         if (restart) {
           themeMusic.currentTime = 0;
           tryPlayTheme();
+        } else if (window.MusicPosition) {
+          // Page load (not a manual track switch): resume where this track left off.
+          window.MusicPosition.restore(MUSIC_POS_KEY, themeMusic);
         }
       }
       applyActiveTrack(false);
+      if (window.MusicPosition) window.MusicPosition.track(MUSIC_POS_KEY, themeMusic);
 
       function tryPlayTheme() {
         if (!audioEnabled) return;
@@ -613,9 +712,11 @@
       window.addEventListener('pointerdown', unlockTheme);
       window.addEventListener('keydown', unlockTheme);
 
-      muteBtn.addEventListener('click', () => {
+      modalMuteBtn.addEventListener('click', () => {
         audioEnabled = !audioEnabled;
-        muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
+        const icon = audioEnabled ? '🔊' : '🔇';
+        modalMuteBtn.textContent = icon;
+        npEyebrow.textContent = `${icon} Now Playing`;
         if (audioEnabled) tryPlayTheme();
         else themeMusic.pause();
       });
@@ -774,6 +875,14 @@
       backgroundClose.addEventListener('click', () => backgroundOverlay.classList.remove('open'));
       backgroundOverlay.addEventListener('click', (e) => {
         if (e.target === backgroundOverlay) backgroundOverlay.classList.remove('open');
+      });
+
+      // Escape closes whichever modal is currently open
+      window.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        [playlistOverlay, inventoryOverlay, backgroundOverlay].forEach((overlay) => {
+          overlay.classList.remove('open');
+        });
       });
     })();
   </script>

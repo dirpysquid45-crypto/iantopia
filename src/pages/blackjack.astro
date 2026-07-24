@@ -131,21 +131,21 @@
   #earn-panel button:hover, #earn-panel a:hover { background:#ffe958; }
 
   #strubles-badge{
-    position:fixed; top:15px; left:20px; display:flex; align-items:center; gap:8px;
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
     background:#000; padding:8px 12px; border:3px solid #ffd700;
     font-weight:700; z-index:20;
   }
   #strubles-badge img{ width:28px; height:28px; }
 
   #mute-btn {
-    position:fixed; top:15px; right:20px; z-index:20;
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(20px + env(safe-area-inset-right)); z-index:20;
     background:#000; border:3px solid #ffd700; color:#fff;
     font-size:18px; padding:8px 12px; cursor:none; line-height:1;
   }
 
   .betbox{ display:flex; align-items:center; gap:8px; }
   .betbox input{ width:70px; padding:8px 10px; border:3px solid #000; background:#0f1523; color:var(--ink); font-weight:700; border-radius:0; font-family:inherit; font-size:11px; }
-  .betbox button { padding:8px 14px; }
+  .betbox button { padding:8px 14px; min-width:44px; min-height:44px; }
 
   /* Blackjack celebration overlay */
   #bj-money-overlay {
@@ -264,8 +264,9 @@
 
 <script is:inline src="/strubles.js?v=2"></script>
 <script is:inline src="/cursor.js"></script>
+<script is:inline src="/music-position.js"></script>
 
-<script>
+<script is:inline>
 (() => {
   const suits  = ['♠','♥','♦','♣'];
   const values = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
@@ -326,6 +327,11 @@
   // --- Theme music (background loop, tied to the same mute control) ---
   const themeMusic = $('theme-music');
   themeMusic.volume = 0.3;
+  const MUSIC_POS_KEY = 'blackjack_theme_pos_v1';
+  if (window.MusicPosition) {
+    window.MusicPosition.restore(MUSIC_POS_KEY, themeMusic);
+    window.MusicPosition.track(MUSIC_POS_KEY, themeMusic);
+  }
   function tryPlayTheme(){
     if (!audioEnabled) return;
     themeMusic.play().catch(() => {});

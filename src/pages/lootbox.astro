@@ -56,14 +56,14 @@
     text-shadow: 0 0 5px var(--gold), 0 0 12px var(--gold), 0 0 24px rgba(255,215,0,.6);
   }
   .badge{
-    position:fixed; top:15px; left:20px; display:flex; align-items:center; gap:8px;
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
     background:#000; border:3px solid var(--gold); padding:8px 12px; font-weight:700; z-index:20;
     box-shadow: 0 0 10px rgba(255,215,0,.3);
   }
   .badge img{ width:28px; height:28px; }
 
   #mute-btn {
-    position:fixed; top:15px; right:20px; z-index:20;
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(20px + env(safe-area-inset-right)); z-index:20;
     background:#000; border:3px solid var(--gold); color:#fff;
     font-size:18px; padding:8px 12px; cursor:none; line-height:1;
   }
@@ -120,7 +120,8 @@
   <script is:inline src="/lootbox-data.js?v=1"></script>
   <script is:inline src="/lootbox.js?v=1"></script>
   <script is:inline src="/cursor.js"></script>
-  <script>
+  <script is:inline src="/music-position.js"></script>
+  <script is:inline>
     const balEl = document.getElementById('bal');
     const costEl = document.getElementById('cost');
     const resultEl = document.getElementById('result');
@@ -154,6 +155,11 @@
 
     const themeMusic = document.getElementById('theme-music');
     themeMusic.volume = 0.3;
+    const MUSIC_POS_KEY = 'lootbox_theme_pos_v1';
+    if (window.MusicPosition) {
+      window.MusicPosition.restore(MUSIC_POS_KEY, themeMusic);
+      window.MusicPosition.track(MUSIC_POS_KEY, themeMusic);
+    }
     function tryPlayTheme(){
       if (!audioEnabled) return;
       themeMusic.play().catch(() => {});
