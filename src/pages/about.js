@@ -1,4 +1,4 @@
-export function render(view) {
+export function render() {
   const view = document.getElementById("app-view");
   if (!view) return;
 

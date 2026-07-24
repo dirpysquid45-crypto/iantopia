@@ -1,0 +1,411 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Glorious Iantopia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @keyframes titleGlow {
+      0%, 100% {
+        text-shadow: 0 0 10px rgba(255, 235, 59, 0.3), 0 0 20px rgba(255, 152, 86, 0.2);
+      }
+      50% {
+        text-shadow: 0 0 20px rgba(255, 235, 59, 0.6), 0 0 40px rgba(255, 152, 86, 0.4), 0 0 60px rgba(255, 196, 0, 0.2);
+      }
+    }
+
+    @keyframes titleScale {
+      0% { transform: scale(0.95); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background-image: url('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCADIAyADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWm5ybnJ2eoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlbaWmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigD/2Q==');
+      background-size: cover;
+      background-position: center;
+      background-attachment: fixed;
+      color: #ffffff;
+      position: relative;
+      overflow: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.3);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body > * {
+      position: relative;
+      z-index: 1;
+    }
+
+
+    @keyframes flip {
+      0% {
+        transform: perspective(1000px) rotateY(0deg);
+      }
+      50% {
+        transform: perspective(1000px) rotateY(180deg);
+      }
+      100% {
+        transform: perspective(1000px) rotateY(360deg);
+      }
+    }
+
+    @keyframes bob {
+      0%, 100% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-20px);
+      }
+    }
+
+    .image-container {
+      position: relative;
+      perspective: 1000px;
+      animation: bob 3s ease-in-out infinite;
+      width: 360px;
+      height: 270px;
+      margin-bottom: 20px;
+    }
+
+    .flip-card {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      animation: flip 4s linear infinite;
+      transform-style: preserve-3d;
+      filter: drop-shadow(0 0 30px rgba(255, 235, 59, 0.6)) drop-shadow(0 0 60px rgba(255, 152, 86, 0.4));
+    }
+
+    .flip-card-front,
+    .flip-card-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .flip-card-back {
+      transform: rotateY(180deg);
+    }
+
+    .flip-card img {
+      max-width: 100%;
+      height: 100%;
+      object-fit: cover;
+      box-shadow: 0 0 40px rgba(255, 235, 59, 0.5), 0 0 80px rgba(255, 152, 86, 0.3), inset 0 0 30px rgba(255, 235, 59, 0.2);
+      border-radius: 8px;
+    }
+
+    h1 {
+      font-family: 'Press Start 2P', cursive;
+      font-size: clamp(1.2rem, 5vw, 2.5rem);
+      font-weight: 400;
+      margin: 20px 0 10px 0;
+      color: #ffffff;
+      letter-spacing: 2px;
+      animation: titleScale 0.8s ease-out, titleGlow 3s ease-in-out infinite 0.8s;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    a.big,
+    button.big {
+      text-decoration: none;
+      padding: 18px 26px;
+      border-radius: 0;
+      background: #1d2330;
+      border: 1px solid #2a3245;
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+      font-size: clamp(20px, 4vw, 34px);
+      letter-spacing: 0.3px;
+      color: #ffffff;
+      cursor: pointer;
+      transition: transform 0.2s;
+      display: block;
+      margin: 16px auto;
+    }
+
+    a.big:hover,
+    button.big:hover {
+      transform: translateY(-1px);
+    }
+
+    /* Topia Timer */
+    #topia-timer {
+      position: fixed;
+      top: 15px;
+      right: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: 'Press Start 2P', cursive;
+      background: linear-gradient(135deg, #1a0a00 0%, #4d0000 100%);
+      color: #ff3333;
+      padding: 12px 16px;
+      border-radius: 0;
+      border: 2px solid #ff3333;
+      box-shadow: 0 0 20px rgba(255, 51, 51, 0.5), inset 0 0 10px rgba(255, 51, 51, 0.1);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      line-height: 1.4;
+    }
+
+    /* Strubles badge */
+    #strubles-badge {
+      position: fixed;
+      top: 15px;
+      left: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 8px 12px;
+      border-radius: 12px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      font-weight: 700;
+    }
+
+    #strubles-badge img {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+    }
+
+    /* Earn panel */
+    #earn-panel {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    #earn-panel button.big {
+      padding: 12px 16px;
+      font-size: clamp(16px, 3vw, 22px);
+    }
+
+    /* Inventory button */
+    #inv-btn {
+      position: fixed;
+      top: 58px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      border: 1px solid #2a3245;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+
+    #inv-btn:hover {
+      transform: translateY(-1px);
+    }
+
+  </style>
+
+  <link rel="preload" as="image" href="/strubles.png" />
+</head>
+<body>
+  <div class="image-container">
+    <div class="flip-card">
+      <div class="flip-card-front">
+        <img src="/Iantopia.webp" alt="Iantopia Image" />
+      </div>
+      <div class="flip-card-back">
+        <img src="/Iantopia.webp" alt="Iantopia Image Back" />
+      </div>
+    </div>
+  </div>
+  <h1>Glorious Iantopia</h1>
+
+  <a class="big" href="/never">Is Iantopia Done Yet????</a>
+  <a class="big" href="/blackjack">🎲 Gamburing</a>
+  <a class="big" href="https://youtube-transcript.vercel.app/" target="_blank">📹 YouTube Transcripts</a>
+
+  <!-- Timer -->
+  <div id="topia-timer">Loading…</div>
+
+  <!-- Strubles badge -->
+  <div id="strubles-badge">
+    <img src="/strubles.png" alt="Struble" />
+    <span id="strubles-amt">0</span>
+  </div>
+
+
+  <!-- Timer Script -->
+  <script>
+    const TOPIA_START = new Date(2025, 8, 1, 0, 0, 0);
+    function renderTopiaTimer() {
+      const now = new Date();
+      let months =
+        (now.getFullYear() - TOPIA_START.getFullYear()) * 12 +
+        (now.getMonth() - TOPIA_START.getMonth());
+      let anchor = new Date(TOPIA_START);
+      anchor.setMonth(TOPIA_START.getMonth() + months);
+      if (anchor > now) {
+        months--;
+        anchor.setMonth(TOPIA_START.getMonth() + months);
+      }
+
+      let ms = now - anchor;
+      const DAY = 86400000,
+        HOUR = 3600000,
+        MIN = 60000;
+      const days = Math.floor(ms / DAY);
+      ms %= DAY;
+      const hours = Math.floor(ms / HOUR);
+      ms %= HOUR;
+      const minutes = Math.floor(ms / MIN);
+      ms %= MIN;
+      const seconds = Math.floor(ms / 1000);
+
+      document.getElementById("topia-timer").textContent = `${months} months, ${days} days, ${hours} hours, ${minutes} minutes, ${seconds} seconds`;
+    }
+    renderTopiaTimer();
+    setInterval(renderTopiaTimer, 1000);
+  </script>
+
+  <!-- Strubles -->
+  <script is:inline src="/strubles.js?v=2"></script>
+
+  <!-- Earn UI wiring -->
+  <script>
+    (function () {
+      if (typeof Strubles !== "object") return;
+
+      const amtEl = document.getElementById("strubles-amt");
+      const starterBtn = document.getElementById("btn-starter");
+      const dailyBtn = document.getElementById("btn-daily");
+
+      Strubles.canClaimStarter ??= () => !localStorage.getItem("starter");
+      Strubles.claimStarter ??= (amt) => {
+        if (!Strubles.canClaimStarter()) return false;
+        Strubles.add(amt);
+        localStorage.setItem("starter", "1");
+        return true;
+      };
+
+      const todayUTC = () => {
+        const d = new Date();
+        return `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
+      };
+      Strubles.canDailyClaim ??= () =>
+        localStorage.getItem("daily") !== todayUTC();
+      Strubles.dailyClaim ??= (amt) => {
+        if (!Strubles.canDailyClaim()) return false;
+        Strubles.add(amt);
+        localStorage.setItem("daily", todayUTC());
+        return true;
+      };
+
+      function updateUI() {
+        amtEl.textContent = Strubles.get();
+        starterBtn.disabled = !Strubles.canClaimStarter();
+        dailyBtn.disabled = !Strubles.canDailyClaim();
+      }
+
+      starterBtn.addEventListener("click", () => {
+        if (Strubles.claimStarter(100)) updateUI();
+      });
+      dailyBtn.addEventListener("click", () => {
+        if (Strubles.dailyClaim(500)) updateUI();
+      });
+
+      window.addEventListener("strubles:change", updateUI);
+      updateUI();
+    })();
+  </script>
+
+  <!-- Custom Cursor Implementation (Canvas-based) -->
+  <script>
+    const canvas = document.createElement('canvas');
+    canvas.width = 48;
+    canvas.height = 48;
+    canvas.style.position = 'fixed';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.zIndex = '9999';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    document.body.appendChild(canvas);
+
+    const ctx = canvas.getContext('2d');
+    let mouseX = 0, mouseY = 0;
+    let cursorImage = null;
+    let isLoaded = false;
+
+    // Load optimized Smiski cursor image (32x32 @ 852B)
+    const img = new Image();
+    img.src = '/Smiski-cursor.png';
+    img.onload = () => {
+      cursorImage = img;
+      isLoaded = true;
+      document.body.style.cursor = 'none';
+      animate();
+    };
+    img.onerror = () => {
+      console.error('Cursor image failed to load, reverting to default');
+      document.body.style.cursor = 'auto';
+    };
+
+    function animate() {
+      if (!isLoaded) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (cursorImage) {
+        ctx.drawImage(cursorImage, mouseX - 12, mouseY - 12, 24, 24);
+      }
+      requestAnimationFrame(animate);
+    }
+
+    document.addEventListener('mousemove', (e) => {
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+    });
+
+    // Brighten cursor over clickable elements
+    document.addEventListener('mouseover', (e) => {
+      const el = e.target;
+      if (el.tagName === 'A' || el.tagName === 'BUTTON' || el.closest('[role="button"]')) {
+        canvas.style.filter = 'brightness(1.5) drop-shadow(0 0 6px rgba(255, 235, 59, 0.9))';
+      }
+    }, true);
+
+    document.addEventListener('mouseout', () => {
+      canvas.style.filter = 'brightness(1)';
+    }, true);
+  </script>
+
+</body>
+</html>
