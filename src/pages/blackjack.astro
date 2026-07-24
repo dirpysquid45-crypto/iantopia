@@ -271,7 +271,6 @@
     <div class="status" id="status">Welcome! Set a bet and press Deal.</div>
 
     <div id="earn-panel">
-      <button id="btn-starter" class="big">💰 Claim Starter +100</button>
       <button id="btn-daily" class="big">🗓️ Daily +500</button>
       <a href="/lootbox">🎁 루트박스 🫧 𓇼𓏲*ੈ✩‧₊˚🎐</a>
     </div>
@@ -375,16 +374,7 @@
   window.addEventListener('strubles:change', syncBalance);
   window.addEventListener('storage', syncBalance);
 
-  const starterBtn = document.getElementById('btn-starter');
   const dailyBtn = document.getElementById('btn-daily');
-
-  Strubles.canClaimStarter ??= () => !localStorage.getItem("starter");
-  Strubles.claimStarter ??= (amt) => {
-    if (!Strubles.canClaimStarter()) return false;
-    Strubles.add(amt);
-    localStorage.setItem("starter", "1");
-    return true;
-  };
 
   const todayUTC = () => {
     const d = new Date();
@@ -399,13 +389,9 @@
   };
 
   function updateEarnUI() {
-    starterBtn.disabled = !Strubles.canClaimStarter();
     dailyBtn.disabled = !Strubles.canDailyClaim();
   }
 
-  starterBtn.addEventListener("click", () => {
-    if (Strubles.claimStarter(100)) { syncBalance(); updateEarnUI(); }
-  });
   dailyBtn.addEventListener("click", () => {
     if (Strubles.dailyClaim(500)) { syncBalance(); updateEarnUI(); }
   });
