@@ -310,6 +310,14 @@
         z-index: 50;
       }
 
+      @media (max-width: 600px) {
+        .container { padding: 20px; }
+        .file-row { grid-template-columns: 70px 1fr; gap: 10px; }
+        h1 { font-size: 22px; }
+        .input-group { flex-direction: column; gap: 8px; }
+        .input-group button { width: 100%; }
+      }
+
       h1 {
         font-size: 28px;
         margin-bottom: 10px;

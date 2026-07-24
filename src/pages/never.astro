@@ -61,6 +61,13 @@ const clowns = Array.from({ length: CLOWN_COUNT }).map(() => ({
     border-radius:8px;
   }
   #home-link:hover{ background:#fff; color:#000; }
+
+  @media (max-width:768px){
+    body{ overflow-y: auto; }
+    .marquee{ font-size: clamp(32px, 8vw, 100px); top: 40%; }
+    .clown{ font-size: clamp(18px, 4vw, 40px); }
+    #home-link{ top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); padding: 6px 10px; font-size: 12px; }
+  }
 </style>
 </head>
 <body>

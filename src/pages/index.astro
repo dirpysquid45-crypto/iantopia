@@ -405,10 +405,23 @@
       font-size: clamp(16px, 3vw, 22px);
     }
 
+    @media (max-width: 768px) {
+      body { overflow-y: auto; }
+      .image-container { width: min(150px, 60vw); margin-bottom: 12px; }
+      h1 { font-size: clamp(1rem, 4vw, 1.8rem); margin: 12px 0 8px; }
+      a.big, button.big { padding: 12px 20px; font-size: clamp(16px, 3vw, 24px); margin: 10px auto; }
+      #topia-timer { font-size: 0.55rem; padding: 8px 10px; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); }
+      #strubles-badge { top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); font-size: 0.8rem; }
+      #inv-btn, #bg-btn { font-size: 0.7rem; padding: 6px 8px; top: auto; left: calc(10px + env(safe-area-inset-left)); }
+      #inv-btn { bottom: calc(100px + env(safe-area-inset-bottom)); }
+      #bg-btn { bottom: calc(50px + env(safe-area-inset-bottom)); }
+      #now-playing, #amsa-quote { position: static; max-width: 100%; margin-top: 12px; right: auto; top: auto; font-size: 0.7rem; }
+      .modal-box { width: min(300px, 90vw); max-height: 60vh; }
+    }
     @media (max-width: 480px) {
-      #topia-timer { font-size: 0.6rem; padding: 10px 12px; }
-      #now-playing, #amsa-quote { max-width: 140px; }
-      a.big, button.big { padding: 14px 18px; }
+      #topia-timer { font-size: 0.5rem; padding: 6px 8px; }
+      #now-playing, #amsa-quote { font-size: 0.65rem; }
+      a.big, button.big { padding: 10px 16px; font-size: clamp(14px, 2.5vw, 20px); }
     }
 
   </style>
