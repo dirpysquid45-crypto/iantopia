@@ -2,6 +2,6 @@ fastapi==0.104.1
 uvicorn[standard]==0.24.0
 python-multipart==0.0.6
 youtube-transcript-api==0.6.1
-yt-dlp==2026.2.4
+yt-dlp>=2024.12.0
 pydantic==2.5.0
 python-dotenv==1.0.0

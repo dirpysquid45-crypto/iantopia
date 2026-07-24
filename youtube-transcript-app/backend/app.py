@@ -19,9 +19,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-TRANSCRIPTS_DIR = Path("/app/transcripts")
-DOWNLOADS_DIR = Path("/app/downloads")
-AUDIO_DIR = Path("/app/audio")
+BASE_DIR = Path(__file__).parent.parent
+TRANSCRIPTS_DIR = BASE_DIR / "transcripts"
+DOWNLOADS_DIR = BASE_DIR / "downloads"
+AUDIO_DIR = BASE_DIR / "audio"
 PREFERENCES_FILE = TRANSCRIPTS_DIR / "preferences.json"
 
 TRANSCRIPTS_DIR.mkdir(exist_ok=True)
