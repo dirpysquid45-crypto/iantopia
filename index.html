@@ -144,6 +144,9 @@
   <a class="big" href="/lootbox.html">🎁 루트박스 🫧 𓇼𓏲*ੈ✩‧₊˚🎐</a>
 
   <br />
+  <a class="big" onclick="goToYouTubeTranscripts()">🎬 YouTube Transcripts</a>
+
+  <br />
   <div id="earn-panel">
     <button id="btn-starter" class="big">💰 Claim Starter +100</button>
     <button id="btn-daily" class="big">🗓️ Daily +500</button>
@@ -297,6 +300,13 @@
       window.open("https://yt1d.com/en/youtube-to-mp3", "_blank");
 
     });
+
+    // YouTube Transcripts navigation
+    function goToYouTubeTranscripts() {
+      const hostname = window.location.hostname;
+      const port = hostname === 'localhost' || hostname === '127.0.0.1' ? '3000' : '3000';
+      window.location.href = `http://${hostname}:${port}/`;
+    }
   </script>
 
 </body>

@@ -807,9 +807,10 @@
 
       console.log('Script loaded');
 
-      // Home button handler - determines home server dynamically
+      // Home button handler - navigates in same tab
       function goHome(e) {
         e.preventDefault();
+        e.stopPropagation();
         const hostname = window.location.hostname;
         const port = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
           ? '5500'
@@ -821,6 +822,8 @@
       // Set home link handler
       const homeLink = document.getElementById('homeLink');
       if (homeLink) {
+        homeLink.removeAttribute('href');
+        homeLink.style.cursor = 'pointer';
         homeLink.addEventListener('click', goHome);
       }
 
