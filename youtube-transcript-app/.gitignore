@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+*.pyc
+__pycache__/
+.DS_Store
+.astro/
+.claude/
+transcripts/
+downloads/
+audio/
+preferences.json

@@ -38,7 +38,7 @@
       align-items: center;
       justify-content: center;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background-image: url('data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCADIAyADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWm5ybnJ2eoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlbaWmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwD3+iiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigD/2Q==');
+      background-image: url('/taipei.gif');
       background-size: cover;
       background-position: center;
       background-attachment: fixed;
@@ -150,7 +150,7 @@
       font-size: clamp(20px, 4vw, 34px);
       letter-spacing: 0.3px;
       color: #ffffff;
-      cursor: pointer;
+      cursor: none;
       transition: transform 0.2s;
       display: block;
       margin: 16px auto;
@@ -201,6 +201,22 @@
       border-radius: 6px;
     }
 
+    #mute-btn {
+      position: fixed;
+      top: 85px;
+      right: 20px;
+      z-index: 20;
+      background: rgba(0, 0, 0, 0.6);
+      border: 1px solid rgba(255, 235, 59, 0.5);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 18px;
+      padding: 6px 10px;
+      line-height: 1;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      cursor: none;
+    }
+
     /* Earn panel */
     #earn-panel {
       display: flex;
@@ -226,7 +242,7 @@
       border-radius: 10px;
       padding: 6px 10px;
       font-weight: 600;
-      cursor: pointer;
+      cursor: none;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
     }
 
@@ -253,7 +269,7 @@
 
   <a class="big" href="/never">Is Iantopia Done Yet????</a>
   <a class="big" href="/blackjack">🎲 Gamburing</a>
-  <a class="big" href="https://youtube-transcript.vercel.app/" target="_blank">📹 YouTube Transcripts</a>
+  <a class="big" href="http://localhost:3000" target="_blank">📹 YouTube Transcripts</a>
 
   <!-- Timer -->
   <div id="topia-timer">Loading…</div>
@@ -264,6 +280,8 @@
     <span id="strubles-amt">0</span>
   </div>
 
+  <button id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
+  <audio id="theme-music" src="/home-theme.mp3" preload="none" loop></audio>
 
   <!-- Timer Script -->
   <script>
@@ -337,74 +355,52 @@
         dailyBtn.disabled = !Strubles.canDailyClaim();
       }
 
-      starterBtn.addEventListener("click", () => {
-        if (Strubles.claimStarter(100)) updateUI();
-      });
-      dailyBtn.addEventListener("click", () => {
-        if (Strubles.dailyClaim(500)) updateUI();
-      });
+      if (starterBtn) {
+        starterBtn.addEventListener("click", () => {
+          if (Strubles.claimStarter(100)) updateUI();
+        });
+      }
+      if (dailyBtn) {
+        dailyBtn.addEventListener("click", () => {
+          if (Strubles.dailyClaim(500)) updateUI();
+        });
+      }
 
       window.addEventListener("strubles:change", updateUI);
       updateUI();
     })();
   </script>
 
-  <!-- Custom Cursor Implementation (Canvas-based) -->
+  <!-- Custom Cursor Implementation (Canvas-based, shared across pages) -->
+  <script is:inline src="/cursor.js"></script>
+
+  <!-- Home theme music -->
   <script>
-    const canvas = document.createElement('canvas');
-    canvas.width = 48;
-    canvas.height = 48;
-    canvas.style.position = 'fixed';
-    canvas.style.pointerEvents = 'none';
-    canvas.style.zIndex = '9999';
-    canvas.style.top = '0';
-    canvas.style.left = '0';
-    document.body.appendChild(canvas);
+    (() => {
+      let audioEnabled = true;
+      const themeMusic = document.getElementById('theme-music');
+      const muteBtn = document.getElementById('mute-btn');
 
-    const ctx = canvas.getContext('2d');
-    let mouseX = 0, mouseY = 0;
-    let cursorImage = null;
-    let isLoaded = false;
-
-    // Load optimized Smiski cursor image (32x32 @ 852B)
-    const img = new Image();
-    img.src = '/Smiski-cursor.png';
-    img.onload = () => {
-      cursorImage = img;
-      isLoaded = true;
-      document.body.style.cursor = 'none';
-      animate();
-    };
-    img.onerror = () => {
-      console.error('Cursor image failed to load, reverting to default');
-      document.body.style.cursor = 'auto';
-    };
-
-    function animate() {
-      if (!isLoaded) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      if (cursorImage) {
-        ctx.drawImage(cursorImage, mouseX - 12, mouseY - 12, 24, 24);
+      function tryPlayTheme() {
+        if (!audioEnabled) return;
+        themeMusic.play().catch(() => {});
       }
-      requestAnimationFrame(animate);
-    }
+      tryPlayTheme();
+      const unlockTheme = () => {
+        tryPlayTheme();
+        window.removeEventListener('pointerdown', unlockTheme);
+        window.removeEventListener('keydown', unlockTheme);
+      };
+      window.addEventListener('pointerdown', unlockTheme);
+      window.addEventListener('keydown', unlockTheme);
 
-    document.addEventListener('mousemove', (e) => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-    });
-
-    // Brighten cursor over clickable elements
-    document.addEventListener('mouseover', (e) => {
-      const el = e.target;
-      if (el.tagName === 'A' || el.tagName === 'BUTTON' || el.closest('[role="button"]')) {
-        canvas.style.filter = 'brightness(1.5) drop-shadow(0 0 6px rgba(255, 235, 59, 0.9))';
-      }
-    }, true);
-
-    document.addEventListener('mouseout', () => {
-      canvas.style.filter = 'brightness(1)';
-    }, true);
+      muteBtn.addEventListener('click', () => {
+        audioEnabled = !audioEnabled;
+        muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
+        if (audioEnabled) tryPlayTheme();
+        else themeMusic.pause();
+      });
+    })();
   </script>
 
 </body>

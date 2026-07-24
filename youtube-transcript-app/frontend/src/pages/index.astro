@@ -1,0 +1,1177 @@
+---
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>YouTube Transcript Downloader</title>
+    <style is:global>
+      .file-item {
+        margin-bottom: 15px;
+      }
+
+      .file-item:hover .file-title {
+        background: rgba(0, 80, 0, 0.6);
+        border-left-color: #00ff00;
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.4);
+        text-shadow: 0 0 10px #00ff00, 0 0 5px rgba(0, 255, 0, 0.6);
+      }
+
+      .file-title {
+        color: #00ff00 !important;
+        font-family: 'Courier New', monospace !important;
+        font-size: 13px !important;
+        font-weight: 600;
+        letter-spacing: 1px;
+        margin-bottom: 8px;
+        padding: 10px 12px;
+        background: rgba(0, 60, 0, 0.5);
+        border: 1px solid rgba(0, 255, 0, 0.5);
+        border-left: 3px solid #00ff00;
+        word-break: break-all;
+        transition: all 0.3s ease;
+        text-shadow: 0 0 8px #00ff00, 0 0 3px rgba(0, 255, 0, 0.4) !important;
+      }
+
+      .file-row {
+        background: rgba(0, 30, 0, 0.25);
+        border: 1px solid rgba(0, 170, 0, 0.5);
+        border-left: 3px solid #00dd00;
+        padding: 10px 15px;
+        display: grid;
+        grid-template-columns: 90px 1fr;
+        gap: 15px;
+        align-items: center;
+        transition: all 0.3s ease;
+        margin-bottom: 2px;
+      }
+
+      .file-row:hover {
+        background: rgba(0, 50, 0, 0.4);
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.25);
+        border-color: #00ff00;
+        border-left-color: #00ff00;
+      }
+
+      .file-type {
+        background: rgba(0, 100, 0, 0.3);
+        border: 1px solid #00ff00;
+        padding: 6px 10px;
+        text-align: center;
+        font-size: 10px;
+        font-weight: bold;
+        color: #00ff00 !important;
+        font-family: 'Courier New', monospace;
+        letter-spacing: 1px;
+        line-height: 1.4;
+      }
+
+      .file-size {
+        color: #00aa00 !important;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        text-align: center;
+        letter-spacing: 0.5px;
+      }
+
+      .file-action {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .file-btn {
+        padding: 8px 18px !important;
+        font-size: 10px !important;
+        font-weight: bold !important;
+        border: 2px solid #00ff00 !important;
+        background: rgba(0, 120, 0, 0.4) !important;
+        color: #00ff00 !important;
+        font-family: 'Courier New', monospace !important;
+        letter-spacing: 1px !important;
+        white-space: nowrap;
+        flex-shrink: 0;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+
+      .file-btn:hover {
+        background: rgba(0, 200, 0, 0.5) !important;
+        box-shadow: 0 0 25px rgba(0, 255, 0, 0.9), inset 0 0 15px rgba(0, 255, 0, 0.2) !important;
+        transform: scale(1.08) translateY(-2px) !important;
+        border-color: #00ff00 !important;
+      }
+
+      .file-btn:active {
+        transform: scale(1.02) translateY(0) !important;
+      }
+
+      @keyframes matrix-fall {
+        0% {
+          transform: translateY(-50px) perspective(800px) rotateX(0deg) rotateZ(0deg) scale(0.8);
+          opacity: 0;
+          filter: brightness(0.3) blur(2px);
+        }
+        10% {
+          opacity: 0.9;
+          filter: brightness(1) blur(0px);
+          transform: translateY(0px) perspective(800px) rotateX(0deg) rotateZ(0deg) scale(1);
+        }
+        85% {
+          opacity: 0.9;
+          filter: brightness(1) blur(0px);
+        }
+        100% {
+          transform: translateY(100vh) perspective(800px) rotateX(60deg) rotateZ(8deg) scale(0.5);
+          opacity: 0;
+          filter: brightness(0.5) blur(2px);
+        }
+      }
+
+      @keyframes matrix-fall-slow {
+        0% {
+          transform: translateY(-100%) perspective(1500px) rotateX(0deg) scaleY(1);
+          opacity: 0;
+          filter: brightness(0.3);
+        }
+        5% {
+          opacity: 0.6;
+          filter: brightness(0.8);
+        }
+        50% {
+          filter: brightness(1);
+          transform: translateY(50vh) perspective(1500px) rotateX(45deg) scaleY(1.05);
+        }
+        95% {
+          opacity: 0.6;
+          filter: brightness(0.8);
+        }
+        100% {
+          transform: translateY(100vh) perspective(1500px) rotateX(90deg) scaleY(1);
+          opacity: 0;
+          filter: brightness(0.3);
+        }
+      }
+
+      @keyframes matrix-drift {
+        0% {
+          transform: translateY(-100%) translateX(0px) perspective(2000px) rotateX(0deg) rotateY(0deg);
+          opacity: 0;
+        }
+        5% {
+          opacity: 0.4;
+        }
+        50% {
+          transform: translateY(50vh) translateX(50px) perspective(2000px) rotateX(45deg) rotateY(15deg);
+        }
+        95% {
+          opacity: 0.4;
+        }
+        100% {
+          transform: translateY(100vh) translateX(100px) perspective(2000px) rotateX(90deg) rotateY(30deg);
+          opacity: 0;
+        }
+      }
+
+      @keyframes matrix-drift-left {
+        0% {
+          transform: translateY(-100%) translateX(0px) perspective(2000px) rotateX(0deg) rotateY(0deg);
+          opacity: 0;
+        }
+        5% {
+          opacity: 0.4;
+        }
+        50% {
+          transform: translateY(50vh) translateX(-50px) perspective(2000px) rotateX(45deg) rotateY(-15deg);
+        }
+        95% {
+          opacity: 0.4;
+        }
+        100% {
+          transform: translateY(100vh) translateX(-100px) perspective(2000px) rotateX(90deg) rotateY(-30deg);
+          opacity: 0;
+        }
+      }
+    </style>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      @keyframes glow {
+        0%, 100% {
+          text-shadow: 0 0 2px #00ff00;
+        }
+        50% {
+          text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+        }
+      }
+
+      body {
+        font-family: 'Courier New', monospace;
+        background: #000;
+        min-height: 100vh;
+        padding: 20px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .matrix-bg {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: visible;
+        z-index: 1;
+        background: #000;
+        perspective: 1200px;
+        pointer-events: none;
+      }
+
+      .matrix-bg::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+
+      .matrix-char {
+        position: fixed;
+        color: #00ff00;
+        font-family: 'Courier New', monospace;
+        font-weight: bold;
+        font-size: 24px;
+        opacity: 0.8;
+        animation: matrix-fall 8s linear infinite;
+        text-shadow: 0 0 10px #00ff00, 0 0 20px rgba(0, 255, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        will-change: transform, opacity;
+        z-index: 1;
+        pointer-events: none;
+        line-height: 1;
+        letter-spacing: 2px;
+      }
+
+      .matrix-char.slow {
+        animation: matrix-fall-slow linear infinite;
+        font-size: 18px;
+        opacity: 0.6;
+        color: #00aa00;
+        text-shadow: 0 0 8px #00aa00;
+        will-change: transform;
+      }
+
+      .matrix-char.drift {
+        animation: matrix-drift linear infinite;
+        font-size: 16px;
+        opacity: 0.4;
+        color: #008800;
+        text-shadow: 0 0 4px #008800;
+        will-change: transform;
+      }
+
+      .matrix-char.drift-left {
+        animation: matrix-drift-left linear infinite;
+        font-size: 16px;
+        opacity: 0.4;
+        color: #005500;
+        text-shadow: 0 0 4px #005500;
+        will-change: transform;
+      }
+
+      .content-wrapper {
+        position: relative;
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        pointer-events: auto;
+      }
+
+      .container {
+        background: rgba(15, 15, 15, 0.98);
+        border: 2px solid #00ff00;
+        box-shadow: 0 0 20px rgba(0, 255, 0, 0.3), inset 0 0 20px rgba(0, 255, 0, 0.05);
+        padding: 40px;
+        width: 100%;
+        max-width: 900px;
+        max-height: 90vh;
+        overflow-y: auto;
+        position: relative;
+        z-index: 50;
+      }
+
+      h1 {
+        font-size: 28px;
+        margin-bottom: 10px;
+        color: #00ff00;
+        text-shadow: 0 0 10px #00ff00;
+        letter-spacing: 2px;
+        font-weight: bold;
+      }
+
+      .subtitle {
+        color: #00aa00;
+        margin-bottom: 30px;
+        font-size: 14px;
+        letter-spacing: 1px;
+      }
+
+      .input-group {
+        display: flex;
+        gap: 0;
+        margin-bottom: 20px;
+      }
+
+      input {
+        flex: 1;
+        padding: 12px;
+        border: 1px solid #00ff00;
+        background: rgba(0, 0, 0, 0.8);
+        color: #00ff00;
+        font-size: 14px;
+        font-family: 'Courier New', monospace;
+        transition: all 0.2s;
+      }
+
+      input::placeholder {
+        color: #006600;
+      }
+
+      input:focus {
+        outline: none;
+        box-shadow: 0 0 15px rgba(0, 255, 0, 0.5), inset 0 0 10px rgba(0, 255, 0, 0.1);
+      }
+
+      @keyframes shine {
+        0% {
+          background-position: -1000px 0;
+        }
+        100% {
+          background-position: 1000px 0;
+        }
+      }
+
+      @keyframes grow-hover {
+        0% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+        100% {
+          transform: scale(1.08);
+        }
+      }
+
+      button {
+        padding: 12px 30px;
+        background: rgba(0, 255, 0, 0.1);
+        color: #00ff00;
+        border: 1px solid #00ff00;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 600;
+        font-family: 'Courier New', monospace;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        letter-spacing: 1px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -1000px;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.3),
+          transparent
+        );
+        animation: none;
+      }
+
+      button:hover {
+        background: rgba(0, 255, 0, 0.2);
+        box-shadow: 0 0 25px rgba(0, 255, 0, 0.6), inset 0 0 15px rgba(0, 255, 0, 0.2), 0 10px 25px rgba(0, 255, 0, 0.3);
+        transform: scale(1.08) translateY(-3px);
+        animation: none;
+      }
+
+      button:hover::before {
+        animation: shine 0.6s ease-in-out;
+      }
+
+      button:active {
+        background: rgba(0, 255, 0, 0.3);
+        transform: scale(1.05) translateY(-1px);
+      }
+
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      .download-btn {
+        background: rgba(0, 120, 0, 0.4) !important;
+        padding: 8px 18px !important;
+        font-size: 11px !important;
+        font-weight: 700 !important;
+        margin: 0 !important;
+        border: 2px solid #00ff00 !important;
+        color: #00ff00 !important;
+        font-family: 'Courier New', monospace !important;
+        letter-spacing: 1px !important;
+        white-space: nowrap;
+        flex-shrink: 0;
+        position: relative !important;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+
+      .download-btn::before {
+        content: '' !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: -1000px !important;
+        width: 100% !important;
+        height: 100% !important;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.2),
+          transparent
+        ) !important;
+        animation: none !important;
+      }
+
+      .download-btn:hover {
+        background: rgba(0, 200, 0, 0.5) !important;
+        box-shadow: 0 0 25px rgba(0, 255, 0, 0.9), inset 0 0 15px rgba(0, 255, 0, 0.3) !important;
+        transform: scale(1.08) translateY(-1px) !important;
+        border-color: #00ff00 !important;
+      }
+
+      .download-btn:active {
+        background: rgba(0, 255, 0, 0.4) !important;
+        transform: scale(1.02) translateY(0) !important;
+      }
+
+      .status {
+        margin-top: 20px;
+        padding: 15px;
+        border: 1px solid #00ff00;
+        font-size: 14px;
+        display: none;
+        letter-spacing: 0.5px;
+        opacity: 0;
+        transform: translateY(-10px);
+        transition: all 0.3s ease-in-out;
+      }
+
+      .status.show {
+        display: block;
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .status.loading {
+        background: rgba(0, 50, 0, 0.3);
+        color: #00ff00;
+        border-color: #00ff00;
+        animation: glow 1s infinite;
+      }
+
+      .status.success {
+        background: rgba(0, 80, 0, 0.3);
+        color: #00ff00;
+        border-color: #00aa00;
+      }
+
+      .status.error {
+        background: rgba(80, 0, 0, 0.3);
+        color: #ff3333;
+        border-color: #ff3333;
+      }
+
+      .status.duplicate {
+        background: rgba(80, 40, 0, 0.3);
+        color: #ffaa00;
+        border-color: #ffaa00;
+      }
+
+      .duplicate-actions {
+        display: flex;
+        gap: 0;
+        margin-top: 15px;
+      }
+
+      .duplicate-actions button {
+        flex: 1;
+        padding: 10px;
+      }
+
+      .skip-btn {
+        background: rgba(60, 60, 60, 0.3);
+        color: #999;
+        border-color: #666;
+      }
+
+      .skip-btn:hover {
+        background: rgba(80, 80, 80, 0.3);
+        box-shadow: 0 0 10px rgba(100, 100, 100, 0.3);
+      }
+
+      .overwrite-btn {
+        background: rgba(100, 0, 0, 0.2);
+        color: #ff3333;
+        border-color: #ff3333;
+      }
+
+      .overwrite-btn:hover {
+        background: rgba(150, 0, 0, 0.3);
+        box-shadow: 0 0 10px rgba(255, 50, 50, 0.4);
+      }
+
+      .checkbox-group {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+      }
+
+      .checkbox-group input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: #00ff00;
+      }
+
+      .checkbox-group label {
+        font-size: 13px;
+        color: #00aa00;
+        cursor: pointer;
+      }
+
+      .transcripts-section {
+        margin-top: 40px;
+        padding-top: 0;
+        border-top: 1px solid #00ff00;
+        max-height: 300px;
+        overflow-y: auto;
+        padding-right: 10px;
+        position: relative;
+      }
+
+      .transcripts-section::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      .transcripts-section::-webkit-scrollbar-track {
+        background: rgba(0, 255, 0, 0.1);
+      }
+
+      .transcripts-section::-webkit-scrollbar-thumb {
+        background: #00ff00;
+        border-radius: 0;
+      }
+
+      .transcripts-section h2 {
+        font-size: 16px;
+        margin-bottom: 20px;
+        margin-top: 0;
+        color: #00ff00;
+        text-shadow: 0 0 12px #00ff00;
+        letter-spacing: 2px;
+        font-weight: bold;
+        position: sticky;
+        top: 0;
+        background: rgba(15, 15, 15, 0.98);
+        padding: 10px 0 10px 0;
+        border-bottom: 1px solid rgba(0, 255, 0, 0.3);
+        z-index: 10;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 30px 20px;
+        color: #006600;
+      }
+
+      .empty-state-icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="matrix-bg" id="matrixBg"></div>
+
+    <div class="content-wrapper">
+      <div class="container">
+        <a href="http://localhost:4321/" id="homeLink" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; font-family:'Courier New', monospace;">&larr; HOME</a>
+        <h1>> YT-TRANSCRIPT_PLUS</h1>
+        <p class="subtitle">>> Download transcripts & videos from YouTube</p>
+        <p style="color: #006600; font-size: 11px; margin-top: 5px; margin-bottom: 30px; letter-spacing: 1px; text-align: right;">a widget by EEN</p>
+
+        <div style="margin-bottom: 30px;">
+          <p style="color: #00aa00; font-size: 12px; margin-bottom: 10px; letter-spacing: 1px;">>>> TRANSCRIPT MODE</p>
+          <div class="input-group">
+            <input
+              type="text"
+              id="youtubeUrl"
+              placeholder="https://www.youtube.com/watch?v=..."
+              autocomplete="off"
+            />
+            <button id="fetchBtn">[FETCH]</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <p style="color: #00aa00; font-size: 12px; margin-bottom: 10px; letter-spacing: 1px;">>>> VIDEO MODE</p>
+          <div class="input-group">
+            <input
+              type="text"
+              id="videoUrl"
+              placeholder="https://www.youtube.com/watch?v=..."
+              autocomplete="off"
+            />
+            <button id="downloadVideoBtn">[DOWNLOAD]</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 30px;">
+          <p style="color: #00aa00; font-size: 12px; margin-bottom: 10px; letter-spacing: 1px;">>>> AUDIO MODE (MP3)</p>
+          <div class="input-group">
+            <input
+              type="text"
+              id="audioUrl"
+              placeholder="https://www.youtube.com/watch?v=..."
+              autocomplete="off"
+            />
+            <button id="downloadAudioBtn">[DOWNLOAD]</button>
+          </div>
+        </div>
+
+        <div id="status" class="status"></div>
+
+        <div class="transcripts-section">
+          <h2>>>> TRANSCRIPTS</h2>
+          <div id="transcriptsList">
+            <div class="empty-state">
+              <div class="empty-state-icon">∅</div>
+              <p>No transcripts cached</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="transcripts-section">
+          <h2>>>> VIDEOS</h2>
+          <div id="videosList">
+            <div class="empty-state">
+              <div class="empty-state-icon">∅</div>
+              <p>No videos downloaded</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="transcripts-section">
+          <h2>>>> AUDIO</h2>
+          <div id="audioList">
+            <div class="empty-state">
+              <div class="empty-state-icon">∅</div>
+              <p>No audio downloaded</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script is:inline>
+      // Matrix rain effect with 0s and 1s
+      function initMatrix() {
+        console.log('Matrix initialization starting...');
+        const matrixBg = document.getElementById('matrixBg');
+        if (!matrixBg) {
+          console.error('matrixBg element not found!');
+          return;
+        }
+        console.log('Matrix BG found:', matrixBg);
+        console.log('Matrix BG computed style:', window.getComputedStyle(matrixBg));
+        console.log('Matrix BG z-index:', window.getComputedStyle(matrixBg).zIndex);
+
+        // Create foreground layer - fast falling 0s and 1s with staggered timing
+        let totalChars = 0;
+        for (let i = 0; i < 60; i++) {
+          const char = document.createElement('div');
+          char.className = 'matrix-char';
+          char.textContent = Math.random() > 0.5 ? '0' : '1';
+          const leftPos = Math.random() * 100;
+          char.style.left = leftPos + '%';
+          char.style.top = '-50px';
+          const duration = Math.random() * 3 + 5;
+          const delay = (i / 60) * 0.3 + Math.random() * 0.2;
+          char.style.animationDuration = duration + 's';
+          char.style.animationDelay = delay + 's';
+          char.style.fontSize = '28px';
+          matrixBg.appendChild(char);
+          totalChars++;
+        }
+        console.log('Created foreground layer:', totalChars, 'chars');
+
+        // Create mid layer - medium speed 0s and 1s
+        for (let i = 0; i < 40; i++) {
+          const char = document.createElement('div');
+          char.className = 'matrix-char slow';
+          char.textContent = Math.random() > 0.5 ? '0' : '1';
+          char.style.left = Math.random() * 100 + '%';
+          const duration = Math.random() * 6 + 8;
+          const delay = (i / 40) * 0.8 + Math.random() * 0.5;
+          char.style.animationDuration = duration + 's';
+          char.style.animationDelay = delay + 's';
+          char.style.opacity = String(0.5 + Math.random() * 0.2);
+          matrixBg.appendChild(char);
+          totalChars++;
+        }
+        console.log('Created mid layer, total:', totalChars, 'chars');
+
+        // Create background layer - drifting right
+        for (let i = 0; i < 30; i++) {
+          const char = document.createElement('div');
+          char.className = 'matrix-char drift';
+          char.textContent = Math.random() > 0.5 ? '0' : '1';
+          char.style.left = Math.random() * 100 + '%';
+          const duration = Math.random() * 10 + 12;
+          const delay = (i / 30) * 1.2 + Math.random() * 0.8;
+          char.style.animationDuration = duration + 's';
+          char.style.animationDelay = delay + 's';
+          char.style.opacity = String(0.3 + Math.random() * 0.15);
+          matrixBg.appendChild(char);
+          totalChars++;
+        }
+        console.log('Created drift right layer, total:', totalChars, 'chars');
+
+        // Create background layer - drifting left
+        for (let i = 0; i < 30; i++) {
+          const char = document.createElement('div');
+          char.className = 'matrix-char drift-left';
+          char.textContent = Math.random() > 0.5 ? '0' : '1';
+          char.style.left = Math.random() * 100 + '%';
+          const duration = Math.random() * 10 + 12;
+          const delay = (i / 30) * 1.2 + Math.random() * 0.8;
+          char.style.animationDuration = duration + 's';
+          char.style.animationDelay = delay + 's';
+          char.style.opacity = String(0.25 + Math.random() * 0.1);
+          matrixBg.appendChild(char);
+          totalChars++;
+        }
+        console.log('Matrix initialization complete! Total chars:', totalChars);
+        console.log('Matrix BG children count:', matrixBg.children.length);
+
+        // TEST: Add visible styling to verify elements exist
+        const testChar = matrixBg.children[0];
+        if (testChar) {
+          console.log('First character element:', testChar);
+          console.log('Text content:', testChar.textContent);
+          console.log('Classes:', testChar.className);
+
+          // Get computed animation
+          const computedStyle = window.getComputedStyle(testChar);
+          console.log('Animation name:', computedStyle.animationName);
+          console.log('Animation duration:', computedStyle.animationDuration);
+          console.log('Opacity:', computedStyle.opacity);
+          console.log('Position:', computedStyle.position);
+          console.log('Left:', computedStyle.left);
+        }
+      }
+
+      console.log('Script loaded');
+
+      // Wait for DOM to be fully loaded
+      if (document.readyState === 'loading') {
+        console.log('DOM still loading, waiting...');
+        document.addEventListener('DOMContentLoaded', function() {
+          console.log('DOM loaded, calling initMatrix');
+          initMatrix();
+        });
+      } else {
+        console.log('DOM already loaded, calling initMatrix');
+        initMatrix();
+      }
+
+      // Determine API base URL: from data attribute, window variable, or fallback
+      const API_BASE =
+        document.documentElement.dataset.apiBase ||
+        (typeof window !== 'undefined' && window.API_BASE) ||
+        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? 'http://localhost:8000'
+          : `http://${window.location.hostname}:8000`);
+      let currentVideoId = null;
+      let currentOverwrite = false;
+
+      const urlInput = document.getElementById("youtubeUrl");
+      const fetchBtn = document.getElementById("fetchBtn");
+      const videoInput = document.getElementById("videoUrl");
+      const downloadVideoBtn = document.getElementById("downloadVideoBtn");
+      const audioInput = document.getElementById("audioUrl");
+      const downloadAudioBtn = document.getElementById("downloadAudioBtn");
+      const statusDiv = document.getElementById("status");
+      const transcriptsList = document.getElementById("transcriptsList");
+      const videosList = document.getElementById("videosList");
+      const audioList = document.getElementById("audioList");
+
+      fetchBtn.addEventListener("click", handleFetch);
+      urlInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") handleFetch();
+      });
+
+      downloadVideoBtn.addEventListener("click", handleDownloadVideo);
+      videoInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") handleDownloadVideo();
+      });
+
+      downloadAudioBtn.addEventListener("click", handleDownloadAudio);
+      audioInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") handleDownloadAudio();
+      });
+
+      loadTranscripts();
+      loadVideos();
+      loadAudio();
+      setInterval(loadTranscripts, 3000);
+      setInterval(loadVideos, 3000);
+      setInterval(loadAudio, 3000);
+
+      async function loadTranscripts() {
+        try {
+          const response = await fetch(`${API_BASE}/api/transcripts`);
+          const data = await response.json();
+
+          if (data.transcripts && data.transcripts.length > 0) {
+            let html = "";
+            data.transcripts.forEach(file => {
+              const sizeKB = (file.size / 1024).toFixed(2);
+              html += `
+                <div class="file-item">
+                  <div class="file-title" title="${file.filename}">➤ ${file.filename}</div>
+                  <div class="file-row">
+                    <div class="file-type">TX<br/><span class="file-size">${sizeKB}KB</span></div>
+                    <div class="file-action">
+                      <button class="file-btn" data-filename="${file.filename}" data-type="transcript">[DOWNLOAD]</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+            transcriptsList.innerHTML = html;
+          } else {
+            transcriptsList.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-state-icon">∅</div>
+                <p>No transcripts cached</p>
+              </div>
+            `;
+          }
+        } catch (error) {
+          console.error("Failed to load transcripts:", error);
+        }
+      }
+
+      function downloadTranscript(filename) {
+        const downloadUrl = `${API_BASE}/api/download/${encodeURIComponent(filename)}`;
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      // Event delegation for file download buttons
+      transcriptsList.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-type='transcript']");
+        if (btn && btn.dataset.filename) {
+          downloadTranscript(btn.dataset.filename);
+        }
+      });
+
+      videosList.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-type='video']");
+        if (btn && btn.dataset.filename) {
+          downloadVideo(btn.dataset.filename);
+        }
+      });
+
+      audioList.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-type='audio']");
+        if (btn && btn.dataset.filename) {
+          downloadAudio(btn.dataset.filename);
+        }
+      });
+
+      async function loadVideos() {
+        try {
+          const response = await fetch(`${API_BASE}/api/downloads`);
+          const data = await response.json();
+
+          if (data.downloads && data.downloads.length > 0) {
+            let html = "";
+            data.downloads.forEach(file => {
+              html += `
+                <div class="file-item">
+                  <div class="file-title" title="${file.filename}">➤ ${file.filename}</div>
+                  <div class="file-row">
+                    <div class="file-type">VD<br/><span class="file-size">${file.size_mb}MB</span></div>
+                    <div class="file-action">
+                      <button class="file-btn" data-filename="${file.filename}" data-type="video">[DOWNLOAD]</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+            videosList.innerHTML = html;
+          } else {
+            videosList.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-state-icon">∅</div>
+                <p>No videos downloaded</p>
+              </div>
+            `;
+          }
+        } catch (error) {
+          console.error("Failed to load videos:", error);
+        }
+      }
+
+      function downloadVideo(filename) {
+        const downloadUrl = `${API_BASE}/api/download-video/${encodeURIComponent(filename)}`;
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      async function loadAudio() {
+        try {
+          const response = await fetch(`${API_BASE}/api/audio`);
+          const data = await response.json();
+
+          if (data.audio && data.audio.length > 0) {
+            let html = "";
+            data.audio.forEach(file => {
+              html += `
+                <div class="file-item">
+                  <div class="file-title" title="${file.filename}">➤ ${file.filename}</div>
+                  <div class="file-row">
+                    <div class="file-type">MP3<br/><span class="file-size">${file.size_mb}MB</span></div>
+                    <div class="file-action">
+                      <button class="file-btn" data-filename="${file.filename}" data-type="audio">[DOWNLOAD]</button>
+                    </div>
+                  </div>
+                </div>
+              `;
+            });
+            audioList.innerHTML = html;
+          } else {
+            audioList.innerHTML = `
+              <div class="empty-state">
+                <div class="empty-state-icon">∅</div>
+                <p>No audio downloaded</p>
+              </div>
+            `;
+          }
+        } catch (error) {
+          console.error("Failed to load audio:", error);
+        }
+      }
+
+      function downloadAudio(filename) {
+        const downloadUrl = `${API_BASE}/api/download-audio/${encodeURIComponent(filename)}`;
+        const link = document.createElement("a");
+        link.href = downloadUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+
+      async function handleDownloadVideo() {
+        const url = videoInput.value.trim();
+        if (!url) {
+          showStatus("error", ">>> ERROR: Video URL field empty");
+          return;
+        }
+
+        downloadVideoBtn.disabled = true;
+        showStatus("loading", ">>> Downloading video... (this may take a while)");
+
+        try {
+          const response = await fetch(`${API_BASE}/api/download-video`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url }),
+          });
+
+          const data = await response.json();
+
+          if (data.status === "success") {
+            showStatus("success", `✓ Video downloaded: ${data.filename}`);
+            videoInput.value = "";
+            setTimeout(loadVideos, 500);
+          } else {
+            showStatus("error", `>>> ERROR: ${data.detail || "Unknown error"}`);
+          }
+        } catch (error) {
+          showStatus("error", `>>> ERROR: ${error.message}`);
+        } finally {
+          downloadVideoBtn.disabled = false;
+        }
+      }
+
+      async function handleDownloadAudio() {
+        const url = audioInput.value.trim();
+        if (!url) {
+          showStatus("error", ">>> ERROR: Audio URL field empty");
+          return;
+        }
+
+        downloadAudioBtn.disabled = true;
+        showStatus("loading", ">>> Extracting audio... (this may take a while)");
+
+        try {
+          const response = await fetch(`${API_BASE}/api/download-audio`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url }),
+          });
+
+          const data = await response.json();
+
+          if (data.status === "success") {
+            showStatus("success", `✓ Audio downloaded: ${data.filename}`);
+            audioInput.value = "";
+            setTimeout(loadAudio, 500);
+          } else {
+            showStatus("error", `>>> ERROR: ${data.detail || "Unknown error"}`);
+          }
+        } catch (error) {
+          showStatus("error", `>>> ERROR: ${error.message}`);
+        } finally {
+          downloadAudioBtn.disabled = false;
+        }
+      }
+
+      async function handleFetch() {
+        const url = urlInput.value.trim();
+        if (!url) {
+          showStatus("error", ">>> ERROR: URL field empty");
+          return;
+        }
+
+        fetchBtn.disabled = true;
+        showStatus("loading", ">>> Processing...");
+
+        try {
+          const response = await fetch(`${API_BASE}/api/fetch-transcript`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url, overwrite: currentOverwrite }),
+          });
+
+          const data = await response.json();
+
+          if (data.status === "duplicate_exists") {
+            currentVideoId = data.video_id;
+            showDuplicateDialog(data.filename);
+          } else if (data.status === "success") {
+            showStatus("success", `✓ ${data.filename} cached`);
+            urlInput.value = "";
+            currentOverwrite = false;
+            setTimeout(loadTranscripts, 500);
+          } else if (data.status === "skipped") {
+            showStatus("success", `✓ File exists: ${data.filename}`);
+            urlInput.value = "";
+          }
+        } catch (error) {
+          showStatus("error", `>>> ERROR: ${error.message}`);
+        } finally {
+          fetchBtn.disabled = false;
+        }
+      }
+
+      function showDuplicateDialog(filename) {
+        const dontAskCheckbox = `
+          <div class="checkbox-group">
+            <input type="checkbox" id="dontAskAgain" />
+            <label for="dontAskAgain">Remember choice</label>
+          </div>
+        `;
+
+        statusDiv.innerHTML = `
+          <div>
+            <strong>>>> FILE_EXISTS: ${filename}</strong>
+            ${dontAskCheckbox}
+            <div class="duplicate-actions">
+              <button class="skip-btn" id="skipBtn">[KEEP]</button>
+              <button class="overwrite-btn" id="overwriteBtn">[OVERWRITE]</button>
+            </div>
+          </div>
+        `;
+        statusDiv.className = "status show duplicate";
+
+        document.getElementById("skipBtn").addEventListener("click", () => {
+          handleDuplicate("skip");
+        });
+
+        document.getElementById("overwriteBtn").addEventListener("click", () => {
+          handleDuplicate("overwrite");
+        });
+      }
+
+      async function handleDuplicate(action) {
+        const dontAskAgain = document.getElementById("dontAskAgain").checked;
+
+        try {
+          await fetch(`${API_BASE}/api/handle-duplicate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              video_id: currentVideoId,
+              action,
+              dont_ask_again: dontAskAgain,
+            }),
+          });
+
+          if (action === "overwrite") {
+            currentOverwrite = true;
+            handleFetch();
+          } else {
+            showStatus("success", "✓ Operation cancelled");
+            urlInput.value = "";
+          }
+        } catch (error) {
+          showStatus("error", `>>> ERROR: ${error.message}`);
+        }
+      }
+
+      function showStatus(type, message) {
+        statusDiv.textContent = message;
+        statusDiv.className = `status show ${type}`;
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Matrix Animation Debug</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #000;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .matrix-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: visible;
+            z-index: 1;
+            background: #000;
+            perspective: 1200px;
+            pointer-events: none;
+        }
+
+        @keyframes matrix-fall {
+            0% {
+                transform: translateY(-50px) perspective(800px) rotateX(0deg) rotateZ(0deg) scale(0.8);
+                opacity: 0;
+                filter: brightness(0.3) blur(2px);
+            }
+            10% {
+                opacity: 0.9;
+                filter: brightness(1) blur(0px);
+                transform: translateY(0px) perspective(800px) rotateX(0deg) rotateZ(0deg) scale(1);
+            }
+            85% {
+                opacity: 0.9;
+                filter: brightness(1) blur(0px);
+            }
+            100% {
+                transform: translateY(100vh) perspective(800px) rotateX(60deg) rotateZ(8deg) scale(0.5);
+                opacity: 0;
+                filter: brightness(0.5) blur(2px);
+            }
+        }
+
+        .matrix-char {
+            position: fixed;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 24px;
+            opacity: 0.8;
+            animation: matrix-fall 8s linear infinite;
+            text-shadow: 0 0 10px #00ff00, 0 0 20px rgba(0, 255, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            will-change: transform, opacity;
+            z-index: 1;
+            pointer-events: none;
+            line-height: 1;
+            letter-spacing: 2px;
+        }
+
+        .debug-panel {
+            position: relative;
+            z-index: 100;
+            background: rgba(0, 30, 0, 0.9);
+            border: 2px solid #00ff00;
+            padding: 20px;
+            color: #00ff00;
+            font-size: 14px;
+            max-width: 600px;
+            line-height: 1.6;
+        }
+
+        .success { color: #00ff00; }
+        .error { color: #ff3333; }
+        .info { color: #00aa00; }
+
+        h1 {
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="matrix-bg" id="matrixBg"></div>
+
+    <div class="debug-panel">
+        <h1>Matrix Animation Debug</h1>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        const status = document.getElementById('status');
+
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = message;
+            status.appendChild(div);
+            console.log(message);
+        }
+
+        // Check DOM elements
+        const matrixBg = document.getElementById('matrixBg');
+        if (matrixBg) {
+            log('✓ Matrix BG element found', 'success');
+        } else {
+            log('✗ Matrix BG element NOT found', 'error');
+        }
+
+        // Create test characters
+        log('Creating test characters...', 'info');
+        for (let i = 0; i < 80; i++) {
+            const char = document.createElement('div');
+            char.className = 'matrix-char';
+            char.textContent = Math.random() > 0.5 ? '0' : '1';
+            char.style.left = Math.random() * 100 + '%';
+            char.style.top = '-50px';
+            const duration = Math.random() * 3 + 5;
+            const delay = (i / 80) * 0.3 + Math.random() * 0.2;
+            char.style.animationDuration = duration + 's';
+            char.style.animationDelay = delay + 's';
+            matrixBg.appendChild(char);
+        }
+
+        log(`✓ Created ${matrixBg.children.length} characters`, 'success');
+
+        // Check computed styles
+        setTimeout(() => {
+            const testChar = matrixBg.children[0];
+            if (testChar) {
+                const style = window.getComputedStyle(testChar);
+                log('First character computed styles:', 'info');
+                log(`  Position: ${style.position}`, 'info');
+                log(`  Z-index: ${style.zIndex}`, 'info');
+                log(`  Animation: ${style.animationName}`, 'info');
+                log(`  Font size: ${style.fontSize}`, 'info');
+                log(`  Opacity: ${style.opacity}`, 'info');
+                log(`  Left: ${style.left}`, 'info');
+                log(`  Top: ${style.top}`, 'info');
+            }
+        }, 100);
+
+        // Monitor animation
+        setTimeout(() => {
+            log('✓ You should see green 0s and 1s falling from top to bottom!', 'success');
+            log('✓ Try hovering over the button area below for shine effect', 'success');
+        }, 500);
+    </script>
+</body>
+</html>

@@ -1,4 +1,10 @@
 ---
+const CLOWN_COUNT = 80;
+const clowns = Array.from({ length: CLOWN_COUNT }).map(() => ({
+  left: (Math.random() * 95).toFixed(2),
+  duration: (3 + Math.random() * 4).toFixed(2),
+  delay: (Math.random() * 5).toFixed(2),
+}));
 ---
 
 <!DOCTYPE html>
@@ -27,27 +33,38 @@
   @keyframes slide{0%{left:100%}100%{left:-200%}}
   @keyframes hue{0%{background-position:0% 50%}100%{background-position:200% 50%}}
 
-  .clowns{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-  .clown{position:absolute;font-size:clamp(24px,6vw,60px);animation:flash 1.2s steps(2,end) infinite;filter:drop-shadow(0 0 6px rgba(255,255,255,.35));will-change:opacity,transform}
-  @keyframes flash{0%,100%{opacity:1;transform:scale(1) rotate(0deg) translate(0,0)}20%{opacity:.3;transform:scale(1.05) rotate(8deg) translate(2px,-3px)}40%{opacity:.5;transform:scale(0.95) rotate(-5deg) translate(-2px,2px)}60%{opacity:.2;transform:scale(1.1) rotate(12deg) translate(3px,1px)}80%{opacity:.6;transform:scale(1) rotate(-2deg) translate(-1px,-1px)}}
+  .clowns{position:relative;width:100vw;height:100vh;overflow:hidden;pointer-events:none;z-index:1}
+  .clown{
+    position:absolute;
+    top:-60px;
+    left:var(--start-left);
+    animation:rainFall var(--fall-duration) linear infinite;
+    animation-delay:var(--fall-delay);
+    pointer-events:none;
+    font-size:clamp(24px,6vw,60px);
+    filter:drop-shadow(0 0 6px rgba(255,255,255,.35));
+    will-change:transform,opacity;
+  }
+  @keyframes rainFall{
+    0% { transform:translateY(0) rotate(0deg); opacity:1; }
+    100% { transform:translateY(120vh) rotate(360deg); opacity:0.7; }
+  }
 </style>
 </head>
 <body>
-  <div class="clowns" id="clowns"></div>
+  <div class="clowns" id="clowns">
+    {clowns.map((c) => (
+      <div
+        class="clown"
+        style={`--start-left: ${c.left}%; --fall-duration: ${c.duration}s; --fall-delay: ${c.delay}s;`}
+      >🤡</div>
+    ))}
+  </div>
   <div class="marquee">That shit is NEVER GETTING DONE!</div>
 
   <audio id="music" src="/Circus.mp3" preload="auto" autoplay muted loop playsinline></audio>
 
 <script>
-  const container = document.getElementById('clowns');
-  for (let i=0;i<80;i++){
-    const s=document.createElement('div');
-    s.className='clown'; s.textContent='🤡';
-    s.style.left=Math.random()*100+'vw';
-    s.style.top=Math.random()*100+'vh';
-    s.style.animationDelay=(Math.random()*1.2).toFixed(2)+'s';
-    container.appendChild(s);
-  }
 
   const music = document.getElementById('music');
 

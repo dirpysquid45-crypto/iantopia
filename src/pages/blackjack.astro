@@ -8,15 +8,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Iantopia Blackjack</title>
 <link rel="preload" as="image" href="/strubles.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style>
-  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --accent:#22d3ee; --danger:#ff6b6b; }
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --accent:#22d3ee; --danger:#ff6b6b; --felt:#1a472a; }
   * { box-sizing:border-box; }
   body {
     margin:0; background: linear-gradient(135deg, #1a0a2e 0%, #3d1a5f 15%, #5a2d7f 30%, #8b4da6 45%, #d4746b 60%, #ff9a56 75%, #ffb84d 90%, #ffc470 100%);
     color:var(--ink);
-    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
     min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
-    cursor: url('/Smiski-point.webp') 10 2, auto;
+    cursor: none;
     position:relative; overflow:hidden;
   }
   body::before {
@@ -25,105 +28,116 @@
     background-size:cover; background-position:bottom; background-repeat:no-repeat; background-attachment:fixed; pointer-events:none; z-index:0;
   }
   main { position:relative; z-index:1; }
-  a, button {
-    cursor: url('/Smiski_click.png') 24 24, pointer;
-  }
   .table {
     width:min(900px, 95vw);
-    background: linear-gradient(135deg, #0d4620 0%, #0f5c2a 50%, #0d4620 100%);
-    border:3px solid #d4af37;
-    border-radius:18px;
+    background: linear-gradient(135deg, var(--felt) 0%, #235c3a 50%, var(--felt) 100%);
+    border:4px solid #000;
+    border-radius:0;
     padding:20px;
-    box-shadow:0 20px 50px rgba(0,0,0,.45), inset 0 0 40px rgba(212,175,55,.1);
+    box-shadow:0 20px 50px rgba(0,0,0,.5);
     position:relative;
   }
   .table::before {
     content:'';
     position:absolute;
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
+    top:0; left:0; right:0; bottom:0;
     background-image:
-      repeating-linear-gradient(
-        90deg,
-        transparent,
-        transparent 20px,
-        rgba(212,175,55,0.03) 20px,
-        rgba(212,175,55,0.03) 40px
-      ),
-      repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 20px,
-        rgba(212,175,55,0.03) 20px,
-        rgba(212,175,55,0.03) 40px
-      );
+      repeating-linear-gradient(90deg, transparent, transparent 20px, rgba(255,215,0,0.04) 20px, rgba(255,215,0,0.04) 40px),
+      repeating-linear-gradient(0deg, transparent, transparent 20px, rgba(255,215,0,0.04) 20px, rgba(255,215,0,0.04) 40px);
     pointer-events:none;
-    border-radius:15px;
   }
-  main { position:relative; z-index:1; }
-  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:2px solid #d4af37; padding-bottom:10px; }
-  header a { color:#d4af37; text-decoration:none; border:2px solid #d4af37; padding:8px 12px; border-radius:0; font-weight:700; transition:all 0.2s; }
-  header a:hover { background:#d4af37; color:#000; }
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:4px solid #000; padding-bottom:10px; }
+  header a { color:#ffd700; text-decoration:none; border:3px solid #000; padding:8px 12px; border-radius:0; font-weight:700; background:#000; transition:background 0.2s; font-size:10px; cursor:none; }
+  header a:hover { background:#ffd700; color:#000; }
 
-  h1 { margin:0; font-size:clamp(22px,3.5vw,28px); letter-spacing:.3px; color:#d4af37; font-weight:700; }
-  .row { margin-top:14px; padding:14px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px solid #233049; }
-  .label { color:var(--muted); font-size:.95rem; margin-bottom:6px; }
-  .hand { display:flex; gap:10px; flex-wrap:wrap; align-items:center; min-height:66px; }
-  .card { width:48px; height:66px; border-radius:8px; border:1px solid #2b3a58; background:#0c1018;
-    display:grid; place-items:center; font-weight:700; font-size:18px; box-shadow:0 6px 18px rgba(0,0,0,.35); }
-  .red { color:#ff97a0; }
+  h1 {
+    margin:0; font-size:clamp(13px,2.6vw,20px); letter-spacing:1px; color:#ffd700; font-weight:400;
+    text-shadow: 2px 2px 0 #000;
+    text-align:center;
+  }
+  .row { margin-top:16px; padding:14px; border:3px solid #000; background:rgba(0,0,0,0.35); position:relative; z-index:1; }
+  .label { color:#ffd700; font-size:10px; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; }
+  .hand { display:flex; gap:8px; flex-wrap:wrap; align-items:center; min-height:96px; }
+
+  .card-slot {
+    width:64px; height:96px;
+    border:3px solid #000;
+    background:rgba(0,0,0,0.3);
+    padding:8px;
+    display:flex; align-items:center; justify-content:center;
+    border-radius:0;
+  }
+  .card-slot.red { border-color:#8b1e2b; }
+  .card-img {
+    width:48px; height:48px;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+  }
+  .card-slot.deal-in { animation: cardDealIn 0.3s ease-out; }
+  @keyframes cardDealIn {
+    0%   { transform: translateX(-40px) rotateY(90deg); opacity:0; }
+    60%  { transform: translateX(4px) rotateY(0deg); opacity:1; }
+    100% { transform: translateX(0) rotateY(0deg); opacity:1; }
+  }
+
+  .score-display { margin-top:10px; font-size:13px; color:#fff; font-weight:400; }
+  .chips { margin-top:10px; color:var(--muted); font-size:11px; }
+  .status { margin-top:14px; font-weight:400; font-size:11px; color:#fff; }
+
   .controls { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center; }
   button {
-    all:unset; cursor:pointer; padding:12px 16px; border-radius:0; border:1px solid #2a3854;
-    background:#1c2434; color:var(--ink); box-shadow:0 8px 24px rgba(0,0,0,.35); font-weight:600;
+    all:unset; cursor:none; padding:12px 24px; border-radius:0; border:3px solid #333;
+    background:#4a6fa5; color:#fff; font-weight:400; font-size:11px;
+    font-family:'Press Start 2P', ui-monospace, monospace;
+    transition: background .15s, transform .1s;
   }
-  button.primary { background:#122231; border-color:#29415c; }
-  button.accent { background:rgba(34,211,238,.12); border-color:#2a4956; }
-  button.danger { background:rgba(255,107,107,.12); border-color:#5a2f3b; }
+  button:hover:not(:disabled) { background:#6a8fc5; }
+  button:active:not(:disabled) { transform: translateY(2px); }
+  button.primary { background:#2c5f8a; }
+  button.primary:hover:not(:disabled) { background:#3d7cae; }
+  button.accent { background:#22757a; }
+  button.accent:hover:not(:disabled) { background:#2f9aa1; }
+  button.danger { background:#7a2222; }
+  button.danger:hover:not(:disabled) { background:#a13030; }
   button:disabled { opacity:.5; cursor:not-allowed; }
 
   #earn-panel {
-    display: flex;
-    gap: 15px;
-    margin-top: 30px;
-    flex-wrap: wrap;
-    justify-content: center;
-    padding: 20px;
-    background: rgba(212, 175, 55, 0.05);
-    border: 2px solid #d4af37;
-    border-radius: 8px;
+    display: flex; gap: 15px; margin-top: 24px; flex-wrap: wrap; justify-content: center;
+    padding: 16px; background: rgba(255, 215, 0, 0.06); border: 3px solid #ffd700; position:relative; z-index:1;
   }
   #earn-panel button, #earn-panel a {
-    padding: 14px 20px;
-    font-size: 16px;
-    background: linear-gradient(135deg, #d4af37 0%, #aa8c2a 100%);
-    border: 2px solid #8b7a1a;
-    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
-    border-radius: 0;
-    color: #000;
-    text-decoration: none;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    padding: 12px 18px; font-size: 10px;
+    background: #ffd700; border: 3px solid #8b7a1a; border-radius: 0;
+    color: #000; text-decoration: none; font-weight: 400; text-transform: uppercase; letter-spacing: 1px;
+    font-family:'Press Start 2P', ui-monospace, monospace; cursor:none;
   }
-  #earn-panel button:hover, #earn-panel a:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(212, 175, 55, 0.6), inset 0 1px 0 rgba(255,255,255,0.3);
-  }
-  .status { margin-top:12px; font-weight:700; }
-  .chips { margin-top:8px; color:var(--muted); font-size:.95rem; }
+  #earn-panel button:hover, #earn-panel a:hover { background:#ffe958; }
 
-  /* Strubles badge */
   #strubles-badge{
     position:fixed; top:15px; left:20px; display:flex; align-items:center; gap:8px;
-    background:rgba(0,0,0,.6); padding:8px 12px; border-radius:12px; box-shadow:0 2px 6px rgba(0,0,0,.25);
-    font-weight:700;
+    background:#000; padding:8px 12px; border:3px solid #ffd700;
+    font-weight:700; z-index:20;
   }
-  #strubles-badge img{ width:28px; height:28px; border-radius:6px; }
+  #strubles-badge img{ width:28px; height:28px; }
+
+  #mute-btn {
+    position:fixed; top:15px; right:20px; z-index:20;
+    background:#000; border:3px solid #ffd700; color:#fff;
+    font-size:18px; padding:8px 12px; cursor:none; line-height:1;
+  }
+
   .betbox{ display:flex; align-items:center; gap:8px; }
-  .betbox input{ width:90px; padding:8px 10px; border-radius:10px; border:1px solid #2a3854; background:#0f1523; color:var(--ink); font-weight:700; }
+  .betbox input{ width:70px; padding:8px 10px; border:3px solid #000; background:#0f1523; color:var(--ink); font-weight:700; border-radius:0; font-family:inherit; font-size:11px; }
+  .betbox button { padding:8px 14px; }
+
+  @media (max-width:600px){
+    .table { padding:12px; }
+    h1 { font-size:12px; }
+    .card-slot { width:48px; height:72px; padding:6px; }
+    .card-img { width:36px; height:36px; }
+    .controls { flex-direction:column; align-items:stretch; }
+    #earn-panel { flex-direction:column; }
+  }
 </style>
 </head>
 <body>
@@ -133,16 +147,19 @@
     <span id="bal">0</span>
   </div>
 
+  <button id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
+
   <main class="table">
     <header>
       <a href="/" title="Back to Iantopia">← Home</a>
-      <h1>Blackjack at Iantopia</h1>
+      <h1>BLACKJACK IANTOPIA</h1>
       <div style="width:86px;"></div>
     </header>
 
     <section class="row">
       <div class="label">Dealer</div>
       <div class="hand" id="dealer-hand"></div>
+      <div class="score-display" id="dealer-score"></div>
     </section>
 
     <section class="row">
@@ -174,7 +191,10 @@
     </div>
   </main>
 
+  <audio id="theme-music" src="/Balatro-Main-Theme.mp3" preload="auto" loop></audio>
+
 <script is:inline src="/strubles.js?v=2"></script>
+<script is:inline src="/cursor.js"></script>
 
 <script>
 (() => {
@@ -194,6 +214,7 @@
   const statusEl = $('status');
   const totalsEl = $('totals');
   const balNumEl = $('bal');
+  const dealerScoreEl = $('dealer-score');
 
   const betInput = $('bet');
   const betMinus = $('bet-minus');
@@ -203,6 +224,48 @@
   const btnHit     = $('btn-hit');
   const btnStand   = $('btn-stand');
   const btnRestart = $('btn-restart');
+
+  // --- Audio manager (additive; does not read or affect game state) ---
+  const AUDIO_BASE = '/assets/casino/audio/';
+  let audioEnabled = true;
+  const audioCache = {};
+  function playSound(name){
+    if (!audioEnabled) return;
+    let audio = audioCache[name];
+    if (!audio) {
+      audio = new Audio(`${AUDIO_BASE}${name}.ogg`);
+      audio.volume = 0.5;
+      audioCache[name] = audio;
+    }
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
+  function playRandomSound(base, count){
+    playSound(`${base}-${1 + Math.floor(Math.random() * count)}`);
+  }
+  // --- Theme music (background loop, tied to the same mute control) ---
+  const themeMusic = $('theme-music');
+  themeMusic.volume = 0.3;
+  function tryPlayTheme(){
+    if (!audioEnabled) return;
+    themeMusic.play().catch(() => {});
+  }
+  tryPlayTheme();
+  const unlockTheme = () => {
+    tryPlayTheme();
+    window.removeEventListener('pointerdown', unlockTheme);
+    window.removeEventListener('keydown', unlockTheme);
+  };
+  window.addEventListener('pointerdown', unlockTheme);
+  window.addEventListener('keydown', unlockTheme);
+
+  const muteBtn = $('mute-btn');
+  muteBtn.addEventListener('click', () => {
+    audioEnabled = !audioEnabled;
+    muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
+    if (audioEnabled) tryPlayTheme();
+    else themeMusic.pause();
+  });
 
   function syncBalance(){ try { balNumEl.textContent = Strubles.get(); } catch {} }
   syncBalance();
@@ -269,16 +332,53 @@
   }
   function drawCard(){ if (deck.length===0) deck = makeDeck(); return deck.pop(); }
 
-  function renderHand(hand, el, hideHole=false){
+  // --- Card image mapping (presentation only, reads existing card objects) ---
+  function suitName(s) {
+    return { '♠':'spades', '♥':'hearts', '♦':'diamonds', '♣':'clubs' }[s];
+  }
+  function rankCode(v) {
+    if (v === '10') return '10';
+    if (['A','J','Q','K'].includes(v)) return v;
+    return '0' + v;
+  }
+  function cardImgSrc(c) {
+    return `/assets/casino/cards/card_${suitName(c.s)}_${rankCode(c.v)}.png`;
+  }
+
+  function renderHand(hand, el, hideHole=false, autoSound=true){
+    const prevCount = el.children.length;
     el.innerHTML = '';
     hand.forEach((c, i) => {
-      const div = document.createElement('div');
-      div.className = 'card' + ((c.s==='♥'||c.s==='♦') ? ' red':'');
-      if (hideHole && i===1 && !holeRevealed) div.textContent = '🂠';
-      else div.textContent = `${c.v}${c.s}`;
-      el.appendChild(div);
+      const isHidden = hideHole && i===1 && !holeRevealed;
+      const slot = document.createElement('div');
+      slot.className = 'card-slot' + ((!isHidden && (c.s==='♥'||c.s==='♦')) ? ' red' : '');
+      const img = document.createElement('img');
+      img.className = 'card-img';
+      if (isHidden) {
+        img.src = '/assets/casino/cards/card_back.png';
+        img.alt = 'Hidden card';
+      } else {
+        img.src = cardImgSrc(c);
+        img.alt = `${c.v} of ${suitName(c.s)}`;
+      }
+      slot.appendChild(img);
+      el.appendChild(slot);
+      if (i >= prevCount) {
+        slot.classList.add('deal-in');
+        if (autoSound) playSound(Math.random() < 0.5 ? 'card-place-1' : 'card-place-2');
+      }
     });
   }
+
+  function updateDealerScore(){
+    if (!dealerScoreEl) return;
+    if (!holeRevealed && dealer.length > 1) {
+      dealerScoreEl.textContent = `Showing: ${dealer[0].v}`;
+    } else {
+      dealerScoreEl.textContent = `Total: ${handValue(dealer)}`;
+    }
+  }
+
   function updateTotals(){
     const pv = handValue(player);
     totalsEl.textContent = `Total: ${pv}`;
@@ -304,6 +404,7 @@
     else if (result === 'push') payout = currentBet;
     if (payout) Strubles.add(payout);
     syncBalance();
+    if (result === 'win' || result === 'blackjack') playRandomSound('chips-stack', 6);
   }
 
   function deal(){
@@ -323,6 +424,7 @@
     renderHand(dealer, dealerEl, true);
     renderHand(player, playerEl, false);
     updateTotals();
+    updateDealerScore();
 
     betInput.disabled = true;
     betMinus.disabled = true;
@@ -332,7 +434,8 @@
     if (pv === 21) {
       holeRevealed = true;
       renderHand(dealer, dealerEl, false);
-      while (handValue(dealer) < 17) dealer.push(drawCard());
+      updateDealerScore();
+      while (handValue(dealer) < 17) { dealer.push(drawCard()); renderHand(dealer, dealerEl, false); updateDealerScore(); }
       const dv = handValue(dealer);
       if (dv === 21) { settle('push'); endRound('Push (both blackjack).'); }
       else { settle('blackjack'); endRound('Blackjack! You win 🎉'); }
@@ -349,12 +452,15 @@
   function hit(){
     if (!inRound) return;
     player.push(drawCard());
-    renderHand(player, playerEl, false);
+    renderHand(player, playerEl, false, false);
+    playRandomSound('card-slide', 8);
     updateTotals();
     const pv = handValue(player);
     if (pv > 21){
       holeRevealed = true;
       renderHand(dealer, dealerEl, false);
+      updateDealerScore();
+      playSound('card-shove-1');
       endRound('Bust! Dealer wins 💀');
     }
   }
@@ -363,17 +469,19 @@
     if (!inRound) return;
     holeRevealed = true;
     renderHand(dealer, dealerEl, false);
+    updateDealerScore();
 
     while (handValue(dealer) < 17) {
       dealer.push(drawCard());
       renderHand(dealer, dealerEl, false);
+      updateDealerScore();
     }
 
     const pv = handValue(player);
     const dv = handValue(dealer);
 
     if (dv > 21) { settle('win'); endRound('Dealer busts — You win 🎉'); }
-    else if (dv > pv) { endRound('Dealer wins 😔'); }
+    else if (dv > pv) { playRandomSound('card-slide', 8); endRound('Dealer wins 😔'); }
     else if (dv < pv) { settle('win'); endRound('You win 🎉'); }
     else { settle('push'); endRound('Push 🤝'); }
   }
@@ -386,6 +494,7 @@
     dealerEl.innerHTML = '';
     playerEl.innerHTML = '';
     totalsEl.textContent = 'Total: —';
+    if (dealerScoreEl) dealerScoreEl.textContent = '';
     statusEl.textContent = 'Welcome! Set a bet and press Deal.';
     btnDeal.disabled = false;
     btnHit.disabled = true;

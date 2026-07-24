@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Transcript App</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #000;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: rgba(15, 15, 15, 0.95);
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3), inset 0 0 20px rgba(0, 255, 0, 0.05);
+            padding: 60px 40px;
+            text-align: center;
+            max-width: 500px;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .icon {
+            font-size: 60px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #00ff00;
+            margin-bottom: 15px;
+            font-size: 32px;
+            text-shadow: 0 0 10px #00ff00;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: #00aa00;
+            margin-bottom: 30px;
+            font-size: 16px;
+            line-height: 1.6;
+            letter-spacing: 1px;
+        }
+
+        .status {
+            background: rgba(0, 50, 0, 0.3);
+            border: 1px solid #00ff00;
+            padding: 15px;
+            border-radius: 0;
+            margin-bottom: 30px;
+            text-align: left;
+        }
+
+        .status-label {
+            color: #00ff00;
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 5px;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        .status-value {
+            color: #00aa00;
+            font-size: 14px;
+        }
+
+        .launch-btn {
+            display: inline-block;
+            background: rgba(0, 255, 0, 0.1);
+            color: #00ff00;
+            padding: 15px 50px;
+            border: 1px solid #00ff00;
+            border-radius: 0;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+            font-family: 'Courier New', monospace;
+            letter-spacing: 1px;
+        }
+
+        .launch-btn:hover {
+            background: rgba(0, 255, 0, 0.2);
+            box-shadow: 0 0 30px rgba(0, 255, 0, 0.6);
+        }
+
+        .footer {
+            margin-top: 30px;
+            color: #666;
+            font-size: 12px;
+        }
+
+        .app-link {
+            color: #00ff00;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .app-link:hover {
+            text-decoration: underline;
+        }
+
+        .features {
+            text-align: left;
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #00ff00;
+        }
+
+        .features h3 {
+            color: #00ff00;
+            font-size: 14px;
+            margin-bottom: 15px;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        .feature-item {
+            color: #00aa00;
+            font-size: 13px;
+            margin-bottom: 10px;
+            padding-left: 25px;
+            position: relative;
+        }
+
+        .feature-item:before {
+            content: "▶";
+            position: absolute;
+            left: 0;
+            color: #00ff00;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🎬</div>
+        <h1>> TRANSCRIPT_DOWNLOADER</h1>
+        <p class="subtitle">>> Download and save YouTube video transcripts</p>
+
+        <div class="status">
+            <div class="status-label">>> STATUS</div>
+            <div class="status-value" id="status">Checking...</div>
+        </div>
+
+        <button class="launch-btn" onclick="launchApp()">[LAUNCH APP]</button>
+
+        <div class="features">
+            <h3>>> FEATURES</h3>
+            <div class="feature-item">Paste YouTube link → get transcript instantly</div>
+            <div class="feature-item">Auto-saves with video title as filename</div>
+            <div class="feature-item">Smart duplicate detection</div>
+            <div class="feature-item">Clean interface on localhost:3000</div>
+            <div class="feature-item">Download transcripts to your computer</div>
+        </div>
+
+        <div class="footer">
+            <p>Running on <a href="http://localhost:3000" class="app-link">http://localhost:3000</a></p>
+        </div>
+    </div>
+
+    <script>
+        // Check if the app is running
+        async function checkStatus() {
+            try {
+                const response = await fetch('http://localhost:3000');
+                if (response.ok) {
+                    document.getElementById('status').textContent = '✓ App is running and ready';
+                    document.getElementById('status').style.color = '#00ff00';
+                } else {
+                    updateOfflineStatus();
+                }
+            } catch (error) {
+                updateOfflineStatus();
+            }
+        }
+
+        function updateOfflineStatus() {
+            document.getElementById('status').textContent = '○ App is offline - Please start Docker';
+            document.getElementById('status').style.color = '#ff3333';
+        }
+
+        function launchApp() {
+            window.location.href = 'http://localhost:3000';
+        }
+
+        // Check status on load and every 5 seconds
+        checkStatus();
+        setInterval(checkStatus, 5000);
+    </script>
+</body>
+</html>
