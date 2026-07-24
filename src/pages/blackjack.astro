@@ -188,23 +188,29 @@
   }
 
   @media (max-width:768px){
-    body { overflow-y: auto; padding: 12px; }
-    .table { width: 100vw; max-width: 100%; padding: 12px; margin: 0 -12px; }
+    body { overflow-y: auto; padding: 12px; background-attachment: scroll; }
+    main { margin-top: 60px; }
+    .table { width: 100vw; max-width: 100%; padding: 10px; margin: 0 -12px; }
     h1 { font-size: clamp(11px, 3vw, 14px); }
-    header { flex-direction: column; gap: 8px; }
-    header a { font-size: 8px; padding: 6px 10px; }
-    .row { padding: 10px; margin-top: 8px; }
-    .label { font-size: 9px; margin-bottom: 6px; }
-    .hand { min-height: 80px; gap: 6px; }
-    .card-slot { width: 48px; height: 72px; padding: 4px; }
-    .card-img { width: 36px; height: 36px; }
-    .score-display { font-size: 11px; }
-    .controls { flex-direction: column; gap: 8px; align-items: stretch; }
-    button { font-size: 9px; padding: 8px 12px; }
-    .betbox { gap: 4px; }
-    .betbox input { width: 50px; }
-    #earn-panel { flex-direction: column; gap: 8px; margin-top: 8px; }
-    #earn-panel button { width: 100%; }
+    header { flex-direction: column; gap: 6px; }
+    header a { font-size: 8px; padding: 5px 8px; }
+    .row { padding: 8px; margin-top: 6px; }
+    .label { font-size: 8px; margin-bottom: 4px; }
+    .hand { min-height: 70px; gap: 4px; }
+    .card-slot { width: 44px; height: 66px; padding: 3px; }
+    .card-img { width: 32px; height: 32px; }
+    .score-display { font-size: 10px; }
+    .status { font-size: 9px; }
+    .controls { flex-direction: column; gap: 6px; align-items: stretch; }
+    button { font-size: 8px; padding: 6px 10px; min-height: auto; }
+    .betbox { gap: 3px; }
+    .betbox button { min-width: 36px; min-height: 36px; padding: 4px 6px; }
+    .betbox input { width: 45px; padding: 6px 8px; font-size: 9px; }
+    #earn-panel { flex-direction: column; gap: 6px; margin-top: 8px; padding: 12px; }
+    #earn-panel button, #earn-panel a { padding: 8px 12px; font-size: 8px; }
+    #strubles-badge { top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); padding: 6px 8px; }
+    #strubles-badge img { width: 22px; height: 22px; }
+    #mute-btn { top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); font-size: 14px; padding: 6px 8px; }
   }
 </style>
 </head>

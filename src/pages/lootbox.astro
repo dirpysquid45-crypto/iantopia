@@ -90,16 +90,17 @@
   .result{ margin-top:4px; font-size:12px; min-height:1.6em; color:#fff; text-shadow:0 0 6px rgba(255,255,255,.4); }
 
   @media (max-width:768px){
-    body { overflow-y: auto; padding: 12px; }
-    .wrap{ width: 100vw; max-width: 100%; padding: 16px; margin: 0 -12px; }
+    body { overflow-y: auto; padding: 12px; background-attachment: scroll; }
+    .wrap{ width: 100vw; max-width: 100%; padding: 14px; margin: 0 -12px; }
     h1{ font-size: clamp(12px, 4vw, 16px); }
-    .badge{ top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); font-size: 0.8rem; }
-    button{ font-size: clamp(12px, 3vw, 14px); padding: 10px 16px; }
+    .badge{ top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); font-size: 0.75rem; gap: 4px; }
+    .badge img{ width: 22px; height: 22px; }
+    button{ font-size: clamp(10px, 2.5vw, 12px); padding: 8px 14px; width: min(200px, 80vw); margin: 6px auto; display: block; }
   }
   @media (max-width:480px){
-    .wrap{ padding: 12px; }
+    .wrap{ padding: 10px; }
     h1{ font-size: clamp(11px, 3vw, 13px); }
-    button{ padding: 8px 12px; font-size: 11px; }
+    button{ padding: 6px 12px; font-size: 9px; width: min(160px, 75vw); }
   }
 </style>
 </head>

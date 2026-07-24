@@ -47,6 +47,12 @@
       overflow: hidden;
     }
 
+    @media (max-width: 768px) {
+      body {
+        background-attachment: scroll;
+      }
+    }
+
     body::before {
       content: '';
       position: fixed;
@@ -608,16 +614,7 @@
       if (typeof Strubles !== "object") return;
 
       const amtEl = document.getElementById("strubles-amt");
-      const starterBtn = document.getElementById("btn-starter");
       const dailyBtn = document.getElementById("btn-daily");
-
-      Strubles.canClaimStarter ??= () => !localStorage.getItem("starter");
-      Strubles.claimStarter ??= (amt) => {
-        if (!Strubles.canClaimStarter()) return false;
-        Strubles.add(amt);
-        localStorage.setItem("starter", "1");
-        return true;
-      };
 
       const todayUTC = () => {
         const d = new Date();
@@ -634,14 +631,7 @@
 
       function updateUI() {
         amtEl.textContent = Strubles.get();
-        starterBtn.disabled = !Strubles.canClaimStarter();
-        dailyBtn.disabled = !Strubles.canDailyClaim();
-      }
-
-      if (starterBtn) {
-        starterBtn.addEventListener("click", () => {
-          if (Strubles.claimStarter(100)) updateUI();
-        });
+        if (dailyBtn) dailyBtn.disabled = !Strubles.canDailyClaim();
       }
       if (dailyBtn) {
         dailyBtn.addEventListener("click", () => {
