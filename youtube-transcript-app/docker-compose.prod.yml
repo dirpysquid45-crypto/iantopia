@@ -60,7 +60,7 @@ services:
       interval: 30s
       timeout: 30s
       retries: 5
-      start_period: 60s
+      start_period: 120s
 
   nginx:
     image: nginx:alpine
@@ -73,10 +73,10 @@ services:
       - ./ssl:/etc/nginx/ssl:ro
       - ./media:/usr/share/nginx/media:ro
     depends_on:
-      frontend:
-        condition: service_healthy
       backend:
         condition: service_healthy
+      frontend:
+        condition: service_started
     container_name: yt-transcript-nginx
     networks:
       - yt-network
