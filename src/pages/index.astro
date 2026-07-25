@@ -38,7 +38,7 @@
       align-items: center;
       justify-content: center;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      background-image: url('/taipei.gif');
+      background-image: url('/video/taipei.gif');
       background-size: cover;
       background-position: center;
       background-attachment: fixed;
@@ -535,7 +535,7 @@
   </button>
   <div id="amsa-quote">"I play to win."<br>— AMSA</div>
 
-  <audio id="theme-music" src="https://transcripts.iantopia.com/media/home-theme.mp3" preload="none" loop></audio>
+  <audio id="theme-music" src="/audio/music/default.mp3" preload="none" loop></audio>
 
   <!-- Playlist modal -->
   <div class="modal-overlay" id="playlist-overlay" role="dialog" aria-modal="true" aria-labelledby="playlist-title">
@@ -652,7 +652,7 @@
     (() => {
       const ACTIVE_TRACK_KEY = 'home_active_track_v1';
       const INV_KEY = 'strubles_inventory_v1';
-      const LIBRARY = window.MUSIC_LIBRARY || { default: { label: 'Home Theme', src: 'https://transcripts.iantopia.com/media/home-theme.mp3' } };
+      const LIBRARY = window.MUSIC_LIBRARY || { default: { label: 'Home Theme', src: '/audio/music/default.mp3' } };
 
       function loadInventory() {
         try {
@@ -813,7 +813,7 @@
 
       // --- Background switcher ---
       const ACTIVE_BG_KEY = 'home_active_bg_v1';
-      const BG_LIBRARY = window.BACKGROUND_LIBRARY || { default: { label: 'Taipei', type: 'gif', src: '/taipei.gif', position: 'center' } };
+      const BG_LIBRARY = window.BACKGROUND_LIBRARY || { default: { label: 'Taipei', type: 'gif', src: '/video/taipei.gif', position: 'center' } };
       const bgBtn = document.getElementById('bg-btn');
       const bgVideo = document.getElementById('bg-video');
       const backgroundOverlay = document.getElementById('background-overlay');

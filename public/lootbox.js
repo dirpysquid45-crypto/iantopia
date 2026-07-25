@@ -6,7 +6,7 @@
   const ACTIVE_TRACK_KEY = "home_active_track_v1";
 
   // Root-level file paths (no /assets folder)
-  const SFX_MAP = { cursed: "/cursed.mp3" };
+  const SFX_MAP = { cursed: "/audio/music/cursed.mp3" };
 
   function loadJSON(k, fallback) {
     try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; }

@@ -16,7 +16,7 @@
   * { box-sizing:border-box; }
   body {
     margin:0;
-    background-image: url('/casino-entrance.gif');
+    background-image: url('/video/casino-entrance.gif');
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
@@ -151,7 +151,7 @@
   #bj-money-overlay {
     display:none;
     position:fixed; inset:0; z-index:199;
-    background-image:url('/raining-money.gif');
+    background-image:url('/video/raining-money.gif');
     background-size:cover; background-position:center;
     pointer-events:none;
   }
@@ -276,7 +276,7 @@
     </div>
   </main>
 
-  <audio id="theme-music" src="/Balatro-Main-Theme.mp3" preload="auto" loop></audio>
+  <audio id="theme-music" src="/audio/music/Balatro-Main-Theme.mp3" preload="auto" loop></audio>
 
 <script is:inline src="/strubles.js?v=2"></script>
 <script is:inline src="/cursor.js"></script>
@@ -549,7 +549,7 @@
 
     let jackpotAudio = null;
     if (audioEnabled) {
-      jackpotAudio = new Audio('/jackpot-win.mp3');
+      jackpotAudio = new Audio('/audio/music/jackpot-win.mp3');
       jackpotAudio.volume = 0.6;
       jackpotAudio.play().catch(() => {});
     }
