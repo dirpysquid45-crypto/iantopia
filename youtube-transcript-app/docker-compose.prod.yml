@@ -5,7 +5,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    restart: unless-stopped
+    restart: on-failure:5
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -17,37 +17,54 @@ services:
     container_name: yt-transcript-backend
     networks:
       - yt-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/transcripts"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile.prod
-    restart: unless-stopped
+    restart: on-failure:5
     ports:
       - "127.0.0.1:3000:3000"
     environment:
       - HOST=0.0.0.0
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     container_name: yt-transcript-frontend
     networks:
       - yt-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      timeout: 30s
+      retries: 5
+      start_period: 60s
 
   nginx:
     image: nginx:alpine
-    restart: unless-stopped
+    restart: on-failure:5
     ports:
       - "0.0.0.0:80:80"
       - "0.0.0.0:443:443"
@@ -56,17 +73,27 @@ services:
       - ./ssl:/etc/nginx/ssl:ro
       - ./media:/usr/share/nginx/media:ro
     depends_on:
-      - frontend
-      - backend
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
     container_name: yt-transcript-nginx
     networks:
       - yt-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
 
 networks:
   yt-network:
