@@ -11,3 +11,7 @@ dist/
 *.swp
 *.swo
 *~
+
+# Oversized media (>25MB Cloudflare Pages limit) - served from qasim instead
+public/home-theme.mp3
+public/trippy-roulette.gif
