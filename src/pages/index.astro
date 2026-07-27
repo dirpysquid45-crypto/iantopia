@@ -650,9 +650,16 @@
   <!-- Home theme music, Now Playing / playlist, and Inventory -->
   <script is:inline>
     (() => {
+      // Hardcoded — the homepage default track is never looked up from
+      // MUSIC_LIBRARY or localStorage. A stale cached music-library.js or a
+      // leftover localStorage key must never be able to change what plays
+      // by default here. Only an explicit, current-session playlist click
+      // (handled below) can switch it to something else.
+      const HOME_THEME = { label: 'Home Theme', src: '/audio/music/home-theme.mp3' };
+
       const ACTIVE_TRACK_KEY = 'home_active_track_v1';
       const INV_KEY = 'strubles_inventory_v1';
-      const LIBRARY = window.MUSIC_LIBRARY || { default: { label: 'Home Theme', src: '/audio/music/home-theme.mp3' } };
+      const LIBRARY = Object.assign({}, window.MUSIC_LIBRARY, { default: HOME_THEME });
 
       function loadInventory() {
         try {
@@ -663,7 +670,7 @@
 
       function getActiveTrackKey() {
         const key = localStorage.getItem(ACTIVE_TRACK_KEY);
-        return (key && LIBRARY[key]) ? key : 'default';
+        return (key && key !== 'default' && LIBRARY[key]) ? key : 'default';
       }
 
       let audioEnabled = true;
@@ -683,12 +690,17 @@
         localStorage.setItem(VOLUME_KEY, themeMusic.volume);
       });
 
+      // Force the hardcoded default on every load, ignoring whatever is in
+      // the <audio> tag's src attribute or any library lookup.
+      themeMusic.src = HOME_THEME.src;
+      npLabel.textContent = HOME_THEME.label;
+
       let activeTrackKey = getActiveTrackKey();
 
       const MUSIC_POS_KEY = 'home_theme_pos_v1';
 
       function applyActiveTrack(restart) {
-        const track = LIBRARY[activeTrackKey] || LIBRARY.default;
+        const track = activeTrackKey === 'default' ? HOME_THEME : (LIBRARY[activeTrackKey] || HOME_THEME);
         themeMusic.src = track.src;
         npLabel.textContent = track.label;
         if (restart) {
