@@ -535,7 +535,7 @@
   </button>
   <div id="amsa-quote">"I play to win."<br>— AMSA</div>
 
-  <audio id="theme-music" src="/audio/music/default.mp3" preload="none" loop></audio>
+  <audio id="theme-music" src="/audio/music/home-theme.mp3" preload="none" loop></audio>
 
   <!-- Playlist modal -->
   <div class="modal-overlay" id="playlist-overlay" role="dialog" aria-modal="true" aria-labelledby="playlist-title">
@@ -652,7 +652,7 @@
     (() => {
       const ACTIVE_TRACK_KEY = 'home_active_track_v1';
       const INV_KEY = 'strubles_inventory_v1';
-      const LIBRARY = window.MUSIC_LIBRARY || { default: { label: 'Home Theme', src: '/audio/music/default.mp3' } };
+      const LIBRARY = window.MUSIC_LIBRARY || { default: { label: 'Home Theme', src: '/audio/music/home-theme.mp3' } };
 
       function loadInventory() {
         try {
