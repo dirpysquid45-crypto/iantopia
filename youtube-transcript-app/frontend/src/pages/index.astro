@@ -811,12 +811,7 @@
       function goHome(e) {
         e.preventDefault();
         e.stopPropagation();
-        const hostname = window.location.hostname;
-        const port = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-          ? '5500'
-          : '5500';
-        const homeUrl = `http://${hostname}:${port}/`;
-        window.location.href = homeUrl;
+        window.location.href = 'https://iantopia.com/';
       }
 
       // Set home link handler
@@ -839,13 +834,10 @@
         initMatrix();
       }
 
-      // Determine API base URL: from data attribute, window variable, or fallback
-      const API_BASE =
-        document.documentElement.dataset.apiBase ||
-        (typeof window !== 'undefined' && window.API_BASE) ||
-        (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-          ? 'http://localhost:8000'
-          : `http://${window.location.hostname}:8000`);
+      // Relative path — nginx proxies /api/ to the backend container on
+      // port 80, so this works identically whether accessed via
+      // iantopia.com, localhost, or qasim's IP directly.
+      const API_BASE = '/api';
       let currentVideoId = null;
       let currentOverwrite = false;
 
@@ -884,7 +876,7 @@
 
       async function loadTranscripts() {
         try {
-          const response = await fetch(`${API_BASE}/api/transcripts`);
+          const response = await fetch(`${API_BASE}/transcripts`);
           const data = await response.json();
 
           if (data.transcripts && data.transcripts.length > 0) {
@@ -918,7 +910,7 @@
       }
 
       function downloadTranscript(filename) {
-        const downloadUrl = `${API_BASE}/api/download/${encodeURIComponent(filename)}`;
+        const downloadUrl = `${API_BASE}/download/${encodeURIComponent(filename)}`;
         const link = document.createElement("a");
         link.href = downloadUrl;
         link.download = filename;
@@ -951,7 +943,7 @@
 
       async function loadVideos() {
         try {
-          const response = await fetch(`${API_BASE}/api/downloads`);
+          const response = await fetch(`${API_BASE}/downloads`);
           const data = await response.json();
 
           if (data.downloads && data.downloads.length > 0) {
@@ -984,7 +976,7 @@
       }
 
       function downloadVideo(filename) {
-        const downloadUrl = `${API_BASE}/api/download-video/${encodeURIComponent(filename)}`;
+        const downloadUrl = `${API_BASE}/download-video/${encodeURIComponent(filename)}`;
         const link = document.createElement("a");
         link.href = downloadUrl;
         link.download = filename;
@@ -995,7 +987,7 @@
 
       async function loadAudio() {
         try {
-          const response = await fetch(`${API_BASE}/api/audio`);
+          const response = await fetch(`${API_BASE}/audio`);
           const data = await response.json();
 
           if (data.audio && data.audio.length > 0) {
@@ -1028,7 +1020,7 @@
       }
 
       function downloadAudio(filename) {
-        const downloadUrl = `${API_BASE}/api/download-audio/${encodeURIComponent(filename)}`;
+        const downloadUrl = `${API_BASE}/download-audio/${encodeURIComponent(filename)}`;
         const link = document.createElement("a");
         link.href = downloadUrl;
         link.download = filename;
@@ -1048,7 +1040,7 @@
         showStatus("loading", ">>> Downloading video... (this may take a while)");
 
         try {
-          const response = await fetch(`${API_BASE}/api/download-video`, {
+          const response = await fetch(`${API_BASE}/download-video`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ url }),
@@ -1081,7 +1073,7 @@
         showStatus("loading", ">>> Extracting audio... (this may take a while)");
 
         try {
-          const response = await fetch(`${API_BASE}/api/download-audio`, {
+          const response = await fetch(`${API_BASE}/download-audio`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ url }),
@@ -1114,7 +1106,7 @@
         showStatus("loading", ">>> Processing...");
 
         try {
-          const response = await fetch(`${API_BASE}/api/fetch-transcript`, {
+          const response = await fetch(`${API_BASE}/fetch-transcript`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ url, overwrite: currentOverwrite }),
@@ -1174,7 +1166,7 @@
         const dontAskAgain = document.getElementById("dontAskAgain").checked;
 
         try {
-          await fetch(`${API_BASE}/api/handle-duplicate`, {
+          await fetch(`${API_BASE}/handle-duplicate`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
