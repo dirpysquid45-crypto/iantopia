@@ -12,6 +12,14 @@ dist/
 *.swo
 *~
 
-# Oversized media (>25MB Cloudflare Pages limit) - served from qasim instead
-public/home-theme.mp3
+# Oversized media (>25MB Cloudflare Pages limit) - served from
+# transcripts.iantopia.com/media/ instead. background-library.js, music-library.js
+# and case-data.js reference the CDN URLs directly, so dev and prod both resolve
+# without these files ever being committed.
+# NOTE: paths must match where the file actually lives -- the old
+# `public/home-theme.mp3` rule silently stopped matching when the file moved
+# into public/audio/music/, and a 38MB blob got committed as a result.
+public/audio/music/home-theme.mp3
 public/trippy-roulette.gif
+public/video/bangkok-night.mp4
+public/video/ehden.gif

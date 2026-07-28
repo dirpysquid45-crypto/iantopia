@@ -6,13 +6,26 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Iantopia Lootbox</title>
+<title>Iantopia Cases</title>
 <link rel="preload" as="image" href="/strubles.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<style>
-  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --accent:#22d3ee; --gold:#ffd700; --money:#39ff14; }
+<!--
+  is:global is REQUIRED here, not stylistic. Astro scopes <style> by stamping
+  data-astro-cid-* on elements in the template and rewriting selectors to match.
+  The reel tiles and reveal artwork are built at runtime via innerHTML, so they
+  never receive that attribute and every scoped rule silently skips them —
+  tiles fall back to the natural size of their GIF, widths stop being uniform,
+  and the reel's landing math (which assumes a fixed step) lands on the wrong
+  item. This page is a standalone document, so scoping buys nothing anyway.
+-->
+<style is:global>
+  :root{
+    --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf;
+    --accent:#22d3ee; --gold:#ffd700; --money:#39ff14;
+    --tile-w: 186px; --tile-gap: 10px;
+  }
   *{box-sizing:border-box}
   body{
     margin:0;
@@ -20,193 +33,726 @@
     background-size:cover; background-position:center; background-attachment:fixed;
     color:var(--ink); font-family:'Press Start 2P', ui-monospace, 'Courier New', monospace;
     min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
-    cursor: none; position:relative; overflow:hidden;
+    cursor:none; position:relative;
   }
-  body::before {
-    content:''; position:fixed; top:0; left:0; width:100%; height:100%;
+  body::before{
+    content:''; position:fixed; inset:0;
     background-image:url('/video/raining-money.gif');
     background-size:cover; background-position:center; background-attachment:fixed;
-    pointer-events:none; z-index:0;
+    pointer-events:none; z-index:0; opacity:.5;
   }
-  body::after {
-    content:''; position:fixed; top:0; left:0; width:100%; height:100%;
-    background: rgba(0,0,0,0.4);
-    pointer-events:none; z-index:0;
+  body::after{
+    content:''; position:fixed; inset:0;
+    background:rgba(0,0,0,.55); pointer-events:none; z-index:0;
   }
-  main { position:relative; z-index:1; }
+  main{ position:relative; z-index:1; }
+
   .wrap{
-    width:min(720px,95vw);
+    width:min(1000px,96vw);
     background:#0a0a0a;
     border:4px solid var(--gold);
-    border-radius:0;
     padding:24px;
-    box-shadow:0 20px 50px rgba(0,0,0,.5), 0 0 20px rgba(255,215,0,.4), 0 0 40px rgba(255,215,0,.25), 0 0 80px rgba(57,255,20,.12);
-    animation: wrapFloat 4s ease-in-out infinite;
+    box-shadow:0 20px 50px rgba(0,0,0,.5), 0 0 20px rgba(255,215,0,.4), 0 0 60px rgba(255,215,0,.18);
   }
-  @keyframes wrapFloat {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-8px); }
+  header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:3px solid var(--gold); padding-bottom:12px; gap:10px; }
+  header a, .btn{
+    color:var(--gold); text-decoration:none; border:3px solid var(--gold); padding:8px 12px;
+    background:#000; font-size:9px; transition:background .2s, color .2s; cursor:none;
+    font-family:inherit; letter-spacing:1px; text-transform:uppercase;
   }
-  header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; border-bottom:3px solid var(--gold); padding-bottom:12px; }
-  header a{ color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; background:#000; font-weight:400; font-size:10px; transition:background .2s; cursor:none; }
-  header a:hover{ background:var(--gold); color:#000; }
+  header a:hover, .btn:hover{ background:var(--gold); color:#000; }
   h1{
-    margin:0; font-size:clamp(16px,3vw,22px); letter-spacing:1px; color:var(--gold); font-weight:400;
-    text-transform:uppercase; text-align:center;
-    text-shadow: 0 0 5px var(--gold), 0 0 12px var(--gold), 0 0 24px rgba(255,215,0,.6);
+    margin:0; font-size:clamp(14px,2.6vw,20px); color:var(--gold); font-weight:400;
+    text-transform:uppercase; text-align:center; letter-spacing:1px;
+    text-shadow:0 0 5px var(--gold), 0 0 12px var(--gold), 0 0 24px rgba(255,215,0,.6);
   }
+
   .badge{
-    position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
-    background:#000; border:3px solid var(--gold); padding:8px 12px; font-weight:700; z-index:20;
-    box-shadow: 0 0 10px rgba(255,215,0,.3);
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left));
+    display:flex; align-items:center; gap:8px;
+    background:#000; border:3px solid var(--gold); padding:8px 12px; z-index:30;
+    box-shadow:0 0 10px rgba(255,215,0,.3); font-size:12px;
   }
   .badge img{ width:28px; height:28px; }
-
-  #mute-btn {
-    position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(20px + env(safe-area-inset-right)); z-index:20;
-    background:#000; border:3px solid var(--gold); color:#fff;
-    font-size:18px; padding:8px 12px; cursor:none; line-height:1;
+  #mute-btn{
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(20px + env(safe-area-inset-right)); z-index:30;
+    background:#000; border:3px solid var(--gold); color:#fff; font-size:18px; padding:8px 12px; cursor:none; line-height:1;
   }
+  #np-btn{
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(84px + env(safe-area-inset-right)); z-index:30;
+    background:#000; border:3px solid var(--gold); color:var(--gold);
+    font-family:inherit; font-size:9px; padding:10px 12px; cursor:none; line-height:1.4;
+    max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    display:flex; align-items:center; gap:8px;
+  }
+  #np-btn:hover{ background:var(--gold); color:#000; }
+  #np-btn .np-name{ overflow:hidden; text-overflow:ellipsis; }
 
-  .panel{ display:grid; gap:16px; place-items:center; text-align:center; padding:14px 0; }
-  .small{ color:var(--muted); font-size:10px; line-height:1.6; }
+  .track-row{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:12px; margin-bottom:8px; border:2px solid #232a37; background:#10141c;
+    font-size:9px; color:var(--ink); line-height:1.7; cursor:none;
+  }
+  .track-row:hover{ border-color:var(--gold); }
+  .track-row.active{ border-color:var(--money); color:var(--money); }
+  .track-empty{ color:var(--muted); font-size:9px; padding:12px; line-height:1.9; }
+
+  .small{ color:var(--muted); font-size:9px; line-height:1.8; }
   .small strong{ color:var(--money); }
 
-  button.primary{
-    all:unset; cursor:none; padding:16px 26px; border:3px solid var(--money);
-    background:#0a2e0a; color:var(--money); font-weight:400; font-size:13px;
-    font-family:'Press Start 2P', ui-monospace, monospace; text-transform:uppercase; letter-spacing:1px;
-    --glow-color: var(--money);
-    animation: neonBtnPulse 2s ease-in-out infinite;
-    transition: transform .1s, background .15s;
+  /* ---------- Case select ---------- */
+  .case-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
+  .case-card{
+    border:3px solid #2a3242; background:#10141c; padding:16px; display:flex; flex-direction:column; gap:10px;
+    text-align:center; transition:border-color .2s, transform .15s;
   }
-  button.primary:hover{ background:#0f3d0f; }
-  button.primary:active{ transform: translateY(2px); }
-  @keyframes neonBtnPulse {
-    0%, 100% { box-shadow: 0 0 4px var(--glow-color), 0 0 10px var(--glow-color); text-shadow: 0 0 4px var(--glow-color); }
-    50% { box-shadow: 0 0 10px var(--glow-color), 0 0 24px var(--glow-color), 0 0 38px var(--glow-color); text-shadow: 0 0 8px var(--glow-color); }
+  .case-card:hover{ border-color:var(--gold); transform:translateY(-3px); }
+  .case-emoji{ font-size:44px; line-height:1; }
+  .case-name{ font-size:11px; color:var(--gold); line-height:1.5; }
+  .case-blurb{ font-size:8px; color:var(--muted); line-height:1.8; min-height:4.5em; }
+  .case-cost{ font-size:10px; color:var(--money); }
+  .case-owned{ font-size:8px; color:var(--accent); min-height:1.4em; }
+  .case-actions{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+
+  button{ font-family:inherit; cursor:none; }
+  button:disabled{ opacity:.4; }
+  button.primary{
+    all:unset; cursor:none; padding:12px 20px; border:3px solid var(--money);
+    background:#0a2e0a; color:var(--money); font-size:10px; text-align:center;
+    font-family:'Press Start 2P', ui-monospace, monospace; text-transform:uppercase; letter-spacing:1px;
+    transition:background .15s, transform .1s;
+  }
+  button.primary:hover:not(:disabled){ background:#0f3d0f; }
+  button.primary:active:not(:disabled){ transform:translateY(2px); }
+  button.primary:disabled{ cursor:none; opacity:.35; }
+
+  /* ---------- Reel ---------- */
+  #open-view{ display:none; }
+  #open-view.active{ display:block; }
+  #case-select.hidden{ display:none; }
+
+  .reel-title{ text-align:center; font-size:11px; color:var(--gold); margin-bottom:14px; }
+
+  .reel-viewport{
+    position:relative; overflow:hidden; border:3px solid #2a3242; background:#080a0f;
+    padding:16px 0; margin-bottom:18px;
+    -webkit-mask-image:linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+    mask-image:linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
+  }
+  .reel-strip{ display:flex; gap:var(--tile-gap); will-change:transform; }
+  .reel-marker{
+    position:absolute; top:0; bottom:0; left:50%; width:4px; margin-left:-2px;
+    background:var(--gold); box-shadow:0 0 12px var(--gold), 0 0 24px var(--gold); z-index:5; pointer-events:none;
+  }
+  .reel-marker::before, .reel-marker::after{
+    content:''; position:absolute; left:50%; transform:translateX(-50%);
+    border-left:9px solid transparent; border-right:9px solid transparent;
+  }
+  .reel-marker::before{ top:0; border-top:12px solid var(--gold); }
+  .reel-marker::after{ bottom:0; border-bottom:12px solid var(--gold); }
+
+  /* CS2 proportions: landscape tile, art dominating, name small at the bottom. */
+  .tile{
+    flex:0 0 var(--tile-w); width:var(--tile-w); height:190px;
+    background:linear-gradient(180deg, #171d28 0%, #0b0e14 70%);
+    border:2px solid #232a37; border-bottom-width:7px;
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+    gap:10px; padding:14px 10px 10px;
+    position:relative; overflow:hidden;
+  }
+  .tile-art{
+    flex:1 1 auto; width:100%; display:flex; align-items:center; justify-content:center; min-height:0;
+  }
+  .tile img{ max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; }
+  .tile-emoji{ font-size:72px; line-height:1; }
+  .tile-label{
+    font-size:7px; color:var(--muted); text-align:center; line-height:1.7;
+    width:100%; flex:0 0 auto;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
   }
 
-  .result{ margin-top:4px; font-size:12px; min-height:1.6em; color:#fff; text-shadow:0 0 6px rgba(255,255,255,.4); }
+  /* ---------- Case open animation ---------- */
+  /* Plays before the reel: the case rattles, winds up, then bursts. */
+  #case-anim{ display:none; }
+  #case-anim.active{ display:flex; align-items:center; justify-content:center; height:190px; margin-bottom:18px; }
+  .case-anim-box{
+    font-size:130px; line-height:1; transform-origin:50% 60%;
+    filter:drop-shadow(0 0 12px var(--gold));
+  }
+  .case-anim-box.rattle{ animation:caseRattle 1.5s cubic-bezier(.36,.07,.19,.97) both; }
+  .case-anim-box.burst{ animation:caseBurst .45s ease-out forwards; }
+  @keyframes caseRattle{
+    0%   { transform:rotate(0) scale(1); }
+    10%  { transform:rotate(-6deg) scale(1.02); }
+    20%  { transform:rotate(6deg)  scale(1.02); }
+    30%  { transform:rotate(-9deg) scale(1.05); }
+    40%  { transform:rotate(9deg)  scale(1.05); }
+    55%  { transform:rotate(-13deg) scale(1.09); filter:drop-shadow(0 0 26px var(--gold)); }
+    70%  { transform:rotate(13deg)  scale(1.12); }
+    85%  { transform:rotate(-16deg) scale(1.16); filter:drop-shadow(0 0 44px var(--money)); }
+    100% { transform:rotate(0) scale(1.2); filter:drop-shadow(0 0 60px #fff); }
+  }
+  @keyframes caseBurst{
+    0%   { transform:scale(1.2); opacity:1; filter:drop-shadow(0 0 60px #fff) brightness(1); }
+    40%  { transform:scale(1.55); opacity:1; filter:drop-shadow(0 0 90px #fff) brightness(3); }
+    100% { transform:scale(2.6); opacity:0; filter:brightness(6); }
+  }
+  /* Full-bleed white flash at the moment the case pops. */
+  #flash{
+    position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:50;
+  }
+  #flash.fire{ animation:flashOut .5s ease-out; }
+  @keyframes flashOut{ 0%{opacity:.85} 100%{opacity:0} }
+
+  .reel-viewport.hidden{ display:none; }
+
+  /* ---------- Reveal ---------- */
+  #reveal{ display:none; text-align:center; }
+  #reveal.active{ display:block; animation:revealIn .45s ease-out; }
+  @keyframes revealIn{ from{ opacity:0; transform:scale(.9);} to{ opacity:1; transform:scale(1);} }
+  .reveal-card{
+    display:inline-flex; flex-direction:column; align-items:center; gap:14px;
+    padding:26px 34px; border:4px solid var(--rc,#fff); background:#0b0e14; margin-bottom:16px;
+  }
+  .reveal-card img{ max-width:260px; max-height:170px; width:auto; height:auto; object-fit:contain; }
+  .reveal-emoji{ font-size:104px; line-height:1; }
+  .reveal-rarity{ font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--rc,#fff); }
+  .reveal-label{ font-size:13px; color:#fff; line-height:1.6; max-width:340px; }
+  .reveal-note{ font-size:9px; color:var(--money); line-height:1.8; }
+  .reveal-actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:6px; }
+
+  /* ---------- Contents modal ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:40;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    width:min(720px,95vw); max-height:85vh; overflow-y:auto;
+    background:#0a0a0a; border:4px solid var(--gold); padding:20px;
+  }
+  .modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; }
+  .modal-head h2{ margin:0; font-size:12px; color:var(--gold); font-weight:400; }
+  .tier-head{
+    font-size:9px; letter-spacing:1px; text-transform:uppercase; margin:16px 0 8px;
+    padding-bottom:6px; border-bottom:2px solid currentColor;
+  }
+  .tier-items{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+  .tier-item{ display:flex; align-items:center; gap:8px; font-size:8px; color:var(--muted); background:#10141c; padding:8px; border-left:4px solid currentColor; line-height:1.6; }
+  .tier-item img{ width:26px; height:26px; object-fit:contain; flex:0 0 26px; }
+  .tier-item .te{ font-size:20px; flex:0 0 26px; text-align:center; }
+  .tier-item span{ color:var(--ink); }
 
   @media (max-width:768px){
-    body { overflow-y: auto; padding: 12px; background-attachment: scroll; }
-    .wrap{ width: 100vw; max-width: 100%; padding: 14px; margin: 0 -12px; }
-    h1{ font-size: clamp(12px, 4vw, 16px); }
-    .badge{ top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); font-size: 0.75rem; gap: 4px; }
-    .badge img{ width: 22px; height: 22px; }
-    button{ font-size: clamp(10px, 2.5vw, 12px); padding: 8px 14px; width: min(200px, 80vw); margin: 6px auto; display: block; }
-  }
-  @media (max-width:480px){
-    .wrap{ padding: 10px; }
-    h1{ font-size: clamp(11px, 3vw, 13px); }
-    button{ padding: 6px 12px; font-size: 9px; width: min(160px, 75vw); }
+    :root{ --tile-w: 132px; }
+    body{ padding:10px; background-attachment:scroll; align-items:flex-start; }
+    .wrap{ width:100%; padding:14px; }
+    h1{ font-size:clamp(11px,3.4vw,14px); }
+    .badge{ top:calc(6px + env(safe-area-inset-top)); left:calc(6px + env(safe-area-inset-left)); font-size:10px; padding:6px 8px; }
+    .badge img{ width:20px; height:20px; }
+    #mute-btn{ top:calc(6px + env(safe-area-inset-top)); right:calc(6px + env(safe-area-inset-right)); padding:6px 9px; font-size:14px; }
+    .tile{ height:150px; padding:10px 8px 8px; }
+    .tile-emoji{ font-size:48px; }
+    .reveal-card{ padding:18px 20px; }
+    .reveal-card img{ max-width:200px; max-height:130px; }
+    .reveal-emoji{ font-size:72px; }
+    .case-anim-box{ font-size:96px; }
   }
 </style>
 </head>
 <body>
-  <div class="badge"><img src="/strubles.png" alt="Struble"><span id="bal">0</span></div>
+  <div class="badge"><img src="/strubles.png" alt="Strubles"><span id="bal">0</span></div>
+  <button id="np-btn" type="button" title="Change music">🎵 <span class="np-name" id="np-name">Lootbox Theme</span></button>
   <button id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
 
   <main class="wrap">
     <header>
       <a href="/">← Home</a>
-      <h1>Lootbox</h1>
-      <div style="width:86px"></div>
+      <h1>Iantopia Cases</h1>
+      <button class="btn" id="contents-btn" type="button">Contents</button>
     </header>
 
-    <section class="panel">
-      <div class="small">Cost: <strong id="cost">—</strong> Strubles</div>
-      <button id="open" class="primary">🎁 Open Lootbox</button>
-      <div id="result" class="result"></div>
-      <div class="small">Prizes are random. Some unlock themes, badges, or hidden pages.</div>
+    <!-- Case select -->
+    <section id="case-select">
+      <div class="case-grid" id="case-grid"></div>
+      <p class="small" style="text-align:center;margin-top:18px">
+        Buy a case, then open it. Duplicates refund <strong>Strubles</strong> based on rarity.
+      </p>
+    </section>
+
+    <!-- Opening -->
+    <section id="open-view">
+      <div class="reel-title" id="reel-title">—</div>
+
+      <div id="case-anim"><div class="case-anim-box" id="case-anim-box">📦</div></div>
+
+      <div class="reel-viewport" id="reel-viewport">
+        <div class="reel-marker"></div>
+        <div class="reel-strip" id="reel-strip"></div>
+      </div>
+
+      <div id="reveal">
+        <div class="reveal-card" id="reveal-card">
+          <div class="reveal-rarity" id="reveal-rarity"></div>
+          <div id="reveal-visual"></div>
+          <div class="reveal-label" id="reveal-label"></div>
+          <div class="reveal-note" id="reveal-note"></div>
+        </div>
+        <div class="reveal-actions">
+          <button class="primary" id="again-btn" type="button">Open Another</button>
+          <button class="btn" id="back-btn" type="button">Back to Cases</button>
+        </div>
+      </div>
     </section>
   </main>
+
+  <!-- Now Playing / playlist -->
+  <div class="overlay" id="playlist-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Now Playing</h2>
+        <button class="btn" id="playlist-close" type="button">Close</button>
+      </div>
+      <div id="playlist-list"></div>
+    </div>
+  </div>
+
+  <!-- Contents / odds -->
+  <div class="overlay" id="contents-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="contents-title">Case Contents</h2>
+        <button class="btn" id="contents-close" type="button">Close</button>
+      </div>
+      <div id="contents-body"></div>
+    </div>
+  </div>
+
+  <div id="flash"></div>
 
   <audio id="theme-music" src="/audio/music/lootbox-theme.mp3" preload="none" loop></audio>
 
   <script is:inline src="/strubles.js?v=2"></script>
-  <script is:inline src="/lootbox-data.js?v=1"></script>
-  <script is:inline src="/lootbox.js?v=1"></script>
-  <script is:inline src="/cursor.js"></script>
+  <script is:inline src="/music-library.js?v=4"></script>
+  <script is:inline src="/case-data.js?v=1"></script>
+  <script is:inline src="/lootbox.js?v=3"></script>
+  <script is:inline src="/cursor-library.js?v=1"></script>
+  <script is:inline src="/cursor.js?v=2"></script>
   <script is:inline src="/music-position.js"></script>
   <script is:inline>
-    const balEl = document.getElementById('bal');
-    const costEl = document.getElementById('cost');
-    const resultEl = document.getElementById('result');
-    const btn = document.getElementById('open');
+  (() => {
+    const RARITIES = window.CASE_RARITIES;
+    const ORDER = window.CASE_RARITY_ORDER;
+    const ITEMS = window.CASE_ITEMS;
+    const CASES = window.CASES;
 
-    function syncBal(){ balEl.textContent = Strubles.get(); }
+    const balEl = document.getElementById('bal');
+    const caseSelect = document.getElementById('case-select');
+    const caseGrid = document.getElementById('case-grid');
+    const openView = document.getElementById('open-view');
+    const reelTitle = document.getElementById('reel-title');
+    const viewport = document.getElementById('reel-viewport');
+    const strip = document.getElementById('reel-strip');
+    const reveal = document.getElementById('reveal');
+    const againBtn = document.getElementById('again-btn');
+    const backBtn = document.getElementById('back-btn');
+
+    let currentCaseKey = null;
+    let spinning = false;
+
+    const syncBal = () => { balEl.textContent = Strubles.get().toLocaleString(); };
     syncBal();
     window.addEventListener('strubles:change', syncBal);
     window.addEventListener('storage', syncBal);
 
-    costEl.textContent = window.LOOTBOX?.cost ?? 1000;
-
-    // --- Audio manager (additive; does not read or affect lootbox logic) ---
+    // ---------- Audio ----------
     const AUDIO_BASE = '/assets/casino/audio/';
     let audioEnabled = true;
-    const audioCache = {};
-    function playSound(name){
+    const cache = {};
+    function sound(name){
+      if (!audioEnabled) return null;
+      let a = cache[name];
+      if (!a) { a = new Audio(`${AUDIO_BASE}${name}.ogg`); a.volume = .5; cache[name] = a; }
+      return a;
+    }
+    function play(name){ const a = sound(name); if (a) { a.currentTime = 0; a.play().catch(()=>{}); } }
+    function playRandom(base, count){ play(`${base}-${1 + Math.floor(Math.random()*count)}`); }
+
+    // Ticks fire faster than one <audio> can restart, so round-robin a small
+    // pool of clones — otherwise the reel sounds like it's dropping every
+    // other tick at full speed.
+    const TICK_POOL_SIZE = 6;
+    const tickPool = [];
+    for (let i = 0; i < TICK_POOL_SIZE; i++) {
+      const a = new Audio(`${AUDIO_BASE}chip-lay-1.ogg`);
+      a.volume = .35;
+      tickPool.push(a);
+    }
+    let tickIdx = 0;
+    function playTick(){
       if (!audioEnabled) return;
-      let audio = audioCache[name];
-      if (!audio) {
-        audio = new Audio(`${AUDIO_BASE}${name}.ogg`);
-        audio.volume = 0.5;
-        audioCache[name] = audio;
-      }
-      audio.currentTime = 0;
-      audio.play().catch(() => {});
+      const a = tickPool[tickIdx = (tickIdx + 1) % TICK_POOL_SIZE];
+      a.currentTime = 0;
+      a.play().catch(()=>{});
     }
-    function playRandomSound(base, count){
-      playSound(`${base}-${1 + Math.floor(Math.random() * count)}`);
-    }
+
+    // ---------- Music: unlocked tracks playable while opening ----------
+    // Keeps its own active-track key so picking something here doesn't change
+    // what the homepage plays, and vice versa.
+    const LOOTBOX_THEME = { label: 'Lootbox Theme', src: '/audio/music/lootbox-theme.mp3' };
+    const TRACKS = Object.assign({}, window.MUSIC_LIBRARY, { default: LOOTBOX_THEME });
+    const ACTIVE_TRACK_KEY = 'lootbox_active_track_v1';
+    const INV_KEY = 'strubles_inventory_v1';
 
     const themeMusic = document.getElementById('theme-music');
-    themeMusic.volume = 0.3;
-    const MUSIC_POS_KEY = 'lootbox_theme_pos_v1';
-    if (window.MusicPosition) {
-      window.MusicPosition.restore(MUSIC_POS_KEY, themeMusic);
-      window.MusicPosition.track(MUSIC_POS_KEY, themeMusic);
-    }
-    function tryPlayTheme(){
-      if (!audioEnabled) return;
-      themeMusic.play().catch(() => {});
-    }
-    tryPlayTheme();
-    const unlockTheme = () => {
-      tryPlayTheme();
-      window.removeEventListener('pointerdown', unlockTheme);
-      window.removeEventListener('keydown', unlockTheme);
-    };
-    window.addEventListener('pointerdown', unlockTheme);
-    window.addEventListener('keydown', unlockTheme);
+    themeMusic.volume = .3;
 
-    const muteBtn = document.getElementById('mute-btn');
-    muteBtn.addEventListener('click', () => {
+    function loadInv(){
+      try { const v = localStorage.getItem(INV_KEY); return v ? JSON.parse(v) : {}; } catch { return {}; }
+    }
+    function activeTrackKey(){
+      const k = localStorage.getItem(ACTIVE_TRACK_KEY);
+      return (k && TRACKS[k]) ? k : 'default';
+    }
+
+    let trackKey = activeTrackKey();
+    // Position is stored per track — one shared key would resume a new song at
+    // the timestamp of the previous one.
+    const posKey = (k) => `lootbox_pos_${k}_v1`;
+
+    // MusicPosition.track() opens an interval + unload listeners and hands back
+    // a teardown. Dropping it would stack a new interval per switch, each still
+    // writing this element's time under a stale key.
+    let stopTracking = null;
+
+    function applyTrack(key, restart){
+      const t = TRACKS[key] || LOOTBOX_THEME;
+      trackKey = key;
+      if (stopTracking) { stopTracking(); stopTracking = null; }
+
+      themeMusic.src = t.src;
+      document.getElementById('np-name').textContent = t.label;
+
+      if (restart) {
+        themeMusic.currentTime = 0;
+      } else if (window.MusicPosition) {
+        // currentTime cannot be set before metadata exists, so wait for it
+        // rather than assigning into a element that will ignore the write.
+        themeMusic.addEventListener('loadedmetadata', function once(){
+          themeMusic.removeEventListener('loadedmetadata', once);
+          window.MusicPosition.restore(posKey(key), themeMusic);
+        });
+      }
+
+      if (window.MusicPosition) stopTracking = window.MusicPosition.track(posKey(key), themeMusic);
+      tryPlayTheme();
+    }
+
+    const tryPlayTheme = () => { if (audioEnabled) themeMusic.play().catch(()=>{}); };
+    applyTrack(trackKey, false);
+
+    const unlock = () => { tryPlayTheme(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+
+    document.getElementById('mute-btn').addEventListener('click', (e) => {
       audioEnabled = !audioEnabled;
-      muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
-      if (audioEnabled) tryPlayTheme();
-      else themeMusic.pause();
+      e.currentTarget.textContent = audioEnabled ? '🔊' : '🔇';
+      if (audioEnabled) tryPlayTheme(); else themeMusic.pause();
     });
 
-    btn.addEventListener('click', () => {
-      playRandomSound('cards-pack-open', 2);
+    const playlistOverlay = document.getElementById('playlist-overlay');
+    const playlistList = document.getElementById('playlist-list');
 
-      const res = IantopiaLoot.openBox();
-      if (!res.ok) {
-        resultEl.textContent = res.message || "Not enough Strubles.";
-        return;
-      }
-      const p = res.prize;
-      const bonus = p.type === "rng_strubles" ? ` (+${p._amount})` : "";
-      resultEl.textContent = `You got: ${p.label}${bonus}`;
+    function renderPlaylist(){
+      const unlockedTracks = (loadInv().tracks || []).filter((k) => TRACKS[k]);
+      const keys = ['default', ...unlockedTracks];
+      playlistList.innerHTML = keys.map((k) => {
+        const active = k === trackKey;
+        return `<div class="track-row${active ? ' active' : ''}" data-key="${k}">
+          <span>${TRACKS[k].label}</span>${active ? '<span>▶</span>' : ''}
+        </div>`;
+      }).join('') + (unlockedTracks.length === 0
+        ? '<div class="track-empty">No tracks unlocked yet — music drops from Classified upward. The Signal Case is stuffed with them.</div>'
+        : '');
+
+      playlistList.querySelectorAll('.track-row').forEach((row) => {
+        row.addEventListener('click', () => {
+          applyTrack(row.dataset.key, true);
+          localStorage.setItem(ACTIVE_TRACK_KEY, row.dataset.key);
+          playlistOverlay.classList.remove('open');
+          renderPlaylist();
+        });
+      });
+    }
+
+    document.getElementById('np-btn').addEventListener('click', () => {
+      renderPlaylist();
+      playlistOverlay.classList.add('open');
+    });
+    document.getElementById('playlist-close').addEventListener('click', () => playlistOverlay.classList.remove('open'));
+    playlistOverlay.addEventListener('click', (e) => {
+      if (e.target === playlistOverlay) playlistOverlay.classList.remove('open');
+    });
+
+    // A track won mid-session should become selectable straight away.
+    window.addEventListener('music:unlocked', () => { if (playlistOverlay.classList.contains('open')) renderPlaylist(); });
+
+    // ---------- Rendering helpers ----------
+    function visual(item, cls){
+      return item.img
+        ? `<img src="${item.img}" alt="" loading="lazy">`
+        : `<span class="${cls}">${item.emoji || '❓'}</span>`;
+    }
+    function tileHTML(id){
+      const it = ITEMS[id];
+      if (!it) return '';
+      const color = (RARITIES[it.tier] || {}).color || '#fff';
+      return `<div class="tile" style="border-bottom-color:${color};box-shadow:inset 0 -34px 38px -34px ${color}">
+        <div class="tile-art">${visual(it, 'tile-emoji')}</div>
+        <div class="tile-label">${it.label}</div>
+      </div>`;
+    }
+
+    // ---------- Case select ----------
+    function renderCases(){
+      const owned = IantopiaCase.getCases();
+      caseGrid.innerHTML = Object.entries(CASES).map(([key, def]) => {
+        const n = owned[key] || 0;
+        return `<div class="case-card">
+          <div class="case-emoji">${def.emoji || '📦'}</div>
+          <div class="case-name">${def.label}</div>
+          <div class="case-blurb">${def.blurb || ''}</div>
+          <div class="case-cost">${def.cost.toLocaleString()} Strubles</div>
+          <div class="case-owned">${n ? `You own ${n}` : ''}</div>
+          <div class="case-actions">
+            <button class="primary" data-buy="${key}" type="button">Buy</button>
+            <button class="primary" data-open="${key}" type="button" ${n ? '' : 'disabled'}>Open</button>
+          </div>
+          <button class="btn" data-contents="${key}" type="button">Contents</button>
+        </div>`;
+      }).join('');
+
+      caseGrid.querySelectorAll('[data-buy]').forEach((b) => {
+        b.addEventListener('click', () => {
+          const res = IantopiaCase.buyCase(b.dataset.buy);
+          if (!res.ok) { flashCase(b, res.message); return; }
+          playRandom('chips-stack', 6);
+          renderCases();
+        });
+      });
+      caseGrid.querySelectorAll('[data-open]').forEach((b) => {
+        b.addEventListener('click', () => startOpen(b.dataset.open));
+      });
+      caseGrid.querySelectorAll('[data-contents]').forEach((b) => {
+        b.addEventListener('click', () => showContents(b.dataset.contents));
+      });
+    }
+
+    function flashCase(btn, msg){
+      const card = btn.closest('.case-card');
+      const el = card.querySelector('.case-owned');
+      const prev = el.textContent;
+      el.textContent = msg;
+      el.style.color = '#eb4b4b';
+      setTimeout(() => { el.textContent = prev; el.style.color = ''; }, 1800);
+    }
+
+    // ---------- Opening ----------
+    function startOpen(caseKey){
+      if (spinning) return;
+      // A longer strip means more travel time at speed before the decelerating
+      // tail, which is where the tension actually lives.
+      const res = IantopiaCase.openCase(caseKey, { reelLength: 88, winnerIndex: 80 });
+      if (!res.ok) { renderCases(); return; }
+
+      currentCaseKey = caseKey;
+      spinning = true;
+      caseSelect.classList.add('hidden');
+      openView.classList.add('active');
+      reveal.classList.remove('active');
+      reelTitle.textContent = CASES[caseKey].label;
+
+      strip.innerHTML = res.reel.map(tileHTML).join('');
+      strip.style.transition = 'none';
+      strip.style.transform = 'translateX(0px)';
+
+      // setTimeout rather than rAF: rAF does not fire at all in a backgrounded
+      // tab, which would strand the reel after the case had already been spent.
+      // animateTo() forces its own layout flush, so a frame callback buys nothing.
+      playCaseAnimation(caseKey).then(() => setTimeout(() => animateTo(res), 30));
+    }
+
+    // The case rattles, winds up, then bursts into a flash before the reel
+    // appears. Resolves when the reel should start moving.
+    function playCaseAnimation(caseKey){
+      const anim = document.getElementById('case-anim');
+      const box = document.getElementById('case-anim-box');
+      const flash = document.getElementById('flash');
+      const viewport = document.getElementById('reel-viewport');
+
+      box.textContent = (CASES[caseKey] && CASES[caseKey].emoji) || '📦';
+      box.className = 'case-anim-box';
+      anim.classList.add('active');
+      viewport.classList.add('hidden');
+
+      playRandom('cards-pack-take-out', 2);
+      void box.offsetWidth; // restart the animation on repeat opens
+      box.classList.add('rattle');
+
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          box.classList.remove('rattle');
+          box.classList.add('burst');
+          playRandom('cards-pack-open', 2);
+          flash.classList.remove('fire');
+          void flash.offsetWidth;
+          flash.classList.add('fire');
+        }, 1500);
+
+        setTimeout(() => {
+          anim.classList.remove('active');
+          viewport.classList.remove('hidden');
+          resolve();
+        }, 1900);
+      });
+    }
+
+    function animateTo(res){
+      const tiles = strip.children;
+      if (tiles.length < 2) { finish(res); return; }
+
+      // Measure the true step from the DOM rather than assuming the CSS values,
+      // so changing --tile-w or --tile-gap can't desync the landing position.
+      const step = tiles[1].offsetLeft - tiles[0].offsetLeft;
+      const tileW = tiles[0].offsetWidth;
+      const centre = viewport.clientWidth / 2;
+
+      // Land off-centre by a random fraction of a tile so the winner doesn't
+      // snap to dead centre every single time.
+      const jitter = (Math.random() - 0.5) * tileW * 0.5;
+      const target = -(res.winnerIndex * step + tileW / 2 - centre + jitter);
+
+      const DURATION = 9400;
+
+      strip.style.transition = 'none';
+      strip.style.transform = 'translateX(0px)';
+      void strip.offsetWidth; // force reflow so the reset isn't coalesced
+      // Long tail: the curve spends most of its time in the final crawl, so the
+      // last handful of tiles inch past the marker one at a time.
+      strip.style.transition = `transform ${DURATION}ms cubic-bezier(.10,.68,.12,1)`;
+      strip.style.transform = `translateX(${target}px)`;
+
+      // Tick whenever a new tile crosses the marker.
+      let lastIdx = -1, running = true;
+      (function tickLoop(){
+        if (!running) return;
+        const m = new DOMMatrixReadOnly(getComputedStyle(strip).transform);
+        const idx = Math.round((-m.m41 + centre) / step);
+        if (idx !== lastIdx) { if (lastIdx !== -1) playTick(); lastIdx = idx; }
+        requestAnimationFrame(tickLoop);
+      })();
+
+      let settled = false;
+      const done = (e) => {
+        if (e && (e.target !== strip || e.propertyName !== 'transform')) return;
+        if (settled) return;
+        settled = true;
+        clearTimeout(guard);
+        strip.removeEventListener('transitionend', done);
+        running = false;
+        finish(res);
+      };
+      strip.addEventListener('transitionend', done);
+
+      // transitionend is the only thing that reveals the prize, and it can be
+      // missed — an interrupted transition, a backgrounded tab, or a browser
+      // honouring prefers-reduced-motion will never fire it. Without this guard
+      // the reel hangs forever with spinning=true and the case is already spent.
+      const guard = setTimeout(done, DURATION + 600);
+    }
+
+    function finish(res){
+      spinning = false;
       syncBal();
 
-      if (p.type === "strubles" || p.type === "rng_strubles") {
-        playRandomSound('chips-stack', 6);
+      const color = res.rarity.color || '#fff';
+      const card = document.getElementById('reveal-card');
+      card.style.setProperty('--rc', color);
+      card.style.boxShadow = `0 0 20px ${color}, 0 0 60px ${color}55, inset 0 0 40px ${color}22`;
+
+      document.getElementById('reveal-rarity').textContent = res.rarity.label;
+      document.getElementById('reveal-visual').innerHTML = visual(res.item, 'reveal-emoji');
+      document.getElementById('reveal-label').textContent = res.item.label;
+
+      const note = document.getElementById('reveal-note');
+      if (res.duplicate) {
+        note.textContent = `Duplicate — refunded ${res.refund.toLocaleString()} Strubles`;
+      } else if (res.item.type === 'strubles') {
+        note.textContent = `+${res.item.amount.toLocaleString()} added to your balance`;
+      } else if (res.item.type === 'unlock_page') {
+        note.textContent = `Unlocked: ${res.item.path}`;
+      } else {
+        note.textContent = 'Added to your inventory';
       }
+
+      // Action items hand back a mailto instead of navigating on their own —
+      // a redirect mid-reveal would yank the player off the page.
+      const actions = document.querySelector('.reveal-actions');
+      const old = actions.querySelector('[data-mailto]');
+      if (old) old.remove();
+      if (res.mailto) {
+        const a = document.createElement('a');
+        a.className = 'btn'; a.dataset.mailto = '1'; a.href = res.mailto; a.textContent = 'Send It';
+        actions.insertBefore(a, actions.firstChild);
+      }
+
+      // Loud tiers get a loud sound.
+      if (res.tier === 'exceedingly_rare' || res.tier === 'covert') playRandom('chips-stack', 6);
+      else playRandom('chip-lay', 3);
+
+      reveal.classList.add('active');
+      againBtn.disabled = IantopiaCase.getCaseCount(currentCaseKey) === 0;
+      againBtn.textContent = againBtn.disabled ? 'No Cases Left' : 'Open Another';
+    }
+
+    againBtn.addEventListener('click', () => { if (!againBtn.disabled) startOpen(currentCaseKey); });
+    backBtn.addEventListener('click', () => {
+      openView.classList.remove('active');
+      reveal.classList.remove('active');
+      caseSelect.classList.remove('hidden');
+      renderCases();
     });
+
+    // ---------- Contents / odds ----------
+    const contentsOverlay = document.getElementById('contents-overlay');
+    function showContents(caseKey){
+      const def = CASES[caseKey];
+      const odds = IantopiaCase.oddsFor(caseKey);
+      document.getElementById('contents-title').textContent = def.label;
+
+      let html = '';
+      // Highest rarity first — that's what people open the panel to check.
+      [...ORDER].reverse().forEach((tier) => {
+        const ids = IantopiaCase.itemsInTier(caseKey, tier);
+        if (!ids.length) return;
+        const r = RARITIES[tier];
+        html += `<div class="tier-head" style="color:${r.color}">${r.label} — ${odds[tier]}%</div>`;
+        html += `<div class="tier-items">` + ids.map((id) => {
+          const it = ITEMS[id];
+          const vis = it.img ? `<img src="${it.img}" alt="">` : `<span class="te">${it.emoji || '❓'}</span>`;
+          return `<div class="tier-item" style="color:${r.color}">${vis}<span>${it.label}</span></div>`;
+        }).join('') + `</div>`;
+      });
+      document.getElementById('contents-body').innerHTML = html;
+      contentsOverlay.classList.add('open');
+    }
+    document.getElementById('contents-btn').addEventListener('click', () => showContents(currentCaseKey || Object.keys(CASES)[0]));
+    document.getElementById('contents-close').addEventListener('click', () => contentsOverlay.classList.remove('open'));
+    contentsOverlay.addEventListener('click', (e) => { if (e.target === contentsOverlay) contentsOverlay.classList.remove('open'); });
+
+    renderCases();
+  })();
   </script>
 </body>
 </html>

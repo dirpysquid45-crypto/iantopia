@@ -10,7 +10,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-  <style>
+  <!--
+    is:global is REQUIRED. Astro scopes <style> by stamping data-astro-cid-* on
+    template elements and rewriting selectors to match. The modal rows here
+    (.modal-track, .modal-item, .inv-category, .cursor-swatch) are all built at
+    runtime via innerHTML, so they never get that attribute and every scoped
+    rule silently skips them — the playlist, inventory, background and cursor
+    pickers all render as unstyled text. This is a standalone document, so
+    scoping buys nothing.
+  -->
+  <style is:global>
     * {
       margin: 0;
       padding: 0;
@@ -390,6 +399,53 @@
     }
     #bg-btn:hover { transform: translateY(-1px); }
 
+    #cursor-btn {
+      position: fixed;
+      top: calc(180px + env(safe-area-inset-top));
+      left: calc(20px + env(safe-area-inset-left));
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      border: 1px solid #2a3245;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      z-index: 20;
+    }
+    #cursor-btn:hover { transform: translateY(-1px); }
+
+    #ending-link {
+      position: fixed;
+      top: calc(230px + env(safe-area-inset-top));
+      left: calc(20px + env(safe-area-inset-left));
+      background: rgba(0, 0, 0, 0.75);
+      color: #ffd700;
+      border: 1px solid #ffd700;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: none;
+      z-index: 20;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.35);
+      animation: endingGlow 2.4s ease-in-out infinite;
+    }
+    #ending-link:hover { background: #ffd700; color: #000; }
+    #ending-link[hidden] { display: none; }
+    @keyframes endingGlow {
+      0%, 100% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
+      50%      { box-shadow: 0 0 18px rgba(255, 215, 0, 0.75); }
+    }
+
+    /* Cursor preview swatch in the picker rows */
+    .cursor-swatch {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 26px; height: 26px; margin-right: 8px; vertical-align: middle;
+      font-size: 20px; line-height: 1;
+    }
+    .cursor-swatch img { width: 24px; height: 24px; object-fit: contain; }
+
     #bg-video {
       display: none;
       position: fixed; inset: 0; width: 100vw; height: 100vh;
@@ -418,9 +474,11 @@
       a.big, button.big { padding: 12px 20px; font-size: clamp(16px, 3vw, 24px); margin: 10px auto; }
       #topia-timer { font-size: 0.55rem; padding: 8px 10px; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); }
       #strubles-badge { top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); font-size: 0.8rem; }
-      #inv-btn, #bg-btn { font-size: 0.7rem; padding: 6px 8px; top: auto; left: calc(10px + env(safe-area-inset-left)); }
-      #inv-btn { bottom: calc(100px + env(safe-area-inset-bottom)); }
-      #bg-btn { bottom: calc(50px + env(safe-area-inset-bottom)); }
+      #inv-btn, #bg-btn, #cursor-btn, #ending-link { font-size: 0.7rem; padding: 6px 8px; top: auto; left: calc(10px + env(safe-area-inset-left)); }
+      #inv-btn { bottom: calc(200px + env(safe-area-inset-bottom)); }
+      #bg-btn { bottom: calc(150px + env(safe-area-inset-bottom)); }
+      #cursor-btn { bottom: calc(100px + env(safe-area-inset-bottom)); }
+      #ending-link { bottom: calc(50px + env(safe-area-inset-bottom)); }
       #now-playing, #amsa-quote { position: static; max-width: 100%; margin-top: 12px; right: auto; top: auto; font-size: 0.7rem; }
       .modal-box { width: min(300px, 90vw); max-height: 60vh; }
     }
@@ -527,6 +585,9 @@
 
   <button id="inv-btn" title="Inventory">🎒 Inventory</button>
   <button id="bg-btn" title="Change background">🖼️ Background</button>
+  <button id="cursor-btn" title="Change cursor">🖱️ Cursor</button>
+  <!-- Revealed only once /never has been pulled from a case. -->
+  <a id="ending-link" href="/never" title="Alternate Ending" hidden>🎬 Alternate Ending</a>
   <video id="bg-video" autoplay muted loop playsinline></video>
 
   <button id="now-playing" title="Music options" aria-haspopup="dialog" aria-controls="playlist-overlay">
@@ -535,7 +596,7 @@
   </button>
   <div id="amsa-quote">"I play to win."<br>— AMSA</div>
 
-  <audio id="theme-music" src="/audio/music/home-theme.mp3" preload="none" loop></audio>
+  <audio id="theme-music" src="https://transcripts.iantopia.com/media/home-theme.mp3" preload="none" loop></audio>
 
   <!-- Playlist modal -->
   <div class="modal-overlay" id="playlist-overlay" role="dialog" aria-modal="true" aria-labelledby="playlist-title">
@@ -568,9 +629,20 @@
     </div>
   </div>
 
-  <script is:inline src="/music-library.js?v=3"></script>
+  <!-- Cursor modal -->
+  <div class="modal-overlay" id="cursor-overlay" role="dialog" aria-modal="true" aria-labelledby="cursor-title">
+    <div class="modal-box">
+      <h2 id="cursor-title">Cursor</h2>
+      <div id="cursor-list"></div>
+      <button class="modal-close" id="cursor-close">Close</button>
+    </div>
+  </div>
+
+  <script is:inline src="/music-library.js?v=4"></script>
   <script is:inline src="/music-position.js"></script>
-  <script is:inline src="/background-library.js"></script>
+  <script is:inline src="/background-library.js?v=2"></script>
+  <script is:inline src="/cursor-library.js?v=1"></script>
+  <script is:inline src="/case-data.js?v=1"></script>
 
   <!-- Timer Script -->
   <script is:inline>
@@ -645,7 +717,7 @@
   </script>
 
   <!-- Custom Cursor Implementation (Canvas-based, shared across pages) -->
-  <script is:inline src="/cursor.js"></script>
+  <script is:inline src="/cursor.js?v=2"></script>
 
   <!-- Home theme music, Now Playing / playlist, and Inventory -->
   <script is:inline>
@@ -655,7 +727,9 @@
       // leftover localStorage key must never be able to change what plays
       // by default here. Only an explicit, current-session playlist click
       // (handled below) can switch it to something else.
-      const HOME_THEME = { label: 'Home Theme', src: '/audio/music/home-theme.mp3' };
+      // CDN-hosted: 38MB, over the 25MB Cloudflare Pages per-file limit, so it
+      // is gitignored and never deployed alongside the site.
+      const HOME_THEME = { label: 'Home Theme', src: 'https://transcripts.iantopia.com/media/home-theme.mp3' };
 
       const ACTIVE_TRACK_KEY = 'home_active_track_v1';
       const INV_KEY = 'strubles_inventory_v1';
@@ -665,6 +739,15 @@
         try {
           const v = localStorage.getItem(INV_KEY);
           return v ? JSON.parse(v) : {};
+        } catch { return {}; }
+      }
+
+      const CASES_KEY = 'strubles_cases_v1';
+      function loadCases() {
+        try {
+          const v = localStorage.getItem(CASES_KEY);
+          const parsed = v ? JSON.parse(v) : {};
+          return (parsed && typeof parsed === 'object') ? parsed : {};
         } catch { return {}; }
       }
 
@@ -785,30 +868,50 @@
       const inventoryList = document.getElementById('inventory-list');
       const inventoryClose = document.getElementById('inventory-close');
 
+      const CURSOR_LIB = window.CURSOR_LIBRARY || {};
+      const BG_LIB_FOR_INV = window.BACKGROUND_LIBRARY || {};
+
+      // `lookup` maps a stored key to a human label. Without it the modal shows
+      // raw keys like "taipei_nightlife" instead of "Taipei Nightlife".
       const INV_CATEGORIES = [
         { key: 'items', label: 'Items' },
         { key: 'badges', label: 'Badges' },
         { key: 'themes', label: 'Themes' },
         { key: 'powerups', label: 'Powerups' },
         { key: 'sfx', label: 'Sounds' },
-        { key: 'tracks', label: 'Music Tracks' },
+        { key: 'tracks', label: 'Music Tracks', lookup: LIBRARY },
+        { key: 'backgrounds', label: 'Backgrounds', lookup: BG_LIB_FOR_INV },
+        { key: 'cursors', label: 'Cursors', lookup: CURSOR_LIB },
       ];
 
       function renderInventory() {
         const inv = loadInventory();
+        const cases = loadCases();
+        const caseCount = Object.values(cases).reduce((s, n) => s + n, 0);
         const hasAny = INV_CATEGORIES.some((c) => Array.isArray(inv[c.key]) && inv[c.key].length > 0);
-        if (!hasAny) {
-          inventoryList.innerHTML = '<div class="modal-empty">Nothing unlocked yet — open a Lootbox to start collecting!</div>';
+        if (!hasAny && !caseCount) {
+          inventoryList.innerHTML = '<div class="modal-empty">Nothing unlocked yet — open a case to start collecting!</div>';
           return;
         }
         let html = '';
+
+        // Unopened cases first — they're the only actionable thing in here.
+        if (caseCount) {
+          html += `<div class="inv-category">Unopened Cases</div>`;
+          Object.entries(cases).forEach(([key, n]) => {
+            if (!n) return;
+            const def = (window.CASES || {})[key];
+            html += `<div class="modal-item"><span>${def ? def.label : key}</span><span>×${n}</span></div>`;
+          });
+        }
+
         INV_CATEGORIES.forEach((c) => {
           const entries = Array.isArray(inv[c.key]) ? inv[c.key] : [];
           if (entries.length === 0) return;
           html += `<div class="inv-category">${c.label}</div>`;
           entries.forEach((entry) => {
-            const label = (c.key === 'tracks' && LIBRARY[entry]) ? LIBRARY[entry].label : entry;
-            html += `<div class="modal-item"><span>${label}</span></div>`;
+            const found = c.lookup && c.lookup[entry];
+            html += `<div class="modal-item"><span>${found ? found.label : entry}</span></div>`;
           });
         });
         inventoryList.innerHTML = html;
@@ -892,10 +995,80 @@
         if (e.target === backgroundOverlay) backgroundOverlay.classList.remove('open');
       });
 
+      // --- Cursor picker ---
+      // Writes the active key, then fires 'cursor:changed'; cursor.js listens
+      // and re-skins its canvas live, so the swap is visible without a reload.
+      const ACTIVE_CURSOR_KEY = 'active_cursor_v1';
+      const cursorBtn = document.getElementById('cursor-btn');
+      const cursorOverlay = document.getElementById('cursor-overlay');
+      const cursorList = document.getElementById('cursor-list');
+      const cursorClose = document.getElementById('cursor-close');
+
+      function getActiveCursorKey() {
+        const key = localStorage.getItem(ACTIVE_CURSOR_KEY);
+        return (key && CURSOR_LIB[key]) ? key : 'default';
+      }
+
+      function cursorSwatch(entry) {
+        return entry.emoji
+          ? `<span class="cursor-swatch">${entry.emoji}</span>`
+          : `<span class="cursor-swatch"><img src="${entry.point}" alt=""></span>`;
+      }
+
+      function renderCursorList() {
+        const active = getActiveCursorKey();
+        const unlocked = (loadInventory().cursors || []).filter((k) => CURSOR_LIB[k]);
+        const keys = ['default', ...unlocked];
+
+        cursorList.innerHTML = keys.map((key) => {
+          const entry = CURSOR_LIB[key];
+          const isActive = key === active;
+          return `<div class="modal-track${isActive ? ' active' : ''}" data-key="${key}">
+            <span>${cursorSwatch(entry)}${entry.label}</span>${isActive ? '<span>▶</span>' : ''}
+          </div>`;
+        }).join('') + (unlocked.length === 0
+          ? '<div class="modal-empty">No extra cursors unlocked yet — try a case!</div>'
+          : '');
+
+        cursorList.querySelectorAll('.modal-track').forEach((row) => {
+          row.addEventListener('click', () => {
+            localStorage.setItem(ACTIVE_CURSOR_KEY, row.dataset.key);
+            window.dispatchEvent(new CustomEvent('cursor:changed'));
+            cursorOverlay.classList.remove('open');
+            renderCursorList();
+          });
+        });
+      }
+
+      cursorBtn.addEventListener('click', () => {
+        renderCursorList();
+        cursorOverlay.classList.add('open');
+      });
+      cursorClose.addEventListener('click', () => cursorOverlay.classList.remove('open'));
+      cursorOverlay.addEventListener('click', (e) => {
+        if (e.target === cursorOverlay) cursorOverlay.classList.remove('open');
+      });
+
+      // --- Alternate Ending reveal ---
+      // The link stays hidden until /never is actually pulled from a case, so
+      // the gold drop is what makes it appear rather than it always being there.
+      const UNLOCKS_KEY = 'strubles_unlocks_v1';
+      const endingLink = document.getElementById('ending-link');
+      function syncEndingLink() {
+        let pages = [];
+        try {
+          const u = JSON.parse(localStorage.getItem(UNLOCKS_KEY) || '{}');
+          if (Array.isArray(u.pages)) pages = u.pages;
+        } catch {}
+        endingLink.hidden = !pages.includes('/never');
+      }
+      syncEndingLink();
+      window.addEventListener('storage', syncEndingLink);
+
       // Escape closes whichever modal is currently open
       window.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        [playlistOverlay, inventoryOverlay, backgroundOverlay].forEach((overlay) => {
+        [playlistOverlay, inventoryOverlay, backgroundOverlay, cursorOverlay].forEach((overlay) => {
           overlay.classList.remove('open');
         });
       });

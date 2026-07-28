@@ -1,4 +1,13 @@
 // lootbox-data.js
+
+// Paths an `unlock_page` prize is allowed to grant. A path only belongs here
+// once the page is a real, built route — applyPrize() refuses to unlock
+// anything not on this list, so a prize can never hand out a dead link.
+// Add the route here in the same change that adds the page, not before.
+window.LOOTBOX_UNLOCKABLE_PAGES = [
+  "/never", // src/pages/never.astro
+];
+
 window.LOOTBOX = {
   cost: 1000, // cost to open (adjust anytime)
   prizes: [
@@ -43,8 +52,11 @@ window.LOOTBOX_ARCHIVED_PRIZES = [
   { id:"golden_struble", label:"Golden Struble (+2% wins)", weight:50, type:"flag", key:"golden_struble" },
   { id:"ians_id", label:"Ian's Driver License", weight:30, type:"item" },
   { id:"cursed_audio", label:"Cursed Audio File", weight:20, type:"sfx", key:"cursed" }, // plays once on win, not persistent/selectable like a music track
-  { id:"alt_ending", label:"Alternate Ending", weight:10, type:"unlock_page", path:"/iantopia-secret.html" },
+  { id:"alt_ending", label:"Alternate Ending", weight:10, type:"unlock_page", path:"/never" }, // was /iantopia-secret.html, which was never built; /never is the real easter-egg page
   { id:"collector_badge", label:"Collector's Edition Badge", weight:9, type:"badge", key:"collector_glow" },
+  // BLOCKED: /ideas.html does not exist. Build the page and add its path to
+  // LOOTBOX_UNLOCKABLE_PAGES before putting this back into rotation, or it
+  // will be refused at grant time.
   { id:"ideas_wall", label:"Lobby for Iantopia", weight:1, type:"unlock_page", path:"/ideas.html" },
   { id:"patronage", label:"Topian Patronage (2× daily)", weight:1, type:"flag", key:"daily_x2" },
   { id:"crown", label:"Crown of Iantopia", weight:1, type:"flag", key:"crown" }

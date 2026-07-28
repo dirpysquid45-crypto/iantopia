@@ -1,178 +1,375 @@
-// lootbox.js
+// lootbox.js — CS2-style case engine
+//
+// Two-step economy, like CS2: you BUY a case (it becomes an object you own),
+// then you OPEN it. Buying and opening are separate so unopened cases can sit
+// in your inventory and the opening animation has something to consume.
+//
+// Rolling is CS2's model, in this order:
+//   1. Pick a rarity tier by its chance.
+//   2. Pick uniformly among that case's items in that tier.
+// Rarity is decided FIRST, so stuffing more items into a tier doesn't change
+// how often that tier hits — only which item you get when it does.
+//
+// Requires case-data.js. Exposes window.IantopiaCase.
 (function () {
-  const INV_KEY    = "strubles_inventory_v1";
-  const FLAGS_KEY  = "strubles_flags_v1";
-  const UNLOCKS_KEY= "strubles_unlocks_v1";
-  const ACTIVE_TRACK_KEY = "home_active_track_v1";
+  const INV_KEY     = 'strubles_inventory_v1';
+  const FLAGS_KEY   = 'strubles_flags_v1';
+  const UNLOCKS_KEY = 'strubles_unlocks_v1';
+  const CASES_KEY   = 'strubles_cases_v1';
+  const HISTORY_KEY = 'strubles_case_history_v1';
+  const STATS_KEY   = 'strubles_case_stats_v1';
+  const ACTIVE_TRACK_KEY  = 'home_active_track_v1';
+  const ACTIVE_BG_KEY     = 'home_active_bg_v1';
+  const ACTIVE_CURSOR_KEY = 'active_cursor_v1';
 
-  // Root-level file paths (no /assets folder)
-  const SFX_MAP = { cursed: "/audio/music/cursed.mp3" };
+  // Winning a cosmetic equips it immediately. Granting it silently into the
+  // inventory means you unbox a background, go to the homepage, still see the
+  // old one, and reasonably conclude you were given the wrong item.
+  const AUTO_EQUIP = {
+    music_unlock: ACTIVE_TRACK_KEY,
+    background_unlock: ACTIVE_BG_KEY,
+    cursor_unlock: ACTIVE_CURSOR_KEY,
+  };
+
+  const HISTORY_MAX = 50;
+
+  // Duplicate unlocks (a background/cursor/track you already own) pay out
+  // instead of granting nothing. Without this, an expensive case handing back
+  // something you own reads as a bug rather than a bad roll.
+  const DUPLICATE_REFUND = {
+    mil_spec: 200,
+    restricted: 750,
+    classified: 2000,
+    covert: 5000,
+    exceedingly_rare: 25000,
+  };
+
+  const INV_BUCKETS = ['items', 'powerups', 'sfx', 'themes', 'badges', 'tracks', 'backgrounds', 'cursors'];
+
+  // Must hand back FRESH arrays every call. Returning a shared template and
+  // letting callers push into it mutates the template itself, so every later
+  // read starts pre-populated and real wins get misreported as duplicates.
+  function emptyInv() {
+    const inv = {};
+    INV_BUCKETS.forEach((b) => { inv[b] = []; });
+    return inv;
+  }
 
   function loadJSON(k, fallback) {
     try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
   }
   function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
-
-  // Helpers
-  const uniqPush = (arr, val) => { if (!arr.includes(val)) arr.push(val); };
-  const dispatch = (name) => { try { window.dispatchEvent(new CustomEvent(name)); } catch {} };
+  const dispatch = (name, detail) => { try { window.dispatchEvent(new CustomEvent(name, { detail })); } catch {} };
 
   const state = {
-    get inv()   { return loadJSON(INV_KEY,   { items:[], powerups:[], sfx:[], themes:[], badges:[], tracks:[], backgrounds:[] }); },
-    set inv(v)  { saveJSON(INV_KEY, v); dispatch("inventory:changed"); },
-    get flags() { return loadJSON(FLAGS_KEY, {}); },
-    set flags(v){ saveJSON(FLAGS_KEY, v); },
-    get unlocks(){return loadJSON(UNLOCKS_KEY, { pages:[] }); },
-    set unlocks(v){ saveJSON(UNLOCKS_KEY, v); },
+    get inv() {
+      const raw = loadJSON(INV_KEY, {}) || {};
+      const inv = emptyInv();
+      // Copy per-bucket rather than spreading, so a corrupted or non-array
+      // bucket in saved state can't blow up the .includes()/.push() below.
+      INV_BUCKETS.forEach((b) => { if (Array.isArray(raw[b])) inv[b] = raw[b].slice(); });
+      return inv;
+    },
+    set inv(v)     { saveJSON(INV_KEY, v); dispatch('inventory:changed'); },
+    get flags()    { return loadJSON(FLAGS_KEY, {}); },
+    set flags(v)   { saveJSON(FLAGS_KEY, v); },
+    get unlocks()  { const u = loadJSON(UNLOCKS_KEY, {}); return { pages: Array.isArray(u.pages) ? u.pages : [] }; },
+    set unlocks(v) { saveJSON(UNLOCKS_KEY, v); },
+    get cases()    { const c = loadJSON(CASES_KEY, {}); return (c && typeof c === 'object') ? c : {}; },
+    set cases(v)   { saveJSON(CASES_KEY, v); dispatch('cases:changed'); },
   };
 
-  function pickWeighted(list) {
-    const total = list.reduce((s,p)=>s+(p.weight||0), 0);
-    if (total <= 0) return list[0];
-    let r = Math.random()*total;
-    for (const p of list) { r -= p.weight; if (r <= 0) return p; }
-    return list[list.length-1];
+  // Which inventory bucket each unlock type collects into. Types not listed
+  // here (strubles, action, unlock_page) aren't collections and are handled
+  // individually in applyItem().
+  const BUCKET = {
+    item: 'items',
+    badge: 'badges',
+    powerup: 'powerups',
+    sfx: 'sfx',
+    theme: 'themes',
+    music_unlock: 'tracks',
+    background_unlock: 'backgrounds',
+    cursor_unlock: 'cursors',
+  };
+
+  const MAILTO = {
+    email_haiku: () => {
+      const subject = encodeURIComponent('Iantopia speaks from the void');
+      const body = encodeURIComponent('Haiku:\nIantopia waits\nStrubles whisper in the dark\nShip it, mortal king');
+      return `mailto:ian@example.com?subject=${subject}&body=${body}`;
+    },
+    email_finish: () => {
+      const subject = encodeURIComponent('Finish Iantopia (Mythic Redemption)');
+      const body = encodeURIComponent('I pulled the Covert: Email Ian to Finish Iantopia.\nPlease finish it. 🙏\n— Sent from iantopia.com');
+      return `mailto:ian@example.com?subject=${subject}&body=${body}`;
+    },
+  };
+
+  function getCaseDef(caseKey) {
+    return (window.CASES && window.CASES[caseKey]) || null;
   }
 
-  function playSfx(key){
-    const src = SFX_MAP[key];
-    if (!src) return;
-    try { new Audio(src).play().catch(()=>{}); } catch {}
+  function oddsFor(def) {
+    if (def.odds) return def.odds;
+    const R = window.CASE_RARITIES || {};
+    return Object.fromEntries(Object.entries(R).map(([k, v]) => [k, v.chance]));
   }
 
-  function describePrize(prize){
-    switch (prize.type){
-      case "strubles":      return `+${prize.amount} Strubles`;
-      case "rng_strubles":  return `+${prize._amount ?? ""} Strubles`;
-      case "item":          return prize.id;
-      case "badge":         return `Badge: ${prize.key||prize.id}`;
-      case "theme":         return `Theme unlocked: ${prize.key||prize.id}`;
-      case "sfx":           return `Sound: ${prize.key||prize.id}`;
-      case "flag":          return `Flag: ${prize.key||prize.id}`;
-      case "powerup":       return `Powerup: ${prize.effect||prize.id}`;
-      case "music_unlock":  return `Track unlocked: ${prize.label||prize.key||prize.id}`;
-      case "background_unlock": return `Background unlocked: ${prize.label||prize.key||prize.id}`;
-      case "unlock_page":   return `Secret page unlocked`;
-      case "action":        return prize.label || "Special action";
-      default:              return "Mystery prize";
+  function pickTier(def) {
+    const odds = oddsFor(def);
+    const total = Object.values(odds).reduce((s, n) => s + n, 0);
+    let r = Math.random() * total;
+    for (const [tier, chance] of Object.entries(odds)) {
+      if (chance <= 0) continue;
+      r -= chance;
+      if (r <= 0) return tier;
     }
+    // Float drift only; fall back to the most common tier this case can roll.
+    return Object.entries(odds).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1])[0][0];
   }
 
-  function applyPrize(prize) {
-    const inv = state.inv;
-    const flags = state.flags;
-    const unlocks = state.unlocks;
+  function itemsInTier(def, tier) {
+    const I = window.CASE_ITEMS || {};
+    return def.items.filter((id) => I[id] && I[id].tier === tier);
+  }
 
-    switch (prize.type) {
-      case "strubles": {
-        Strubles.add(prize.amount||0);
+  // One roll: tier first, then uniform within the tier.
+  function rollItemId(def) {
+    const tier = pickTier(def);
+    const pool = itemsInTier(def, tier);
+    if (pool.length === 0) {
+      // validateCases() warns about this at load; recover rather than throw.
+      const all = def.items.filter((id) => (window.CASE_ITEMS || {})[id]);
+      return all[Math.floor(Math.random() * all.length)];
+    }
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+
+  // Filler tiles for the scrolling reel. Rolled with the same tier odds as a
+  // real drop so the strip *looks* like the case's rarity distribution —
+  // mostly blue with the occasional gold. Uniform filler would make every
+  // spin look like a jackpot and spoil the tension.
+  function buildReel(def, winnerId, length, winnerIndex) {
+    const reel = [];
+    for (let i = 0; i < length; i++) reel.push(rollItemId(def));
+    reel[winnerIndex] = winnerId;
+    return reel;
+  }
+
+  function applyItem(item) {
+    const inv = state.inv;
+    const result = { duplicate: false, refund: 0, mailto: null, unlocked: false };
+
+    switch (item.type) {
+      case 'strubles': {
+        Strubles.add(item.amount || 0);
+        result.unlocked = true;
         break;
       }
-      case "rng_strubles": {
-        const min = prize.min||0, max = prize.max||0;
-        const amt = Math.floor(min + Math.random()*(max-min+1));
-        Strubles.add(amt);
-        prize._amount = amt; // for UI
-        break;
-      }
-      case "item": {
-        uniqPush(inv.items, prize.id);
-        state.inv = inv;
-        break;
-      }
-      case "badge": {
-        const key = prize.key || prize.id;
-        uniqPush(inv.badges, key);
-        state.inv = inv;
-        break;
-      }
-      case "theme": {
-        const key = prize.key || prize.id;
-        uniqPush(inv.themes, key);
-        state.inv = inv;
-        break;
-      }
-      case "sfx": {
-        const key = prize.key || prize.id;
-        uniqPush(inv.sfx, key);
-        state.inv = inv;
-        // play it on win
-        playSfx(key);
-        break;
-      }
-      case "flag": {
-        flags[prize.key||prize.id] = true;
-        state.flags = flags;
-        break;
-      }
-      case "powerup": {
-        const key = prize.effect || prize.id;
-        uniqPush(inv.powerups, key);
-        state.inv = inv;
-        break;
-      }
-      case "music_unlock": {
-        const key = prize.key || prize.id;
-        inv.tracks = inv.tracks || [];
-        uniqPush(inv.tracks, key);
-        state.inv = inv;
-        // Auto-switch the home page's now-playing track to the newly unlocked one
-        try { localStorage.setItem(ACTIVE_TRACK_KEY, key); } catch {}
-        dispatch("music:unlocked");
-        break;
-      }
-      case "background_unlock": {
-        const key = prize.key || prize.id;
-        inv.backgrounds = inv.backgrounds || [];
-        uniqPush(inv.backgrounds, key);
-        state.inv = inv;
-        dispatch("background:unlocked");
-        break;
-      }
-      case "unlock_page": {
-        if (prize.path && !state.unlocks.pages.includes(prize.path)) {
-          unlocks.pages.push(prize.path);
+
+      case 'unlock_page': {
+        const allowed = Array.isArray(window.LOOTBOX_UNLOCKABLE_PAGES) ? window.LOOTBOX_UNLOCKABLE_PAGES : [];
+        if (!item.path || !allowed.includes(item.path)) {
+          // The page was never built, or was removed. Refuse rather than
+          // handing the player a link that 404s, and be loud so whoever
+          // added the item finds out immediately.
+          console.warn(
+            `[cases] item wants to unlock an unregistered page: ${item.path}. ` +
+            `Build the page and add its path to LOOTBOX_UNLOCKABLE_PAGES before shipping this item.`
+          );
+          break;
+        }
+        const unlocks = state.unlocks;
+        if (unlocks.pages.includes(item.path)) {
+          result.duplicate = true;
+        } else {
+          unlocks.pages.push(item.path);
           state.unlocks = unlocks;
         }
+        result.unlocked = true;
         break;
       }
-      case "action": {
-        // keep mailto for now; swap to Worker endpoint later
-        if (prize.effect === "email_haiku") {
-          const subject = encodeURIComponent("Iantopia speaks from the void");
-          const body = encodeURIComponent("Haiku:\nIantopia waits\nStrubles whisper in the dark\nShip it, mortal king");
-          window.location.href = `mailto:ian@example.com?subject=${subject}&body=${body}`;
-        } else if (prize.effect === "email_finish") {
-          const subject = encodeURIComponent("Finish Iantopia (Mythic Redemption)");
-          const body = encodeURIComponent("I pulled the Mythic: Email Ian to Finish Iantopia.\nPlease finish it. 🙏\n— Sent from iantopia.pages.dev");
-          window.location.href = `mailto:ian@example.com?subject=${subject}&body=${body}`;
+
+      case 'action': {
+        // Deliberately does NOT navigate. The old build fired window.location
+        // straight to a mailto: on win, which would now yank the player out of
+        // the page mid-reveal. The URL is handed to the UI instead, which
+        // offers it as a button on the reveal card.
+        const build = MAILTO[item.effect];
+        result.mailto = build ? build() : null;
+        result.unlocked = true;
+        break;
+      }
+
+      default: {
+        const bucket = BUCKET[item.type];
+        if (!bucket) {
+          console.warn(`[cases] unknown item type "${item.type}"; nothing granted.`);
+          break;
         }
+        const key = item.key || item.id;
+        if (inv[bucket].includes(key)) {
+          result.duplicate = true;
+        } else {
+          inv[bucket].push(key);
+          state.inv = inv;
+
+          // Equip whatever was just won. Music always did this; backgrounds and
+          // cursors did not, so unboxing a background changed nothing visible
+          // and looked like the wrong item had been granted.
+          const activeKey = AUTO_EQUIP[item.type];
+          if (activeKey) { try { localStorage.setItem(activeKey, key); } catch {} }
+
+          if (item.type === 'music_unlock') dispatch('music:unlocked');
+          if (item.type === 'background_unlock') dispatch('background:unlocked');
+          if (item.type === 'cursor_unlock') dispatch('cursor:unlocked');
+        }
+        result.unlocked = true;
         break;
       }
     }
+
+    if (result.duplicate) {
+      result.refund = DUPLICATE_REFUND[item.tier] || 0;
+      if (result.refund) Strubles.add(result.refund);
+    }
+    return result;
   }
 
-  function openBox() {
-    // Validate config
-    if (!window.LOOTBOX || !Array.isArray(window.LOOTBOX.prizes) || window.LOOTBOX.prizes.length===0) {
-      return { ok:false, message:"Lootbox not configured." };
-    }
-
-    const cost = Number(window.LOOTBOX.cost ?? 1000);
-    if (!Strubles.spend(cost)) {
-      return { ok:false, message:"Not enough Strubles." };
-    }
-
-    const prize = pickWeighted(window.LOOTBOX.prizes);
-    applyPrize(prize);
-
-    const message = describePrize(prize);
-    return { ok:true, prize, message };
+  function pushHistory(entry) {
+    const h = loadJSON(HISTORY_KEY, []);
+    const list = Array.isArray(h) ? h : [];
+    list.unshift(entry);
+    saveJSON(HISTORY_KEY, list.slice(0, HISTORY_MAX));
   }
 
-  // expose minimal API
+  // Lifetime totals. History is capped at HISTORY_MAX, so it cannot answer
+  // "how many cases have I ever opened" — these counters only ever go up.
+  function emptyStats() {
+    return { opened: 0, spent: 0, refunded: 0, duplicates: 0, byTier: {}, best: null, firstOpenAt: null };
+  }
+  function getStats() {
+    const s = loadJSON(STATS_KEY, null);
+    return (s && typeof s === 'object') ? Object.assign(emptyStats(), s) : emptyStats();
+  }
+  function bumpStats(fn) {
+    const s = getStats();
+    fn(s);
+    saveJSON(STATS_KEY, s);
+  }
+  function tierRank(tier) {
+    const order = window.CASE_RARITY_ORDER || [];
+    return order.indexOf(tier);
+  }
+
+  // --- Public API ---
+
+  function buyCase(caseKey, qty = 1) {
+    const def = getCaseDef(caseKey);
+    if (!def) return { ok: false, message: 'Unknown case.' };
+    const n = Math.max(1, Math.floor(qty));
+    const total = def.cost * n;
+    if (!Strubles.spend(total)) {
+      return { ok: false, message: `Not enough Strubles (need ${total.toLocaleString()}).` };
+    }
+    const cases = state.cases;
+    cases[caseKey] = (cases[caseKey] || 0) + n;
+    state.cases = cases;
+    bumpStats((s) => { s.spent += total; });
+    return { ok: true, message: `Bought ${n} × ${def.label}.`, owned: cases[caseKey] };
+  }
+
+  function getCases() { return state.cases; }
+  function getCaseCount(caseKey) { return state.cases[caseKey] || 0; }
+
+  // Consumes one owned case and resolves the drop. The reel is returned with
+  // the winner already placed so the UI only has to animate to winnerIndex.
+  function openCase(caseKey, opts = {}) {
+    const def = getCaseDef(caseKey);
+    if (!def) return { ok: false, message: 'Unknown case.' };
+
+    const cases = state.cases;
+    if (!cases[caseKey]) return { ok: false, message: 'You don\'t own that case.' };
+
+    const I = window.CASE_ITEMS || {};
+    const winnerId = rollItemId(def);
+    const item = I[winnerId];
+    if (!item) return { ok: false, message: 'Case is misconfigured.' };
+
+    // Consume only after the roll is known to be valid.
+    cases[caseKey] -= 1;
+    if (cases[caseKey] <= 0) delete cases[caseKey];
+    state.cases = cases;
+
+    const applied = applyItem(Object.assign({ id: winnerId }, item));
+
+    const reelLength = opts.reelLength || 60;
+    const winnerIndex = opts.winnerIndex != null ? opts.winnerIndex : reelLength - 6;
+    const reel = buildReel(def, winnerId, reelLength, winnerIndex);
+
+    const rarity = (window.CASE_RARITIES || {})[item.tier] || { label: item.tier, color: '#fff' };
+
+    const now = Date.now();
+    pushHistory({ caseKey, itemId: winnerId, tier: item.tier, at: now });
+    bumpStats((s) => {
+      s.opened += 1;
+      s.byTier[item.tier] = (s.byTier[item.tier] || 0) + 1;
+      if (applied.duplicate) s.duplicates += 1;
+      s.refunded += applied.refund || 0;
+      if (s.firstOpenAt == null) s.firstOpenAt = now;
+      // Rarest pull ever. Ties keep the earlier one — first time you hit it.
+      if (!s.best || tierRank(item.tier) > tierRank(s.best.tier)) {
+        s.best = { itemId: winnerId, tier: item.tier, label: item.label, at: now };
+      }
+    });
+
+    return {
+      ok: true,
+      caseKey,
+      itemId: winnerId,
+      item,
+      tier: item.tier,
+      rarity,
+      reel,
+      winnerIndex,
+      duplicate: applied.duplicate,
+      refund: applied.refund,
+      mailto: applied.mailto,
+      message: applied.duplicate
+        ? `Duplicate — refunded ${applied.refund.toLocaleString()} Strubles`
+        : item.label,
+    };
+  }
+
+  function getHistory() {
+    const h = loadJSON(HISTORY_KEY, []);
+    return Array.isArray(h) ? h : [];
+  }
+
+  window.IantopiaCase = {
+    buyCase,
+    openCase,
+    getCases,
+    getCaseCount,
+    getHistory,
+    getStats,
+    getInventory: () => state.inv,
+    getFlags: () => state.flags,
+    getUnlocks: () => state.unlocks,
+    // Exposed for the odds table in the UI and for tests.
+    oddsFor: (caseKey) => { const d = getCaseDef(caseKey); return d ? oddsFor(d) : null; },
+    itemsInTier: (caseKey, tier) => { const d = getCaseDef(caseKey); return d ? itemsInTier(d, tier) : []; },
+  };
+
+  // Back-compat: the old API name, so any page still calling openBox() keeps
+  // working against the default case instead of throwing.
   window.IantopiaLoot = {
-    openBox,
+    openBox: () => {
+      const buy = buyCase('starter');
+      if (!buy.ok) return { ok: false, message: buy.message };
+      return openCase('starter');
+    },
     getInventory: () => state.inv,
     getFlags: () => state.flags,
     getUnlocks: () => state.unlocks,
