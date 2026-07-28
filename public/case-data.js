@@ -54,7 +54,7 @@ window.CASE_ITEMS = {
   mus_death:   { label: 'Panchiko – DEATHMETAL',          tier: 'classified', emoji: '📻',                                  type: 'music_unlock', key: 'deathmetal' },
   bg_circus:   { label: 'Background: Circus',             tier: 'classified', img: '/video/circus.gif',                    type: 'background_unlock', key: 'circus' },
   bg_money:    { label: 'Background: Raining Money',      tier: 'classified', img: '/video/raining-money.gif',             type: 'background_unlock', key: 'raining_money' },
-  bg_ehden:    { label: 'Background: Ehden',              tier: 'classified', img: 'https://transcripts.iantopia.com/media/ehden.gif', type: 'background_unlock', key: 'ehden' },
+  bg_ehden:    { label: 'Background: Ehden',              tier: 'classified', img: '/video/ehden.gif',                     type: 'background_unlock', key: 'ehden' },
   cur_card:    { label: 'Cursor: Card Back',              tier: 'classified', img: '/assets/casino/cards/card_back.png',   type: 'cursor_unlock', key: 'card_back' },
   haiku_email: { label: 'Email from the Void (AI haiku)', tier: 'classified', emoji: '✉️',                                  type: 'action', effect: 'email_haiku' },
 

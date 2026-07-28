@@ -20,9 +20,13 @@ window.BACKGROUND_LIBRARY = {
   ny_skyline:       { label: 'NY Skyline',        type: 'gif',   src: '/video/nyskyline.gif', position: 'center' },
   circus:           { label: 'Circus',            type: 'gif',   src: '/video/circus.gif', position: 'center' },
   raining_money:    { label: 'Raining Money',     type: 'gif',   src: '/video/raining-money.gif', position: 'center' },
-  // CDN-hosted: both exceed the 25MB Cloudflare Pages per-file limit, so they
-  // are gitignored locally and served from transcripts.iantopia.com instead.
-  ehden:            { label: 'Ehden',             type: 'gif',   src: 'https://transcripts.iantopia.com/media/ehden.gif', position: 'center' },
+  // NOT COMMITTED: both exceed the 25MB Cloudflare Pages per-file limit, so
+  // they are gitignored. They work in local dev because the files are on disk,
+  // but they will 404 in production until they are hosted somewhere.
+  // transcripts.iantopia.com does NOT currently serve them — it answers every
+  // /media/* path with a 200 HTML fallback, so a status check looks fine while
+  // the bytes are wrong.
+  ehden:            { label: 'Ehden',             type: 'gif',   src: '/video/ehden.gif', position: 'center' },
   taipei_nightlife: { label: 'Taipei Nightlife',  type: 'video', src: '/video/taipei-nightlife.mp4' },
-  bangkok_night:    { label: 'Bangkok Night',     type: 'video', src: 'https://transcripts.iantopia.com/media/bangkok-night.mp4' },
+  bangkok_night:    { label: 'Bangkok Night',     type: 'video', src: '/video/bangkok-night.mp4' },
 };

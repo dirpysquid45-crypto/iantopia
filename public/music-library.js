@@ -9,8 +9,7 @@
 // To add a track: drop the mp3 in public/audio/music/, add one line here, and
 // add a matching music_unlock item to case-data.js.
 window.MUSIC_LIBRARY = {
-  // CDN-hosted: 38MB, over the 25MB Cloudflare Pages per-file limit.
-  default: { label: 'Home Theme', src: 'https://transcripts.iantopia.com/media/home-theme.mp3' },
+  default: { label: 'Home Theme', src: '/audio/music/home-theme.mp3' },
 
   // --- Unlockable ---
   taipei_instrumental: { label: 'Yung Lean – Taipei Instrumental',  src: '/audio/music/taipei-instrumental.mp3' },

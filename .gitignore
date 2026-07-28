@@ -12,14 +12,15 @@ dist/
 *.swo
 *~
 
-# Oversized media (>25MB Cloudflare Pages limit) - served from
-# transcripts.iantopia.com/media/ instead. background-library.js, music-library.js
-# and case-data.js reference the CDN URLs directly, so dev and prod both resolve
-# without these files ever being committed.
-# NOTE: paths must match where the file actually lives -- the old
-# `public/home-theme.mp3` rule silently stopped matching when the file moved
-# into public/audio/music/, and a 38MB blob got committed as a result.
-public/audio/music/home-theme.mp3
+# Oversized media (>25MB Cloudflare Pages limit).
+#
+# These are NOT hosted anywhere yet. transcripts.iantopia.com answers every
+# /media/* path with a 200 HTML fallback, so it looks like a working CDN to a
+# status-code check while actually serving no bytes -- do not point at it
+# without fetching the body and confirming the content-type first.
+#
+# Kept on disk so `astro dev` serves them locally; they will 404 in production
+# until they are hosted for real.
 public/trippy-roulette.gif
 public/video/bangkok-night.mp4
 public/video/ehden.gif
