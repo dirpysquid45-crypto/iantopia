@@ -78,6 +78,7 @@
       .file-action {
         display: flex;
         justify-content: flex-end;
+        gap: 8px;
       }
 
       .file-btn {
@@ -100,6 +101,28 @@
         box-shadow: 0 0 25px rgba(0, 255, 0, 0.9), inset 0 0 15px rgba(0, 255, 0, 0.2) !important;
         transform: scale(1.08) translateY(-2px) !important;
         border-color: #00ff00 !important;
+      }
+
+      .file-btn-delete {
+        padding: 8px 18px !important;
+        font-size: 10px !important;
+        font-weight: bold !important;
+        border: 2px solid #ff3333 !important;
+        background: rgba(120, 0, 0, 0.4) !important;
+        color: #ff3333 !important;
+        font-family: 'Courier New', monospace !important;
+        letter-spacing: 1px !important;
+        white-space: nowrap;
+        flex-shrink: 0;
+        cursor: pointer;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      }
+
+      .file-btn-delete:hover {
+        background: rgba(200, 0, 0, 0.5) !important;
+        box-shadow: 0 0 25px rgba(255, 51, 51, 0.9), inset 0 0 15px rgba(255, 51, 51, 0.2) !important;
+        transform: scale(1.08) translateY(-2px) !important;
+        border-color: #ff3333 !important;
       }
 
       .file-btn:active {
@@ -630,6 +653,7 @@
     <div class="content-wrapper">
       <div class="container">
         <a href="/" id="homeLink" onclick="goHome(event)" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; font-family:'Courier New', monospace; cursor:pointer;">&larr; HOME</a>
+        <a href="/transcripts/terms" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; margin-left:8px; font-family:'Courier New', monospace; cursor:pointer;">TERMS OF SERVICE</a>
         <h1>> YT-TRANSCRIPT_PLUS</h1>
         <p class="subtitle">>> Download transcripts & videos from YouTube</p>
         <p style="color: #006600; font-size: 11px; margin-top: 5px; margin-bottom: 30px; letter-spacing: 1px; text-align: right;">a widget by EEN</p>
@@ -676,31 +700,14 @@
         <div id="status" class="status"></div>
 
         <div class="transcripts-section">
-          <h2>>>> TRANSCRIPTS</h2>
-          <div id="transcriptsList">
+          <h2>>>> YOUR DOWNLOADS</h2>
+          <p style="color: #006600; font-size: 10px; margin-bottom: 12px;">
+            Tracked locally in your browser only — nothing is stored on our server.
+          </p>
+          <div id="downloadsHistoryList">
             <div class="empty-state">
               <div class="empty-state-icon">∅</div>
-              <p>No transcripts cached</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="transcripts-section">
-          <h2>>>> VIDEOS</h2>
-          <div id="videosList">
-            <div class="empty-state">
-              <div class="empty-state-icon">∅</div>
-              <p>No videos downloaded</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="transcripts-section">
-          <h2>>>> AUDIO</h2>
-          <div id="audioList">
-            <div class="empty-state">
-              <div class="empty-state-icon">∅</div>
-              <p>No audio downloaded</p>
+              <p>No downloads yet</p>
             </div>
           </div>
         </div>
@@ -838,8 +845,6 @@
       // port 80, so this works identically whether accessed via
       // iantopia.com, localhost, or qasim's IP directly.
       const API_BASE = '/api';
-      let currentVideoId = null;
-      let currentOverwrite = false;
 
       const urlInput = document.getElementById("youtubeUrl");
       const fetchBtn = document.getElementById("fetchBtn");
@@ -848,9 +853,7 @@
       const audioInput = document.getElementById("audioUrl");
       const downloadAudioBtn = document.getElementById("downloadAudioBtn");
       const statusDiv = document.getElementById("status");
-      const transcriptsList = document.getElementById("transcriptsList");
-      const videosList = document.getElementById("videosList");
-      const audioList = document.getElementById("audioList");
+      const downloadsHistoryList = document.getElementById("downloadsHistoryList");
 
       fetchBtn.addEventListener("click", handleFetch);
       urlInput.addEventListener("keypress", (e) => {
@@ -867,231 +870,127 @@
         if (e.key === "Enter") handleDownloadAudio();
       });
 
-      loadTranscripts();
-      loadVideos();
-      loadAudio();
-      setInterval(loadTranscripts, 3000);
-      setInterval(loadVideos, 3000);
-      setInterval(loadAudio, 3000);
+      // --- Download history (localStorage-only; nothing is stored server-side) ---
+      const HISTORY_KEY = "downloadHistory";
 
-      async function loadTranscripts() {
+      function getDownloadHistory() {
         try {
-          const response = await fetch(`${API_BASE}/transcripts`);
-          const data = await response.json();
-
-          if (data.transcripts && data.transcripts.length > 0) {
-            let html = "";
-            data.transcripts.forEach(file => {
-              const sizeKB = (file.size / 1024).toFixed(2);
-              html += `
-                <div class="file-item">
-                  <div class="file-title" title="${file.filename}">➤ ${file.filename}</div>
-                  <div class="file-row">
-                    <div class="file-type">TX<br/><span class="file-size">${sizeKB}KB</span></div>
-                    <div class="file-action">
-                      <button class="file-btn" data-filename="${file.filename}" data-type="transcript">[DOWNLOAD]</button>
-                    </div>
-                  </div>
-                </div>
-              `;
-            });
-            transcriptsList.innerHTML = html;
-          } else {
-            transcriptsList.innerHTML = `
-              <div class="empty-state">
-                <div class="empty-state-icon">∅</div>
-                <p>No transcripts cached</p>
-              </div>
-            `;
-          }
-        } catch (error) {
-          console.error("Failed to load transcripts:", error);
+          return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+        } catch {
+          return [];
         }
       }
 
-      function downloadTranscript(filename) {
-        const downloadUrl = `${API_BASE}/download/${encodeURIComponent(filename)}`;
-        const link = document.createElement("a");
-        link.href = downloadUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      function saveDownloadHistory(history) {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
       }
 
-      // Event delegation for file download buttons
-      transcriptsList.addEventListener("click", (e) => {
-        const btn = e.target.closest("button[data-type='transcript']");
-        if (btn && btn.dataset.filename) {
-          downloadTranscript(btn.dataset.filename);
-        }
-      });
-
-      videosList.addEventListener("click", (e) => {
-        const btn = e.target.closest("button[data-type='video']");
-        if (btn && btn.dataset.filename) {
-          downloadVideo(btn.dataset.filename);
-        }
-      });
-
-      audioList.addEventListener("click", (e) => {
-        const btn = e.target.closest("button[data-type='audio']");
-        if (btn && btn.dataset.filename) {
-          downloadAudio(btn.dataset.filename);
-        }
-      });
-
-      async function loadVideos() {
-        try {
-          const response = await fetch(`${API_BASE}/downloads`);
-          const data = await response.json();
-
-          if (data.downloads && data.downloads.length > 0) {
-            let html = "";
-            data.downloads.forEach(file => {
-              html += `
-                <div class="file-item">
-                  <div class="file-title" title="${file.filename}">➤ ${file.filename}</div>
-                  <div class="file-row">
-                    <div class="file-type">VD<br/><span class="file-size">${file.size_mb}MB</span></div>
-                    <div class="file-action">
-                      <button class="file-btn" data-filename="${file.filename}" data-type="video">[DOWNLOAD]</button>
-                    </div>
-                  </div>
-                </div>
-              `;
-            });
-            videosList.innerHTML = html;
-          } else {
-            videosList.innerHTML = `
-              <div class="empty-state">
-                <div class="empty-state-icon">∅</div>
-                <p>No videos downloaded</p>
-              </div>
-            `;
-          }
-        } catch (error) {
-          console.error("Failed to load videos:", error);
-        }
+      function addToDownloadHistory(entry) {
+        const history = getDownloadHistory();
+        history.unshift({ id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, ...entry });
+        saveDownloadHistory(history);
+        renderDownloadHistory();
       }
 
-      function downloadVideo(filename) {
-        const downloadUrl = `${API_BASE}/download-video/${encodeURIComponent(filename)}`;
-        const link = document.createElement("a");
-        link.href = downloadUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+      function forgetDownload(id) {
+        const history = getDownloadHistory().filter((entry) => entry.id !== id);
+        saveDownloadHistory(history);
+        renderDownloadHistory();
       }
 
-      async function loadAudio() {
-        try {
-          const response = await fetch(`${API_BASE}/audio`);
-          const data = await response.json();
+      const TYPE_LABELS = { transcript: "TX", video: "VD", audio: "MP3" };
 
-          if (data.audio && data.audio.length > 0) {
-            let html = "";
-            data.audio.forEach(file => {
-              html += `
-                <div class="file-item">
-                  <div class="file-title" title="${file.filename}">➤ ${file.filename}</div>
-                  <div class="file-row">
-                    <div class="file-type">MP3<br/><span class="file-size">${file.size_mb}MB</span></div>
-                    <div class="file-action">
-                      <button class="file-btn" data-filename="${file.filename}" data-type="audio">[DOWNLOAD]</button>
-                    </div>
-                  </div>
-                </div>
-              `;
-            });
-            audioList.innerHTML = html;
-          } else {
-            audioList.innerHTML = `
-              <div class="empty-state">
-                <div class="empty-state-icon">∅</div>
-                <p>No audio downloaded</p>
-              </div>
-            `;
-          }
-        } catch (error) {
-          console.error("Failed to load audio:", error);
-        }
-      }
+      function renderDownloadHistory() {
+        const history = getDownloadHistory();
 
-      function downloadAudio(filename) {
-        const downloadUrl = `${API_BASE}/download-audio/${encodeURIComponent(filename)}`;
-        const link = document.createElement("a");
-        link.href = downloadUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      }
-
-      async function handleDownloadVideo() {
-        const url = videoInput.value.trim();
-        if (!url) {
-          showStatus("error", ">>> ERROR: Video URL field empty");
+        if (history.length === 0) {
+          downloadsHistoryList.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-state-icon">∅</div>
+              <p>No downloads yet</p>
+            </div>
+          `;
           return;
         }
 
-        downloadVideoBtn.disabled = true;
-        showStatus("loading", ">>> Downloading video... (this may take a while)");
+        downloadsHistoryList.innerHTML = history.map((entry) => `
+          <div class="file-item">
+            <div class="file-title" title="${entry.filename}">➤ ${entry.filename}</div>
+            <div class="file-row">
+              <div class="file-type">${TYPE_LABELS[entry.type] || "?"}<br/><span class="file-size">${new Date(entry.timestamp).toLocaleDateString()}</span></div>
+              <div class="file-action">
+                <button class="file-btn-delete" data-id="${entry.id}">[FORGET]</button>
+              </div>
+            </div>
+          </div>
+        `).join("");
+      }
+
+      downloadsHistoryList.addEventListener("click", (e) => {
+        const btn = e.target.closest("button[data-id]");
+        if (btn) {
+          forgetDownload(btn.dataset.id);
+        }
+      });
+
+      renderDownloadHistory();
+
+      // Extracts the server-provided filename from a Content-Disposition
+      // header (e.g. `attachment; filename="Some Title.mp3"`), falling
+      // back to the given default if the header is missing/unparseable.
+      function filenameFromResponse(response, fallback) {
+        const cd = response.headers.get("content-disposition") || "";
+        const match = cd.match(/filename\*?=(?:UTF-8'')?"?([^";\n]+)"?/i);
+        if (match && match[1]) {
+          try {
+            return decodeURIComponent(match[1]);
+          } catch {
+            return match[1];
+          }
+        }
+        return fallback;
+      }
+
+      // Streams a blob to the user as a file download via a throwaway
+      // object URL — the file only ever exists in browser memory.
+      function triggerBrowserDownload(blob, filename) {
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(objectUrl);
+      }
+
+      async function streamDownload({ endpoint, url, type, fallbackFilename, button, loadingMessage }) {
+        button.disabled = true;
+        showStatus("loading", loadingMessage);
 
         try {
-          const response = await fetch(`${API_BASE}/download-video`, {
+          const response = await fetch(`${API_BASE}/${endpoint}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ url }),
           });
 
-          const data = await response.json();
-
-          if (data.status === "success") {
-            showStatus("success", `✓ Video downloaded: ${data.filename}`);
-            videoInput.value = "";
-            setTimeout(loadVideos, 500);
-          } else {
+          if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
             showStatus("error", `>>> ERROR: ${data.detail || "Unknown error"}`);
+            return;
           }
+
+          const blob = await response.blob();
+          const filename = filenameFromResponse(response, fallbackFilename);
+          triggerBrowserDownload(blob, filename);
+
+          addToDownloadHistory({ filename, type, timestamp: new Date().toISOString(), url });
+          showStatus("success", `✓ Downloaded: ${filename}`);
         } catch (error) {
           showStatus("error", `>>> ERROR: ${error.message}`);
         } finally {
-          downloadVideoBtn.disabled = false;
-        }
-      }
-
-      async function handleDownloadAudio() {
-        const url = audioInput.value.trim();
-        if (!url) {
-          showStatus("error", ">>> ERROR: Audio URL field empty");
-          return;
-        }
-
-        downloadAudioBtn.disabled = true;
-        showStatus("loading", ">>> Extracting audio... (this may take a while)");
-
-        try {
-          const response = await fetch(`${API_BASE}/download-audio`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url }),
-          });
-
-          const data = await response.json();
-
-          if (data.status === "success") {
-            showStatus("success", `✓ Audio downloaded: ${data.filename}`);
-            audioInput.value = "";
-            setTimeout(loadAudio, 500);
-          } else {
-            showStatus("error", `>>> ERROR: ${data.detail || "Unknown error"}`);
-          }
-        } catch (error) {
-          showStatus("error", `>>> ERROR: ${error.message}`);
-        } finally {
-          downloadAudioBtn.disabled = false;
+          button.disabled = false;
         }
       }
 
@@ -1102,90 +1001,51 @@
           return;
         }
 
-        fetchBtn.disabled = true;
-        showStatus("loading", ">>> Processing...");
-
-        try {
-          const response = await fetch(`${API_BASE}/fetch-transcript`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url, overwrite: currentOverwrite }),
-          });
-
-          const data = await response.json();
-
-          if (data.status === "duplicate_exists") {
-            currentVideoId = data.video_id;
-            showDuplicateDialog(data.filename);
-          } else if (data.status === "success") {
-            showStatus("success", `✓ ${data.filename} cached`);
-            urlInput.value = "";
-            currentOverwrite = false;
-            setTimeout(loadTranscripts, 500);
-          } else if (data.status === "skipped") {
-            showStatus("success", `✓ File exists: ${data.filename}`);
-            urlInput.value = "";
-          }
-        } catch (error) {
-          showStatus("error", `>>> ERROR: ${error.message}`);
-        } finally {
-          fetchBtn.disabled = false;
-        }
+        await streamDownload({
+          endpoint: "fetch-transcript",
+          url,
+          type: "transcript",
+          fallbackFilename: "transcript.txt",
+          button: fetchBtn,
+          loadingMessage: ">>> Processing...",
+        });
+        urlInput.value = "";
       }
 
-      function showDuplicateDialog(filename) {
-        const dontAskCheckbox = `
-          <div class="checkbox-group">
-            <input type="checkbox" id="dontAskAgain" />
-            <label for="dontAskAgain">Remember choice</label>
-          </div>
-        `;
+      async function handleDownloadVideo() {
+        const url = videoInput.value.trim();
+        if (!url) {
+          showStatus("error", ">>> ERROR: Video URL field empty");
+          return;
+        }
 
-        statusDiv.innerHTML = `
-          <div>
-            <strong>>>> FILE_EXISTS: ${filename}</strong>
-            ${dontAskCheckbox}
-            <div class="duplicate-actions">
-              <button class="skip-btn" id="skipBtn">[KEEP]</button>
-              <button class="overwrite-btn" id="overwriteBtn">[OVERWRITE]</button>
-            </div>
-          </div>
-        `;
-        statusDiv.className = "status show duplicate";
-
-        document.getElementById("skipBtn").addEventListener("click", () => {
-          handleDuplicate("skip");
+        await streamDownload({
+          endpoint: "download-video",
+          url,
+          type: "video",
+          fallbackFilename: "video.mp4",
+          button: downloadVideoBtn,
+          loadingMessage: ">>> Downloading video... (this may take a while)",
         });
-
-        document.getElementById("overwriteBtn").addEventListener("click", () => {
-          handleDuplicate("overwrite");
-        });
+        videoInput.value = "";
       }
 
-      async function handleDuplicate(action) {
-        const dontAskAgain = document.getElementById("dontAskAgain").checked;
-
-        try {
-          await fetch(`${API_BASE}/handle-duplicate`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              video_id: currentVideoId,
-              action,
-              dont_ask_again: dontAskAgain,
-            }),
-          });
-
-          if (action === "overwrite") {
-            currentOverwrite = true;
-            handleFetch();
-          } else {
-            showStatus("success", "✓ Operation cancelled");
-            urlInput.value = "";
-          }
-        } catch (error) {
-          showStatus("error", `>>> ERROR: ${error.message}`);
+      async function handleDownloadAudio() {
+        const url = audioInput.value.trim();
+        if (!url) {
+          showStatus("error", ">>> ERROR: Audio URL field empty");
+          return;
         }
+
+        await streamDownload({
+          endpoint: "download-audio",
+          url,
+          type: "audio",
+          fallbackFilename: "audio.mp3",
+          button: downloadAudioBtn,
+          loadingMessage: ">>> Extracting audio... (this may take a while)",
+        });
+        audioInput.value = "";
       }
 
       function showStatus(type, message) {
