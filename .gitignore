@@ -21,6 +21,5 @@ dist/
 #
 # Kept on disk so `astro dev` serves them locally; they will 404 in production
 # until they are hosted for real.
-public/trippy-roulette.gif
 public/video/bangkok-night.mp4
 public/video/ehden.gif
