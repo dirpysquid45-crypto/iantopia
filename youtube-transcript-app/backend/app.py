@@ -22,6 +22,13 @@ app.add_middleware(
 class YouTubeLink(BaseModel):
     url: str
 
+# YouTube has been rolling out "SABR streaming" enforcement against yt-dlp's
+# default web client, which silently drops formats and can yield an empty or
+# near-empty download instead of a hard error. Falling back through android
+# then web keeps a working format available.
+# See: https://github.com/yt-dlp/yt-dlp/issues/12482
+YOUTUBE_EXTRACTOR_ARGS = {'youtube': {'player_client': ['android', 'web']}}
+
 def extract_video_id(url: str) -> str:
     pattern = r"(?:https?://)?(?:www\.)?(?:youtube\.com/watch\?v=|youtu\.be/)([\w-]{11})"
     match = re.search(pattern, url)
@@ -118,14 +125,18 @@ async def download_video(data: YouTubeLink):
             'format': 'best[ext=mp4]',
             'outtmpl': str(Path(tmpdir) / "%(title)s.%(ext)s"),
             'socket_timeout': 30,
+            'extractor_args': YOUTUBE_EXTRACTOR_ARGS,
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}")
             filepath = Path(ydl.prepare_filename(info))
 
-        if not filepath.exists():
-            raise Exception("Conversion did not produce an output file")
+        # yt-dlp can report success while writing a near-empty file (e.g. when
+        # YouTube serves a broken/placeholder format) — a hard size floor turns
+        # that into a real error instead of a silent 0-second download.
+        if not filepath.exists() or filepath.stat().st_size < 10_000:
+            raise Exception("Download produced no usable video data")
 
         return FileResponse(
             path=filepath,
@@ -154,6 +165,7 @@ async def download_audio(data: YouTubeLink):
             'format': 'bestaudio/best',
             'outtmpl': str(Path(tmpdir) / "%(title)s.%(ext)s"),
             'socket_timeout': 30,
+            'extractor_args': YOUTUBE_EXTRACTOR_ARGS,
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -169,8 +181,11 @@ async def download_audio(data: YouTubeLink):
             raw_filename = ydl.prepare_filename(info)
             filepath = Path(raw_filename).with_suffix('.mp3')
 
-        if not filepath.exists():
-            raise Exception("Conversion did not produce an output file")
+        # yt-dlp can report success while writing a near-empty file (e.g. when
+        # YouTube serves a broken/placeholder format) — a hard size floor turns
+        # that into a real error instead of a silent 0-second download.
+        if not filepath.exists() or filepath.stat().st_size < 10_000:
+            raise Exception("Conversion produced no usable audio data")
 
         return FileResponse(
             path=filepath,
