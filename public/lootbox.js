@@ -33,9 +33,12 @@
 
   const HISTORY_MAX = 50;
 
-  // Duplicate unlocks (a background/cursor/track you already own) pay out
-  // instead of granting nothing. Without this, an expensive case handing back
-  // something you own reads as a bug rather than a bad roll.
+  // Owned collectibles are filtered out of the roll pool before a case ever
+  // opens (see isOwned/itemsInTier/rollItemId below) — a case will not hand
+  // back something you already have. DUPLICATE_REFUND is a safety net for
+  // the one case that can still reach applyItem's duplicate branch: a case
+  // fully cleaned out (every collectible in it already owned), where
+  // rollItemId's last-resort fallback has nothing left to fall back to.
   const DUPLICATE_REFUND = {
     mil_spec: 200,
     restricted: 750,
@@ -94,9 +97,9 @@
   };
 
   const MAILTO = {
-    email_haiku: () => {
+    email_void: () => {
       const subject = encodeURIComponent('Iantopia speaks from the void');
-      const body = encodeURIComponent('Haiku:\nIantopia waits\nStrubles whisper in the dark\nShip it, mortal king');
+      const body = encodeURIComponent('The void has nothing to say. It just wanted you to open your inbox.\n— Sent from iantopia.com');
       return `mailto:ian@example.com?subject=${subject}&body=${body}`;
     },
     email_finish: () => {
@@ -129,20 +132,67 @@
     return Object.entries(odds).filter(([, c]) => c > 0).sort((a, b) => b[1] - a[1])[0][0];
   }
 
-  function itemsInTier(def, tier) {
-    const I = window.CASE_ITEMS || {};
-    return def.items.filter((id) => I[id] && I[id].tier === tier);
+  // Strubles and mailto actions aren't collectibles -- you can always win
+  // more of either, so they're never "owned" for roll-filtering purposes.
+  // Everything else (items, badges, themes, powerups, sfx, and every unlock
+  // type) is a one-time collectible: once you have it, it comes out of your
+  // own future rolls entirely, so a case can never hand back a duplicate.
+  function isOwned(id, item) {
+    if (item.type === 'strubles' || item.type === 'action') return false;
+    if (item.type === 'unlock_page') {
+      const pages = state.unlocks.pages;
+      return Array.isArray(pages) && pages.includes(item.path);
+    }
+    const bucket = BUCKET[item.type];
+    if (!bucket) return false;
+    const inv = state.inv;
+    const key = item.key || id;
+    return Array.isArray(inv[bucket]) && inv[bucket].includes(key);
   }
 
-  // One roll: tier first, then uniform within the tier.
+  function itemsInTier(def, tier) {
+    const I = window.CASE_ITEMS || {};
+    return def.items.filter((id) => {
+      const item = I[id];
+      return item && item.tier === tier && !isOwned(id, item);
+    });
+  }
+
+  // One roll: tier first, then uniform within the tier -- among whatever in
+  // that tier you don't already own. Layered fallbacks so a player who has
+  // cleaned out a tier (or an entire case) never gets stuck or gets handed
+  // something owned; each step only widens the pool once the narrower one is
+  // provably empty.
   function rollItemId(def) {
     const tier = pickTier(def);
-    const pool = itemsInTier(def, tier);
+    let pool = itemsInTier(def, tier);
+
     if (pool.length === 0) {
-      // validateCases() warns about this at load; recover rather than throw.
-      const all = def.items.filter((id) => (window.CASE_ITEMS || {})[id]);
-      return all[Math.floor(Math.random() * all.length)];
+      // Tier maxed out. Borrow from every unowned item this case can give,
+      // any tier, rather than ever falling back to something owned.
+      pool = def.items.filter((id) => {
+        const item = (window.CASE_ITEMS || {})[id];
+        return item && !isOwned(id, item);
+      });
     }
+
+    if (pool.length === 0) {
+      // Every collectible in this case is owned. Strubles/action items are
+      // never "owned" (see isOwned), so this is the true completionist
+      // fallback -- still gives something, never a duplicate.
+      pool = def.items.filter((id) => {
+        const item = (window.CASE_ITEMS || {})[id];
+        return item && (item.type === 'strubles' || item.type === 'action');
+      });
+    }
+
+    if (pool.length === 0) {
+      // No currency/action items exist in this case's pool at all -- a data
+      // problem validateCases() should already be warning about at load.
+      // Recover rather than throw at open time.
+      pool = def.items.filter((id) => (window.CASE_ITEMS || {})[id]);
+    }
+
     return pool[Math.floor(Math.random() * pool.length)];
   }
 

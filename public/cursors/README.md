@@ -48,5 +48,18 @@ A cursor doesn't need art at all. An entry with `emoji` instead of `point` is
 rendered as text on the canvas:
 
 ```js
-crown: { label: 'Crown of Iantopia', emoji: '👑' },
+lightning: { label: 'Lightning Bolt', emoji: '⚡' },
+```
+
+## Click sounds
+
+An entry can optionally cycle through a sequence of sounds on every click,
+looping back to the start once it reaches the end:
+
+```js
+my_cursor: {
+  label: 'My Cursor',
+  point: '/cursors/my-cursor.png',
+  clickSounds: ['/audio/sfx/my-cursor-1.mp3', '/audio/sfx/my-cursor-2.mp3'],
+},
 ```

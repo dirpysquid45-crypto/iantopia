@@ -14,19 +14,12 @@ window.BACKGROUND_LIBRARY = {
 
   // --- Unlockable ---
   vegas_skyline:    { label: 'Las Vegas Skyline', type: 'gif',   src: '/video/vegas-skyline.gif', position: 'top center' },
-  trippy_roulette:  { label: 'Trippy Roulette',   type: 'gif',   src: 'https://transcripts.iantopia.com/media/trippy-roulette.gif', position: 'center' },
   old_ppl_slot:     { label: 'Old People Slot',   type: 'gif',   src: '/video/old-ppl-slot.gif', position: 'center' },
   casino_entrance:  { label: 'Casino Entrance',   type: 'gif',   src: '/video/casino-entrance.gif', position: 'center' },
   ny_skyline:       { label: 'NY Skyline',        type: 'gif',   src: '/video/nyskyline.gif', position: 'center' },
   circus:           { label: 'Circus',            type: 'gif',   src: '/video/circus.gif', position: 'center' },
   raining_money:    { label: 'Raining Money',     type: 'gif',   src: '/video/raining-money.gif', position: 'center' },
-  // NOT COMMITTED: both exceed the 25MB Cloudflare Pages per-file limit, so
-  // they are gitignored. They work in local dev because the files are on disk,
-  // but they will 404 in production until they are hosted somewhere.
-  // transcripts.iantopia.com does NOT currently serve them — it answers every
-  // /media/* path with a 200 HTML fallback, so a status check looks fine while
-  // the bytes are wrong.
-  ehden:            { label: 'Ehden',             type: 'gif',   src: '/video/ehden.gif', position: 'center' },
   taipei_nightlife: { label: 'Taipei Nightlife',  type: 'video', src: '/video/taipei-nightlife.mp4' },
-  bangkok_night:    { label: 'Bangkok Night',     type: 'video', src: '/video/bangkok-night.mp4' },
+  bladee_waster:    { label: 'Bladee – Waster',   type: 'video', src: '/video/bladee-waster.mp4' },
+  evian_yxguden:    { label: 'Evian Christ – Yxguden (feat. Bladee)', type: 'video', src: '/video/evian-christ-yxguden.mp4' },
 };

@@ -8,7 +8,7 @@
 // to the built-in Smiski paths so the cursor never simply disappears.
 if (!('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
 const ACTIVE_CURSOR_KEY = 'active_cursor_v1';
-const FALLBACK = { label: 'Smiski', point: '/Smiski-cursor.png', interact: '/Smiski-interact.png' };
+const FALLBACK = { label: 'Smiski', point: '/cursors/Smiski-cursor.png', interact: '/cursors/Smiski-interact.png' };
 const SIZE = 34;
 
 const canvas = document.createElement('canvas');
@@ -35,7 +35,8 @@ let running = false;
 
 // Current skin, resolved from the library. `ready` gates drawing so a
 // half-loaded image swap never blanks the cursor mid-move.
-let skin = { emoji: null, point: null, interact: null, ready: false };
+let skin = { emoji: null, point: null, interact: null, clickSounds: null, ready: false };
+let clickSoundIndex = 0;
 
 function resolveEntry(key) {
   const lib = window.CURSOR_LIBRARY;
@@ -64,9 +65,13 @@ function loadImage(src) {
 
 async function applySkin(key) {
   const entry = resolveEntry(key);
+  // Every skin switch restarts the click-sound sequence at the top, so
+  // equipping a skin always begins its cycle at sound 1 rather than wherever
+  // a previous skin's clicks left off.
+  clickSoundIndex = 0;
 
   if (entry.emoji) {
-    skin = { emoji: entry.emoji, point: null, interact: null, ready: true };
+    skin = { emoji: entry.emoji, point: null, interact: null, clickSounds: entry.clickSounds || null, ready: true };
     start();
     return;
   }
@@ -85,7 +90,7 @@ async function applySkin(key) {
     return;
   }
 
-  skin = { emoji: null, point, interact, ready: true };
+  skin = { emoji: null, point, interact, clickSounds: entry.clickSounds || null, ready: true };
   start();
 }
 
@@ -139,6 +144,16 @@ document.addEventListener('mouseout', (e) => {
     canvas.style.filter = 'brightness(1)';
   }
 }, true);
+
+// Skins with clickSounds advance through the list on every click anywhere on
+// the page, looping back to the start once they run off the end.
+document.addEventListener('click', () => {
+  const sounds = skin.clickSounds;
+  if (!sounds || sounds.length === 0) return;
+  const src = sounds[clickSoundIndex % sounds.length];
+  clickSoundIndex++;
+  try { new Audio(src).play().catch(() => {}); } catch {}
+});
 
 // Live switching: the picker writes localStorage then fires this.
 window.addEventListener('cursor:changed', () => applySkin(getActiveKey()));

@@ -21,4 +21,10 @@ window.MUSIC_LIBRARY = {
   atari:               { label: 'Ecco2k – Play Em Like Atari',      src: '/audio/music/play-em-like-atari.mp3' },
   deathmetal:          { label: 'Panchiko – DEATHMETAL',            src: '/audio/music/deathmetal.mp3' },
   forever_young:       { label: 'Alphaville – Forever Young',       src: '/audio/music/forever-young.mp3' },
+
+  // Combo tracks: paired with a matching background in index.astro's
+  // applyBackground() rather than won separately — selecting the background
+  // is enough to also switch Now Playing to this, no independent unlock.
+  bladee_waster:       { label: 'Bladee – Waster',                  src: '/audio/music/bladee-waster.mp3' },
+  evian_yxguden:        { label: 'Evian Christ – Yxguden (feat. Bladee)', src: '/audio/music/evian-christ-yxguden.mp3' },
 };

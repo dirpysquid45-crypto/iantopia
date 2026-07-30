@@ -13,10 +13,6 @@ const clowns = Array.from({ length: CLOWN_COUNT }).map(() => ({
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>That shit is NEVER GETTING DONE!</title>
-<!--
-  is:global — the credits rows are built at runtime from localStorage stats, so
-  Astro's scoped selectors would never match them. Same trap as the case reel.
--->
 <style is:global>
   :root{ --bg:#000; }
   html,body{ height:100%; }
@@ -24,30 +20,6 @@ const clowns = Array.from({ length: CLOWN_COUNT }).map(() => ({
     margin:0;background:var(--bg) url('/video/circus.gif') repeat;overflow:hidden;position:relative;
     font-family:"Comic Sans MS","Comic Sans",cursive;
   }
-
-  /* ---------- Locked ---------- */
-  #gate{
-    position:fixed; inset:0; z-index:30; display:none;
-    align-items:center; justify-content:center; text-align:center;
-    background:rgba(0,0,0,.92); padding:24px;
-  }
-  #gate.show{ display:flex; }
-  .gate-box{ max-width:560px; }
-  .gate-box h1{
-    font-size:clamp(22px,5vw,42px); color:#ff0040; margin:0 0 18px;
-    text-shadow:0 0 14px rgba(255,0,64,.7);
-  }
-  .gate-box p{ color:#cfd6e6; font-size:clamp(13px,2.4vw,17px); line-height:1.8; margin:0 0 14px; }
-  .gate-box .hint{ color:#8fa0bf; font-size:13px; }
-  .gate-box a{
-    display:inline-block; margin-top:20px; color:#fff; text-decoration:none;
-    background:rgba(0,0,0,.6); border:2px solid #fff; padding:10px 18px; border-radius:8px; font-weight:700;
-  }
-  .gate-box a:hover{ background:#fff; color:#000; }
-
-  /* ---------- Ending ---------- */
-  #ending{ display:none; }
-  #ending.show{ display:block; }
 
   .marquee{
     position:absolute;white-space:nowrap;top:50%;left:100%;
@@ -79,45 +51,6 @@ const clowns = Array.from({ length: CLOWN_COUNT }).map(() => ({
     0% { transform:translateY(0) rotate(0deg); opacity:1; }
     100% { transform:translateY(120vh) rotate(360deg); opacity:0.7; }
   }
-
-  /* Credits scroll up the middle, over the clowns, under nothing. */
-  .credits-viewport{
-    position:fixed; inset:0; z-index:3; overflow:hidden; pointer-events:none;
-    display:flex; justify-content:center;
-  }
-  #credits{
-    position:absolute; top:100%;
-    width:min(560px, 92vw);
-    text-align:center;
-    animation:creditRoll 52s linear infinite;
-    text-shadow:0 2px 10px #000, 0 0 22px #000;
-  }
-  @keyframes creditRoll{
-    0%   { transform:translateY(0); }
-    100% { transform:translateY(-190%); }
-  }
-  .cr-title{
-    font-size:clamp(34px,7vw,62px); font-weight:900; color:#ffe600;
-    letter-spacing:3px; margin-bottom:6px;
-    text-shadow:0 0 16px rgba(255,230,0,.8), 0 2px 10px #000;
-  }
-  .cr-sub{ color:#cfd6e6; font-size:clamp(13px,2.4vw,17px); margin-bottom:38px; font-style:italic; }
-  .cr-head{
-    color:#00e0ff; font-size:clamp(12px,2.2vw,15px); letter-spacing:4px;
-    margin:34px 0 14px; text-transform:uppercase;
-  }
-  .cr-rows{
-    font-family:ui-monospace,"Courier New",monospace;
-    font-size:clamp(11px,2.1vw,14px); line-height:2.1; color:#fff;
-    white-space:pre; display:inline-block; text-align:left;
-  }
-  .cr-rows .v{ color:#4cff00; }
-  .cr-rows .rare{ color:#ffd700; }
-  .cr-end{
-    margin-top:44px; font-size:clamp(28px,6vw,52px); font-weight:900; color:#fff;
-    text-shadow:0 0 18px rgba(255,255,255,.6), 0 2px 10px #000;
-  }
-  .cr-end small{ display:block; font-size:clamp(12px,2.2vw,16px); color:#9fb0cf; font-weight:400; margin-top:10px; }
 
   /* Runaway ETA, pinned bottom. */
   #eta{
@@ -155,130 +88,30 @@ const clowns = Array.from({ length: CLOWN_COUNT }).map(() => ({
 <body>
   <a id="home-link" href="/" title="Back to Iantopia">← Home</a>
 
-  <!-- Shown when /never has not been unlocked -->
-  <div id="gate">
-    <div class="gate-box">
-      <h1>YOU HAVEN'T EARNED THIS ENDING</h1>
-      <p>The Alternate Ending is an Exceedingly Rare drop. You have to actually pull it.</p>
-      <p class="hint">Open cases until gold hits. It's 1 in 125 from the Vault, 1 in 625 from a Starter.</p>
-      <a href="/lootbox">Go open some cases →</a>
-    </div>
+  <div class="clowns" id="clowns">
+    {clowns.map((c) => (
+      <div
+        class="clown"
+        style={`--start-left: ${c.left}%; --fall-duration: ${c.duration}s; --fall-delay: ${c.delay}s;`}
+      >🤡</div>
+    ))}
   </div>
 
-  <div id="ending">
-    <div class="clowns" id="clowns">
-      {clowns.map((c) => (
-        <div
-          class="clown"
-          style={`--start-left: ${c.left}%; --fall-duration: ${c.duration}s; --fall-delay: ${c.delay}s;`}
-        >🤡</div>
-      ))}
-    </div>
+  <div class="marquee">That shit is NEVER GETTING DONE!</div>
 
-    <div class="marquee">That shit is NEVER GETTING DONE!</div>
-
-    <div class="credits-viewport"><div id="credits"></div></div>
-
-    <div id="eta">
-      <div class="lbl">Estimated Completion</div>
-      <div class="val" id="eta-val">—</div>
-      <div class="note" id="eta-note"></div>
-    </div>
+  <div id="eta">
+    <div class="lbl">Estimated Completion</div>
+    <div class="val" id="eta-val">—</div>
+    <div class="note" id="eta-note"></div>
   </div>
 
   <audio id="music" src="/audio/music/Circus.mp3" preload="auto" loop playsinline></audio>
 
-<script is:inline src="/case-data.js?v=1"></script>
 <script is:inline>
 (() => {
-  const UNLOCKS_KEY = 'strubles_unlocks_v1';
-  const STATS_KEY   = 'strubles_case_stats_v1';
-  const INV_KEY     = 'strubles_inventory_v1';
-  const TOPIA_START = new Date(2025, 8, 1, 0, 0, 0);
-
-  const load = (k, fb) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } };
-
-  // --- Gate -------------------------------------------------------------
-  // Client-side only, and deliberately so: this is a punchline, not a vault.
-  const unlocks = load(UNLOCKS_KEY, {});
-  const pages = Array.isArray(unlocks.pages) ? unlocks.pages : [];
-  const unlocked = pages.includes('/never');
-
   const music = document.getElementById('music');
 
-  if (!unlocked) {
-    document.getElementById('gate').classList.add('show');
-    document.body.style.background = '#000';
-    return; // no credits, no clowns, no music
-  }
-
-  document.getElementById('ending').classList.add('show');
-
-  // --- Credits ----------------------------------------------------------
-  const stats = Object.assign(
-    { opened: 0, spent: 0, refunded: 0, duplicates: 0, byTier: {}, best: null },
-    load(STATS_KEY, {})
-  );
-  const inv = load(INV_KEY, {});
-  const n = (v) => Number(v || 0).toLocaleString();
-  const count = (k) => (Array.isArray(inv[k]) ? inv[k].length : 0);
-
-  function elapsed() {
-    let ms = Date.now() - TOPIA_START.getTime();
-    const day = 864e5;
-    const days = Math.floor(ms / day);
-    const months = Math.floor(days / 30.44);
-    return `${months} months, ${days - Math.floor(months * 30.44)} days`;
-  }
-
-  // Monospace + dot leaders, so the columns line up like real credits.
-  const WIDTH = 34;
-  function row(label, value, cls) {
-    const dots = '.'.repeat(Math.max(2, WIDTH - label.length));
-    return `${label} ${dots} <span class="${cls || 'v'}">${value}</span>`;
-  }
-
-  const golds = stats.byTier.exceedingly_rare || 0;
-  const coverts = stats.byTier.covert || 0;
-  const best = stats.best ? stats.best.label : 'nothing worth mentioning';
-
-  document.getElementById('credits').innerHTML = `
-    <div class="cr-title">IANTOPIA</div>
-    <div class="cr-sub">an unfinished production</div>
-
-    <div class="cr-head">Your Run</div>
-    <div class="cr-rows">${[
-      row('TIME ELAPSED', elapsed()),
-      row('CASES OPENED', n(stats.opened)),
-      row('STRUBLES BURNED', n(stats.spent)),
-      row('REFUNDED ON DUPES', n(stats.refunded)),
-      row('DUPLICATES', n(stats.duplicates) + (stats.duplicates > 5 ? '  (you fool)' : '')),
-      row('COVERTS', n(coverts)),
-      row('GOLDS', n(golds), 'rare'),
-      row('RAREST PULL', best, 'rare'),
-    ].join('\n')}</div>
-
-    <div class="cr-head">Collection</div>
-    <div class="cr-rows">${[
-      row('TRACKS', n(count('tracks'))),
-      row('BACKGROUNDS', n(count('backgrounds'))),
-      row('CURSORS', n(count('cursors'))),
-      row('TRINKETS', n(count('items') + count('badges'))),
-    ].join('\n')}</div>
-
-    <div class="cr-head">Crew</div>
-    <div class="cr-rows">${[
-      row('DIRECTED BY', 'Ian'),
-      row('CURRENCY BY', 'Strubles'),
-      row('CLOWNS BY', '🤡 × 80'),
-      row('MUSIC BY', 'Circus'),
-      row('FINISHED BY', 'nobody'),
-    ].join('\n')}</div>
-
-    <div class="cr-end">THE END<small>(it is not the end)</small></div>
-  `;
-
-  // --- Runaway ETA ------------------------------------------------------
+  // --- Runaway ETA --------------------------------------------------------
   // Starts ~3 months out and recedes faster than time passes, so the longer
   // you watch the further away completion gets. That is the whole joke.
   const DAY = 864e5;
@@ -311,7 +144,7 @@ const clowns = Array.from({ length: CLOWN_COUNT }).map(() => ({
   renderEta();
   setInterval(renderEta, 1000);
 
-  // --- Music ------------------------------------------------------------
+  // --- Music ----------------------------------------------------------------
   (async () => { try { await music.play(); } catch (e) {} })();
   const unlockAudio = async () => {
     music.muted = false;

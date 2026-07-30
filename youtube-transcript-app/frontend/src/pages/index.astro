@@ -645,6 +645,87 @@
         font-size: 48px;
         margin-bottom: 10px;
       }
+
+      /* ---------- Terms of Service modal ---------- */
+      #tos-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.85);
+        padding: 20px;
+      }
+      #tos-overlay.open { display: flex; }
+
+      .tos-box {
+        width: min(620px, 94vw);
+        max-height: 84vh;
+        overflow-y: auto;
+        background: #000;
+        border: 2px solid #00ff00;
+        box-shadow: 0 0 25px rgba(0, 255, 0, 0.5), inset 0 0 20px rgba(0, 255, 0, 0.05);
+        padding: 28px;
+        font-family: 'Courier New', monospace;
+      }
+
+      .tos-box h1 {
+        font-size: 20px;
+        letter-spacing: 2px;
+        color: #00ff00;
+        text-shadow: 0 0 10px #00ff00, 0 0 4px #00ff00;
+        margin-bottom: 6px;
+        text-transform: uppercase;
+      }
+
+      .tos-box .tos-sub {
+        color: #009900;
+        font-size: 11px;
+        margin-bottom: 26px;
+        font-style: italic;
+      }
+
+      .tos-box h2 {
+        color: #00e0ff;
+        font-size: 12px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        margin: 22px 0 8px;
+      }
+      .tos-box h2:first-of-type { margin-top: 0; }
+
+      .tos-box p {
+        color: #00cc00;
+        font-size: 12.5px;
+        line-height: 1.7;
+      }
+
+      .tos-box .tos-contact {
+        color: #00ff00;
+        text-shadow: 0 0 6px rgba(0, 255, 0, 0.6);
+      }
+
+      #tos-close {
+        all: unset;
+        display: block;
+        margin: 26px auto 0;
+        cursor: pointer;
+        padding: 10px 22px;
+        border: 2px solid #00ff00;
+        background: rgba(0, 60, 0, 0.5);
+        color: #00ff00;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        text-align: center;
+        transition: background 0.2s ease, box-shadow 0.2s ease;
+      }
+      #tos-close:hover {
+        background: rgba(0, 200, 0, 0.3);
+        box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+      }
     </style>
   </head>
   <body>
@@ -653,7 +734,52 @@
     <div class="content-wrapper">
       <div class="container">
         <a href="/" id="homeLink" onclick="goHome(event)" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; font-family:'Courier New', monospace; cursor:pointer;">&larr; HOME</a>
-        <a href="/transcripts/terms" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; margin-left:8px; font-family:'Courier New', monospace; cursor:pointer;">TERMS OF SERVICE</a>
+        <a href="#" id="tosLink" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; margin-left:8px; font-family:'Courier New', monospace; cursor:pointer;">TERMS OF SERVICE</a>
+
+        <!-- Terms of Service modal -->
+        <div id="tos-overlay" role="dialog" aria-modal="true" aria-labelledby="tos-title">
+          <div class="tos-box">
+            <h1 id="tos-title">Terms of Service</h1>
+            <p class="tos-sub">YouTube Transcript / Video / Audio Downloader</p>
+
+            <h2>&gt;&gt;&gt; Your Responsibility</h2>
+            <p>
+              You are responsible for ensuring all downloads comply with copyright law.
+              Do not download copyrighted content without permission.
+            </p>
+
+            <h2>&gt;&gt;&gt; How It Works</h2>
+            <p>
+              This service converts videos on-demand and streams the result directly to
+              you. Files are not stored on our server — only on your device.
+            </p>
+
+            <h2>&gt;&gt;&gt; Your Download History</h2>
+            <p>
+              Your download history is stored locally in your browser using localStorage.
+              Clearing your browser cache will clear this history. History is private
+              and not shared with us or other users.
+            </p>
+
+            <h2>&gt;&gt;&gt; No Liability</h2>
+            <p>
+              We provide this tool as-is with no warranty. We are not liable for lost
+              files, misuse, or legal consequences from user actions.
+            </p>
+
+            <h2>&gt;&gt;&gt; DMCA Takedown</h2>
+            <p>
+              Since we do not store files, DMCA notices are not applicable. If you have
+              concerns about specific content, contact YouTube directly at
+              <span class="tos-contact">https://www.youtube.com/copyright_complaint_form</span>
+            </p>
+
+            <h2>&gt;&gt;&gt; No Warranty</h2>
+            <p>This service is provided as-is. No guarantees of uptime or availability.</p>
+
+            <button id="tos-close">Close</button>
+          </div>
+        </div>
         <h1>> YT-TRANSCRIPT_PLUS</h1>
         <p class="subtitle">>> Download transcripts & videos from YouTube</p>
         <p style="color: #006600; font-size: 11px; margin-top: 5px; margin-bottom: 30px; letter-spacing: 1px; text-align: right;">a widget by EEN</p>
@@ -1052,6 +1178,23 @@
         statusDiv.textContent = message;
         statusDiv.className = `status show ${type}`;
       }
+
+      // --- Terms of Service modal ---
+      const tosLink = document.getElementById('tosLink');
+      const tosOverlay = document.getElementById('tos-overlay');
+      const tosClose = document.getElementById('tos-close');
+
+      tosLink.addEventListener('click', (e) => {
+        e.preventDefault();
+        tosOverlay.classList.add('open');
+      });
+      tosClose.addEventListener('click', () => tosOverlay.classList.remove('open'));
+      tosOverlay.addEventListener('click', (e) => {
+        if (e.target === tosOverlay) tosOverlay.classList.remove('open');
+      });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') tosOverlay.classList.remove('open');
+      });
     </script>
   </body>
 </html>

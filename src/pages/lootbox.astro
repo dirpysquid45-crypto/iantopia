@@ -74,19 +74,13 @@
     box-shadow:0 0 10px rgba(255,215,0,.3); font-size:12px;
   }
   .badge img{ width:28px; height:28px; }
-  #mute-btn{
-    position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(20px + env(safe-area-inset-right)); z-index:30;
-    background:#000; border:3px solid var(--gold); color:#fff; font-size:18px; padding:8px 12px; cursor:none; line-height:1;
-  }
   #np-btn{
-    position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(84px + env(safe-area-inset-right)); z-index:30;
     background:#000; border:3px solid var(--gold); color:var(--gold);
     font-family:inherit; font-size:9px; padding:10px 12px; cursor:none; line-height:1.4;
-    max-width:230px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    display:flex; align-items:center; gap:8px;
+    max-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    display:flex; align-items:center; gap:8px; flex-shrink:0;
   }
   #np-btn:hover{ background:var(--gold); color:#000; }
-  #np-btn .np-name{ overflow:hidden; text-overflow:ellipsis; }
 
   .track-row{
     display:flex; justify-content:space-between; align-items:center; gap:10px;
@@ -163,7 +157,11 @@
   .tile-art{
     flex:1 1 auto; width:100%; display:flex; align-items:center; justify-content:center; min-height:0;
   }
-  .tile img{ max-width:100%; max-height:100%; width:auto; height:auto; object-fit:contain; }
+  /* Fixed size + object-fit, not max-width/auto: auto-sized images never
+     enlarge past their native resolution, so small source art (e.g. a
+     93x120 badge icon) would render tiny instead of filling the tile. */
+  .tile img{ width:110px; height:110px; object-fit:contain; }
+  .tile img.pixel-art{ image-rendering:pixelated; }
   .tile-emoji{ font-size:72px; line-height:1; }
   .tile-label{
     font-size:7px; color:var(--muted); text-align:center; line-height:1.7;
@@ -214,12 +212,26 @@
     display:inline-flex; flex-direction:column; align-items:center; gap:14px;
     padding:26px 34px; border:4px solid var(--rc,#fff); background:#0b0e14; margin-bottom:16px;
   }
-  .reveal-card img{ max-width:260px; max-height:170px; width:auto; height:auto; object-fit:contain; }
+  /* Same fixed-size-over-auto reasoning as .tile img above. */
+  .reveal-card img{ width:200px; height:170px; object-fit:contain; }
+  .reveal-card img.pixel-art{ image-rendering:pixelated; }
   .reveal-emoji{ font-size:104px; line-height:1; }
   .reveal-rarity{ font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--rc,#fff); }
   .reveal-label{ font-size:13px; color:#fff; line-height:1.6; max-width:340px; }
   .reveal-note{ font-size:9px; color:var(--money); line-height:1.8; }
   .reveal-actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:6px; }
+
+  /* Volume + mute controls inside the Now Playing popup — same pattern on
+     every page (home/blackjack/lootbox); only the accent color changes. */
+  .volume-row{
+    display:flex; align-items:center; gap:10px; margin-bottom:16px;
+    padding-bottom:14px; border-bottom:1px solid rgba(255,215,0,0.3);
+  }
+  .volume-row input[type="range"]{ flex:1; accent-color:var(--gold); cursor:none; }
+  .volume-mute-btn{
+    all:unset; cursor:none; font-size:16px; padding:4px 8px;
+    border:1px solid var(--gold); border-radius:0; background:#000;
+  }
 
   /* ---------- Contents modal ---------- */
   .overlay{
@@ -250,11 +262,10 @@
     h1{ font-size:clamp(11px,3.4vw,14px); }
     .badge{ top:calc(6px + env(safe-area-inset-top)); left:calc(6px + env(safe-area-inset-left)); font-size:10px; padding:6px 8px; }
     .badge img{ width:20px; height:20px; }
-    #mute-btn{ top:calc(6px + env(safe-area-inset-top)); right:calc(6px + env(safe-area-inset-right)); padding:6px 9px; font-size:14px; }
     .tile{ height:150px; padding:10px 8px 8px; }
     .tile-emoji{ font-size:48px; }
     .reveal-card{ padding:18px 20px; }
-    .reveal-card img{ max-width:200px; max-height:130px; }
+    .reveal-card img{ width:170px; height:130px; }
     .reveal-emoji{ font-size:72px; }
     .case-anim-box{ font-size:96px; }
   }
@@ -262,14 +273,17 @@
 </head>
 <body>
   <div class="badge"><img src="/strubles.png" alt="Strubles"><span id="bal">0</span></div>
-  <button id="np-btn" type="button" title="Change music">🎵 <span class="np-name" id="np-name">Lootbox Theme</span></button>
-  <button id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
+  <div style="position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(20px + env(safe-area-inset-right)); z-index:30; display:flex; gap:6px;">
+    <button class="btn" id="np-btn" type="button" title="Music options">🎵</button>
+    <button class="btn" id="bg-btn" type="button" title="Change background">🖼️</button>
+    <button class="btn" id="cursor-btn" type="button" title="Change cursor">🖱️</button>
+  </div>
 
   <main class="wrap">
     <header>
       <a href="/">← Home</a>
       <h1>Iantopia Cases</h1>
-      <button class="btn" id="contents-btn" type="button">Contents</button>
+      <div style="width:86px;"></div>
     </header>
 
     <!-- Case select -->
@@ -313,7 +327,33 @@
         <h2>Now Playing</h2>
         <button class="btn" id="playlist-close" type="button">Close</button>
       </div>
+      <div class="volume-row">
+        <button class="volume-mute-btn" id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
+        <input type="range" id="volume-slider" min="0" max="100" value="30" aria-label="Music volume" />
+      </div>
       <div id="playlist-list"></div>
+    </div>
+  </div>
+
+  <!-- Background Picker -->
+  <div class="overlay" id="bg-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Backgrounds</h2>
+        <button class="btn" id="bg-close" type="button">Close</button>
+      </div>
+      <div id="bg-list"></div>
+    </div>
+  </div>
+
+  <!-- Cursor Picker -->
+  <div class="overlay" id="cursor-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Cursors</h2>
+        <button class="btn" id="cursor-close" type="button">Close</button>
+      </div>
+      <div id="cursor-list"></div>
     </div>
   </div>
 
@@ -330,15 +370,139 @@
 
   <div id="flash"></div>
 
+  <video id="bg-video" style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1; display:none;" loop></video>
   <audio id="theme-music" src="/audio/music/lootbox-theme.mp3" preload="none" loop></audio>
 
   <script is:inline src="/strubles.js?v=2"></script>
   <script is:inline src="/music-library.js?v=4"></script>
-  <script is:inline src="/case-data.js?v=1"></script>
+  <script is:inline src="/background-library.js?v=2"></script>
+  <script is:inline src="/case-data.js?v=2"></script>
   <script is:inline src="/lootbox.js?v=3"></script>
   <script is:inline src="/cursor-library.js?v=1"></script>
   <script is:inline src="/cursor.js?v=2"></script>
   <script is:inline src="/music-position.js"></script>
+  <script is:inline>
+    // Register pickers for bg/cursor only (lootbox handles music itself)
+    window.initPickersForBgAndCursor = function() {
+      const BG_LIB = window.BACKGROUND_LIBRARY || {};
+      const CURSOR_LIB = window.CURSOR_LIBRARY || {};
+      function loadInventory() {
+        try {
+          const inv = localStorage.getItem('strubles_inventory_v1');
+          return inv ? JSON.parse(inv) : { cursors: [], backgrounds: [] };
+        } catch {
+          return { cursors: [], backgrounds: [] };
+        }
+      }
+      // Background
+      const bgBtn = document.getElementById('bg-btn');
+      const bgOverlay = document.getElementById('bg-overlay');
+      const bgList = document.getElementById('bg-list');
+      const bgClose = document.getElementById('bg-close');
+      if (bgBtn && bgOverlay && bgList && bgClose) {
+        const ACTIVE_BG_KEY = 'active_bg_v1';
+        function renderBgPicker() {
+          bgList.innerHTML = '';
+          Object.entries(BG_LIB).forEach(([key, bg]) => {
+            const row = document.createElement('div');
+            row.className = 'picker-row';
+            row.style.cursor = 'pointer';
+            const label = document.createElement('span');
+            label.textContent = bg.label;
+            const indicator = document.createElement('span');
+            indicator.style.marginLeft = 'auto';
+            indicator.textContent = localStorage.getItem(ACTIVE_BG_KEY) === key ? '✓' : '';
+            row.appendChild(label);
+            row.appendChild(indicator);
+            row.addEventListener('click', () => {
+              localStorage.setItem(ACTIVE_BG_KEY, key);
+              const bg2 = BG_LIB[key] || {};
+              if (bg2.type === 'video') {
+                document.body.style.backgroundImage = 'none';
+                const vid = document.getElementById('bg-video');
+                if (vid) {
+                  vid.src = bg2.src;
+                  vid.classList.add('show');
+                  vid.play().catch(() => {});
+                }
+              } else {
+                const vid = document.getElementById('bg-video');
+                if (vid) {
+                  vid.classList.remove('show');
+                  vid.pause();
+                }
+                document.body.style.backgroundImage = `url('${bg2.src}')`;
+                document.body.style.backgroundPosition = bg2.position || 'center';
+              }
+              renderBgPicker();
+            });
+            bgList.appendChild(row);
+          });
+        }
+        bgBtn.addEventListener('click', () => {
+          renderBgPicker();
+          bgOverlay.classList.add('open');
+        });
+        bgClose.addEventListener('click', () => bgOverlay.classList.remove('open'));
+        bgOverlay.addEventListener('click', (e) => { if (e.target === bgOverlay) bgOverlay.classList.remove('open'); });
+        const bgKey = localStorage.getItem(ACTIVE_BG_KEY) || 'default';
+        if (BG_LIB[bgKey]) {
+          const bg = BG_LIB[bgKey];
+          if (bg.type === 'video') {
+            const vid = document.getElementById('bg-video');
+            if (vid) {
+              vid.src = bg.src;
+              vid.classList.add('show');
+              vid.play().catch(() => {});
+            }
+          } else {
+            document.body.style.backgroundImage = `url('${bg.src}')`;
+            document.body.style.backgroundPosition = bg.position || 'center';
+          }
+        }
+      }
+      // Cursor
+      const cursorBtn = document.getElementById('cursor-btn');
+      const cursorOverlay = document.getElementById('cursor-overlay');
+      const cursorList = document.getElementById('cursor-list');
+      const cursorClose = document.getElementById('cursor-close');
+      if (cursorBtn && cursorOverlay && cursorList && cursorClose) {
+        const ACTIVE_CURSOR_KEY = 'active_cursor_v1';
+        function renderCursorPicker() {
+          cursorList.innerHTML = '';
+          Object.entries(CURSOR_LIB).forEach(([key, cursor]) => {
+            const owned = loadInventory().cursors?.includes(key) || key === 'default';
+            const row = document.createElement('div');
+            row.className = 'picker-row';
+            row.style.cursor = owned ? 'pointer' : 'default';
+            row.style.opacity = owned ? '1' : '0.5';
+            const label = document.createElement('span');
+            label.textContent = cursor.label;
+            if (!owned) label.style.textDecoration = 'line-through';
+            const indicator = document.createElement('span');
+            indicator.style.marginLeft = 'auto';
+            indicator.textContent = (localStorage.getItem(ACTIVE_CURSOR_KEY) === key) ? '✓' : '';
+            row.appendChild(label);
+            row.appendChild(indicator);
+            if (owned) {
+              row.addEventListener('click', () => {
+                localStorage.setItem(ACTIVE_CURSOR_KEY, key);
+                window.dispatchEvent(new Event('cursor:changed'));
+                renderCursorPicker();
+              });
+            }
+            cursorList.appendChild(row);
+          });
+        }
+        cursorBtn.addEventListener('click', () => {
+          renderCursorPicker();
+          cursorOverlay.classList.add('open');
+        });
+        cursorClose.addEventListener('click', () => cursorOverlay.classList.remove('open'));
+        cursorOverlay.addEventListener('click', (e) => { if (e.target === cursorOverlay) cursorOverlay.classList.remove('open'); });
+      }
+    };
+  </script>
   <script is:inline>
   (() => {
     const RARITIES = window.CASE_RARITIES;
@@ -405,7 +569,23 @@
     const INV_KEY = 'strubles_inventory_v1';
 
     const themeMusic = document.getElementById('theme-music');
-    themeMusic.volume = .3;
+    // Shared across every page — a volume change here follows you to
+    // blackjack/home, since it's one dial, not per-page track state.
+    const VOLUME_KEY = 'music_volume_v1';
+    const volumeSlider = document.getElementById('volume-slider');
+    const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
+    themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.3;
+    volumeSlider.value = Math.round(themeMusic.volume * 100);
+    volumeSlider.addEventListener('input', () => {
+      themeMusic.volume = volumeSlider.value / 100;
+      localStorage.setItem(VOLUME_KEY, themeMusic.volume);
+    });
+    window.addEventListener('storage', (e) => {
+      if (e.key === VOLUME_KEY && e.newValue != null) {
+        themeMusic.volume = parseFloat(e.newValue);
+        volumeSlider.value = Math.round(themeMusic.volume * 100);
+      }
+    });
 
     function loadInv(){
       try { const v = localStorage.getItem(INV_KEY); return v ? JSON.parse(v) : {}; } catch { return {}; }
@@ -431,7 +611,6 @@
       if (stopTracking) { stopTracking(); stopTracking = null; }
 
       themeMusic.src = t.src;
-      document.getElementById('np-name').textContent = t.label;
 
       if (restart) {
         themeMusic.currentTime = 0;
@@ -500,9 +679,9 @@
 
     // ---------- Rendering helpers ----------
     function visual(item, cls){
-      return item.img
-        ? `<img src="${item.img}" alt="" loading="lazy">`
-        : `<span class="${cls}">${item.emoji || '❓'}</span>`;
+      if (!item.img) return `<span class="${cls}">${item.emoji || '❓'}</span>`;
+      const pixelClass = item.pixelated ? ' pixel-art' : '';
+      return `<img src="${item.img}" alt="" loading="lazy" class="${pixelClass}">`;
     }
     function tileHTML(id){
       const it = ITEMS[id];
@@ -747,11 +926,15 @@
       document.getElementById('contents-body').innerHTML = html;
       contentsOverlay.classList.add('open');
     }
-    document.getElementById('contents-btn').addEventListener('click', () => showContents(currentCaseKey || Object.keys(CASES)[0]));
     document.getElementById('contents-close').addEventListener('click', () => contentsOverlay.classList.remove('open'));
     contentsOverlay.addEventListener('click', (e) => { if (e.target === contentsOverlay) contentsOverlay.classList.remove('open'); });
 
     renderCases();
+
+    // Initialize pickers (background and cursor only; lootbox has its own music logic)
+    if (window.initPickersForBgAndCursor) {
+      setTimeout(window.initPickersForBgAndCursor, 100);
+    }
   })();
   </script>
 </body>

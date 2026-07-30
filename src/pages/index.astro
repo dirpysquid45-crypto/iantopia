@@ -238,7 +238,9 @@
       padding: 8px 12px;
       border-radius: 12px;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
-      font-weight: 700;
+      font-family: 'Press Start 2P', cursive;
+      font-weight: 400;
+      font-size: 0.75rem;
     }
 
     #strubles-badge img {
@@ -364,23 +366,177 @@
     .inv-category { color: #ffeb3b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 6px; }
     .inv-category:first-child { margin-top: 0; }
 
-    /* Inventory button */
+    /* Inventory button — a small CSS chest with a hinged lid. The lid opens
+       on hover, and also gets the .drag-near class while a desktop item is
+       being dragged close by (see the desktop-items script), so the chest
+       reads as an open drop target before the item is actually released. */
     #inv-btn {
       position: fixed;
       top: calc(80px + env(safe-area-inset-top));
       left: calc(20px + env(safe-area-inset-left));
+      display: flex;
+      align-items: center;
+      gap: 8px;
       background: rgba(0, 0, 0, 0.6);
       color: #fff;
       border: 1px solid #2a3245;
       border-radius: 10px;
-      padding: 6px 10px;
+      padding: 6px 10px 6px 8px;
       font-weight: 600;
       cursor: none;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      z-index: 20;
     }
 
     #inv-btn:hover {
       transform: translateY(-1px);
+    }
+
+    .chest {
+      position: relative;
+      width: 26px;
+      height: 20px;
+      flex-shrink: 0;
+      perspective: 60px;
+    }
+    .chest-base {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      height: 13px;
+      background: linear-gradient(180deg, #7a4a1e 0%, #5c3614 100%);
+      border: 1.5px solid #ffd700;
+      border-top: none;
+      border-radius: 0 0 4px 4px;
+    }
+    .chest-base::after {
+      content: '';
+      position: absolute;
+      left: 50%; top: -1px;
+      width: 5px; height: 5px;
+      transform: translate(-50%, -50%);
+      background: #ffd700;
+      border-radius: 50%;
+      box-shadow: 0 0 3px rgba(255, 215, 0, 0.8);
+    }
+    .chest-lid {
+      position: absolute;
+      left: 0; right: 0; top: 0;
+      height: 11px;
+      background: linear-gradient(180deg, #a8681f 0%, #7a4a1e 100%);
+      border: 1.5px solid #ffd700;
+      border-bottom: none;
+      border-radius: 4px 4px 1px 1px;
+      transform-origin: 50% 100%;
+      transform: rotateX(0deg);
+      transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+    }
+
+    #inv-btn:hover .chest-lid,
+    #inv-btn.drag-near .chest-lid {
+      transform: rotateX(-115deg) translateY(-1px);
+    }
+    #inv-btn.drag-near {
+      border-color: #ffd700;
+      box-shadow: 0 0 10px rgba(255, 215, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.25);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .chest-lid { transition: none; }
+    }
+
+
+    /* Movable item toys — see desktop-items.js */
+    #desktop-items {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+    }
+    .desktop-item-wrap {
+      position: fixed;
+      pointer-events: none;
+      border: 2px solid transparent;
+      border-radius: 4px;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+    .desktop-item-wrap.selected {
+      border-color: rgba(255, 215, 0, 0.6);
+      box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+    }
+    .desktop-item {
+      position: static;
+      display: block;
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+      pointer-events: auto;
+      cursor: none;
+      touch-action: none;
+      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+      transition: filter 0.15s ease, transform 0.15s ease;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+    .desktop-item.pixel-art { image-rendering: pixelated; }
+    .desktop-item:hover {
+      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 8px rgba(255, 215, 0, 0.5));
+      transform: scale(1.06);
+    }
+    .desktop-item.dragging {
+      transition: none;
+      filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 10px rgba(255, 215, 0, 0.7));
+      transform: scale(1.1);
+    }
+    .desktop-item.stashing {
+      transition: transform 0.18s ease, opacity 0.18s ease;
+      transform: scale(0.2);
+      opacity: 0;
+    }
+    .desktop-item-remove {
+      all: unset;
+      position: absolute;
+      top: -7px;
+      right: -7px;
+      width: 18px;
+      height: 18px;
+      line-height: 16px;
+      text-align: center;
+      border-radius: 50%;
+      background: rgba(15, 15, 15, 0.85);
+      border: 1px solid rgba(255, 235, 59, 0.55);
+      color: #ffeb3b;
+      font-size: 13px;
+      cursor: none;
+      pointer-events: auto;
+      opacity: 0;
+      transition: opacity 0.15s ease, background 0.15s ease;
+      z-index: 22;
+    }
+    .desktop-item-wrap:hover .desktop-item-remove,
+    .desktop-item-remove:focus-visible {
+      opacity: 1;
+    }
+    .desktop-item-remove:hover {
+      background: rgba(255, 235, 59, 0.25);
+    }
+    @media (hover: none) {
+      .desktop-item-remove { opacity: 0.6; }
+    }
+    .modal-take-out {
+      all: unset;
+      cursor: none;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      color: #ffeb3b;
+      border: 1px solid rgba(255, 235, 59, 0.5);
+      padding: 3px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .modal-take-out:hover { background: rgba(255, 235, 59, 0.12); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .desktop-item { transition: none; }
     }
 
     #bg-btn {
@@ -493,6 +649,13 @@
   <link rel="preload" as="image" href="/strubles.png" />
 </head>
 <body>
+  <!-- Static decorations, purely visual -->
+  <!-- Movable item toys (see desktop-items.js) render here, positioned fixed. -->
+  <div id="desktop-items"></div>
+  <div style="position:fixed; bottom:20px; left:20px; font-size:11px; color:#888; line-height:1.4; pointer-events:none; z-index:5;">
+    Drag to move • Shift+Click to multi-select • Click × to remove
+  </div>
+
   <div class="image-container" id="image-container" role="button" tabindex="0" aria-label="Spin the Iantopia image faster">
     <div class="flip-card" id="flip-card">
       <div class="flip-card-front">
@@ -583,11 +746,17 @@
     <span id="strubles-amt">0</span>
   </div>
 
-  <button id="inv-btn" title="Inventory">🎒 Inventory</button>
+  <button id="inv-btn" title="Inventory">
+    <span class="chest" aria-hidden="true">
+      <span class="chest-lid"></span>
+      <span class="chest-base"></span>
+    </span>
+    Inventory
+  </button>
   <button id="bg-btn" title="Change background">🖼️ Background</button>
   <button id="cursor-btn" title="Change cursor">🖱️ Cursor</button>
   <!-- Revealed only once /never has been pulled from a case. -->
-  <a id="ending-link" href="/never" title="Alternate Ending" hidden>🎬 Alternate Ending</a>
+  <a id="ending-link" href="/alternate-ending" title="Alternate Ending" hidden>🎬 Alternate Ending</a>
   <video id="bg-video" autoplay muted loop playsinline></video>
 
   <button id="now-playing" title="Music options" aria-haspopup="dialog" aria-controls="playlist-overlay">
@@ -601,7 +770,7 @@
   <!-- Playlist modal -->
   <div class="modal-overlay" id="playlist-overlay" role="dialog" aria-modal="true" aria-labelledby="playlist-title">
     <div class="modal-box">
-      <h2 id="playlist-title">Playlist</h2>
+      <h2 id="playlist-title">Now Playing</h2>
       <div class="volume-row">
         <button class="volume-mute-btn" id="modal-mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
         <input type="range" id="volume-slider" min="0" max="100" value="30" aria-label="Music volume" />
@@ -642,7 +811,8 @@
   <script is:inline src="/music-position.js"></script>
   <script is:inline src="/background-library.js?v=2"></script>
   <script is:inline src="/cursor-library.js?v=1"></script>
-  <script is:inline src="/case-data.js?v=1"></script>
+  <script is:inline src="/case-data.js?v=2"></script>
+  <script is:inline src="/desktop-items.js?v=3"></script>
 
   <!-- Timer Script -->
   <script is:inline>
@@ -762,13 +932,21 @@
       const modalMuteBtn = document.getElementById('modal-mute-btn');
       const volumeSlider = document.getElementById('volume-slider');
 
-      const VOLUME_KEY = 'home_theme_volume_v1';
+      // Shared across every page (home/blackjack/lootbox) so the volume level
+      // — not the track, each page has its own — carries over between them.
+      const VOLUME_KEY = 'music_volume_v1';
       const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
       themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.3;
       volumeSlider.value = Math.round(themeMusic.volume * 100);
       volumeSlider.addEventListener('input', () => {
         themeMusic.volume = volumeSlider.value / 100;
         localStorage.setItem(VOLUME_KEY, themeMusic.volume);
+      });
+      window.addEventListener('storage', (e) => {
+        if (e.key === VOLUME_KEY && e.newValue != null) {
+          themeMusic.volume = parseFloat(e.newValue);
+          volumeSlider.value = Math.round(themeMusic.volume * 100);
+        }
       });
 
       // Force the hardcoded default on every load, ignoring whatever is in
@@ -866,14 +1044,32 @@
       const inventoryList = document.getElementById('inventory-list');
       const inventoryClose = document.getElementById('inventory-close');
 
+      // --- Movable desktop items (sock, panda, ...) ---
+      const desktopItems = window.DesktopItems
+        ? window.DesktopItems.init(document.getElementById('desktop-items'), invBtn)
+        : null;
+      function loadPlacedDesktopItems() {
+        return window.DesktopItems ? window.DesktopItems.getPlaced() : {};
+      }
+      function takeOutDesktopItem(id) {
+        if (!window.DesktopItems) return;
+        window.DesktopItems.takeOut(id);
+        if (desktopItems) desktopItems.refresh();
+      }
+      function stashDesktopItem(id) {
+        if (!window.DesktopItems) return;
+        window.DesktopItems.stash(id);
+        if (desktopItems) desktopItems.refresh();
+      }
+
       const CURSOR_LIB = window.CURSOR_LIBRARY || {};
       const BG_LIB_FOR_INV = window.BACKGROUND_LIBRARY || {};
 
       // `lookup` maps a stored key to a human label. Without it the modal shows
       // raw keys like "taipei_nightlife" instead of "Taipei Nightlife".
       const INV_CATEGORIES = [
-        { key: 'items', label: 'Items' },
-        { key: 'badges', label: 'Badges' },
+        { key: 'items', label: 'Items', lookup: window.CASE_ITEMS },
+        { key: 'badges', label: 'Badges', lookup: window.CASE_ITEMS },
         { key: 'themes', label: 'Themes' },
         { key: 'powerups', label: 'Powerups' },
         { key: 'sfx', label: 'Sounds' },
@@ -886,8 +1082,10 @@
         const inv = loadInventory();
         const cases = loadCases();
         const caseCount = Object.values(cases).reduce((s, n) => s + n, 0);
+        const staticItems = window.DesktopItems ? window.DesktopItems.getStaticItems() : {};
+        const staticIds = Object.keys(staticItems);
         const hasAny = INV_CATEGORIES.some((c) => Array.isArray(inv[c.key]) && inv[c.key].length > 0);
-        if (!hasAny && !caseCount) {
+        if (!hasAny && !caseCount && staticIds.length === 0) {
           inventoryList.innerHTML = '<div class="modal-empty">Nothing unlocked yet — open a case to start collecting!</div>';
           return;
         }
@@ -903,16 +1101,44 @@
           });
         }
 
+        const placed = loadPlacedDesktopItems();
+
+        function draggableRow(label, id) {
+          if (!(id in placed)) {
+            return `<div class="modal-item"><span>${label}</span><button class="modal-take-out" data-take-out="${id}">[Take Out]</button></div>`;
+          }
+          return `<div class="modal-item"><span>${label}</span><button class="modal-take-out" data-stash="${id}" title="Put back in inventory">📦</button></div>`;
+        }
+
+        // Always-on decorations — not loot, never locked, always listed.
+        if (staticIds.length) {
+          html += `<div class="inv-category">Decorations</div>`;
+          staticIds.forEach((id) => { html += draggableRow(staticItems[id].label, id); });
+        }
+
         INV_CATEGORIES.forEach((c) => {
           const entries = Array.isArray(inv[c.key]) ? inv[c.key] : [];
           if (entries.length === 0) return;
           html += `<div class="inv-category">${c.label}</div>`;
           entries.forEach((entry) => {
             const found = c.lookup && c.lookup[entry];
-            html += `<div class="modal-item"><span>${found ? found.label : entry}</span></div>`;
+            const label = found ? found.label : entry;
+            html += (found && found.draggable) ? draggableRow(label, entry) : `<div class="modal-item"><span>${label}</span></div>`;
           });
         });
         inventoryList.innerHTML = html;
+        inventoryList.querySelectorAll('[data-take-out]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            takeOutDesktopItem(btn.dataset.takeOut);
+            renderInventory();
+          });
+        });
+        inventoryList.querySelectorAll('[data-stash]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            stashDesktopItem(btn.dataset.stash);
+            renderInventory();
+          });
+        });
       }
 
       invBtn.addEventListener('click', () => {
@@ -938,6 +1164,11 @@
         const key = localStorage.getItem(ACTIVE_BG_KEY);
         return (key && BG_LIBRARY[key]) ? key : 'default';
       }
+      // Backgrounds that swap Now Playing to a matching track the moment
+      // they're selected — a combo, not a separate unlock. Keyed the same
+      // in both libraries on purpose (see music-library.js).
+      const BACKGROUND_MUSIC_COMBOS = ['bladee_waster', 'evian_yxguden'];
+
       function applyBackground(key) {
         const bg = BG_LIBRARY[key] || BG_LIBRARY.default;
         activeBgKey = key;
@@ -952,6 +1183,12 @@
           bgVideo.removeAttribute('src');
           document.body.style.backgroundImage = `url('${bg.src}')`;
           document.body.style.backgroundPosition = bg.position || 'center';
+        }
+
+        if (BACKGROUND_MUSIC_COMBOS.includes(key) && LIBRARY[key]) {
+          activeTrackKey = key;
+          localStorage.setItem(ACTIVE_TRACK_KEY, activeTrackKey);
+          applyActiveTrack(true);
         }
       }
       applyBackground(getActiveBgKey());
@@ -1048,8 +1285,8 @@
       });
 
       // --- Alternate Ending reveal ---
-      // The link stays hidden until /never is actually pulled from a case, so
-      // the gold drop is what makes it appear rather than it always being there.
+      // The link stays hidden until it's actually pulled from a case, so the
+      // gold drop is what makes it appear rather than it always being there.
       const UNLOCKS_KEY = 'strubles_unlocks_v1';
       const endingLink = document.getElementById('ending-link');
       function syncEndingLink() {
@@ -1058,7 +1295,7 @@
           const u = JSON.parse(localStorage.getItem(UNLOCKS_KEY) || '{}');
           if (Array.isArray(u.pages)) pages = u.pages;
         } catch {}
-        endingLink.hidden = !pages.includes('/never');
+        endingLink.hidden = !pages.includes('/alternate-ending');
       }
       syncEndingLink();
       window.addEventListener('storage', syncEndingLink);

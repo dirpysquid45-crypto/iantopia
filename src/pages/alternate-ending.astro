@@ -1,0 +1,255 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Alternate Ending — Iantopia</title>
+<!--
+  is:global — the credits rows are built at runtime from localStorage stats,
+  so Astro's scoped selectors would never match them. Same trap as the case reel.
+-->
+<style is:global>
+  :root{ --bg:#000; }
+  html,body{ height:100%; }
+  body{
+    margin:0; background:var(--bg); overflow:hidden; position:relative;
+    font-family:"Comic Sans MS","Comic Sans",cursive;
+  }
+
+  /* ---------- Locked ---------- */
+  #gate{
+    position:fixed; inset:0; z-index:30; display:none;
+    align-items:center; justify-content:center; text-align:center;
+    background:rgba(0,0,0,.92); padding:24px;
+  }
+  #gate.show{ display:flex; }
+  .gate-box{ max-width:560px; }
+  .gate-box h1{
+    font-size:clamp(22px,5vw,42px); color:#ff0040; margin:0 0 18px;
+    text-shadow:0 0 14px rgba(255,0,64,.7);
+  }
+  .gate-box p{ color:#cfd6e6; font-size:clamp(13px,2.4vw,17px); line-height:1.8; margin:0 0 14px; }
+  .gate-box .hint{ color:#8fa0bf; font-size:13px; }
+  .gate-box a{
+    display:inline-block; margin-top:20px; color:#fff; text-decoration:none;
+    background:rgba(0,0,0,.6); border:2px solid #fff; padding:10px 18px; border-radius:8px; font-weight:700;
+  }
+  .gate-box a:hover{ background:#fff; color:#000; }
+
+  #playlist-overlay.open, #bg-overlay.open, #cursor-overlay.open { display:flex !important; }
+  .picker-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.2); color:#fff; font-size:11px; }
+  .picker-row:last-child { border-bottom:none; }
+
+  /* ---------- Ending ---------- */
+  #ending{ display:none; height:100%; }
+  #ending.show{ display:block; }
+
+  /* Credits scroll up the middle. */
+  .credits-viewport{
+    position:fixed; inset:0; z-index:3; overflow:hidden;
+    display:flex; justify-content:center;
+  }
+  #credits{
+    position:absolute; top:100%;
+    width:min(560px, 92vw);
+    text-align:center;
+    animation:creditRoll 52s linear infinite;
+    text-shadow:0 2px 10px #000, 0 0 22px #000;
+  }
+  @keyframes creditRoll{
+    0%   { transform:translateY(0); }
+    100% { transform:translateY(-190%); }
+  }
+  .cr-title{
+    font-size:clamp(34px,7vw,62px); font-weight:900; color:#ffe600;
+    letter-spacing:3px; margin-bottom:6px;
+    text-shadow:0 0 16px rgba(255,230,0,.8), 0 2px 10px #000;
+  }
+  .cr-sub{ color:#cfd6e6; font-size:clamp(13px,2.4vw,17px); margin-bottom:38px; font-style:italic; }
+  .cr-head{
+    color:#00e0ff; font-size:clamp(12px,2.2vw,15px); letter-spacing:4px;
+    margin:34px 0 14px; text-transform:uppercase;
+  }
+  .cr-rows{
+    font-family:ui-monospace,"Courier New",monospace;
+    font-size:clamp(11px,2.1vw,14px); line-height:2.1; color:#fff;
+    white-space:pre; display:inline-block; text-align:left;
+  }
+  .cr-rows .v{ color:#4cff00; }
+  .cr-rows .rare{ color:#ffd700; }
+  .cr-end{
+    margin-top:44px; font-size:clamp(28px,6vw,52px); font-weight:900; color:#fff;
+    text-shadow:0 0 18px rgba(255,255,255,.6), 0 2px 10px #000;
+  }
+  .cr-end small{ display:block; font-size:clamp(12px,2.2vw,16px); color:#9fb0cf; font-weight:400; margin-top:10px; }
+
+  #home-link{
+    position:fixed;
+    top:calc(15px + env(safe-area-inset-top));
+    left:calc(15px + env(safe-area-inset-left));
+    z-index:40;
+    color:#fff;text-decoration:none;
+    background:rgba(0,0,0,.6);border:2px solid #fff;
+    padding:8px 14px;font-size:14px;font-weight:700;
+    border-radius:8px;
+  }
+  #home-link:hover{ background:#fff; color:#000; }
+
+  @media (max-width:768px){
+    body{ overflow-y: auto; }
+    #home-link{ top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); padding: 6px 10px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+  <a id="home-link" href="/" title="Back to Iantopia">← Home</a>
+  <div style="position:fixed; top:20px; right:20px; z-index:40; display:flex; gap:6px;">
+    <button id="now-playing" type="button" title="Music options" style="background:#000; border:2px solid #fff; color:#fff; padding:6px 10px; font-size:11px; cursor:none;">🎵</button>
+    <button id="bg-btn" type="button" title="Change background" style="background:#000; border:2px solid #fff; color:#fff; padding:6px 10px; font-size:11px; cursor:none;">🖼️</button>
+    <button id="cursor-btn" type="button" title="Change cursor" style="background:#000; border:2px solid #fff; color:#fff; padding:6px 10px; font-size:11px; cursor:none;">🖱️</button>
+  </div>
+
+  <!-- Shown until the Alternate Ending has actually been pulled from a case -->
+  <div id="gate">
+    <div class="gate-box">
+      <h1>YOU HAVEN'T EARNED THIS ENDING</h1>
+      <p>The Alternate Ending is an Exceedingly Rare drop. You have to actually pull it.</p>
+      <p class="hint">Open cases until gold hits. It's 1 in 125 from the Vault, 1 in 625 from a Starter.</p>
+      <a href="/lootbox">Go open some cases →</a>
+    </div>
+  </div>
+
+  <div id="ending">
+    <div class="credits-viewport"><div id="credits"></div></div>
+  </div>
+
+  <!-- Pickers -->
+  <div id="playlist-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:50; align-items:center; justify-content:center;">
+    <div style="background:#000; border:2px solid #fff; padding:20px; max-width:300px; max-height:400px; overflow-y:auto; box-shadow:0 0 20px rgba(255,255,255,0.3);">
+      <div style="color:#fff; margin-bottom:12px; font-size:12px; text-transform:uppercase; font-weight:bold;">Music</div>
+      <div id="playlist-list"></div>
+      <button id="playlist-close" style="margin-top:12px; width:100%; background:#fff; color:#000; border:none; padding:6px; cursor:none; font-weight:700;">Close</button>
+    </div>
+  </div>
+
+  <div id="bg-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:50; align-items:center; justify-content:center;">
+    <div style="background:#000; border:2px solid #fff; padding:20px; max-width:300px; max-height:400px; overflow-y:auto; box-shadow:0 0 20px rgba(255,255,255,0.3);">
+      <div style="color:#fff; margin-bottom:12px; font-size:12px; text-transform:uppercase; font-weight:bold;">Backgrounds</div>
+      <div id="bg-list"></div>
+      <button id="bg-close" style="margin-top:12px; width:100%; background:#fff; color:#000; border:none; padding:6px; cursor:none; font-weight:700;">Close</button>
+    </div>
+  </div>
+
+  <div id="cursor-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:50; align-items:center; justify-content:center;">
+    <div style="background:#000; border:2px solid #fff; padding:20px; max-width:300px; max-height:400px; overflow-y:auto; box-shadow:0 0 20px rgba(255,255,255,0.3);">
+      <div style="color:#fff; margin-bottom:12px; font-size:12px; text-transform:uppercase; font-weight:bold;">Cursors</div>
+      <div id="cursor-list"></div>
+      <button id="cursor-close" style="margin-top:12px; width:100%; background:#fff; color:#000; border:none; padding:6px; cursor:none; font-weight:700;">Close</button>
+    </div>
+  </div>
+
+  <video id="bg-video" style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1; display:none;" loop></video>
+
+<script is:inline src="/music-library.js?v=4"></script>
+<script is:inline src="/music-position.js"></script>
+<script is:inline src="/background-library.js?v=2"></script>
+<script is:inline src="/cursor-library.js?v=1"></script>
+<script is:inline src="/case-data.js?v=2"></script>
+<script is:inline src="/cursor.js"></script>
+<script is:inline src="/strubles.js?v=2"></script>
+<script is:inline src="/pickers.js"></script>
+<script is:inline>
+(() => {
+  const UNLOCKS_KEY = 'strubles_unlocks_v1';
+  const STATS_KEY   = 'strubles_case_stats_v1';
+  const INV_KEY     = 'strubles_inventory_v1';
+  const TOPIA_START = new Date(2025, 8, 1, 0, 0, 0);
+
+  const load = (k, fb) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } };
+
+  // --- Gate -------------------------------------------------------------
+  // Client-side only, and deliberately so: this is a punchline, not a vault.
+  const unlocks = load(UNLOCKS_KEY, {});
+  const pages = Array.isArray(unlocks.pages) ? unlocks.pages : [];
+  const unlocked = pages.includes('/alternate-ending');
+
+  if (!unlocked) {
+    document.getElementById('gate').classList.add('show');
+    return; // no credits
+  }
+
+  document.getElementById('ending').classList.add('show');
+
+  // --- Credits ------------------------------------------------------------
+  const stats = Object.assign(
+    { opened: 0, spent: 0, refunded: 0, duplicates: 0, byTier: {}, best: null },
+    load(STATS_KEY, {})
+  );
+  const inv = load(INV_KEY, {});
+  const n = (v) => Number(v || 0).toLocaleString();
+  const count = (k) => (Array.isArray(inv[k]) ? inv[k].length : 0);
+
+  function elapsed() {
+    let ms = Date.now() - TOPIA_START.getTime();
+    const day = 864e5;
+    const days = Math.floor(ms / day);
+    const months = Math.floor(days / 30.44);
+    return `${months} months, ${days - Math.floor(months * 30.44)} days`;
+  }
+
+  // Monospace + dot leaders, so the columns line up like real credits.
+  const WIDTH = 34;
+  function row(label, value, cls) {
+    const dots = '.'.repeat(Math.max(2, WIDTH - label.length));
+    return `${label} ${dots} <span class="${cls || 'v'}">${value}</span>`;
+  }
+
+  const golds = stats.byTier.exceedingly_rare || 0;
+  const coverts = stats.byTier.covert || 0;
+  const best = stats.best ? stats.best.label : 'nothing worth mentioning';
+
+  document.getElementById('credits').innerHTML = `
+    <div class="cr-title">IANTOPIA</div>
+    <div class="cr-sub">an unfinished production</div>
+
+    <div class="cr-head">Your Run</div>
+    <div class="cr-rows">${[
+      row('TIME ELAPSED', elapsed()),
+      row('CASES OPENED', n(stats.opened)),
+      row('STRUBLES BURNED', n(stats.spent)),
+      row('REFUNDED ON DUPES', n(stats.refunded)),
+      row('DUPLICATES', n(stats.duplicates) + (stats.duplicates > 5 ? '  (you fool)' : '')),
+      row('COVERTS', n(coverts)),
+      row('GOLDS', n(golds), 'rare'),
+      row('RAREST PULL', best, 'rare'),
+    ].join('\n')}</div>
+
+    <div class="cr-head">Collection</div>
+    <div class="cr-rows">${[
+      row('TRACKS', n(count('tracks'))),
+      row('BACKGROUNDS', n(count('backgrounds'))),
+      row('CURSORS', n(count('cursors'))),
+      row('TRINKETS', n(count('items') + count('badges'))),
+    ].join('\n')}</div>
+
+    <div class="cr-head">Crew</div>
+    <div class="cr-rows">${[
+      row('DIRECTED BY', 'Ian'),
+      row('CURRENCY BY', 'Strubles'),
+      row('FINISHED BY', 'nobody'),
+    ].join('\n')}</div>
+
+    <div class="cr-end">THE END<small>(it is not the end)</small></div>
+  `;
+
+  // Initialize pickers
+  if (window.initPickers) {
+    setTimeout(window.initPickers, 100);
+  }
+})();
+</script>
+</body>
+</html>

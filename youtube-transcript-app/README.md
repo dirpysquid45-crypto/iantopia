@@ -1,101 +1,143 @@
 # YouTube Transcript Downloader
 
-A local web app to fetch YouTube transcripts and save them as text files. Built with Astro + FastAPI + Docker.
-
-## Features
-
-- 🎬 Paste YouTube link → get transcript in seconds
-- 💾 Auto-saves with video title as filename
-- 🔄 Smart duplicate detection with "don't ask again" option
-- 🐳 Docker containerized for persistence
-- 🌐 Localhost web interface (no terminal needed)
-- 🚀 Auto-starts on Mac boot (optional)
-
-## Quick Start
-
-### Prerequisites
-- Docker & Docker Desktop installed
-- Mac (launchd support)
-
-### Manual Launch
-
-```bash
-cd /Users/solriver/youtube-transcript-app
-docker-compose up
-```
-
-Then open: **http://localhost:3000**
-
-### Auto-Start on Boot
-
-1. Copy plist to LaunchAgents:
-```bash
-cp com.youtube-transcript-app.plist ~/Library/LaunchAgents/
-```
-
-2. Load it:
-```bash
-launchctl load ~/Library/LaunchAgents/com.youtube-transcript-app.plist
-```
-
-3. Verify it's running:
-```bash
-launchctl list | grep youtube-transcript
-```
-
-4. To unload later:
-```bash
-launchctl unload ~/Library/LaunchAgents/com.youtube-transcript-app.plist
-```
-
-## Usage
-
-1. Go to http://localhost:3000
-2. Paste a YouTube URL
-3. Click "Fetch"
-4. If duplicate exists, choose: Skip or Overwrite
-5. Optionally check "Don't ask me again"
-6. Transcript saved to `/transcripts/{video-title}.txt`
+A web app to fetch YouTube transcripts, video, and audio files. Built with Astro (frontend) + FastAPI (backend) + Docker.
 
 ## Architecture
 
+**Streaming-based, no local persistence.** All downloads are ephemeral:
+
+- User requests a transcript/video/audio via the web UI
+- Backend streams the file directly to the browser
+- No files are stored on the server after the response
+
 ```
-Astro Frontend (port 3000)
-        ↓
-   FastAPI Backend (port 8000)
-        ↓
-  Docker Volumes (transcripts/)
+Astro Frontend (Cloudflare Tunnel)
+       ↓
+FastAPI Backend (Docker)
+       ↓
+    YouTube
 ```
+
+## Deployment
+
+### Prerequisites
+
+- Docker & Docker Compose
+- Cloudflare Tunnel configured (see `deploy/` directory)
+
+### Start Services
+
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+This runs:
+
+- **Frontend:** Astro on port 3000 (behind nginx reverse proxy)
+- **Backend:** FastAPI on port 8000
+- **Nginx:** Reverse proxy on port 80
+
+### Access the App
+
+Via **Cloudflare Tunnel** (public URL, see `deploy/` docs) or locally at `http://localhost` (if Tunnel is not running).
+
+### Validate Deployment
+
+```bash
+./deploy-with-validation.sh
+```
+
+Checks health endpoint, backend API, frontend, and nginx proxy.
+
+### Deploy to Qasim (Home Server)
+
+See `deploy/` folder for Cloudflare Tunnel setup and deployment scripts.
+
+## Development
+
+### Local Dev Mode
+
+```bash
+cd frontend && npm install && npm run dev    # Astro on :3000
+cd backend && python -m venv venv && . venv/bin/activate && pip install -r requirements.txt && python main.py  # FastAPI on :8000
+```
+
+Frontend dev server auto-proxies to `http://localhost:8000` for API requests.
 
 ## File Structure
 
 ```
 youtube-transcript-app/
-├── frontend/          # Astro app
-├── backend/           # FastAPI app
-├── transcripts/       # Downloaded transcripts
-├── docker-compose.yml # Orchestration
-└── com.youtube-transcript-app.plist # Auto-start config
+├── frontend/              # Astro web UI
+├── backend/               # FastAPI app
+├── deploy/                # Deployment scripts & configs
+├── docker-compose.prod.yml # Production orchestration
+├── nginx.conf             # Reverse proxy config
+└── deploy-with-validation.sh # Health check script
 ```
 
 ## Troubleshooting
 
-**App won't start?**
-- Make sure Docker Desktop is running
-- Check: `docker-compose up --build`
+**Containers won't start?**
 
-**Transcripts not saving?**
-- Check folder permissions: `ls -la transcripts/`
-- Docker volume issue: `docker volume ls`
-
-**Want to stop auto-start?**
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.youtube-transcript-app.plist
+docker-compose -f docker-compose.prod.yml logs
 ```
 
-## Logs
+**Backend API not responding?**
 
-Manual run logs appear in terminal. Auto-start logs:
 ```bash
-tail -f /var/log/youtube-transcript-app.log
+curl http://localhost:8000/health
 ```
+
+**Frontend blank or broken?**
+
+- Check nginx logs: `docker-compose -f docker-compose.prod.yml logs yt-transcript-nginx`
+- Verify reverse proxy config: `cat nginx.conf`
+
+**Health validation failing?**
+
+```bash
+docker ps -a  # Check if containers are running
+docker-compose -f docker-compose.prod.yml down && docker-compose -f docker-compose.prod.yml up -d  # Restart
+```
+
+## API
+
+### GET `/transcripts`
+
+Fetch a YouTube transcript.
+
+**Query params:**
+- `url` (required): YouTube video URL
+
+**Response:** Plain text transcript (streamed)
+
+**Example:**
+```bash
+curl "http://localhost:8000/transcripts?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+```
+
+### GET `/video`
+
+Download a YouTube video (MP4).
+
+**Query params:**
+- `url` (required): YouTube video URL
+
+**Response:** MP4 file (streamed)
+
+### GET `/audio`
+
+Download a YouTube video as audio (MP3).
+
+**Query params:**
+- `url` (required): YouTube video URL
+
+**Response:** MP3 file (streamed)
+
+### GET `/health`
+
+Health check endpoint.
+
+**Response:** `{"status": "ok"}`
