@@ -11,15 +11,3 @@ dist/
 *.swp
 *.swo
 *~
-
-# Oversized media (>25MB Cloudflare Pages limit).
-#
-# These are NOT hosted anywhere yet. transcripts.iantopia.com answers every
-# /media/* path with a 200 HTML fallback, so it looks like a working CDN to a
-# status-code check while actually serving no bytes -- do not point at it
-# without fetching the body and confirming the content-type first.
-#
-# Kept on disk so `astro dev` serves them locally; they will 404 in production
-# until they are hosted for real.
-public/video/bangkok-night.mp4
-public/video/ehden.gif

@@ -150,7 +150,7 @@ This site is **static** — no server required. Build to `dist/` and serve via:
 
 - **Local:** `npx astro preview`
 - **Netlify / Vercel / GitHub Pages** — one-click deploy from `dist/`
-- **Qasim (home server):** Served via Cloudflare Tunnel (see `/youtube-transcript-app/deploy/`)
+- **Qasim (home server):** `dist/` is served by the nginx container defined in `youtube-transcript-app/docker-compose.prod.yml`, reached via a Cloudflare Tunnel configured directly on the host
 
 ## Development Tips
 

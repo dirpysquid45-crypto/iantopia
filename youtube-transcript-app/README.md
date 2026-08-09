@@ -10,7 +10,7 @@ A web app to fetch YouTube transcripts, video, and audio files. Built with Astro
 - Backend streams the file directly to the browser
 - No files are stored on the server after the response
 
-```
+```text
 Astro Frontend (Cloudflare Tunnel)
        ↓
 FastAPI Backend (Docker)
@@ -20,14 +20,21 @@ FastAPI Backend (Docker)
 
 ## Deployment
 
+Deployed to a home server ("Qasim") behind a Cloudflare Tunnel. The tunnel itself
+(`cloudflared`) is configured directly on Qasim, not tracked in this repo.
+
 ### Prerequisites
 
 - Docker & Docker Compose
-- Cloudflare Tunnel configured (see `deploy/` directory)
+- `cloudflared` already configured and running on the host (routes `iantopia.com`
+  to this box)
 
-### Start Services
+### Deploy
 
 ```bash
+cd youtube-transcript-app
+git pull
+docker-compose -f docker-compose.prod.yml build backend   # after backend/app.py changes
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
@@ -35,23 +42,13 @@ This runs:
 
 - **Frontend:** Astro on port 3000 (behind nginx reverse proxy)
 - **Backend:** FastAPI on port 8000
-- **Nginx:** Reverse proxy on port 80
+- **Nginx:** Reverse proxy on ports 80/443, also serves the main Iantopia site's
+  static build (`/home/user/iantopia/dist`) at `/`
 
 ### Access the App
 
-Via **Cloudflare Tunnel** (public URL, see `deploy/` docs) or locally at `http://localhost` (if Tunnel is not running).
-
-### Validate Deployment
-
-```bash
-./deploy-with-validation.sh
-```
-
-Checks health endpoint, backend API, frontend, and nginx proxy.
-
-### Deploy to Qasim (Home Server)
-
-See `deploy/` folder for Cloudflare Tunnel setup and deployment scripts.
+Via the Cloudflare Tunnel (`iantopia.com/transcripts/`) or locally at `http://localhost`
+if the tunnel isn't running.
 
 ## Development
 
@@ -59,21 +56,19 @@ See `deploy/` folder for Cloudflare Tunnel setup and deployment scripts.
 
 ```bash
 cd frontend && npm install && npm run dev    # Astro on :3000
-cd backend && python -m venv venv && . venv/bin/activate && pip install -r requirements.txt && python main.py  # FastAPI on :8000
+cd backend && python -m venv venv && . venv/bin/activate && pip install -r requirements.txt && uvicorn app:app --reload --port 8000
 ```
 
 Frontend dev server auto-proxies to `http://localhost:8000` for API requests.
 
 ## File Structure
 
-```
+```text
 youtube-transcript-app/
-├── frontend/              # Astro web UI
-├── backend/               # FastAPI app
-├── deploy/                # Deployment scripts & configs
-├── docker-compose.prod.yml # Production orchestration
-├── nginx.conf             # Reverse proxy config
-└── deploy-with-validation.sh # Health check script
+├── frontend/                # Astro web UI
+├── backend/                 # FastAPI app (app.py)
+├── docker-compose.prod.yml  # Production orchestration
+└── nginx.conf               # Reverse proxy config (also serves the main site)
 ```
 
 ## Troubleshooting
@@ -87,7 +82,7 @@ docker-compose -f docker-compose.prod.yml logs
 **Backend API not responding?**
 
 ```bash
-curl http://localhost:8000/health
+curl http://localhost:8000/api/health
 ```
 
 **Frontend blank or broken?**
@@ -95,49 +90,44 @@ curl http://localhost:8000/health
 - Check nginx logs: `docker-compose -f docker-compose.prod.yml logs yt-transcript-nginx`
 - Verify reverse proxy config: `cat nginx.conf`
 
-**Health validation failing?**
+**Restart everything:**
 
 ```bash
-docker ps -a  # Check if containers are running
-docker-compose -f docker-compose.prod.yml down && docker-compose -f docker-compose.prod.yml up -d  # Restart
+docker-compose -f docker-compose.prod.yml down && docker-compose -f docker-compose.prod.yml up -d
 ```
 
 ## API
 
-### GET `/transcripts`
+All endpoints (except health) are POST with a JSON body: `{"url": "<youtube-url>"}`.
 
-Fetch a YouTube transcript.
+### GET `/api/health`
 
-**Query params:**
-- `url` (required): YouTube video URL
-
-**Response:** Plain text transcript (streamed)
-
-**Example:**
-```bash
-curl "http://localhost:8000/transcripts?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-```
-
-### GET `/video`
-
-Download a YouTube video (MP4).
-
-**Query params:**
-- `url` (required): YouTube video URL
-
-**Response:** MP4 file (streamed)
-
-### GET `/audio`
-
-Download a YouTube video as audio (MP3).
-
-**Query params:**
-- `url` (required): YouTube video URL
-
-**Response:** MP3 file (streamed)
-
-### GET `/health`
-
-Health check endpoint.
+Health check.
 
 **Response:** `{"status": "ok"}`
+
+### POST `/api/fetch-transcript`
+
+Fetch a YouTube video's transcript.
+
+**Response:** Plain text file, streamed (`.txt`)
+
+**Example:**
+
+```bash
+curl -X POST http://localhost:8000/api/fetch-transcript \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"}' -o transcript.txt
+```
+
+### POST `/api/download-video`
+
+Download a YouTube video.
+
+**Response:** MP4 file, streamed
+
+### POST `/api/download-audio`
+
+Download a YouTube video's audio track.
+
+**Response:** MP3 file, streamed (re-encoded via ffmpeg)

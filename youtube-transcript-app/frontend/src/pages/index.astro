@@ -733,7 +733,7 @@
 
     <div class="content-wrapper">
       <div class="container">
-        <a href="/" id="homeLink" onclick="goHome(event)" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; font-family:'Courier New', monospace; cursor:pointer;">&larr; HOME</a>
+        <a href="/" id="homeLink" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; font-family:'Courier New', monospace; cursor:pointer;">&larr; HOME</a>
         <a href="#" id="tosLink" style="display:inline-block; color:#00ff00; text-decoration:none; border:1px solid #00ff00; padding:6px 12px; font-size:11px; letter-spacing:1px; margin-bottom:15px; margin-left:8px; font-family:'Courier New', monospace; cursor:pointer;">TERMS OF SERVICE</a>
 
         <!-- Terms of Service modal -->
@@ -843,15 +843,8 @@
     <script is:inline>
       // Matrix rain effect with 0s and 1s
       function initMatrix() {
-        console.log('Matrix initialization starting...');
         const matrixBg = document.getElementById('matrixBg');
-        if (!matrixBg) {
-          console.error('matrixBg element not found!');
-          return;
-        }
-        console.log('Matrix BG found:', matrixBg);
-        console.log('Matrix BG computed style:', window.getComputedStyle(matrixBg));
-        console.log('Matrix BG z-index:', window.getComputedStyle(matrixBg).zIndex);
+        if (!matrixBg) return;
 
         // Create foreground layer - fast falling 0s and 1s with staggered timing
         let totalChars = 0;
@@ -870,7 +863,6 @@
           matrixBg.appendChild(char);
           totalChars++;
         }
-        console.log('Created foreground layer:', totalChars, 'chars');
 
         // Create mid layer - medium speed 0s and 1s
         for (let i = 0; i < 40; i++) {
@@ -886,7 +878,6 @@
           matrixBg.appendChild(char);
           totalChars++;
         }
-        console.log('Created mid layer, total:', totalChars, 'chars');
 
         // Create background layer - drifting right
         for (let i = 0; i < 30; i++) {
@@ -902,7 +893,6 @@
           matrixBg.appendChild(char);
           totalChars++;
         }
-        console.log('Created drift right layer, total:', totalChars, 'chars');
 
         // Create background layer - drifting left
         for (let i = 0; i < 30; i++) {
@@ -918,27 +908,7 @@
           matrixBg.appendChild(char);
           totalChars++;
         }
-        console.log('Matrix initialization complete! Total chars:', totalChars);
-        console.log('Matrix BG children count:', matrixBg.children.length);
-
-        // TEST: Add visible styling to verify elements exist
-        const testChar = matrixBg.children[0];
-        if (testChar) {
-          console.log('First character element:', testChar);
-          console.log('Text content:', testChar.textContent);
-          console.log('Classes:', testChar.className);
-
-          // Get computed animation
-          const computedStyle = window.getComputedStyle(testChar);
-          console.log('Animation name:', computedStyle.animationName);
-          console.log('Animation duration:', computedStyle.animationDuration);
-          console.log('Opacity:', computedStyle.opacity);
-          console.log('Position:', computedStyle.position);
-          console.log('Left:', computedStyle.left);
-        }
       }
-
-      console.log('Script loaded');
 
       // Home button handler - navigates in same tab
       function goHome(e) {
@@ -957,13 +927,8 @@
 
       // Wait for DOM to be fully loaded
       if (document.readyState === 'loading') {
-        console.log('DOM still loading, waiting...');
-        document.addEventListener('DOMContentLoaded', function() {
-          console.log('DOM loaded, calling initMatrix');
-          initMatrix();
-        });
+        document.addEventListener('DOMContentLoaded', initMatrix);
       } else {
-        console.log('DOM already loaded, calling initMatrix');
         initMatrix();
       }
 
