@@ -1,14 +1,15 @@
 // desktop-items.js
 // Movable "toys" that appear loose on the homepage — draggable PNGs you can
 // drag around the page and drop back onto the inventory chest to put away.
-// Two sources feed this:
-//   1. Case loot: any CASE_ITEMS entry with `draggable: true` (Stinky Ian
-//      Sock, Ian's Panda Express, etc.) — only present once actually won.
-//   2. STATIC_ITEMS below: always-on decorations that aren't loot at all
-//      (the Display Shelf) — present for every visitor, no unlock needed,
-//      but still draggable/stashable through the same mechanic. `size` is
-//      an optional custom render width in px (default: 56, matching loot
-//      toys); height follows the image's own aspect ratio.
+// Everything draggable is case loot: any CASE_ITEMS entry with
+// `draggable: true` (Stinky Ian Sock, the Display Shelf, etc.) — only
+// present once actually won from a case. `size` on a CASE_ITEMS entry is an
+// optional custom render width in px (default: 56); height follows the
+// image's own aspect ratio.
+//
+// STATIC_ITEMS is kept as an (empty) extension point for anything that
+// should ever need to be free/always-on again without unlocking — nothing
+// currently uses it.
 //
 // Requires case-data.js (for CASE_ITEMS art/labels) to be loaded first.
 // Exposes window.DesktopItems.
@@ -21,18 +22,7 @@
   const SEEN_KEY = 'desktop_items_seen_v1';
   const CHEST_PROXIMITY_PX = 70;
 
-  const STATIC_ITEMS = {
-    display_shelf: {
-      label: 'Display Shelf',
-      img: '/assets/decorations/display-shelf.webp',
-      size: 195,
-    },
-    smiski_blind_box: {
-      label: 'Smiski Blind Box',
-      img: '/assets/decorations/smiski-blind-box.png',
-      size: 91,
-    },
-  };
+  const STATIC_ITEMS = {};
 
   // Mirrors lootbox.js's own type -> inventory bucket mapping. A draggable
   // item can be ANY collectible type (mini_trophy is a badge, sock is a

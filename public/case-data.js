@@ -39,6 +39,8 @@ window.CASE_ITEMS = {
   sock:        { label: 'Stinky Ian Sock',                tier: 'mil_spec',   img: '/assets/items/dirty-sock.webp',        type: 'item', draggable: true },
   used_deck:   { label: 'Used Deck of Cards',             tier: 'mil_spec',   img: '/assets/items/used-cards.png',         type: 'item', draggable: true },
   panda:       { label: "Ian's Panda Express",            tier: 'mil_spec',   img: '/assets/items/panda-express.png',      type: 'item', draggable: true },
+  display_shelf: { label: 'Display Shelf',                tier: 'mil_spec',   img: '/assets/decorations/display-shelf.webp', type: 'item', draggable: true, size: 195 },
+  smiski_blind_box: { label: 'Smiski Blind Box',          tier: 'mil_spec',   img: '/assets/decorations/smiski-blind-box.png', type: 'item', draggable: true, size: 91 },
   mus_circus:  { label: 'Circus',                         tier: 'mil_spec',   emoji: '🎪',                                  type: 'music_unlock', key: 'circus' },
   mus_balatro: { label: 'Balatro Main Theme',             tier: 'mil_spec',   emoji: '🃏',                                  type: 'music_unlock', key: 'balatro' },
   bg_circus:   { label: 'Background: Circus',             tier: 'mil_spec',   img: '/video/circus.gif',                    type: 'background_unlock', key: 'circus' },
