@@ -78,6 +78,7 @@
       .file-action {
         display: flex;
         justify-content: flex-end;
+        flex-wrap: wrap;
         gap: 8px;
       }
 
@@ -1010,6 +1011,7 @@
             <div class="file-row">
               <div class="file-type">${TYPE_LABELS[entry.type] || "?"}<br/><span class="file-size">${new Date(entry.timestamp).toLocaleDateString()}</span></div>
               <div class="file-action">
+                <button class="file-btn" data-redownload-id="${entry.id}">[REDOWNLOAD]</button>
                 <button class="file-btn-delete" data-id="${entry.id}">[FORGET]</button>
               </div>
             </div>
@@ -1017,10 +1019,34 @@
         `).join("");
       }
 
+      // Nothing is stored server-side, so a "redownload" is really just
+      // re-running the original fetch against the same source URL — the
+      // history entry only ever held metadata + the source url, never bytes.
+      const DOWNLOAD_CONFIG = {
+        transcript: { endpoint: "fetch-transcript", fallbackFilename: "transcript.txt", loadingMessage: ">>> Processing..." },
+        video: { endpoint: "download-video", fallbackFilename: "video.mp4", loadingMessage: ">>> Downloading video... (this may take a while)" },
+        audio: { endpoint: "download-audio", fallbackFilename: "audio.mp3", loadingMessage: ">>> Extracting audio... (this may take a while)" },
+      };
+
+      async function redownloadEntry(id, button) {
+        const entry = getDownloadHistory().find((e) => e.id === id);
+        const config = entry && DOWNLOAD_CONFIG[entry.type];
+        if (!config) {
+          showStatus("error", ">>> ERROR: Can't redownload — unknown entry");
+          return;
+        }
+        await streamDownload({ ...config, url: entry.url, type: entry.type, button });
+      }
+
       downloadsHistoryList.addEventListener("click", (e) => {
-        const btn = e.target.closest("button[data-id]");
-        if (btn) {
-          forgetDownload(btn.dataset.id);
+        const redownloadBtn = e.target.closest("button[data-redownload-id]");
+        if (redownloadBtn) {
+          redownloadEntry(redownloadBtn.dataset.redownloadId, redownloadBtn);
+          return;
+        }
+        const forgetBtn = e.target.closest("button[data-id]");
+        if (forgetBtn) {
+          forgetDownload(forgetBtn.dataset.id);
         }
       });
 
