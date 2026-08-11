@@ -589,6 +589,27 @@
     }
     #ending-link:hover { background: #ffd700; color: #000; }
     #ending-link[hidden] { display: none; }
+
+    #account-btn {
+      position: fixed;
+      top: calc(280px + env(safe-area-inset-top));
+      left: calc(20px + env(safe-area-inset-left));
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      border: 1px solid #2a3245;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      z-index: 20;
+    }
+    #account-btn:hover { transform: translateY(-1px); }
+    #account-btn img { width: 18px; height: 18px; border-radius: 50%; }
+
     @keyframes endingGlow {
       0%, 100% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
       50%      { box-shadow: 0 0 18px rgba(255, 215, 0, 0.75); }
@@ -630,11 +651,12 @@
       a.big, button.big { padding: 12px 20px; font-size: clamp(16px, 3vw, 24px); margin: 10px auto; }
       #topia-timer { font-size: 0.55rem; padding: 8px 10px; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); }
       #strubles-badge { top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); font-size: 0.8rem; }
-      #inv-btn, #bg-btn, #cursor-btn, #ending-link { font-size: 0.7rem; padding: 6px 8px; top: auto; left: calc(10px + env(safe-area-inset-left)); }
-      #inv-btn { bottom: calc(200px + env(safe-area-inset-bottom)); }
-      #bg-btn { bottom: calc(150px + env(safe-area-inset-bottom)); }
-      #cursor-btn { bottom: calc(100px + env(safe-area-inset-bottom)); }
-      #ending-link { bottom: calc(50px + env(safe-area-inset-bottom)); }
+      #inv-btn, #bg-btn, #cursor-btn, #ending-link, #account-btn { font-size: 0.7rem; padding: 6px 8px; top: auto; left: calc(10px + env(safe-area-inset-left)); }
+      #inv-btn { bottom: calc(250px + env(safe-area-inset-bottom)); }
+      #bg-btn { bottom: calc(200px + env(safe-area-inset-bottom)); }
+      #cursor-btn { bottom: calc(150px + env(safe-area-inset-bottom)); }
+      #ending-link { bottom: calc(100px + env(safe-area-inset-bottom)); }
+      #account-btn { bottom: calc(50px + env(safe-area-inset-bottom)); }
       #now-playing, #amsa-quote { position: static; max-width: 100%; margin-top: 12px; right: auto; top: auto; font-size: 0.7rem; }
       .modal-box { width: min(300px, 90vw); max-height: 60vh; }
     }
@@ -757,7 +779,35 @@
   <button id="cursor-btn" title="Change cursor">🖱️ Cursor</button>
   <!-- Revealed only once /never has been pulled from a case. -->
   <a id="ending-link" href="/alternate-ending" title="Alternate Ending" hidden>🎬 Alternate Ending</a>
+  <button id="account-btn" title="Save progress with Google">👤 Sign In</button>
   <video id="bg-video" autoplay muted loop playsinline></video>
+
+  <!-- Account modal -->
+  <div class="modal-overlay" id="account-overlay" role="dialog" aria-modal="true" aria-labelledby="account-title">
+    <div class="modal-box">
+      <h2 id="account-title">Account</h2>
+      <div id="account-signed-out">
+        <p style="font-size: 13px; color: #ccc; margin: 0 0 14px;">
+          Sign in with Google to save your progress and pick it back up on any device.
+          Only your name, email, and profile picture are used to identify your account —
+          nothing else on your Google account is ever accessed.
+        </p>
+        <button class="modal-close" id="account-signin-btn" style="background:#4285F4; color:#fff;">Sign in with Google</button>
+      </div>
+      <div id="account-signed-in" style="display:none;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+          <img id="account-avatar" alt="" style="width:40px; height:40px; border-radius:50%;" />
+          <div>
+            <div id="account-name" style="font-weight:600;"></div>
+            <div id="account-email" style="font-size:11px; color:#888;"></div>
+          </div>
+        </div>
+        <p style="font-size: 12px; color: #888; margin: 0 0 14px;">Your progress syncs automatically.</p>
+        <button class="modal-close" id="account-signout-btn">Sign Out</button>
+      </div>
+      <button class="modal-close" id="account-close" style="margin-left: 8px;">Close</button>
+    </div>
+  </div>
 
   <button id="now-playing" title="Music options" aria-haspopup="dialog" aria-controls="playlist-overlay">
     <span id="np-eyebrow">🔊 Now Playing</span>
@@ -807,6 +857,10 @@
     </div>
   </div>
 
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script is:inline src="/cloud-sync.js?v=1"></script>
   <script is:inline src="/music-library.js?v=4"></script>
   <script is:inline src="/music-position.js"></script>
   <script is:inline src="/background-library.js?v=2"></script>
@@ -1148,6 +1202,48 @@
       inventoryClose.addEventListener('click', () => inventoryOverlay.classList.remove('open'));
       inventoryOverlay.addEventListener('click', (e) => {
         if (e.target === inventoryOverlay) inventoryOverlay.classList.remove('open');
+      });
+
+      // --- Account (Google Sign-In + progress sync) ---
+      const accountBtn = document.getElementById('account-btn');
+      const accountOverlay = document.getElementById('account-overlay');
+      const accountClose = document.getElementById('account-close');
+      const accountSignedOut = document.getElementById('account-signed-out');
+      const accountSignedIn = document.getElementById('account-signed-in');
+      const accountSigninBtn = document.getElementById('account-signin-btn');
+      const accountSignoutBtn = document.getElementById('account-signout-btn');
+
+      function renderAccountState() {
+        const user = window.CloudSync && window.CloudSync.currentUser;
+        if (user) {
+          accountBtn.textContent = '👤 ' + (user.displayName || user.email || 'Account');
+          accountSignedOut.style.display = 'none';
+          accountSignedIn.style.display = 'block';
+          document.getElementById('account-avatar').src = user.photoURL || '';
+          document.getElementById('account-name').textContent = user.displayName || '';
+          document.getElementById('account-email').textContent = user.email || '';
+        } else {
+          accountBtn.textContent = '👤 Sign In';
+          accountSignedOut.style.display = 'block';
+          accountSignedIn.style.display = 'none';
+        }
+      }
+      window.addEventListener('cloudsync:authchanged', renderAccountState);
+      renderAccountState();
+
+      accountBtn.addEventListener('click', () => {
+        renderAccountState();
+        accountOverlay.classList.add('open');
+      });
+      accountClose.addEventListener('click', () => accountOverlay.classList.remove('open'));
+      accountOverlay.addEventListener('click', (e) => {
+        if (e.target === accountOverlay) accountOverlay.classList.remove('open');
+      });
+      accountSigninBtn.addEventListener('click', () => {
+        window.CloudSync.signIn().catch((err) => console.error('[account] sign-in failed:', err));
+      });
+      accountSignoutBtn.addEventListener('click', () => {
+        window.CloudSync.signOut().then(() => accountOverlay.classList.remove('open'));
       });
 
       // --- Background switcher ---
