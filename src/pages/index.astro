@@ -229,7 +229,7 @@
     /* Strubles badge */
     #strubles-badge {
       position: fixed;
-      top: calc(15px + env(safe-area-inset-top));
+      top: calc(55px + env(safe-area-inset-top));
       left: calc(20px + env(safe-area-inset-left));
       display: flex;
       align-items: center;
@@ -372,7 +372,7 @@
        reads as an open drop target before the item is actually released. */
     #inv-btn {
       position: fixed;
-      top: calc(80px + env(safe-area-inset-top));
+      top: calc(120px + env(safe-area-inset-top));
       left: calc(20px + env(safe-area-inset-left));
       display: flex;
       align-items: center;
@@ -541,7 +541,7 @@
 
     #bg-btn {
       position: fixed;
-      top: calc(130px + env(safe-area-inset-top));
+      top: calc(170px + env(safe-area-inset-top));
       left: calc(20px + env(safe-area-inset-left));
       background: rgba(0, 0, 0, 0.6);
       color: #fff;
@@ -557,7 +557,7 @@
 
     #cursor-btn {
       position: fixed;
-      top: calc(180px + env(safe-area-inset-top));
+      top: calc(220px + env(safe-area-inset-top));
       left: calc(20px + env(safe-area-inset-left));
       background: rgba(0, 0, 0, 0.6);
       color: #fff;
@@ -573,7 +573,7 @@
 
     #ending-link {
       position: fixed;
-      top: calc(230px + env(safe-area-inset-top));
+      top: calc(270px + env(safe-area-inset-top));
       left: calc(20px + env(safe-area-inset-left));
       background: rgba(0, 0, 0, 0.75);
       color: #ffd700;
@@ -592,23 +592,24 @@
 
     #account-btn {
       position: fixed;
-      top: calc(280px + env(safe-area-inset-top));
+      top: calc(15px + env(safe-area-inset-top));
       left: calc(20px + env(safe-area-inset-left));
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       background: rgba(0, 0, 0, 0.6);
       color: #fff;
       border: 1px solid #2a3245;
-      border-radius: 10px;
-      padding: 6px 10px;
+      border-radius: 8px;
+      padding: 4px 8px;
+      font-size: 0.75rem;
       font-weight: 600;
       cursor: none;
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
       z-index: 20;
     }
     #account-btn:hover { transform: translateY(-1px); }
-    #account-btn img { width: 18px; height: 18px; border-radius: 50%; }
+    #account-btn img { width: 14px; height: 14px; border-radius: 50%; object-fit: cover; }
 
     @keyframes endingGlow {
       0%, 100% { box-shadow: 0 0 8px rgba(255, 215, 0, 0.3); }
@@ -779,7 +780,10 @@
   <button id="cursor-btn" title="Change cursor">🖱️ Cursor</button>
   <!-- Revealed only once /never has been pulled from a case. -->
   <a id="ending-link" href="/alternate-ending" title="Alternate Ending" hidden>🎬 Alternate Ending</a>
-  <button id="account-btn" title="Save progress with Google">👤 Sign In</button>
+  <button id="account-btn" title="Save progress with Google">
+    <img id="account-btn-icon" src="/assets/icons/google-logo.png" alt="" referrerpolicy="no-referrer" />
+    <span id="account-btn-label">Sign In</span>
+  </button>
   <video id="bg-video" autoplay muted loop playsinline></video>
 
   <!-- Account modal -->
@@ -1213,17 +1217,34 @@
       const accountSigninBtn = document.getElementById('account-signin-btn');
       const accountSignoutBtn = document.getElementById('account-signout-btn');
 
+      const GOOGLE_LOGO = '/assets/icons/google-logo.png';
+      const accountBtnIcon = document.getElementById('account-btn-icon');
+      const accountBtnLabel = document.getElementById('account-btn-label');
+
+      // Google's photo CDN (lh3.googleusercontent.com) frequently fails to
+      // load unless the request is sent with no referrer, and can still
+      // occasionally 404 for a given account — fall back to the Google
+      // logo rather than showing a broken image icon either way.
+      function setAvatarSrc(imgEl, url) {
+        imgEl.referrerPolicy = 'no-referrer';
+        imgEl.onerror = () => { imgEl.onerror = null; imgEl.src = GOOGLE_LOGO; };
+        imgEl.src = url || GOOGLE_LOGO;
+      }
+
       function renderAccountState() {
         const user = window.CloudSync && window.CloudSync.currentUser;
         if (user) {
-          accountBtn.textContent = '👤 ' + (user.displayName || user.email || 'Account');
+          setAvatarSrc(accountBtnIcon, user.photoURL);
+          accountBtnLabel.textContent = user.displayName || user.email || 'Account';
           accountSignedOut.style.display = 'none';
           accountSignedIn.style.display = 'block';
-          document.getElementById('account-avatar').src = user.photoURL || '';
+          setAvatarSrc(document.getElementById('account-avatar'), user.photoURL);
           document.getElementById('account-name').textContent = user.displayName || '';
           document.getElementById('account-email').textContent = user.email || '';
         } else {
-          accountBtn.textContent = '👤 Sign In';
+          accountBtnIcon.onerror = null;
+          accountBtnIcon.src = GOOGLE_LOGO;
+          accountBtnLabel.textContent = 'Sign In';
           accountSignedOut.style.display = 'block';
           accountSignedIn.style.display = 'none';
         }
