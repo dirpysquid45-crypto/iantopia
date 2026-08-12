@@ -46,10 +46,7 @@
     'desktop_items_seen_v1',
     'active_cursor_v1',
     'active_bg_v1',
-    'home_active_bg_v1',
     'active_track_v1',
-    'home_active_track_v1',
-    'lootbox_active_track_v1',
   ];
 
   const SYNC_EVENTS = [
