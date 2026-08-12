@@ -314,9 +314,12 @@
     </div>
   </div>
 
-  <video id="bg-video" style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1;" loop></video>
+  <!-- Drone footage is minesweeper's true default background (a video, not a
+       static image), so it ships already sourced + shown + autoplaying
+       rather than waiting for a picker selection. -->
+  <video id="bg-video" class="show" src="/video/minesweeper-drone-footage.mp4" autoplay muted loop playsinline style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1;"></video>
 
-  <audio id="theme-music" src="/audio/music/Balatro-Main-Theme.mp3" preload="none" loop></audio>
+  <audio id="theme-music" src="/audio/music/minesweeper-desert.mp3" preload="none" loop></audio>
 
 <script is:inline src="/music-library.js?v=4"></script>
 <script is:inline src="/music-position.js?v=1"></script>
@@ -325,7 +328,10 @@
 <script is:inline src="/case-data.js?v=3"></script>
 <script is:inline src="/cursor.js?v=2"></script>
 <script is:inline src="/strubles.js?v=2"></script>
-<script is:inline src="/pickers.js?v=2"></script>
+<script is:inline>
+  window.PAGE_DEFAULT_BG = { type: 'video', src: '/video/minesweeper-drone-footage.mp4', label: 'Drone Footage' };
+</script>
+<script is:inline src="/pickers.js?v=3"></script>
 
 <script is:inline>
 (() => {
@@ -367,6 +373,80 @@
   syncBalance();
   window.addEventListener('strubles:change', syncBalance);
   window.addEventListener('storage', syncBalance);
+
+  // --- Sound effects (additive; does not affect game state) ---
+  const SFX_BASE = '/audio/sfx/';
+  let audioEnabled = true;
+  const sfxCache = {};
+  function playSfx(name) {
+    if (!audioEnabled) return;
+    let audio = sfxCache[name];
+    if (!audio) {
+      audio = new Audio(`${SFX_BASE}${name}.mp3`);
+      audio.volume = 0.5;
+      sfxCache[name] = audio;
+    }
+    audio.currentTime = 0;
+    audio.play().catch(() => {});
+  }
+  // Victory-1 plays first; victory-2 only starts once victory-1 actually
+  // finishes, never layered on top of it (explicit user correction — these
+  // are sequential, not simultaneous).
+  function playVictorySequence() {
+    if (!audioEnabled) return;
+    const first = new Audio(`${SFX_BASE}minesweeper-victory-1.mp3`);
+    first.volume = 0.5;
+    first.addEventListener('ended', () => {
+      if (!audioEnabled) return;
+      const second = new Audio(`${SFX_BASE}minesweeper-victory-2.mp3`);
+      second.volume = 0.5;
+      second.play().catch(() => {});
+    });
+    first.play().catch(() => {});
+  }
+
+  // --- Theme music (background loop, tied to the same mute control) ---
+  const themeMusic = $('theme-music');
+  const VOLUME_KEY = 'music_volume_v1';
+  const volumeSlider = $('volume-slider');
+  const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
+  themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.3;
+  volumeSlider.value = Math.round(themeMusic.volume * 100);
+  volumeSlider.addEventListener('input', () => {
+    themeMusic.volume = volumeSlider.value / 100;
+    localStorage.setItem(VOLUME_KEY, themeMusic.volume);
+  });
+  window.addEventListener('storage', (e) => {
+    if (e.key === VOLUME_KEY && e.newValue != null) {
+      themeMusic.volume = parseFloat(e.newValue);
+      volumeSlider.value = Math.round(themeMusic.volume * 100);
+    }
+  });
+  const MUSIC_POS_KEY = 'minesweeper_theme_pos_v1';
+  if (window.MusicPosition) {
+    window.MusicPosition.restore(MUSIC_POS_KEY, themeMusic);
+    window.MusicPosition.track(MUSIC_POS_KEY, themeMusic);
+  }
+  function tryPlayTheme() {
+    if (!audioEnabled) return;
+    themeMusic.play().catch(() => {});
+  }
+  tryPlayTheme();
+  const unlockTheme = () => {
+    tryPlayTheme();
+    window.removeEventListener('pointerdown', unlockTheme);
+    window.removeEventListener('keydown', unlockTheme);
+  };
+  window.addEventListener('pointerdown', unlockTheme);
+  window.addEventListener('keydown', unlockTheme);
+
+  const muteBtn = $('mute-btn');
+  muteBtn.addEventListener('click', () => {
+    audioEnabled = !audioEnabled;
+    muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
+    if (audioEnabled) tryPlayTheme();
+    else themeMusic.pause();
+  });
 
   function setStatus(msg, cls) {
     statusEl.textContent = msg;
@@ -530,8 +610,10 @@
       const payout = Math.round(currentBet * DIFFICULTIES[diffKey].mult);
       Strubles.add(payout);
       setStatus(`✓ Cleared the board! +${payout} Strubles`, 'win');
+      playVictorySequence();
     } else {
       setStatus(`💥 Boom. Lost ${currentBet} Strubles.`, 'lose');
+      playSfx('minesweeper-mine-hit');
     }
   }
 
@@ -545,6 +627,7 @@
       flagCount += cell.flagged ? 1 : -1;
       mineCountEl.textContent = String(mineTotal - flagCount);
       updateCellVisual(r, c);
+      playSfx(cell.flagged ? 'minesweeper-flag' : 'minesweeper-unflag');
       return;
     }
     if (cell.flagged) return;
@@ -562,6 +645,7 @@
       return;
     }
 
+    playSfx('minesweeper-reveal');
     revealCell(r, c);
     if (revealedSafeCount === landTotal - mineTotal) {
       endGame(true);
@@ -577,6 +661,7 @@
     flagCount += cell.flagged ? 1 : -1;
     mineCountEl.textContent = String(mineTotal - flagCount);
     updateCellVisual(r, c);
+    playSfx(cell.flagged ? 'minesweeper-flag' : 'minesweeper-unflag');
   }
 
   boardEl.addEventListener('click', (e) => {
@@ -674,6 +759,7 @@
       return;
     }
     currentBet = bet;
+    playSfx('minesweeper-start');
     const diff = DIFFICULTIES[diffKey];
     rows = diff.rows; cols = diff.cols;
     firstClickDone = false;

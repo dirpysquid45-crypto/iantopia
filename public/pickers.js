@@ -3,8 +3,14 @@
 // Usage: call initPickers() after DOM is ready and libraries are loaded.
 
 window.initPickers = function() {
-  const ACTIVE_BG_KEY = 'active_bg_v1';
-  const ACTIVE_TRACK_KEY = 'active_track_v1';
+  // Suffixed with the page's own path so blackjack/alternate-ending/
+  // minesweeper each get independent storage instead of sharing one key —
+  // previously all three pages you'd load pickers.js on shared a single
+  // active_bg_v1/active_track_v1, so a pick on one silently applied to the
+  // others too. Home and lootbox already have their own dedicated keys
+  // outside this shared file.
+  const ACTIVE_BG_KEY = 'active_bg_v1__' + location.pathname;
+  const ACTIVE_TRACK_KEY = 'active_track_v1__' + location.pathname;
   const BG_LIB = window.BACKGROUND_LIBRARY || {};
   const MUSIC_LIB = window.MUSIC_LIBRARY || {};
   const CURSOR_LIB = window.CURSOR_LIBRARY || {};
@@ -28,37 +34,38 @@ window.initPickers = function() {
     function renderBgPicker() {
       bgList.innerHTML = '';
       Object.entries(BG_LIB).forEach(([key, bg]) => {
-        // The cursor/music pickers in this same file already gate on
-        // ownership — this one never did, so every page using pickers.js
-        // showed every background as pickable regardless of whether it was
-        // actually unlocked, while the homepage's own separate background
-        // picker correctly filtered to owned only. That mismatch was the
-        // "different inventory between pages" bug.
+        // Locked backgrounds are hidden entirely, not shown-and-greyed —
+        // you can't see it until you've actually unlocked it.
         const owned = loadInventory().backgrounds?.includes(key) || key === 'default';
+        if (!owned) return;
         const row = document.createElement('div');
         row.className = 'picker-row';
-        row.style.cursor = owned ? 'pointer' : 'default';
-        row.style.opacity = owned ? '1' : '0.5';
+        row.style.cursor = 'pointer';
         const label = document.createElement('span');
-        label.textContent = bg.label;
-        if (!owned) label.style.textDecoration = 'line-through';
+        // The "Default" row's label follows this page's own declared
+        // default (if any), not the shared library's Taipei label — it'd
+        // be confusing to show "Taipei" for a row that actually restores
+        // blackjack's casino entrance or minesweeper's drone footage.
+        label.textContent = (key === 'default' && window.PAGE_DEFAULT_BG?.label) || bg.label;
         const indicator = document.createElement('span');
         indicator.style.marginLeft = 'auto';
         indicator.textContent = localStorage.getItem(ACTIVE_BG_KEY) === key ? '✓' : '';
         row.appendChild(label);
         row.appendChild(indicator);
-        if (owned) {
-          row.addEventListener('click', () => {
-            localStorage.setItem(ACTIVE_BG_KEY, key);
-            applyBg(key);
-            renderBgPicker();
-          });
-        }
+        row.addEventListener('click', () => {
+          localStorage.setItem(ACTIVE_BG_KEY, key);
+          applyBg(key);
+          renderBgPicker();
+        });
         bgList.appendChild(row);
       });
     }
+    // "Default" resolves to whatever this specific page declared as its own
+    // look (window.PAGE_DEFAULT_BG — e.g. minesweeper's drone footage,
+    // blackjack's casino entrance), not the shared library's Taipei entry,
+    // so picking "Default" here restores THIS page's default, not home's.
     function applyBg(key) {
-      const bg = BG_LIB[key] || BG_LIB.default || {};
+      const bg = (key === 'default' && window.PAGE_DEFAULT_BG) || BG_LIB[key] || BG_LIB.default || {};
       if (bg.type === 'video') {
         document.body.style.backgroundImage = 'none';
         const vid = document.getElementById('bg-video');
@@ -85,8 +92,13 @@ window.initPickers = function() {
     bgOverlay.addEventListener('click', (e) => {
       if (e.target === bgOverlay) bgOverlay.classList.remove('open');
     });
-    const bgKey = localStorage.getItem(ACTIVE_BG_KEY) || 'default';
-    if (BG_LIB[bgKey]) applyBg(bgKey);
+    // Only apply anything if the user has made a REAL explicit choice —
+    // otherwise leave the page's own hardcoded default background alone.
+    // This used to unconditionally apply BG_LIB.default (Taipei) on every
+    // page load, silently overwriting e.g. blackjack's casino-entrance.gif
+    // with Taipei for anyone who'd never opened the picker.
+    const savedBgKey = localStorage.getItem(ACTIVE_BG_KEY);
+    if (savedBgKey && savedBgKey !== 'default' && BG_LIB[savedBgKey]) applyBg(savedBgKey);
   }
 
   // Music player (only init if all required elements exist)
@@ -112,24 +124,22 @@ window.initPickers = function() {
       playlistList.innerHTML = '';
       Object.entries(MUSIC_LIB).forEach(([key, track]) => {
         const owned = loadInventory().tracks?.includes(key) || key === 'balatro';
+        // Hidden entirely when locked, not shown-and-greyed.
+        if (!owned) return;
         const row = document.createElement('div');
         row.className = 'picker-row';
-        row.style.cursor = owned ? 'pointer' : 'default';
-        row.style.opacity = owned ? '1' : '0.5';
+        row.style.cursor = 'pointer';
         const label = document.createElement('span');
         label.textContent = track.label;
-        if (!owned) label.style.textDecoration = 'line-through';
         const indicator = document.createElement('span');
         indicator.style.marginLeft = 'auto';
         indicator.textContent = getActiveTrackKey() === key ? '▶' : '';
         row.appendChild(label);
         row.appendChild(indicator);
-        if (owned) {
-          row.addEventListener('click', () => {
-            playTrack(key);
-            renderPlaylist();
-          });
-        }
+        row.addEventListener('click', () => {
+          playTrack(key);
+          renderPlaylist();
+        });
         playlistList.appendChild(row);
       });
     }
@@ -141,8 +151,13 @@ window.initPickers = function() {
     playlistOverlay.addEventListener('click', (e) => {
       if (e.target === playlistOverlay) playlistOverlay.classList.remove('open');
     });
-    if (themeMusic) {
-      themeMusic.src = MUSIC_LIB[getActiveTrackKey()].src;
+    // Only apply anything if a REAL explicit choice was saved — otherwise
+    // leave the page's own hardcoded <audio src> default alone. This used
+    // to unconditionally force Balatro Main Theme on every page load,
+    // which would have silently clobbered minesweeper's own default track.
+    const savedTrackKey = localStorage.getItem(ACTIVE_TRACK_KEY);
+    if (themeMusic && savedTrackKey && MUSIC_LIB[savedTrackKey]) {
+      themeMusic.src = MUSIC_LIB[savedTrackKey].src;
       themeMusic.play().catch(() => {});
     }
   }
@@ -162,25 +177,23 @@ window.initPickers = function() {
       cursorList.innerHTML = '';
       Object.entries(CURSOR_LIB).forEach(([key, cursor]) => {
         const owned = loadInventory().cursors?.includes(key) || key === 'default';
+        // Hidden entirely when locked, not shown-and-greyed.
+        if (!owned) return;
         const row = document.createElement('div');
         row.className = 'picker-row';
-        row.style.cursor = owned ? 'pointer' : 'default';
-        row.style.opacity = owned ? '1' : '0.5';
+        row.style.cursor = 'pointer';
         const label = document.createElement('span');
         label.textContent = cursor.label;
-        if (!owned) label.style.textDecoration = 'line-through';
         const indicator = document.createElement('span');
         indicator.style.marginLeft = 'auto';
         indicator.textContent = getActiveCursorKey() === key ? '✓' : '';
         row.appendChild(label);
         row.appendChild(indicator);
-        if (owned) {
-          row.addEventListener('click', () => {
-            localStorage.setItem(ACTIVE_CURSOR_KEY, key);
-            window.dispatchEvent(new Event('cursor:changed'));
-            renderCursorPicker();
-          });
-        }
+        row.addEventListener('click', () => {
+          localStorage.setItem(ACTIVE_CURSOR_KEY, key);
+          window.dispatchEvent(new Event('cursor:changed'));
+          renderCursorPicker();
+        });
         cursorList.appendChild(row);
       });
     }

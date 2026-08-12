@@ -411,23 +411,20 @@
         function renderBgPicker() {
           bgList.innerHTML = '';
           Object.entries(BG_LIB).forEach(([key, bg]) => {
-            // This picker never checked ownership — every background showed
-            // as pickable regardless of whether it was unlocked, which is
-            // what made inventory look inconsistent between pages.
+            // Locked backgrounds are hidden entirely, not shown-and-greyed —
+            // you can't see it until you've actually unlocked it.
             const owned = loadInventory().backgrounds?.includes(key) || key === 'default';
+            if (!owned) return;
             const row = document.createElement('div');
             row.className = 'picker-row';
-            row.style.cursor = owned ? 'pointer' : 'default';
-            row.style.opacity = owned ? '1' : '0.5';
+            row.style.cursor = 'pointer';
             const label = document.createElement('span');
             label.textContent = bg.label;
-            if (!owned) label.style.textDecoration = 'line-through';
             const indicator = document.createElement('span');
             indicator.style.marginLeft = 'auto';
             indicator.textContent = localStorage.getItem(ACTIVE_BG_KEY) === key ? '✓' : '';
             row.appendChild(label);
             row.appendChild(indicator);
-            if (!owned) { bgList.appendChild(row); return; }
             row.addEventListener('click', () => {
               localStorage.setItem(ACTIVE_BG_KEY, key);
               const bg2 = BG_LIB[key] || {};
@@ -486,25 +483,23 @@
           cursorList.innerHTML = '';
           Object.entries(CURSOR_LIB).forEach(([key, cursor]) => {
             const owned = loadInventory().cursors?.includes(key) || key === 'default';
+            // Hidden entirely when locked, not shown-and-greyed.
+            if (!owned) return;
             const row = document.createElement('div');
             row.className = 'picker-row';
-            row.style.cursor = owned ? 'pointer' : 'default';
-            row.style.opacity = owned ? '1' : '0.5';
+            row.style.cursor = 'pointer';
             const label = document.createElement('span');
             label.textContent = cursor.label;
-            if (!owned) label.style.textDecoration = 'line-through';
             const indicator = document.createElement('span');
             indicator.style.marginLeft = 'auto';
             indicator.textContent = (localStorage.getItem(ACTIVE_CURSOR_KEY) === key) ? '✓' : '';
             row.appendChild(label);
             row.appendChild(indicator);
-            if (owned) {
-              row.addEventListener('click', () => {
-                localStorage.setItem(ACTIVE_CURSOR_KEY, key);
-                window.dispatchEvent(new Event('cursor:changed'));
-                renderCursorPicker();
-              });
-            }
+            row.addEventListener('click', () => {
+              localStorage.setItem(ACTIVE_CURSOR_KEY, key);
+              window.dispatchEvent(new Event('cursor:changed'));
+              renderCursorPicker();
+            });
             cursorList.appendChild(row);
           });
         }
