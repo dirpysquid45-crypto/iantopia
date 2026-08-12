@@ -28,21 +28,32 @@ window.initPickers = function() {
     function renderBgPicker() {
       bgList.innerHTML = '';
       Object.entries(BG_LIB).forEach(([key, bg]) => {
+        // The cursor/music pickers in this same file already gate on
+        // ownership — this one never did, so every page using pickers.js
+        // showed every background as pickable regardless of whether it was
+        // actually unlocked, while the homepage's own separate background
+        // picker correctly filtered to owned only. That mismatch was the
+        // "different inventory between pages" bug.
+        const owned = loadInventory().backgrounds?.includes(key) || key === 'default';
         const row = document.createElement('div');
         row.className = 'picker-row';
-        row.style.cursor = 'pointer';
+        row.style.cursor = owned ? 'pointer' : 'default';
+        row.style.opacity = owned ? '1' : '0.5';
         const label = document.createElement('span');
         label.textContent = bg.label;
+        if (!owned) label.style.textDecoration = 'line-through';
         const indicator = document.createElement('span');
         indicator.style.marginLeft = 'auto';
         indicator.textContent = localStorage.getItem(ACTIVE_BG_KEY) === key ? '✓' : '';
         row.appendChild(label);
         row.appendChild(indicator);
-        row.addEventListener('click', () => {
-          localStorage.setItem(ACTIVE_BG_KEY, key);
-          applyBg(key);
-          renderBgPicker();
-        });
+        if (owned) {
+          row.addEventListener('click', () => {
+            localStorage.setItem(ACTIVE_BG_KEY, key);
+            applyBg(key);
+            renderBgPicker();
+          });
+        }
         bgList.appendChild(row);
       });
     }

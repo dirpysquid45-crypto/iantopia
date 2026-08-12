@@ -325,7 +325,7 @@
 <script is:inline src="/case-data.js?v=3"></script>
 <script is:inline src="/cursor.js?v=2"></script>
 <script is:inline src="/strubles.js?v=2"></script>
-<script is:inline src="/pickers.js?v=1"></script>
+<script is:inline src="/pickers.js?v=2"></script>
 
 <script is:inline>
 (() => {
@@ -595,16 +595,6 @@
     flagModeBtn.classList.toggle('active', flagMode);
   });
 
-  document.getElementById('diff-group').addEventListener('click', (e) => {
-    const btn = e.target.closest('.diff-btn');
-    if (!btn || gameActive) return;
-    diffKey = btn.dataset.diff;
-    document.querySelectorAll('.diff-btn').forEach((b) => b.classList.toggle('active', b === btn));
-    const diff = DIFFICULTIES[diffKey];
-    payoutMultEl.textContent = diff.mult + 'x';
-    mineCountEl.textContent = diffKey === 'hormuz' ? '?' : String(diff.mines);
-  });
-
   // Samples /Hormuz.jpg down to exactly rows x cols and classifies each
   // cell as land or water by comparing red vs. blue channels — water
   // reflects more blue light than sand/desert does, so a plain r > b
@@ -641,6 +631,41 @@
     }
     return mask;
   }
+
+  // Renders the board shape for whatever difficulty is currently selected,
+  // with no mines and no bet spent — purely a preview. Without this,
+  // switching to the Hormuz tab left the previous mode's board on screen
+  // until "New Game" was clicked, which reads as "the shape is broken"
+  // rather than "you haven't started a round yet".
+  let previewToken = 0;
+  async function previewBoard() {
+    const myToken = ++previewToken; // guards against a slow Hormuz sample
+    const diff = DIFFICULTIES[diffKey];               // finishing after the user has since switched away
+    rows = diff.rows; cols = diff.cols;
+    let landMask = null;
+    if (diffKey === 'hormuz') {
+      try {
+        landMask = await sampleHormuzMask(rows, cols);
+      } catch {
+        return; // real error surfaces when they actually click New Game
+      }
+    }
+    if (myToken !== previewToken) return;
+    buildEmptyBoard(landMask);
+    renderBoard();
+    mineCountEl.textContent = diffKey === 'hormuz' ? String(Math.round(landTotal * diff.mineDensity)) : String(diff.mines);
+  }
+
+  document.getElementById('diff-group').addEventListener('click', (e) => {
+    const btn = e.target.closest('.diff-btn');
+    if (!btn || gameActive) return;
+    diffKey = btn.dataset.diff;
+    document.querySelectorAll('.diff-btn').forEach((b) => b.classList.toggle('active', b === btn));
+    const diff = DIFFICULTIES[diffKey];
+    payoutMultEl.textContent = diff.mult + 'x';
+    mineCountEl.textContent = diffKey === 'hormuz' ? '...' : String(diff.mines);
+    previewBoard();
+  });
 
   async function newGame() {
     const bet = Math.max(1, Math.floor(Number(betInput.value) || 0));
