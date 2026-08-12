@@ -114,7 +114,11 @@
 
   /* ---------- Controls ---------- */
   .controls-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:center; margin-top:14px; }
-  .diff-group { display:flex; gap:6px; }
+  /* flex-wrap was missing here specifically — .controls-row (the parent)
+     already wraps, but that only lets .diff-group itself drop to a new
+     line, not the 4 buttons inside it, so on narrow screens they still
+     overflowed off both edges instead of wrapping to a second row. */
+  .diff-group { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; }
   .diff-btn {
     all:unset; cursor:none; padding:8px 12px; border:3px solid #333; background:#1a1f2e;
     color:var(--muted); font-size:9px; font-family:inherit; letter-spacing:1px; text-transform:uppercase;
@@ -157,8 +161,20 @@
     padding:4px;
     width:max-content;
   }
+  /* Dense boards (Hormuz's 40-wide grid) can't fit on a phone screen even
+     at the smallest legible cell size once every cell's gap+border is
+     counted — those add up independently of cell size, so wide/tall modes
+     shed them here instead of shrinking cells past readability. */
+  .board.dense { gap:0; border-width:2px; padding:2px; }
+  .board.dense .cell { border-width:1px; }
   .cell {
     all:unset;
+    /* all:unset resets box-sizing to its initial value (content-box),
+       overriding the global border-box reset — without restating it here,
+       each cell's 2px border renders on top of width/height instead of
+       inside it, so the fit-to-viewport math below silently undercounts
+       every cell's true footprint. */
+    box-sizing:border-box;
     width:var(--cell); height:var(--cell);
     display:flex; align-items:center; justify-content:center;
     background:#3a4356;
@@ -524,7 +540,41 @@
     }
   }
 
+  // Board dimensions swing wildly by mode (9x9 up to 30x40 for Hormuz), so a
+  // fixed cell size meant the wider/taller modes overflowed the viewport and
+  // needed scrolling to reach every cell — worst on mobile. Instead, size
+  // cells to whatever actually fits the space available for the CURRENT
+  // mode, recomputed on every render and on resize/orientation change.
+  const boardWrap = document.querySelector('.board-wrap');
+  // .board adds fixed chrome around the cell grid (gap between cells,
+  // padding + border) that doesn't scale with cell size — has to be
+  // subtracted before dividing by cols/rows, or the fit undershoots and
+  // the board still overflows.
+  function fitFor(chrome, gap, minCell) {
+    const wrapTop = boardWrap.getBoundingClientRect().top;
+    const availableWidth = boardWrap.clientWidth - chrome - (cols - 1) * gap;
+    const availableHeight = (window.innerHeight - wrapTop - 16) - chrome - (rows - 1) * gap;
+    return Math.max(minCell, Math.min(30, Math.floor(availableWidth / cols), Math.floor(availableHeight / rows)));
+  }
+  function fitCellSize() {
+    if (!boardWrap || !rows || !cols) return;
+    // Try the normal (roomier-looking) chrome first; only fall back to the
+    // gap-free "dense" chrome — trading visual polish for actually fitting
+    // the screen — when normal chrome would push cells below readable size.
+    let cell = fitFor(16, 2, 9);
+    let dense = cell < 14;
+    if (dense) cell = fitFor(8, 0, 6);
+    boardEl.classList.toggle('dense', dense);
+    document.documentElement.style.setProperty('--cell', cell + 'px');
+  }
+  let resizeRaf = null;
+  window.addEventListener('resize', () => {
+    if (resizeRaf) cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(fitCellSize);
+  });
+
   function renderBoard() {
+    fitCellSize();
     boardEl.style.gridTemplateColumns = `repeat(${cols}, var(--cell))`;
     boardEl.classList.toggle('hormuz', diffKey === 'hormuz');
     boardEl.style.backgroundImage = diffKey === 'hormuz' ? "url('/Hormuz.jpg')" : 'none';
