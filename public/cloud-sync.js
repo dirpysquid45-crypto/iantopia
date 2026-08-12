@@ -13,7 +13,14 @@
 (function () {
   const firebaseConfig = {
     apiKey: "AIzaSyDHV58VVMfzLgmV8AUebaiTN76JYau9DMg",
-    authDomain: "iantopia.firebaseapp.com",
+    // Same-origin with iantopia.com by design — see the /__/auth proxy in
+    // youtube-transcript-app/nginx.conf. Mobile browsers (Safari ITP,
+    // increasingly others) block the third-party storage access the
+    // popup/redirect handshake depends on when authDomain is a different
+    // origin (iantopia.firebaseapp.com), which manifested as unexpected
+    // reload/navigation behavior after sign-in on mobile. Per Firebase's
+    // own docs: https://firebase.google.com/docs/auth/web/redirect-best-practices
+    authDomain: "iantopia.com",
     projectId: "iantopia",
     storageBucket: "iantopia.firebasestorage.app",
     messagingSenderId: "236083814537",
