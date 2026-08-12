@@ -131,3 +131,28 @@ Download a YouTube video.
 Download a YouTube video's audio track.
 
 **Response:** MP3 file, streamed (re-encoded via ffmpeg)
+
+## Known Gotcha: YouTube SABR Streaming
+
+YouTube periodically rolls out changes that break yt-dlp's default extraction —
+most recently "SABR streaming," where the default web client silently returns
+formats with no playable URL, producing a 0-byte/0-second output instead of an
+error. `backend/app.py` works around this with explicit `extractor_args`
+(`player_client: ['android', 'web']`, see `YOUTUBE_EXTRACTOR_ARGS`). If
+downloads start silently producing empty files again, this is the first place
+to check — it usually means yt-dlp needs a version bump or the client list
+needs adjusting, not that the app logic itself is broken. Verify with `file`
+and `ffprobe` on the actual output, not just the HTTP status code — a "200 OK"
+response can still contain a garbage file.
+
+## Frontend Notes
+
+- **Download history is localStorage-only** (`downloadHistory` key) — nothing
+  is stored server-side, matching the ephemeral-streaming architecture above.
+  Each entry holds metadata + the original source URL, not the file itself.
+- **Redownload button** re-runs the original fetch against that stored URL
+  rather than re-serving cached bytes, since there are no cached bytes to
+  serve — there's nothing else it could mean given the no-persistence design.
+- **Terms of Service** is an in-page modal (`#tos-overlay`), not a separate
+  page — a standalone `/transcripts/terms` route existed at one point and
+  was removed; don't recreate it as a real route.

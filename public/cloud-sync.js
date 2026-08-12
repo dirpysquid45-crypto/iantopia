@@ -76,6 +76,17 @@
   }
 
   function applyRemoteState(data) {
+    const local = snapshotLocalState();
+    const changed = SYNC_KEYS.some((key) => {
+      if (!Object.prototype.hasOwnProperty.call(data, key)) return false;
+      return data[key] !== local[key];
+    });
+    // onAuthStateChanged re-fires on every page load for a persisted
+    // session, not just right after sign-in — without this check we'd
+    // reload every single load forever, since the remote doc always
+    // "exists" once a first sync has happened.
+    if (!changed) return;
+
     applyingRemote = true;
     SYNC_KEYS.forEach((key) => {
       if (Object.prototype.hasOwnProperty.call(data, key)) {

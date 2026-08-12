@@ -11,7 +11,7 @@ CS2-style rarity tiers (Mil-Spec → Exceedingly Rare). Open cases to collect:
 - **Music unlocks** — swap the homepage/game background tracks
 - **Background videos** — swap homepage/game visuals
 - **Cursor skins** — customize the pointer with image or emoji cursors
-- **Collectible items** — draggable toys on the homepage (Stinky Sock, Panda Express, etc.)
+- **Collectible items** — draggable toys on the homepage (Stinky Sock, Panda Express, the Display Shelf, the Smiski Blind Box, etc.) — every draggable is real loot now, nothing is free/always-on
 - **Badges & power-ups** — cosmetic collectibles
 
 All systems prevent duplicate unlocks — once owned, an item leaves the available loot pool.
@@ -31,6 +31,7 @@ Classic blackjack against the house, with:
 - **Music player** — pick a background track from unlocked music
 - **Background switcher** — choose among unlocked visual themes
 - **Cursor picker** — equip unlocked cursor skins
+- **Google Sign-In** — save progress across devices (see [Cloud Sync](#cloud-sync-publiccloud-syncjs) below)
 - **"Never Getting Done" joke page** — a commitment device in emoji
 
 ### 🎬 YouTube Transcript Downloader
@@ -84,12 +85,16 @@ iantopia/
 │   ├── cursor.js                 # Canvas custom cursor renderer
 │   ├── cursor-library.js         # Cursor definitions (image + emoji)
 │   ├── music-library.js          # Unlockable music tracks
+│   ├── music-position.js         # Resumes a track's playback position across page loads
 │   ├── background-library.js     # Unlockable video/image backgrounds
 │   ├── strubles.js               # Currency getter/setter (localStorage)
+│   ├── pickers.js                # Shared music/background/cursor picker UI (blackjack, alternate-ending)
+│   ├── cloud-sync.js             # Google Sign-In + Firestore progress sync
 │   ├── assets/
-│   │   ├── items/                # Collectible item PNGs (sock, panda, license, etc.)
+│   │   ├── items/                # Collectible item PNGs (sock, panda, license, shelf, blind box, etc.)
 │   │   ├── badges/               # Badge PNGs (trophy, etc.)
-│   │   ├── decorations/          # Static decorations (display shelf, blind box)
+│   │   ├── decorations/          # Decoration art (display shelf, blind box — now real loot, not static)
+│   │   ├── icons/                # UI icons (Google logo, etc.)
 │   │   └── casino/               # Card, chip, table graphics
 │   ├── audio/
 │   │   └── sfx/                  # Click sound effects (hamood, etc.)
@@ -143,6 +148,18 @@ Draggable toys that appear on the homepage.
 - **Click outside:** Clears selection
 
 **Position persistence** — all positions stored in `localStorage` (`desktop_items_v1`).
+
+### Cloud Sync (`public/cloud-sync.js`)
+
+Google Sign-In (via Firebase Auth) + cross-device progress sync (via Firestore).
+
+- Sign-in only requests identity (name/email/photo) — no other Google API access is ever requested
+- Firestore rules restrict each user's document (`/users/{uid}`) to that user only
+- A fixed set of localStorage keys are mirrored to Firestore on sign-in — see the `SYNC_KEYS` list in the file for exactly what syncs (inventory, currency, unlocks, cosmetic picks, desktop layout). Device-local preferences (volume, exact playback position) are deliberately excluded
+- Sync triggers off the app's existing custom events (`inventory:changed`, `strubles:change`, etc.), plus a periodic safety-net interval and a `beforeunload` flush for state changes that don't dispatch an event
+- Pulling remote state does a full page reload rather than live-patching already-initialized page state, since every page already treats localStorage as load-time truth
+
+**Firebase config is public by design** — the `apiKey`/`projectId`/etc. in `cloud-sync.js` aren't secrets; access control is entirely enforced server-side by the Firestore security rules, not by hiding this config.
 
 ## Deployment
 
