@@ -46,7 +46,10 @@
     'desktop_items_seen_v1',
     'active_cursor_v1',
     'active_bg_v1',
+    'home_active_bg_v1',
     'active_track_v1',
+    'home_active_track_v1',
+    'lootbox_active_track_v1',
   ];
 
   const SYNC_EVENTS = [
@@ -115,27 +118,37 @@
     }
   }
 
-  function pushToCloud() {
+  // immediate=true bypasses the debounce entirely. This matters: a
+  // debounced write scheduled via setTimeout is destroyed along with the
+  // rest of the page's JS context on navigation, so a normal debounced
+  // pushToCloud() call from beforeunload/visibilitychange never actually
+  // fires — it just reschedules a timer for a page that's about to be
+  // gone. The bug this caused: change a background, navigate away inside
+  // the debounce window, and the push is silently lost; the next sign-in
+  // pull then overwrites the fresh local choice with the stale cloud one.
+  function pushToCloud(immediate) {
     if (!currentUser || applyingRemote) return;
     clearTimeout(pushTimer);
-    pushTimer = setTimeout(() => {
+    const doPush = () => {
       db.collection('users').doc(currentUser.uid).set(snapshotLocalState(), { merge: true }).catch((err) => {
         console.error('[cloud-sync] push failed:', err);
       });
-    }, PUSH_DEBOUNCE_MS);
+    };
+    if (immediate) { doPush(); return; }
+    pushTimer = setTimeout(doPush, PUSH_DEBOUNCE_MS);
   }
 
-  SYNC_EVENTS.forEach((name) => window.addEventListener(name, pushToCloud));
+  SYNC_EVENTS.forEach((name) => window.addEventListener(name, () => pushToCloud(false)));
   // Safety net for state changes that don't dispatch a custom event (e.g.
   // dragging a desktop item, picking an active track/background) — a
-  // period sync plus flushing on tab-hide/unload catches everything else
-  // without needing to touch every individual write site.
-  window.addEventListener('storage', pushToCloud);
-  setInterval(pushToCloud, PERIODIC_SYNC_MS);
+  // periodic sync catches everything else without needing to touch every
+  // individual write site. tab-hide/unload push immediately (see above).
+  window.addEventListener('storage', () => pushToCloud(false));
+  setInterval(() => pushToCloud(false), PERIODIC_SYNC_MS);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') pushToCloud();
+    if (document.visibilityState === 'hidden') pushToCloud(true);
   });
-  window.addEventListener('beforeunload', pushToCloud);
+  window.addEventListener('beforeunload', () => pushToCloud(true));
 
   auth.onAuthStateChanged((user) => {
     currentUser = user;

@@ -377,7 +377,7 @@
   <script is:inline src="/music-library.js?v=4"></script>
   <script is:inline src="/background-library.js?v=2"></script>
   <script is:inline src="/case-data.js?v=3"></script>
-  <script is:inline src="/lootbox.js?v=4"></script>
+  <script is:inline src="/lootbox.js?v=5"></script>
   <script is:inline src="/cursor-library.js?v=1"></script>
   <script is:inline src="/cursor.js?v=2"></script>
   <script is:inline src="/music-position.js?v=1"></script>
@@ -563,12 +563,9 @@
     // ---------- Music: unlocked tracks playable while opening ----------
     const LOOTBOX_THEME = { label: 'Lootbox Theme', src: '/audio/music/lootbox-theme.mp3' };
     const TRACKS = Object.assign({}, window.MUSIC_LIBRARY, { default: LOOTBOX_THEME });
-    // Shared with every other page (blackjack, home, alternate-ending,
-    // minesweeper) — picking a track anywhere applies everywhere now (this
-    // used to be its own separate key, which was the actual cause of
-    // background/music picks feeling "out of sync" between pages). Still
-    // falls back to LOOTBOX_THEME when unset/'default' below.
-    const ACTIVE_TRACK_KEY = 'active_track_v1';
+    // Kept separate on purpose — each page's music choice is independent.
+    // Falls back to LOOTBOX_THEME when unset/'default' below.
+    const ACTIVE_TRACK_KEY = 'lootbox_active_track_v1';
     const INV_KEY = 'strubles_inventory_v1';
 
     const themeMusic = document.getElementById('theme-music');

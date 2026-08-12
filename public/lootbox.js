@@ -18,12 +18,12 @@
   const CASES_KEY   = 'strubles_cases_v1';
   const HISTORY_KEY = 'strubles_case_history_v1';
   const STATS_KEY   = 'strubles_case_stats_v1';
-  // Shared across every page — these used to be hardcoded to the homepage's
-  // own keys, so auto-equip only actually worked if you happened to open
-  // the case from the homepage specifically. Now every page reads/writes
-  // the same key, so this applies wherever the case was actually opened.
-  const ACTIVE_TRACK_KEY  = 'active_track_v1';
-  const ACTIVE_BG_KEY     = 'active_bg_v1';
+  // Always writes to the homepage's own keys, regardless of which page the
+  // case was actually opened on — each page's music/bg choice is
+  // independent, and the homepage is the canonical place to go check what
+  // you just won (see the comment on AUTO_EQUIP below).
+  const ACTIVE_TRACK_KEY  = 'home_active_track_v1';
+  const ACTIVE_BG_KEY     = 'home_active_bg_v1';
   const ACTIVE_CURSOR_KEY = 'active_cursor_v1';
 
   // Winning a cosmetic equips it immediately. Granting it silently into the

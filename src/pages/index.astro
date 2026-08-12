@@ -877,7 +877,7 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script is:inline src="/cloud-sync.js?v=2"></script>
+  <script is:inline src="/cloud-sync.js?v=3"></script>
   <script is:inline src="/music-library.js?v=4"></script>
   <script is:inline src="/music-position.js?v=1"></script>
   <script is:inline src="/background-library.js?v=2"></script>
@@ -970,10 +970,12 @@
       // (handled below) can switch it to something else.
       const HOME_THEME = { label: 'Home Theme', src: '/audio/music/home-theme.mp3' };
 
-      // Shared with every other page — picking a track anywhere applies
-      // everywhere. Each page still falls back to its own default theme
-      // when this is unset/'default', so this only affects an explicit pick.
-      const ACTIVE_TRACK_KEY = 'active_track_v1';
+      // Kept separate from other pages on purpose — each page's music/bg
+      // choice is independent (a prior attempt to unify these caused a
+      // worse bug: cloud-sync's debounced push could lose your choice
+      // entirely if you navigated away within ~1s, so returning to a page
+      // would silently revert to a stale value).
+      const ACTIVE_TRACK_KEY = 'home_active_track_v1';
       const INV_KEY = 'strubles_inventory_v1';
       const LIBRARY = Object.assign({}, window.MUSIC_LIBRARY, { default: HOME_THEME });
 
@@ -1284,9 +1286,9 @@
       });
 
       // --- Background switcher ---
-      // Shared with every other page (blackjack, lootbox, alternate-ending,
-      // minesweeper) — picking a background anywhere applies everywhere.
-      const ACTIVE_BG_KEY = 'active_bg_v1';
+      // Kept separate from other pages on purpose — see the note on
+      // ACTIVE_TRACK_KEY above for why.
+      const ACTIVE_BG_KEY = 'home_active_bg_v1';
       const BG_LIBRARY = window.BACKGROUND_LIBRARY || { default: { label: 'Taipei', type: 'gif', src: '/video/taipei.gif', position: 'center' } };
       const bgBtn = document.getElementById('bg-btn');
       const bgVideo = document.getElementById('bg-video');
