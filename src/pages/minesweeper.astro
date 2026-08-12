@@ -160,6 +160,11 @@
   .cell.mine { background:#7a2222; }
   .cell.mine.exploded { background:#ff3333; }
   .cell.flagged { background:#3a4356; }
+  /* Water cells in Hormuz mode aren't part of the sweep at all — fully
+     transparent and inert so the satellite photo shows straight through,
+     which is what actually reads as a coastline rather than a rectangle. */
+  .cell.water { background:transparent; border:none; pointer-events:none; }
+  .board.hormuz { background-size:100% 100%; background-repeat:no-repeat; }
   .cell[data-n="1"] { color:#4fa8ff; }
   .cell[data-n="2"] { color:#4caf50; }
   .cell[data-n="3"] { color:#ff5252; }
@@ -222,6 +227,7 @@
         <button class="diff-btn active" data-diff="beginner">Beginner</button>
         <button class="diff-btn" data-diff="intermediate">Intermediate</button>
         <button class="diff-btn" data-diff="expert">Expert</button>
+        <button class="diff-btn" data-diff="hormuz">🌊 Strait of Hormuz</button>
       </div>
     </div>
 
@@ -319,15 +325,18 @@
 
   // Classic standard Minesweeper board sizes, plus a payout multiplier
   // scaled to risk (win chance drops sharply as mine density climbs).
+  // hormuz has no fixed mine count — it's computed from however many land
+  // cells the sampled coastline actually has (see sampleHormuzMask).
   const DIFFICULTIES = {
     beginner:     { rows: 9,  cols: 9,  mines: 10, mult: 1.5 },
     intermediate: { rows: 16, cols: 16, mines: 40, mult: 3 },
     expert:       { rows: 16, cols: 30, mines: 99, mult: 6 },
+    hormuz:       { rows: 30, cols: 40, mineDensity: 0.18, mult: 5 },
   };
   let diffKey = 'beginner';
 
-  let board = [];       // board[r][c] = { mine, revealed, flagged, adjacent }
-  let rows = 0, cols = 0, mineTotal = 0;
+  let board = [];       // board[r][c] = { mine, revealed, flagged, adjacent, land }
+  let rows = 0, cols = 0, mineTotal = 0, landTotal = 0;
   let firstClickDone = false;
   let gameActive = false;
   let flagMode = false;
@@ -373,12 +382,18 @@
     return out;
   }
 
-  function buildEmptyBoard() {
+  // landMask[r][c] === false marks a cell as water in Hormuz mode — not
+  // part of the sweep at all (no mine, never revealed/flagged). Every
+  // other mode passes no mask, so every cell defaults to land.
+  function buildEmptyBoard(landMask) {
     board = [];
+    landTotal = 0;
     for (let r = 0; r < rows; r++) {
       const row = [];
       for (let c = 0; c < cols; c++) {
-        row.push({ mine: false, revealed: false, flagged: false, adjacent: 0 });
+        const land = landMask ? landMask[r][c] : true;
+        if (land) landTotal++;
+        row.push({ mine: false, revealed: false, flagged: false, adjacent: 0, land });
       }
       board.push(row);
     }
@@ -386,23 +401,27 @@
 
   // Mines are placed only after the first click, excluding that cell and
   // its neighbors, so the opening move is never an instant loss and
-  // usually opens up a real cascade instead of a single bare number.
+  // usually opens up a real cascade instead of a single bare number. Water
+  // cells (land: false) are never eligible.
   function placeMines(safeR, safeC) {
     const forbidden = new Set([`${safeR},${safeC}`]);
     neighbors(safeR, safeC).forEach(([r, c]) => forbidden.add(`${r},${c}`));
 
     let placed = 0;
-    while (placed < mineTotal) {
+    let attempts = 0;
+    const maxAttempts = rows * cols * 50; // safety valve against an impossible mine count
+    while (placed < mineTotal && attempts < maxAttempts) {
+      attempts++;
       const r = Math.floor(Math.random() * rows);
       const c = Math.floor(Math.random() * cols);
       const key = `${r},${c}`;
-      if (forbidden.has(key) || board[r][c].mine) continue;
+      if (forbidden.has(key) || board[r][c].mine || !board[r][c].land) continue;
       board[r][c].mine = true;
       placed++;
     }
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        if (board[r][c].mine) continue;
+        if (board[r][c].mine || !board[r][c].land) continue;
         board[r][c].adjacent = neighbors(r, c).filter(([nr, nc]) => board[nr][nc].mine).length;
       }
     }
@@ -410,11 +429,13 @@
 
   function renderBoard() {
     boardEl.style.gridTemplateColumns = `repeat(${cols}, var(--cell))`;
+    boardEl.classList.toggle('hormuz', diffKey === 'hormuz');
+    boardEl.style.backgroundImage = diffKey === 'hormuz' ? "url('/Hormuz.jpg')" : 'none';
     boardEl.innerHTML = '';
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const btn = document.createElement('button');
-        btn.className = 'cell';
+        btn.className = 'cell' + (board[r][c].land ? '' : ' water');
         btn.dataset.r = r;
         btn.dataset.c = c;
         boardEl.appendChild(btn);
@@ -466,7 +487,7 @@
       updateCellVisual(r, c);
       if (!cell.mine && cell.adjacent === 0) {
         neighbors(r, c).forEach(([nr, nc]) => {
-          if (!board[nr][nc].revealed && !board[nr][nc].flagged) queue.push([nr, nc]);
+          if (board[nr][nc].land && !board[nr][nc].revealed && !board[nr][nc].flagged) queue.push([nr, nc]);
         });
       }
     }
@@ -500,7 +521,7 @@
   function onCellClick(r, c) {
     if (!gameActive) return;
     const cell = board[r][c];
-    if (cell.revealed) return;
+    if (cell.revealed || !cell.land) return;
 
     if (flagMode) {
       cell.flagged = !cell.flagged;
@@ -525,7 +546,7 @@
     }
 
     revealCell(r, c);
-    if (revealedSafeCount === rows * cols - mineTotal) {
+    if (revealedSafeCount === landTotal - mineTotal) {
       endGame(true);
     }
   }
@@ -534,7 +555,7 @@
     e.preventDefault();
     if (!gameActive) return;
     const cell = board[r][c];
-    if (cell.revealed) return;
+    if (cell.revealed || !cell.land) return;
     cell.flagged = !cell.flagged;
     flagCount += cell.flagged ? 1 : -1;
     mineCountEl.textContent = String(mineTotal - flagCount);
@@ -562,11 +583,49 @@
     if (!btn || gameActive) return;
     diffKey = btn.dataset.diff;
     document.querySelectorAll('.diff-btn').forEach((b) => b.classList.toggle('active', b === btn));
-    payoutMultEl.textContent = DIFFICULTIES[diffKey].mult + 'x';
-    mineCountEl.textContent = String(DIFFICULTIES[diffKey].mines);
+    const diff = DIFFICULTIES[diffKey];
+    payoutMultEl.textContent = diff.mult + 'x';
+    mineCountEl.textContent = diffKey === 'hormuz' ? '?' : String(diff.mines);
   });
 
-  function newGame() {
+  // Samples /Hormuz.jpg down to exactly rows x cols and classifies each
+  // cell as land or water by comparing red vs. blue channels — water
+  // reflects more blue light than sand/desert does, so a plain r > b
+  // comparison reproduces the coastline shape with no other processing
+  // needed (verified against the actual source image before shipping).
+  let hormuzImagePromise = null;
+  function loadHormuzImage() {
+    if (!hormuzImagePromise) {
+      hormuzImagePromise = new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = '/Hormuz.jpg';
+      });
+    }
+    return hormuzImagePromise;
+  }
+  async function sampleHormuzMask(sampleRows, sampleCols) {
+    const img = await loadHormuzImage();
+    const canvas = document.createElement('canvas');
+    canvas.width = sampleCols;
+    canvas.height = sampleRows;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, sampleCols, sampleRows);
+    const { data } = ctx.getImageData(0, 0, sampleCols, sampleRows);
+    const mask = [];
+    for (let r = 0; r < sampleRows; r++) {
+      const row = [];
+      for (let c = 0; c < sampleCols; c++) {
+        const i = (r * sampleCols + c) * 4;
+        row.push(data[i] > data[i + 2]); // red > blue => land
+      }
+      mask.push(row);
+    }
+    return mask;
+  }
+
+  async function newGame() {
     const bet = Math.max(1, Math.floor(Number(betInput.value) || 0));
     if (!Strubles.spend(bet)) {
       setStatus('Not enough Strubles for that bet.', 'lose');
@@ -574,16 +633,33 @@
     }
     currentBet = bet;
     const diff = DIFFICULTIES[diffKey];
-    rows = diff.rows; cols = diff.cols; mineTotal = diff.mines;
+    rows = diff.rows; cols = diff.cols;
     firstClickDone = false;
     gameActive = true;
     flagCount = 0;
     revealedSafeCount = 0;
-    mineCountEl.textContent = String(mineTotal);
     timerEl.textContent = '0';
     payoutMultEl.textContent = diff.mult + 'x';
     stopTimer();
-    buildEmptyBoard();
+
+    let landMask = null;
+    if (diffKey === 'hormuz') {
+      newGameBtn.disabled = true;
+      setStatus('Loading the strait...');
+      try {
+        landMask = await sampleHormuzMask(rows, cols);
+      } catch {
+        setStatus('Could not load the map — refund issued.', 'lose');
+        Strubles.add(bet);
+        gameActive = false;
+        newGameBtn.disabled = false;
+        return;
+      }
+      newGameBtn.disabled = false;
+    }
+    buildEmptyBoard(landMask);
+    mineTotal = diffKey === 'hormuz' ? Math.round(landTotal * diff.mineDensity) : diff.mines;
+    mineCountEl.textContent = String(mineTotal);
     renderBoard();
     setStatus(`Bet ${bet} Strubles. Click any cell to begin.`);
   }
