@@ -1,0 +1,609 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Iantopia Minesweeper</title>
+<link rel="preload" as="image" href="/strubles.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<!--
+  is:global is REQUIRED. Astro scopes <style> by stamping data-astro-cid-* on
+  elements in the template and rewriting selectors to match. The whole board
+  is built at runtime via createElement, so it never receives that attribute
+  and every scoped rule silently skips it. Same trap as blackjack/lootbox.
+-->
+<style is:global>
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; --cell: 28px; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0;
+    background: radial-gradient(circle at 50% 0%, #1a1f2e 0%, #0a0c12 60%, #000 100%);
+    color:var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+    cursor:none;
+    position:relative;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image:
+      repeating-linear-gradient(90deg, transparent, transparent 24px, rgba(255,215,0,0.03) 24px, rgba(255,215,0,0.03) 25px),
+      repeating-linear-gradient(0deg, transparent, transparent 24px, rgba(255,215,0,0.03) 24px, rgba(255,215,0,0.03) 25px);
+    pointer-events:none; z-index:0;
+  }
+  main { position:relative; z-index:1; }
+  .table {
+    width:min(900px, 96vw);
+    background: linear-gradient(135deg, #161c27 0%, #0d1017 100%);
+    border:4px solid var(--gold);
+    padding:20px;
+    box-shadow:0 20px 50px rgba(0,0,0,.6), 0 0 20px rgba(255,215,0,.3), 0 0 60px rgba(255,215,0,.12);
+  }
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:4px solid #000; padding-bottom:10px; }
+  header a { color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; font-weight:700; background:#000; transition:background 0.2s; font-size:10px; cursor:none; }
+  header a:hover { background:var(--gold); color:#000; }
+  header button { color:var(--gold); background:#000; border:2px solid var(--gold); padding:4px 6px; cursor:none; transition:background 0.2s; }
+  header button:hover { background:var(--gold); color:#000; }
+
+  /* Now Playing / Backgrounds / Cursors popups — same system as every other page. */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:100;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    width:min(360px,90vw); max-height:70vh; overflow-y:auto;
+    background:#0a0a0a; border:3px solid var(--gold); padding:20px;
+    box-shadow:0 0 20px rgba(255,215,0,.4);
+  }
+  .modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; }
+  .modal-head h2{ margin:0; font-size:12px; color:var(--gold); font-weight:400; }
+  .btn{
+    color:var(--gold); text-decoration:none; border:3px solid var(--gold); padding:8px 12px;
+    background:#000; font-size:9px; transition:background .2s, color .2s; cursor:none;
+    font-family:inherit; letter-spacing:1px; text-transform:uppercase;
+  }
+  .btn:hover{ background:var(--gold); color:#000; }
+  .picker-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:11px; }
+  .picker-row:last-child { border-bottom:none; }
+
+  .volume-row{
+    display:flex; align-items:center; gap:10px; margin-bottom:16px;
+    padding-bottom:14px; border-bottom:1px solid rgba(255,215,0,0.3);
+  }
+  .volume-row input[type="range"]{ flex:1; accent-color:var(--gold); cursor:none; }
+  .volume-mute-btn{
+    all:unset; cursor:none; font-size:16px; padding:4px 8px;
+    border:1px solid var(--gold); background:#000;
+  }
+
+  h1 {
+    margin:0; font-size:clamp(13px,2.6vw,20px); letter-spacing:1px; color:var(--gold); font-weight:400;
+    text-shadow: 2px 2px 0 #000;
+    text-align:center;
+  }
+
+  #strubles-badge{
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
+    background:#000; padding:8px 12px; border:3px solid var(--gold);
+    font-weight:700; z-index:20;
+  }
+  #strubles-badge img{ width:28px; height:28px; }
+
+  /* ---------- Controls ---------- */
+  .controls-row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:center; margin-top:14px; }
+  .diff-group { display:flex; gap:6px; }
+  .diff-btn {
+    all:unset; cursor:none; padding:8px 12px; border:3px solid #333; background:#1a1f2e;
+    color:var(--muted); font-size:9px; font-family:inherit; letter-spacing:1px; text-transform:uppercase;
+  }
+  .diff-btn.active { border-color:var(--gold); color:var(--gold); background:#2a2410; }
+  .diff-btn:hover { border-color:var(--gold); }
+
+  .betbox{ display:flex; align-items:center; gap:8px; }
+  .betbox input{ width:70px; padding:8px 10px; border:3px solid #000; background:#0f1523; color:var(--ink); font-weight:700; font-family:inherit; font-size:11px; }
+  .betbox button { padding:8px 14px; min-width:44px; min-height:44px; }
+
+  button {
+    all:unset; cursor:none; padding:12px 20px; border:3px solid #333;
+    background:#4a6fa5; color:#fff; font-weight:400; font-size:11px;
+    font-family:'Press Start 2P', ui-monospace, monospace;
+    transition: background .15s, transform .1s;
+  }
+  button:hover:not(:disabled) { background:#6a8fc5; }
+  button:active:not(:disabled) { transform: translateY(2px); }
+  button.primary { background:#2c5f8a; --glow-color:#3d9bff; animation: neonBtnPulse 2s ease-in-out infinite; }
+  button.primary:hover:not(:disabled) { background:#3d7cae; }
+  button.accent { background:#22757a; --glow-color:#22d3ee; }
+  button.accent.active { background:#7a5a22; --glow-color:#ffd700; animation: neonBtnPulse 2s ease-in-out infinite; }
+  button.accent:hover:not(:disabled) { background:#2f9aa1; }
+  @keyframes neonBtnPulse {
+    0%, 100% { box-shadow: 0 0 4px var(--glow-color), 0 0 10px var(--glow-color); text-shadow: 0 0 4px var(--glow-color); }
+    50% { box-shadow: 0 0 10px var(--glow-color), 0 0 24px var(--glow-color), 0 0 38px var(--glow-color); text-shadow: 0 0 8px var(--glow-color); }
+  }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+
+  .status-row { display:flex; justify-content:center; gap:24px; margin-top:14px; font-size:11px; color:var(--gold); }
+
+  /* ---------- Board ---------- */
+  .board-wrap { display:flex; justify-content:center; margin-top:16px; overflow-x:auto; padding-bottom:6px; }
+  .board {
+    display:grid;
+    gap:2px;
+    background:#000;
+    border:4px solid #333;
+    padding:4px;
+    width:max-content;
+  }
+  .cell {
+    all:unset;
+    width:var(--cell); height:var(--cell);
+    display:flex; align-items:center; justify-content:center;
+    background:#3a4356;
+    border:2px solid;
+    border-color:#5a6578 #23283a #23283a #5a6578;
+    font-size:calc(var(--cell) * 0.5);
+    font-family:ui-monospace, 'Courier New', monospace;
+    font-weight:700;
+    cursor:none;
+    user-select:none;
+    -webkit-user-select:none;
+    touch-action:manipulation;
+  }
+  .cell:hover:not(.revealed) { background:#454f66; }
+  .cell.revealed { background:#181c26; border:1px solid #23283a; cursor:default; }
+  .cell.mine { background:#7a2222; }
+  .cell.mine.exploded { background:#ff3333; }
+  .cell.flagged { background:#3a4356; }
+  .cell[data-n="1"] { color:#4fa8ff; }
+  .cell[data-n="2"] { color:#4caf50; }
+  .cell[data-n="3"] { color:#ff5252; }
+  .cell[data-n="4"] { color:#ab47bc; }
+  .cell[data-n="5"] { color:#a1887f; }
+  .cell[data-n="6"] { color:#26c6da; }
+  .cell[data-n="7"] { color:#eee; }
+  .cell[data-n="8"] { color:#9e9e9e; }
+
+  .status { margin-top:14px; text-align:center; font-weight:400; font-size:11px; color:#fff; min-height:16px; }
+  .status.win { color:#4caf50; }
+  .status.lose { color:#ff5252; }
+
+  #earn-panel {
+    display: flex; gap: 15px; margin-top: 24px; flex-wrap: wrap; justify-content: center;
+    padding: 16px; background: rgba(255, 215, 0, 0.06); border: 3px solid var(--gold);
+  }
+  #earn-panel a {
+    padding: 12px 18px; font-size: 10px;
+    background: var(--gold); border: 3px solid #8b7a1a;
+    color: #000; text-decoration: none; font-weight: 400; text-transform: uppercase; letter-spacing: 1px;
+    font-family:'Press Start 2P', ui-monospace, monospace; cursor:none;
+  }
+  #earn-panel a:hover { background:#ffe958; }
+
+  @media (max-width:768px){
+    body { overflow-y:auto; padding:12px; }
+    .table { width:100vw; max-width:100%; padding:10px; margin:0 -12px; }
+    h1 { font-size:clamp(11px,3vw,14px); }
+    header { flex-direction:column; gap:6px; }
+    :root { --cell: 22px; }
+    .controls-row { gap:6px; }
+    .diff-btn { font-size:8px; padding:6px 8px; }
+    .betbox input { width:50px; font-size:9px; }
+    button { font-size:9px; padding:8px 12px; }
+    #strubles-badge { top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); padding: 6px 8px; }
+    #strubles-badge img { width: 22px; height: 22px; }
+  }
+</style>
+</head>
+<body>
+  <div id="strubles-badge">
+    <img src="/strubles.png" alt="Struble">
+    <span id="bal">0</span>
+  </div>
+
+  <main class="table">
+    <header>
+      <a href="/" title="Back to Iantopia">← Home</a>
+      <h1>MINESWEEPER AT IANTOPIA</h1>
+      <div style="display:flex; gap:4px;">
+        <button id="now-playing" title="Music options">🎵</button>
+        <button id="bg-btn" title="Change background">🖼️</button>
+        <button id="cursor-btn" title="Change cursor">🖱️</button>
+      </div>
+    </header>
+
+    <div class="controls-row">
+      <div class="diff-group" id="diff-group">
+        <button class="diff-btn active" data-diff="beginner">Beginner</button>
+        <button class="diff-btn" data-diff="intermediate">Intermediate</button>
+        <button class="diff-btn" data-diff="expert">Expert</button>
+      </div>
+    </div>
+
+    <div class="controls-row">
+      <div class="betbox">
+        <span style="font-size:9px; color:var(--gold);">Bet</span>
+        <button id="bet-minus">−</button>
+        <input id="bet" type="number" min="1" step="1" value="10" />
+        <button id="bet-plus">+</button>
+      </div>
+      <button id="btn-new" class="primary">New Game</button>
+      <button id="btn-flag-mode" class="accent">🚩 Flag Mode</button>
+    </div>
+
+    <div class="status-row">
+      <span>💣 <span id="mine-count">10</span></span>
+      <span>⏱️ <span id="timer">0</span>s</span>
+      <span>Payout: <span id="payout-mult">1.5x</span></span>
+    </div>
+
+    <div class="board-wrap">
+      <div class="board" id="board"></div>
+    </div>
+
+    <div class="status" id="status">Set a bet and press New Game. Right-click (or Flag Mode) to flag a cell.</div>
+
+    <div id="earn-panel">
+      <a href="/lootbox">🎁 루트박스 🫧 𓇼𓏲*ੈ✩‧₊˚🎐</a>
+      <a href="/blackjack">🃏 Blackjack</a>
+    </div>
+  </main>
+
+  <!-- Music Playlist Modal -->
+  <div class="overlay" id="playlist-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Now Playing</h2>
+        <button class="btn" id="playlist-close" type="button">Close</button>
+      </div>
+      <div class="volume-row">
+        <button class="volume-mute-btn" id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
+        <input type="range" id="volume-slider" min="0" max="100" value="30" aria-label="Music volume" />
+      </div>
+      <div id="playlist-list"></div>
+    </div>
+  </div>
+
+  <!-- Background Picker Modal -->
+  <div class="overlay" id="bg-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Backgrounds</h2>
+        <button class="btn" id="bg-close" type="button">Close</button>
+      </div>
+      <div id="bg-list"></div>
+    </div>
+  </div>
+
+  <!-- Cursor Picker Modal -->
+  <div class="overlay" id="cursor-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Cursors</h2>
+        <button class="btn" id="cursor-close" type="button">Close</button>
+      </div>
+      <div id="cursor-list"></div>
+    </div>
+  </div>
+
+  <video id="bg-video" style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1; display:none;" loop></video>
+
+  <audio id="theme-music" src="/audio/music/Balatro-Main-Theme.mp3" preload="none" loop></audio>
+
+<script is:inline src="/music-library.js?v=4"></script>
+<script is:inline src="/music-position.js?v=1"></script>
+<script is:inline src="/background-library.js?v=2"></script>
+<script is:inline src="/cursor-library.js?v=1"></script>
+<script is:inline src="/case-data.js?v=3"></script>
+<script is:inline src="/cursor.js?v=2"></script>
+<script is:inline src="/strubles.js?v=2"></script>
+<script is:inline src="/pickers.js?v=1"></script>
+
+<script is:inline>
+(() => {
+  const $ = id => document.getElementById(id);
+  const balNumEl = $('bal');
+  const boardEl = $('board');
+  const statusEl = $('status');
+  const mineCountEl = $('mine-count');
+  const timerEl = $('timer');
+  const payoutMultEl = $('payout-mult');
+  const betInput = $('bet');
+  const newGameBtn = $('btn-new');
+  const flagModeBtn = $('btn-flag-mode');
+
+  // Classic standard Minesweeper board sizes, plus a payout multiplier
+  // scaled to risk (win chance drops sharply as mine density climbs).
+  const DIFFICULTIES = {
+    beginner:     { rows: 9,  cols: 9,  mines: 10, mult: 1.5 },
+    intermediate: { rows: 16, cols: 16, mines: 40, mult: 3 },
+    expert:       { rows: 16, cols: 30, mines: 99, mult: 6 },
+  };
+  let diffKey = 'beginner';
+
+  let board = [];       // board[r][c] = { mine, revealed, flagged, adjacent }
+  let rows = 0, cols = 0, mineTotal = 0;
+  let firstClickDone = false;
+  let gameActive = false;
+  let flagMode = false;
+  let currentBet = 0;
+  let flagCount = 0;
+  let revealedSafeCount = 0;
+  let timerInterval = null;
+  let elapsed = 0;
+
+  function syncBalance() { try { balNumEl.textContent = Strubles.get(); } catch {} }
+  syncBalance();
+  window.addEventListener('strubles:change', syncBalance);
+  window.addEventListener('storage', syncBalance);
+
+  function setStatus(msg, cls) {
+    statusEl.textContent = msg;
+    statusEl.className = 'status' + (cls ? ' ' + cls : '');
+  }
+
+  function startTimer() {
+    stopTimer();
+    elapsed = 0;
+    timerEl.textContent = '0';
+    timerInterval = setInterval(() => {
+      elapsed++;
+      timerEl.textContent = String(elapsed);
+    }, 1000);
+  }
+  function stopTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
+  function inBounds(r, c) { return r >= 0 && r < rows && c >= 0 && c < cols; }
+  function neighbors(r, c) {
+    const out = [];
+    for (let dr = -1; dr <= 1; dr++) {
+      for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        if (inBounds(r + dr, c + dc)) out.push([r + dr, c + dc]);
+      }
+    }
+    return out;
+  }
+
+  function buildEmptyBoard() {
+    board = [];
+    for (let r = 0; r < rows; r++) {
+      const row = [];
+      for (let c = 0; c < cols; c++) {
+        row.push({ mine: false, revealed: false, flagged: false, adjacent: 0 });
+      }
+      board.push(row);
+    }
+  }
+
+  // Mines are placed only after the first click, excluding that cell and
+  // its neighbors, so the opening move is never an instant loss and
+  // usually opens up a real cascade instead of a single bare number.
+  function placeMines(safeR, safeC) {
+    const forbidden = new Set([`${safeR},${safeC}`]);
+    neighbors(safeR, safeC).forEach(([r, c]) => forbidden.add(`${r},${c}`));
+
+    let placed = 0;
+    while (placed < mineTotal) {
+      const r = Math.floor(Math.random() * rows);
+      const c = Math.floor(Math.random() * cols);
+      const key = `${r},${c}`;
+      if (forbidden.has(key) || board[r][c].mine) continue;
+      board[r][c].mine = true;
+      placed++;
+    }
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (board[r][c].mine) continue;
+        board[r][c].adjacent = neighbors(r, c).filter(([nr, nc]) => board[nr][nc].mine).length;
+      }
+    }
+  }
+
+  function renderBoard() {
+    boardEl.style.gridTemplateColumns = `repeat(${cols}, var(--cell))`;
+    boardEl.innerHTML = '';
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const btn = document.createElement('button');
+        btn.className = 'cell';
+        btn.dataset.r = r;
+        btn.dataset.c = c;
+        boardEl.appendChild(btn);
+      }
+    }
+  }
+
+  function cellEl(r, c) {
+    return boardEl.children[r * cols + c];
+  }
+
+  function updateCellVisual(r, c) {
+    const cell = board[r][c];
+    const el = cellEl(r, c);
+    el.classList.toggle('flagged', cell.flagged);
+    if (!cell.revealed) {
+      el.textContent = cell.flagged ? '🚩' : '';
+      el.classList.remove('revealed');
+      delete el.dataset.n;
+      return;
+    }
+    el.classList.add('revealed');
+    el.classList.remove('flagged');
+    if (cell.mine) {
+      el.classList.add('mine');
+      el.textContent = '💣';
+    } else if (cell.adjacent > 0) {
+      el.textContent = String(cell.adjacent);
+      el.dataset.n = String(cell.adjacent);
+    } else {
+      el.textContent = '';
+    }
+  }
+
+  // BFS flood-fill: revealing a 0-adjacent cell reveals its whole
+  // connected region, matching standard Minesweeper behavior.
+  function revealCell(startR, startC) {
+    const queue = [[startR, startC]];
+    const seen = new Set();
+    while (queue.length) {
+      const [r, c] = queue.shift();
+      const key = `${r},${c}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const cell = board[r][c];
+      if (cell.revealed || cell.flagged) continue;
+      cell.revealed = true;
+      if (!cell.mine) revealedSafeCount++;
+      updateCellVisual(r, c);
+      if (!cell.mine && cell.adjacent === 0) {
+        neighbors(r, c).forEach(([nr, nc]) => {
+          if (!board[nr][nc].revealed && !board[nr][nc].flagged) queue.push([nr, nc]);
+        });
+      }
+    }
+  }
+
+  function revealAllMines(explodedR, explodedC) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (board[r][c].mine) {
+          board[r][c].revealed = true;
+          updateCellVisual(r, c);
+          if (r === explodedR && c === explodedC) cellEl(r, c).classList.add('exploded');
+        }
+      }
+    }
+  }
+
+  function endGame(won, explodedR, explodedC) {
+    gameActive = false;
+    stopTimer();
+    if (!won) revealAllMines(explodedR, explodedC);
+    if (won) {
+      const payout = Math.round(currentBet * DIFFICULTIES[diffKey].mult);
+      Strubles.add(payout);
+      setStatus(`✓ Cleared the board! +${payout} Strubles`, 'win');
+    } else {
+      setStatus(`💥 Boom. Lost ${currentBet} Strubles.`, 'lose');
+    }
+  }
+
+  function onCellClick(r, c) {
+    if (!gameActive) return;
+    const cell = board[r][c];
+    if (cell.revealed) return;
+
+    if (flagMode) {
+      cell.flagged = !cell.flagged;
+      flagCount += cell.flagged ? 1 : -1;
+      mineCountEl.textContent = String(mineTotal - flagCount);
+      updateCellVisual(r, c);
+      return;
+    }
+    if (cell.flagged) return;
+
+    if (!firstClickDone) {
+      firstClickDone = true;
+      placeMines(r, c);
+      startTimer();
+    }
+
+    if (cell.mine) {
+      cell.revealed = true;
+      updateCellVisual(r, c);
+      endGame(false, r, c);
+      return;
+    }
+
+    revealCell(r, c);
+    if (revealedSafeCount === rows * cols - mineTotal) {
+      endGame(true);
+    }
+  }
+
+  function onCellFlag(e, r, c) {
+    e.preventDefault();
+    if (!gameActive) return;
+    const cell = board[r][c];
+    if (cell.revealed) return;
+    cell.flagged = !cell.flagged;
+    flagCount += cell.flagged ? 1 : -1;
+    mineCountEl.textContent = String(mineTotal - flagCount);
+    updateCellVisual(r, c);
+  }
+
+  boardEl.addEventListener('click', (e) => {
+    const el = e.target.closest('.cell');
+    if (!el) return;
+    onCellClick(Number(el.dataset.r), Number(el.dataset.c));
+  });
+  boardEl.addEventListener('contextmenu', (e) => {
+    const el = e.target.closest('.cell');
+    if (!el) return;
+    onCellFlag(e, Number(el.dataset.r), Number(el.dataset.c));
+  });
+
+  flagModeBtn.addEventListener('click', () => {
+    flagMode = !flagMode;
+    flagModeBtn.classList.toggle('active', flagMode);
+  });
+
+  document.getElementById('diff-group').addEventListener('click', (e) => {
+    const btn = e.target.closest('.diff-btn');
+    if (!btn || gameActive) return;
+    diffKey = btn.dataset.diff;
+    document.querySelectorAll('.diff-btn').forEach((b) => b.classList.toggle('active', b === btn));
+    payoutMultEl.textContent = DIFFICULTIES[diffKey].mult + 'x';
+    mineCountEl.textContent = String(DIFFICULTIES[diffKey].mines);
+  });
+
+  function newGame() {
+    const bet = Math.max(1, Math.floor(Number(betInput.value) || 0));
+    if (!Strubles.spend(bet)) {
+      setStatus('Not enough Strubles for that bet.', 'lose');
+      return;
+    }
+    currentBet = bet;
+    const diff = DIFFICULTIES[diffKey];
+    rows = diff.rows; cols = diff.cols; mineTotal = diff.mines;
+    firstClickDone = false;
+    gameActive = true;
+    flagCount = 0;
+    revealedSafeCount = 0;
+    mineCountEl.textContent = String(mineTotal);
+    timerEl.textContent = '0';
+    payoutMultEl.textContent = diff.mult + 'x';
+    stopTimer();
+    buildEmptyBoard();
+    renderBoard();
+    setStatus(`Bet ${bet} Strubles. Click any cell to begin.`);
+  }
+
+  newGameBtn.addEventListener('click', newGame);
+  document.getElementById('bet-minus').addEventListener('click', () => {
+    betInput.value = Math.max(1, (Number(betInput.value) || 1) - 5);
+  });
+  document.getElementById('bet-plus').addEventListener('click', () => {
+    betInput.value = Math.max(1, (Number(betInput.value) || 1) + 5);
+  });
+
+  // Render an empty beginner board immediately so the page isn't blank
+  // before the first "New Game" click.
+  rows = DIFFICULTIES.beginner.rows; cols = DIFFICULTIES.beginner.cols; mineTotal = DIFFICULTIES.beginner.mines;
+  buildEmptyBoard();
+  renderBoard();
+
+  if (window.initPickers) setTimeout(window.initPickers, 100);
+})();
+</script>
+</body>
+</html>
