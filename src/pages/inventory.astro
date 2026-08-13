@@ -30,20 +30,35 @@
   * { box-sizing:border-box; }
   body {
     margin:0;
-    background-image: url('/video/inventory-shelf.jpg');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
+    background: var(--bg);
     color:var(--ink);
     font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
     min-height:100vh;
+    height:100vh;
     cursor:none;
     position:relative;
+    /* No scrolling on this page at all, on purpose — everything (shelf,
+       leaves, items) is position:fixed already, so there's nothing to
+       scroll to. This also sidesteps a real mobile bug: iOS Safari's
+       elastic overscroll bounce visibly desyncs a `background-attachment:
+       fixed` background from position:fixed content even when the page
+       has no real overflow, which read as "items don't stay where I put
+       them" — the items were fine, the background was sliding under them. */
+    overflow:hidden;
+    overscroll-behavior:none;
   }
-  body::before {
-    content:''; position:fixed; inset:0;
+  /* Shelf background lives on its own fixed layer instead of body's
+     background-attachment:fixed (see the overflow:hidden comment above for
+     why) — pickers.js targets this via window.PAGE_BG_TARGET. */
+  #shelf-bg {
+    position:fixed; inset:0; z-index:-1;
+    background-image: url('/video/inventory-shelf.jpg');
+    background-size: cover;
+    background-position: center;
+  }
+  #shelf-bg::before {
+    content:''; position:absolute; inset:0;
     background: rgba(0,0,0,0.35);
-    pointer-events:none; z-index:0;
   }
   /* Falling leaves sit above the shelf but below every interactive layer —
      purely decorative, never allowed to intercept drags/clicks. */
@@ -53,7 +68,7 @@
     background-repeat:repeat; background-size:340px 340px;
     opacity:.65; mix-blend-mode:screen;
   }
-  main { position:relative; z-index:2; max-width:900px; margin:0 auto; padding:24px; }
+  main { position:relative; z-index:2; max-width:900px; margin:0 auto; padding:24px; height:100vh; overflow-y:auto; }
 
   header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:4px solid #000; padding-bottom:10px; }
   header a { color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; font-weight:700; background:#000; transition:background 0.2s; font-size:10px; cursor:none; }
@@ -193,7 +208,6 @@
   @media (prefers-reduced-motion: reduce) { .desktop-item { transition:none; } .chest-lid { transition:none; } }
 
   @media (max-width:768px) {
-    body { overflow-y:auto; }
     main { padding:16px; padding-top:80px; }
     #strubles-badge { top:calc(10px + env(safe-area-inset-top)); left:calc(10px + env(safe-area-inset-left)); font-size:11px; padding:6px 8px; }
     #strubles-badge img { width:22px; height:22px; }
@@ -204,6 +218,7 @@
 </style>
 </head>
 <body>
+  <div id="shelf-bg"></div>
   <div id="leaf-overlay"></div>
 
   <div id="strubles-badge">
@@ -314,12 +329,15 @@
   // Taipei/casino/etc. library, even if genuinely unlocked elsewhere.
   window.PAGE_BG_ALLOWLIST = ['inventory_shelf', 'inventory_shelf_leafy'];
   window.PAGE_FREE_BG_KEY = 'inventory_shelf';
+  // Keeps the background on its own fixed layer instead of body's
+  // background-attachment:fixed — see the #shelf-bg CSS comment.
+  window.PAGE_BG_TARGET = document.getElementById('shelf-bg');
   // Hotel Lounge plays for free on this page specifically (its hardcoded
   // resting default below) without needing to be unlocked from a case — but
   // it's still a real, separately case-unlockable track for every OTHER page.
   window.PAGE_FREE_TRACK_KEY = 'hotel';
 </script>
-<script is:inline src="/pickers.js?v=5"></script>
+<script is:inline src="/pickers.js?v=6"></script>
 
 <script is:inline>
 (() => {
@@ -390,39 +408,8 @@
 
   // --- Movable desktop items (sock, panda, display shelf, ...) ---
   const chestEl = $('storage-chest');
-
-  // Shelf-line positions measured directly off each background image (as a
-  // % of its height — background-size:cover keeps that lined up with the
-  // viewport for any reasonably screen-shaped aspect ratio). The two
-  // backgrounds share the same 7-shelf layout (3 left, 3 right, 1 lower
-  // center) but the leafy variant's hanging vines push its shelves down,
-  // so each gets its own measured set rather than sharing one.
-  // yPct positions the item's top-left corner, so a zone measured exactly
-  // at the shelf line leaves the item hanging a bit below/through the
-  // plank — shifted up ~3 points so the item's body actually rests on top
-  // of it instead.
-  const SHELF_ZONES = {
-    inventory_shelf: [
-      { xPct: 12, yPct: 17 }, { xPct: 12, yPct: 43 }, { xPct: 12, yPct: 66 },
-      { xPct: 82, yPct: 17 }, { xPct: 82, yPct: 43 }, { xPct: 82, yPct: 66 },
-      { xPct: 46, yPct: 78 },
-    ],
-    inventory_shelf_leafy: [
-      { xPct: 12, yPct: 28 }, { xPct: 12, yPct: 47 }, { xPct: 12, yPct: 66 },
-      { xPct: 82, yPct: 28 }, { xPct: 82, yPct: 47 }, { xPct: 82, yPct: 66 },
-      { xPct: 46, yPct: 75 },
-    ],
-  };
-  function activeShelfKey() {
-    const saved = localStorage.getItem('active_bg_v1__' + location.pathname);
-    return (saved && SHELF_ZONES[saved]) ? saved : 'inventory_shelf';
-  }
-  function getSnapZones() {
-    return SHELF_ZONES[activeShelfKey()];
-  }
-
   const desktopItems = window.DesktopItems
-    ? window.DesktopItems.init($('desktop-items'), chestEl, { getSnapZones })
+    ? window.DesktopItems.init($('desktop-items'), chestEl)
     : null;
   function loadPlacedDesktopItems() {
     return window.DesktopItems ? window.DesktopItems.getPlaced() : {};
@@ -527,13 +514,6 @@
 
   window.addEventListener('inventory:changed', () => {
     if (inventoryOverlay.classList.contains('open')) renderInventoryList();
-  });
-
-  // Switching shelf backgrounds moves the shelf lines items snap to —
-  // re-render immediately so placed items jump to the new shelf instead of
-  // looking stuck to where the old background's lines used to be.
-  window.addEventListener('active-background:changed', () => {
-    if (desktopItems) desktopItems.refresh();
   });
 
   // --- Zoom: scales every placed item via --item-scale, persisted so your

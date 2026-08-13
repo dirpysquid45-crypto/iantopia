@@ -89,23 +89,8 @@
     return { xPct: x, yPct: y };
   }
 
-  // opts.getSnapZones — optional () => [{xPct, yPct}, ...]. When provided
-  // (the inventory room only), a drag release snaps to the nearest zone
-  // instead of landing at the raw drop position, so items rest on the
-  // background's actual shelf lines rather than floating anywhere.
-  function init(desktopEl, chestEl, opts) {
+  function init(desktopEl, chestEl) {
     if (!desktopEl || !chestEl) return;
-    const getSnapZones = (opts && opts.getSnapZones) || null;
-    function snapIfNeeded(xPct, yPct) {
-      const zones = getSnapZones && getSnapZones();
-      if (!zones || !zones.length) return { xPct, yPct };
-      let best = zones[0], bestDist = Infinity;
-      zones.forEach((z) => {
-        const d = Math.hypot(z.xPct - xPct, z.yPct - yPct);
-        if (d < bestDist) { bestDist = d; best = z; }
-      });
-      return { xPct: best.xPct, yPct: best.yPct };
-    }
 
     // Multi-select: shift-click toggles an item in/out of `selected`; dragging
     // any selected item (when 2+ are selected) moves the whole group together.
@@ -165,26 +150,13 @@
       const owned = draggableOwnedIds();
       const placed = syncPlaced(owned);
       elementsById = {};
-      // Several items can snap to the same zone — this fans out repeat
-      // occupants a little instead of stacking them exactly on top of
-      // each other, without changing what's actually stored.
-      const zoneOccupancy = {};
 
       desktopEl.innerHTML = '';
       owned.forEach((id, i) => {
         if (!(id in placed)) return; // owned but stashed in the chest
         const def = findItem(id);
         if (!def) return;
-        let spot = placed[id] || randomSpot(i);
-        if (getSnapZones) {
-          spot = snapIfNeeded(spot.xPct, spot.yPct);
-          const zoneKey = spot.xPct + ',' + spot.yPct;
-          const n = zoneOccupancy[zoneKey] || 0;
-          zoneOccupancy[zoneKey] = n + 1;
-          if (n > 0) {
-            spot = { xPct: spot.xPct + n * 4, yPct: spot.yPct - n * 1.5 };
-          }
-        }
+        const spot = placed[id] || randomSpot(i);
 
         // The wrap is the thing that's actually positioned (fixed, shrink-to-fit
         // around the image) so the remove button can sit at a fixed corner
@@ -329,12 +301,6 @@
             placed[gid] = { xPct, yPct };
           });
           savePlaced(placed);
-          // Storage keeps the raw drop point (portable to pages with no
-          // snapping, like home) — render() is what actually snaps it to a
-          // shelf visually here, so redraw to show the snapped result
-          // immediately rather than the raw point until some other change
-          // happens to trigger a render.
-          if (getSnapZones) render();
         }
       };
 

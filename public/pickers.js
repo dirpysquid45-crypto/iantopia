@@ -81,8 +81,14 @@ window.initPickers = function() {
     // so picking "Default" here restores THIS page's default, not home's.
     function applyBg(key) {
       const bg = (key === 'default' && window.PAGE_DEFAULT_BG) || BG_LIB[key] || BG_LIB.default || {};
+      // A page can redirect where the image itself actually lands via
+      // window.PAGE_BG_TARGET (an element) — the inventory room uses this
+      // to keep its background on a dedicated position:fixed layer instead
+      // of body's background-attachment:fixed, which iOS Safari desyncs
+      // from fixed content during elastic overscroll bounce.
+      const target = window.PAGE_BG_TARGET || document.body;
       if (bg.type === 'video') {
-        document.body.style.backgroundImage = 'none';
+        target.style.backgroundImage = 'none';
         const vid = document.getElementById('bg-video');
         if (vid) {
           vid.src = bg.src;
@@ -95,8 +101,8 @@ window.initPickers = function() {
           vid.classList.remove('show');
           vid.pause();
         }
-        document.body.style.backgroundImage = `url('${bg.src}')`;
-        document.body.style.backgroundPosition = bg.position || 'center';
+        target.style.backgroundImage = `url('${bg.src}')`;
+        target.style.backgroundPosition = bg.position || 'center';
       }
     }
     bgBtn.addEventListener('click', () => {
