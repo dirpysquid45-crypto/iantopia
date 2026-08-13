@@ -67,6 +67,10 @@ window.initPickers = function() {
           localStorage.setItem(ACTIVE_BG_KEY, key);
           applyBg(key);
           renderBgPicker();
+          // Lets anything that depends on which background is active react
+          // immediately — e.g. the inventory room re-snapping items to the
+          // newly-selected shelf's line positions instead of the old one's.
+          window.dispatchEvent(new CustomEvent('active-background:changed', { detail: { key } }));
         });
         bgList.appendChild(row);
       });

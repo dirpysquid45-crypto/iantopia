@@ -70,6 +70,12 @@
     text-align:center; color:var(--muted); font-size:10px; line-height:1.8;
     margin-top:18px; padding:12px; background:rgba(0,0,0,.4); border:2px solid rgba(255,215,0,.3);
   }
+  #zoom-row {
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    margin-top:12px; color:var(--gold); font-size:9px; text-transform:uppercase; letter-spacing:1px;
+  }
+  #zoom-row .btn { padding:6px 10px; font-size:11px; }
+  #zoom-reset { min-width:52px; }
 
   /* pickers.js only toggles this class on the <video id="bg-video"> element
      (which starts display:none inline) — without this rule the class gets
@@ -154,10 +160,14 @@
   }
   .desktop-item-wrap.selected { border-color:rgba(255,215,0,.6); box-shadow:0 0 12px rgba(255,215,0,.4); }
   .desktop-item {
-    position:static; display:block; width:56px; height:56px; object-fit:contain;
+    position:static; display:block; object-fit:contain;
+    /* Scaled by the zoom control below (--item-scale, default 1) so
+       everything on the shelf can shrink to fit more on a small screen or
+       grow for a closer look, without moving anything's shelf position. */
+    width:calc(56px * var(--item-scale, 1)); height:calc(56px * var(--item-scale, 1));
     pointer-events:auto; cursor:none; touch-action:none;
     filter:drop-shadow(0 4px 10px rgba(0,0,0,.5));
-    transition:filter .15s ease, transform .15s ease;
+    transition:filter .15s ease, transform .15s ease, width .15s ease, height .15s ease;
     user-select:none; -webkit-user-drag:none;
   }
   .desktop-item.pixel-art { image-rendering:pixelated; }
@@ -188,7 +198,7 @@
     #strubles-badge { top:calc(10px + env(safe-area-inset-top)); left:calc(10px + env(safe-area-inset-left)); font-size:11px; padding:6px 8px; }
     #strubles-badge img { width:22px; height:22px; }
     #storage-chest { padding:8px 10px; font-size:8px; }
-    .desktop-item { width:44px; height:44px; }
+    .desktop-item { width:calc(44px * var(--item-scale, 1)); height:calc(44px * var(--item-scale, 1)); }
     header { flex-direction:column; gap:8px; align-items:stretch; }
   }
 </style>
@@ -222,6 +232,12 @@
 
     <div class="hint">
       Drag anything you've unlocked to arrange it on the shelf. Drop it on Storage to put it away.<br>
+      <div id="zoom-row">
+        <span>Item size</span>
+        <button class="btn" id="zoom-out" type="button" title="Smaller">−</button>
+        <button class="btn" id="zoom-reset" type="button" title="Reset">100%</button>
+        <button class="btn" id="zoom-in" type="button" title="Bigger">+</button>
+      </div>
       <button class="btn" id="full-list-btn" type="button" style="margin-top:10px;">📋 Full List</button>
     </div>
   </main>
@@ -289,7 +305,7 @@
 <script is:inline src="/background-library.js?v=3"></script>
 <script is:inline src="/cursor-library.js?v=2"></script>
 <script is:inline src="/case-data.js?v=7"></script>
-<script is:inline src="/desktop-items.js?v=4"></script>
+<script is:inline src="/desktop-items.js?v=5"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/strubles.js?v=2"></script>
 <script is:inline>
@@ -303,7 +319,7 @@
   // it's still a real, separately case-unlockable track for every OTHER page.
   window.PAGE_FREE_TRACK_KEY = 'hotel';
 </script>
-<script is:inline src="/pickers.js?v=4"></script>
+<script is:inline src="/pickers.js?v=5"></script>
 
 <script is:inline>
 (() => {
@@ -374,8 +390,39 @@
 
   // --- Movable desktop items (sock, panda, display shelf, ...) ---
   const chestEl = $('storage-chest');
+
+  // Shelf-line positions measured directly off each background image (as a
+  // % of its height — background-size:cover keeps that lined up with the
+  // viewport for any reasonably screen-shaped aspect ratio). The two
+  // backgrounds share the same 7-shelf layout (3 left, 3 right, 1 lower
+  // center) but the leafy variant's hanging vines push its shelves down,
+  // so each gets its own measured set rather than sharing one.
+  // yPct positions the item's top-left corner, so a zone measured exactly
+  // at the shelf line leaves the item hanging a bit below/through the
+  // plank — shifted up ~3 points so the item's body actually rests on top
+  // of it instead.
+  const SHELF_ZONES = {
+    inventory_shelf: [
+      { xPct: 12, yPct: 17 }, { xPct: 12, yPct: 43 }, { xPct: 12, yPct: 66 },
+      { xPct: 82, yPct: 17 }, { xPct: 82, yPct: 43 }, { xPct: 82, yPct: 66 },
+      { xPct: 46, yPct: 78 },
+    ],
+    inventory_shelf_leafy: [
+      { xPct: 12, yPct: 28 }, { xPct: 12, yPct: 47 }, { xPct: 12, yPct: 66 },
+      { xPct: 82, yPct: 28 }, { xPct: 82, yPct: 47 }, { xPct: 82, yPct: 66 },
+      { xPct: 46, yPct: 75 },
+    ],
+  };
+  function activeShelfKey() {
+    const saved = localStorage.getItem('active_bg_v1__' + location.pathname);
+    return (saved && SHELF_ZONES[saved]) ? saved : 'inventory_shelf';
+  }
+  function getSnapZones() {
+    return SHELF_ZONES[activeShelfKey()];
+  }
+
   const desktopItems = window.DesktopItems
-    ? window.DesktopItems.init($('desktop-items'), chestEl)
+    ? window.DesktopItems.init($('desktop-items'), chestEl, { getSnapZones })
     : null;
   function loadPlacedDesktopItems() {
     return window.DesktopItems ? window.DesktopItems.getPlaced() : {};
@@ -481,6 +528,31 @@
   window.addEventListener('inventory:changed', () => {
     if (inventoryOverlay.classList.contains('open')) renderInventoryList();
   });
+
+  // Switching shelf backgrounds moves the shelf lines items snap to —
+  // re-render immediately so placed items jump to the new shelf instead of
+  // looking stuck to where the old background's lines used to be.
+  window.addEventListener('active-background:changed', () => {
+    if (desktopItems) desktopItems.refresh();
+  });
+
+  // --- Zoom: scales every placed item via --item-scale, persisted so your
+  // preferred density (handy for fitting more on a small phone screen)
+  // survives a reload. Doesn't touch shelf positions, only item size.
+  const ZOOM_KEY = 'inventory_item_zoom_v1';
+  const ZOOM_MIN = 0.5, ZOOM_MAX = 1.6, ZOOM_STEP = 0.1;
+  const zoomResetBtn = $('zoom-reset');
+  function applyZoom(scale) {
+    const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
+    document.documentElement.style.setProperty('--item-scale', clamped);
+    zoomResetBtn.textContent = Math.round(clamped * 100) + '%';
+    localStorage.setItem(ZOOM_KEY, clamped);
+    return clamped;
+  }
+  let currentZoom = applyZoom(parseFloat(localStorage.getItem(ZOOM_KEY)) || 1);
+  $('zoom-out').addEventListener('click', () => { currentZoom = applyZoom(currentZoom - ZOOM_STEP); });
+  $('zoom-in').addEventListener('click', () => { currentZoom = applyZoom(currentZoom + ZOOM_STEP); });
+  zoomResetBtn.addEventListener('click', () => { currentZoom = applyZoom(1); });
 
   if (window.initPickers) setTimeout(window.initPickers, 100);
 })();
