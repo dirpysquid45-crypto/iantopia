@@ -43,6 +43,7 @@ window.CASE_ITEMS = {
   smiski_blind_box: { label: 'Smiski Blind Box',          tier: 'mil_spec',   img: '/assets/decorations/smiski-blind-box.png', type: 'item', draggable: true, size: 91 },
   mus_circus:  { label: 'Circus',                         tier: 'mil_spec',   emoji: '🎪',                                  type: 'music_unlock', key: 'circus' },
   mus_balatro: { label: 'Balatro Main Theme',             tier: 'mil_spec',   emoji: '🃏',                                  type: 'music_unlock', key: 'balatro' },
+  mus_desert:  { label: 'Desert (Mario, Bitcrushed)',     tier: 'mil_spec',   emoji: '🏜️',                                  type: 'music_unlock', key: 'mario_desert' },
   bg_circus:   { label: 'Background: Circus',             tier: 'mil_spec',   img: '/video/circus.gif',                    type: 'background_unlock', key: 'circus' },
   cur_joker:   { label: 'Cursor: The Joker',              tier: 'mil_spec',   img: '/assets/casino/cards/card_joker_red.png', type: 'cursor_unlock', key: 'joker' },
 

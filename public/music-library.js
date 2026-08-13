@@ -21,6 +21,7 @@ window.MUSIC_LIBRARY = {
   atari:               { label: 'Ecco2k – Play Em Like Atari',      src: '/audio/music/play-em-like-atari.mp3' },
   deathmetal:          { label: 'Panchiko – DEATHMETAL',            src: '/audio/music/deathmetal.mp3' },
   forever_young:       { label: 'Alphaville – Forever Young',       src: '/audio/music/forever-young.mp3' },
+  mario_desert:        { label: 'Desert (Mario, Bitcrushed)',       src: '/audio/music/minesweeper-desert.mp3' },
 
   // Combo tracks: paired with a matching background in index.astro's
   // applyBackground() rather than won separately — selecting the background

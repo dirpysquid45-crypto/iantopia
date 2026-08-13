@@ -108,9 +108,19 @@ window.initPickers = function() {
   const playlistClose = document.getElementById('playlist-close');
   if (nowPlayingBtn && playlistOverlay && playlistList && playlistClose) {
     const themeMusic = document.getElementById('theme-music');
+    // A page's own resting-default track (e.g. blackjack's Balatro,
+    // minesweeper's Desert) plays for free with no unlock needed on THAT
+    // page, but was previously implemented as `key === 'balatro'` being
+    // owned everywhere unconditionally — meaning Balatro showed up as
+    // already-unlocked on every page regardless of whether it had actually
+    // been earned from a case. window.PAGE_FREE_TRACK_KEY scopes that
+    // "free without unlocking" grant to just the one page that declares it;
+    // everywhere else the track still has to be earned normally, and once
+    // it genuinely is (added to the shared inventory), it plays everywhere.
+    const freeKey = window.PAGE_FREE_TRACK_KEY;
     function getActiveTrackKey() {
       const key = localStorage.getItem(ACTIVE_TRACK_KEY);
-      return (key && MUSIC_LIB[key]) ? key : 'balatro';
+      return (key && MUSIC_LIB[key]) ? key : (freeKey || 'default');
     }
     function playTrack(key) {
       if (!MUSIC_LIB[key]) return;
@@ -123,7 +133,7 @@ window.initPickers = function() {
     function renderPlaylist() {
       playlistList.innerHTML = '';
       Object.entries(MUSIC_LIB).forEach(([key, track]) => {
-        const owned = loadInventory().tracks?.includes(key) || key === 'balatro';
+        const owned = loadInventory().tracks?.includes(key) || key === 'default' || key === freeKey;
         // Hidden entirely when locked, not shown-and-greyed.
         if (!owned) return;
         const row = document.createElement('div');
