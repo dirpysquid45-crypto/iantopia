@@ -156,6 +156,8 @@
 
     a.big,
     button.big {
+      position: relative;
+      overflow: hidden;
       text-decoration: none;
       padding: 18px 26px;
       border-radius: 0;
@@ -174,6 +176,30 @@
     a.big:hover,
     button.big:hover {
       transform: translateY(-1px);
+    }
+
+    /* Diagonal shine sweep on hover — a light band slides across the
+       button. content-only, ::before, so it never displaces the label or
+       interferes with the neon glow variants below. */
+    a.big::before,
+    button.big::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -75%;
+      width: 45%;
+      height: 100%;
+      background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+      transform: skewX(-20deg);
+      transition: left 0.55s ease;
+      pointer-events: none;
+    }
+    a.big:hover::before,
+    button.big:hover::before {
+      left: 125%;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      a.big::before, button.big::before { display: none; }
     }
 
     /* Buttons wrap into a centered, evenly-gapped grid instead of one long

@@ -370,6 +370,16 @@
 
   <audio id="theme-music" src="/audio/music/Balatro-Main-Theme.mp3" preload="auto" loop></audio>
 
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<!-- Headless here (no account UI on this page) — cloud-sync.js has no DOM
+     dependencies, it just needs to run so progress made here pushes to the
+     cloud instead of getting silently reverted the next time home pulls.
+     Previously only index.astro loaded this at all, so anything spent/won
+     on blackjack/lootbox/minesweeper never synced, and returning to home
+     would pull the stale pre-visit cloud snapshot right over it. -->
+<script is:inline src="/cloud-sync.js?v=4"></script>
 <script is:inline src="/music-library.js?v=6"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/background-library.js?v=3"></script>
