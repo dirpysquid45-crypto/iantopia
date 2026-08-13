@@ -289,6 +289,7 @@
 <body>
   <div class="badge"><img src="/strubles.png" alt="Strubles"><span id="bal">0</span></div>
   <div style="position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(20px + env(safe-area-inset-right)); z-index:30; display:flex; gap:6px;">
+    <a class="btn" href="/inventory" title="Inventory">🎒</a>
     <button class="btn" id="np-btn" type="button" title="Music options">🎵</button>
     <button class="btn" id="bg-btn" type="button" title="Change background">🖼️</button>
     <button class="btn" id="cursor-btn" type="button" title="Change cursor">🖱️</button>
@@ -389,12 +390,12 @@
   <audio id="theme-music" src="/audio/music/lootbox-theme.mp3" preload="none" loop></audio>
 
   <script is:inline src="/strubles.js?v=2"></script>
-  <script is:inline src="/music-library.js?v=5"></script>
-  <script is:inline src="/background-library.js?v=2"></script>
-  <script is:inline src="/case-data.js?v=4"></script>
+  <script is:inline src="/music-library.js?v=6"></script>
+  <script is:inline src="/background-library.js?v=3"></script>
+  <script is:inline src="/case-data.js?v=7"></script>
   <script is:inline src="/lootbox.js?v=5"></script>
-  <script is:inline src="/cursor-library.js?v=1"></script>
-  <script is:inline src="/cursor.js?v=2"></script>
+  <script is:inline src="/cursor-library.js?v=2"></script>
+  <script is:inline src="/cursor.js?v=3"></script>
   <script is:inline src="/music-position.js?v=1"></script>
   <script is:inline>
     // Register pickers for bg/cursor only (lootbox handles music itself)

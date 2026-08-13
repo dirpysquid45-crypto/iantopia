@@ -166,7 +166,7 @@
       letter-spacing: 0.3px;
       color: #ffffff;
       cursor: none;
-      transition: transform 0.2s;
+      transition: transform 0.2s, box-shadow 0.2s;
       display: block;
       margin: 16px auto;
     }
@@ -174,6 +174,35 @@
     a.big:hover,
     button.big:hover {
       transform: translateY(-1px);
+    }
+
+    /* Buttons wrap into a centered, evenly-gapped grid instead of one long
+       vertical stack — 2 across once there's room, single column below
+       that. Sizing/spacing here overrides the plain stacked defaults above
+       for anything inside the grid. */
+    .button-grid {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: stretch;
+      gap: 16px;
+      max-width: 720px;
+      width: 100%;
+      margin: 18px auto 0;
+      padding: 0 16px;
+    }
+    .button-grid > .big {
+      margin: 0;
+      flex: 1 1 260px;
+      max-width: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: clamp(15px, 2.2vw, 21px);
+    }
+    .button-grid > .big:hover {
+      transform: translateY(-2px);
     }
 
     /* Neon sign buttons */
@@ -749,12 +778,16 @@
       a.big, button.big { padding: 12px 20px; font-size: clamp(16px, 3vw, 24px); margin: 10px auto; }
       #topia-timer { font-size: 0.55rem; padding: 8px 10px; top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right)); }
       #strubles-badge { top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); font-size: 0.8rem; }
-      #inv-btn, #bg-btn, #cursor-btn, #ending-link, #account-btn { font-size: 0.7rem; padding: 6px 8px; top: auto; left: calc(10px + env(safe-area-inset-left)); }
-      #inv-btn { bottom: calc(250px + env(safe-area-inset-bottom)); }
-      #bg-btn { bottom: calc(200px + env(safe-area-inset-bottom)); }
-      #cursor-btn { bottom: calc(150px + env(safe-area-inset-bottom)); }
-      #ending-link { bottom: calc(100px + env(safe-area-inset-bottom)); }
-      #account-btn { bottom: calc(50px + env(safe-area-inset-bottom)); }
+      /* Fixed viewport-bottom stacking (the old approach) assumed the button
+         stack above was always tall enough to push past this zone — once
+         the grid layout made that content shorter, these overlapped it
+         instead. Flowing in-document like #now-playing/#amsa-quote below
+         removes that assumption entirely: wherever the grid ends, these
+         start, on any content height. */
+      #inv-btn, #bg-btn, #cursor-btn, #ending-link, #account-btn {
+        position: static; display: flex; width: fit-content;
+        font-size: 0.7rem; padding: 6px 8px; margin: 6px auto;
+      }
       #now-playing, #amsa-quote { position: static; max-width: 100%; margin-top: 12px; right: auto; top: auto; font-size: 0.7rem; }
       .modal-box { width: min(300px, 90vw); max-height: 60vh; }
     }
@@ -853,11 +886,13 @@
 
   <h1>Glorious Iantopia</h1>
 
-  <a class="big neon-never" href="/never">Is Iantopia Done Yet????</a>
-  <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
-  <a class="big neon-mines" href="/minesweeper">💣 Minesweeper</a>
-  <a class="big neon-yt" href="/transcripts/">YouTube Transcripts</a>
-  <button id="btn-daily" class="big neon-daily">🗓️ Daily (500–5000)</button>
+  <div class="button-grid">
+    <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
+    <a class="big neon-mines" href="/minesweeper">💣 Minesweeper</a>
+    <button id="btn-daily" class="big neon-daily">🗓️ Daily (500–5000)</button>
+    <a class="big neon-yt" href="/transcripts/">YouTube Transcripts</a>
+    <a class="big neon-never" href="/never">Is Iantopia Done Yet????</a>
+  </div>
 
   <!-- Daily struble reel -->
   <div id="daily-reel-overlay">
@@ -949,14 +984,6 @@
     </div>
   </div>
 
-  <!-- Inventory modal -->
-  <div class="modal-overlay" id="inventory-overlay" role="dialog" aria-modal="true" aria-labelledby="inventory-title">
-    <div class="modal-box">
-      <h2 id="inventory-title">Inventory</h2>
-      <div id="inventory-list"></div>
-      <button class="modal-close" id="inventory-close">Close</button>
-    </div>
-  </div>
 
   <!-- Background modal -->
   <div class="modal-overlay" id="background-overlay" role="dialog" aria-modal="true" aria-labelledby="background-title">
@@ -979,12 +1006,12 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script is:inline src="/cloud-sync.js?v=3"></script>
-  <script is:inline src="/music-library.js?v=5"></script>
+  <script is:inline src="/cloud-sync.js?v=4"></script>
+  <script is:inline src="/music-library.js?v=6"></script>
   <script is:inline src="/music-position.js?v=1"></script>
-  <script is:inline src="/background-library.js?v=2"></script>
-  <script is:inline src="/cursor-library.js?v=1"></script>
-  <script is:inline src="/case-data.js?v=4"></script>
+  <script is:inline src="/background-library.js?v=3"></script>
+  <script is:inline src="/cursor-library.js?v=2"></script>
+  <script is:inline src="/case-data.js?v=7"></script>
   <script is:inline src="/desktop-items.js?v=4"></script>
 
   <!-- Timer Script -->
@@ -1162,7 +1189,7 @@
   </script>
 
   <!-- Custom Cursor Implementation (Canvas-based, shared across pages) -->
-  <script is:inline src="/cursor.js?v=2"></script>
+  <script is:inline src="/cursor.js?v=3"></script>
 
   <!-- Home theme music, Now Playing / playlist, and Inventory -->
   <script is:inline>
@@ -1187,15 +1214,6 @@
         try {
           const v = localStorage.getItem(INV_KEY);
           return v ? JSON.parse(v) : {};
-        } catch { return {}; }
-      }
-
-      const CASES_KEY = 'strubles_cases_v1';
-      function loadCases() {
-        try {
-          const v = localStorage.getItem(CASES_KEY);
-          const parsed = v ? JSON.parse(v) : {};
-          return (parsed && typeof parsed === 'object') ? parsed : {};
         } catch { return {}; }
       }
 
@@ -1318,117 +1336,18 @@
         if (e.target === playlistOverlay) playlistOverlay.classList.remove('open');
       });
 
-      // --- Inventory popup ---
+      // --- Inventory button: navigates to the dedicated Inventory Room page
+      // (shelf display + full categorized list) instead of opening a local
+      // modal — kept as the same chest icon/drag target it always was, since
+      // dragging an item near it to stash still works independently of what
+      // a plain click does.
       const invBtn = document.getElementById('inv-btn');
-      const inventoryOverlay = document.getElementById('inventory-overlay');
-      const inventoryList = document.getElementById('inventory-list');
-      const inventoryClose = document.getElementById('inventory-close');
+      invBtn.addEventListener('click', () => { window.location.href = '/inventory'; });
 
       // --- Movable desktop items (sock, panda, ...) ---
-      const desktopItems = window.DesktopItems
-        ? window.DesktopItems.init(document.getElementById('desktop-items'), invBtn)
-        : null;
-      function loadPlacedDesktopItems() {
-        return window.DesktopItems ? window.DesktopItems.getPlaced() : {};
-      }
-      function takeOutDesktopItem(id) {
-        if (!window.DesktopItems) return;
-        window.DesktopItems.takeOut(id);
-        if (desktopItems) desktopItems.refresh();
-      }
-      function stashDesktopItem(id) {
-        if (!window.DesktopItems) return;
-        window.DesktopItems.stash(id);
-        if (desktopItems) desktopItems.refresh();
-      }
+      if (window.DesktopItems) window.DesktopItems.init(document.getElementById('desktop-items'), invBtn);
 
       const CURSOR_LIB = window.CURSOR_LIBRARY || {};
-      const BG_LIB_FOR_INV = window.BACKGROUND_LIBRARY || {};
-
-      // `lookup` maps a stored key to a human label. Without it the modal shows
-      // raw keys like "taipei_nightlife" instead of "Taipei Nightlife".
-      const INV_CATEGORIES = [
-        { key: 'items', label: 'Items', lookup: window.CASE_ITEMS },
-        { key: 'badges', label: 'Badges', lookup: window.CASE_ITEMS },
-        { key: 'themes', label: 'Themes' },
-        { key: 'powerups', label: 'Powerups' },
-        { key: 'sfx', label: 'Sounds' },
-        { key: 'tracks', label: 'Music Tracks', lookup: LIBRARY },
-        { key: 'backgrounds', label: 'Backgrounds', lookup: BG_LIB_FOR_INV },
-        { key: 'cursors', label: 'Cursors', lookup: CURSOR_LIB },
-      ];
-
-      function renderInventory() {
-        const inv = loadInventory();
-        const cases = loadCases();
-        const caseCount = Object.values(cases).reduce((s, n) => s + n, 0);
-        const staticItems = window.DesktopItems ? window.DesktopItems.getStaticItems() : {};
-        const staticIds = Object.keys(staticItems);
-        const hasAny = INV_CATEGORIES.some((c) => Array.isArray(inv[c.key]) && inv[c.key].length > 0);
-        if (!hasAny && !caseCount && staticIds.length === 0) {
-          inventoryList.innerHTML = '<div class="modal-empty">Nothing unlocked yet — open a case to start collecting!</div>';
-          return;
-        }
-        let html = '';
-
-        // Unopened cases first — they're the only actionable thing in here.
-        if (caseCount) {
-          html += `<div class="inv-category">Unopened Cases</div>`;
-          Object.entries(cases).forEach(([key, n]) => {
-            if (!n) return;
-            const def = (window.CASES || {})[key];
-            html += `<div class="modal-item"><span>${def ? def.label : key}</span><span>×${n}</span></div>`;
-          });
-        }
-
-        const placed = loadPlacedDesktopItems();
-
-        function draggableRow(label, id) {
-          if (!(id in placed)) {
-            return `<div class="modal-item"><span>${label}</span><button class="modal-take-out" data-take-out="${id}">[Take Out]</button></div>`;
-          }
-          return `<div class="modal-item"><span>${label}</span><button class="modal-take-out" data-stash="${id}" title="Put back in inventory">📦</button></div>`;
-        }
-
-        // Always-on decorations — not loot, never locked, always listed.
-        if (staticIds.length) {
-          html += `<div class="inv-category">Decorations</div>`;
-          staticIds.forEach((id) => { html += draggableRow(staticItems[id].label, id); });
-        }
-
-        INV_CATEGORIES.forEach((c) => {
-          const entries = Array.isArray(inv[c.key]) ? inv[c.key] : [];
-          if (entries.length === 0) return;
-          html += `<div class="inv-category">${c.label}</div>`;
-          entries.forEach((entry) => {
-            const found = c.lookup && c.lookup[entry];
-            const label = found ? found.label : entry;
-            html += (found && found.draggable) ? draggableRow(label, entry) : `<div class="modal-item"><span>${label}</span></div>`;
-          });
-        });
-        inventoryList.innerHTML = html;
-        inventoryList.querySelectorAll('[data-take-out]').forEach((btn) => {
-          btn.addEventListener('click', () => {
-            takeOutDesktopItem(btn.dataset.takeOut);
-            renderInventory();
-          });
-        });
-        inventoryList.querySelectorAll('[data-stash]').forEach((btn) => {
-          btn.addEventListener('click', () => {
-            stashDesktopItem(btn.dataset.stash);
-            renderInventory();
-          });
-        });
-      }
-
-      invBtn.addEventListener('click', () => {
-        renderInventory();
-        inventoryOverlay.classList.add('open');
-      });
-      inventoryClose.addEventListener('click', () => inventoryOverlay.classList.remove('open'));
-      inventoryOverlay.addEventListener('click', (e) => {
-        if (e.target === inventoryOverlay) inventoryOverlay.classList.remove('open');
-      });
 
       // --- Account (Google Sign-In + progress sync) ---
       const accountBtn = document.getElementById('account-btn');
@@ -1644,7 +1563,7 @@
       // Escape closes whichever modal is currently open
       window.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        [playlistOverlay, inventoryOverlay, backgroundOverlay, cursorOverlay].forEach((overlay) => {
+        [playlistOverlay, backgroundOverlay, cursorOverlay].forEach((overlay) => {
           overlay.classList.remove('open');
         });
       });

@@ -22,4 +22,9 @@ window.BACKGROUND_LIBRARY = {
   taipei_nightlife: { label: 'Taipei Nightlife',  type: 'video', src: '/video/taipei-nightlife.mp4' },
   bladee_waster:    { label: 'Bladee – Waster',   type: 'video', src: '/video/bladee-waster.mp4' },
   evian_yxguden:    { label: 'Evian Christ – Yxguden (feat. Bladee)', type: 'video', src: '/video/evian-christ-yxguden.mp4' },
+
+  // Inventory-page-only backgrounds — restricted there via PAGE_BG_ALLOWLIST
+  // in pickers.js, never selectable on any other page.
+  inventory_shelf:       { label: 'Display Shelf', type: 'image', src: '/video/inventory-shelf.jpg', position: 'center' },
+  inventory_shelf_leafy: { label: 'Leafy Shelf',    type: 'image', src: '/video/inventory-shelf-leafy.jpg', position: 'center' },
 };

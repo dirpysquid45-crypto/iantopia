@@ -33,10 +33,21 @@ window.initPickers = function() {
   if (bgBtn && bgOverlay) {
     function renderBgPicker() {
       bgList.innerHTML = '';
-      Object.entries(BG_LIB).forEach(([key, bg]) => {
+      // A page can restrict itself to a fixed subset of BG_LIB (e.g. the
+      // inventory room only ever offers its own shelf variants, never the
+      // general Taipei/casino/etc. library) via window.PAGE_BG_ALLOWLIST.
+      // When set, it fully replaces the normal "every owned background"
+      // list — including the literal 'default' entry, which is why an
+      // allowlisted page has to name its own free key explicitly via
+      // PAGE_FREE_BG_KEY rather than relying on 'default' being free.
+      const allowlist = window.PAGE_BG_ALLOWLIST;
+      const keys = allowlist || Object.keys(BG_LIB);
+      keys.forEach((key) => {
+        const bg = BG_LIB[key];
+        if (!bg) return;
         // Locked backgrounds are hidden entirely, not shown-and-greyed —
         // you can't see it until you've actually unlocked it.
-        const owned = loadInventory().backgrounds?.includes(key) || key === 'default';
+        const owned = loadInventory().backgrounds?.includes(key) || key === 'default' || key === window.PAGE_FREE_BG_KEY;
         if (!owned) return;
         const row = document.createElement('div');
         row.className = 'picker-row';

@@ -39,11 +39,15 @@ window.CASE_ITEMS = {
   sock:        { label: 'Stinky Ian Sock',                tier: 'mil_spec',   img: '/assets/items/dirty-sock.webp',        type: 'item', draggable: true },
   used_deck:   { label: 'Used Deck of Cards',             tier: 'mil_spec',   img: '/assets/items/used-cards.png',         type: 'item', draggable: true },
   panda:       { label: "Ian's Panda Express",            tier: 'mil_spec',   img: '/assets/items/panda-express.png',      type: 'item', draggable: true },
+  costco_card: { label: 'Costco Executive Membership',    tier: 'mil_spec',   img: '/assets/items/costco-membership.png',  type: 'item', draggable: true },
+  bag_of_rice: { label: 'Bag of Rice',                    tier: 'mil_spec',   img: '/assets/items/bag-of-rice.png',        type: 'item', draggable: true },
+  mcchicken:   { label: 'McChicken',                      tier: 'mil_spec',   img: '/assets/items/mcchicken.png',          type: 'item', draggable: true },
   display_shelf: { label: 'Display Shelf',                tier: 'mil_spec',   img: '/assets/decorations/display-shelf.webp', type: 'item', draggable: true, size: 195 },
   smiski_blind_box: { label: 'Smiski Blind Box',          tier: 'mil_spec',   img: '/assets/decorations/smiski-blind-box.png', type: 'item', draggable: true, size: 91 },
   mus_circus:  { label: 'Circus',                         tier: 'mil_spec',   emoji: '🎪',                                  type: 'music_unlock', key: 'circus' },
   mus_balatro: { label: 'Balatro Main Theme',             tier: 'mil_spec',   emoji: '🃏',                                  type: 'music_unlock', key: 'balatro' },
   mus_desert:  { label: 'Desert (Mario, Bitcrushed)',     tier: 'mil_spec',   emoji: '🏜️',                                  type: 'music_unlock', key: 'mario_desert' },
+  mus_hotel:   { label: 'Hotel Lounge',                   tier: 'mil_spec',   emoji: '🛎️',                                  type: 'music_unlock', key: 'hotel' },
   bg_circus:   { label: 'Background: Circus',             tier: 'mil_spec',   img: '/video/circus.gif',                    type: 'background_unlock', key: 'circus' },
   cur_joker:   { label: 'Cursor: The Joker',              tier: 'mil_spec',   img: '/assets/casino/cards/card_joker_red.png', type: 'cursor_unlock', key: 'joker' },
 
@@ -52,13 +56,16 @@ window.CASE_ITEMS = {
   mini_trophy: { label: 'Iantopia Trophy',                tier: 'restricted', img: '/assets/badges/iantopia-trophy.png',   pixelated: true, type: 'badge', key: 'mini_trophy', draggable: true },
   bg_casino:   { label: 'Background: Casino Entrance',    tier: 'restricted', img: '/video/casino-entrance.gif',           type: 'background_unlock', key: 'casino_entrance' },
   bg_nyc:      { label: 'Background: NY Skyline',         tier: 'restricted', img: '/video/nyskyline.gif',                 type: 'background_unlock', key: 'ny_skyline' },
+  bg_leafy_shelf: { label: 'Inventory Background: Leafy Shelf', tier: 'restricted', img: '/video/inventory-shelf-leafy.jpg', type: 'background_unlock', key: 'inventory_shelf_leafy' },
 
   // ---------- Classified (pink) ----------
   s_10000:     { label: '+10,000 Strubles',               tier: 'classified', img: '/strubles.png',                        type: 'strubles', amount: 10000 },
   mus_atari:   { label: 'Ecco2k – Play Em Like Atari',    tier: 'classified', emoji: '🕹️',                                  type: 'music_unlock', key: 'atari' },
   mus_death:   { label: 'Panchiko – DEATHMETAL',          tier: 'classified', emoji: '📻',                                  type: 'music_unlock', key: 'deathmetal' },
   bg_money:    { label: 'Background: Raining Money',      tier: 'classified', img: '/video/raining-money.gif',             type: 'background_unlock', key: 'raining_money' },
-  haiku_email: { label: 'Email from the Void',            tier: 'classified', emoji: '✉️',                                  type: 'action', effect: 'email_void' },
+  // Archived: kept so existing owners' history/labels still resolve, but
+  // excluded from ALL_IDS below so it can no longer be rolled.
+  haiku_email: { label: 'Email from the Void',            tier: 'classified', emoji: '✉️',                                  type: 'action', effect: 'email_void', archived: true },
 
   // ---------- Covert (red) ----------
   mus_taipei:  { label: 'Yung Lean – Taipei Instrumental', tier: 'covert',    emoji: '🌆',                                  type: 'music_unlock', key: 'taipei_instrumental' },
@@ -69,7 +76,9 @@ window.CASE_ITEMS = {
   mus_aaa:     { label: 'Ecco2k – AAA Powerline',         tier: 'covert',     emoji: '⚡',                                   type: 'music_unlock', key: 'aaa_powerline' },
   bg_waster:   { label: 'Background: Bladee – Waster',    tier: 'covert',     emoji: '🧊',                                  type: 'background_unlock', key: 'bladee_waster' },
   bg_yxguden:  { label: 'Background: Evian Christ – Yxguden', tier: 'covert', emoji: '🌊',                                  type: 'background_unlock', key: 'evian_yxguden' },
-  finish_ian:  { label: 'Email Ian to Finish Iantopia',   tier: 'covert',     emoji: '📧',                                  type: 'action', effect: 'email_finish' },
+  // Archived: kept so existing owners' history/labels still resolve, but
+  // excluded from ALL_IDS below so it can no longer be rolled.
+  finish_ian:  { label: 'Email Ian to Finish Iantopia',   tier: 'covert',     emoji: '📧',                                  type: 'action', effect: 'email_finish', archived: true },
 
   // ---------- Exceedingly Rare (gold) ----------
   one_true:    { label: 'The One True Struble',           tier: 'exceedingly_rare', img: '/strubles.png',                  type: 'strubles', amount: 100000 },
@@ -90,7 +99,7 @@ window.LOOTBOX_UNLOCKABLE_PAGES = [
 // Case contents are DERIVED from the item pool rather than hand-listed, so
 // adding an item above automatically places it in every case it qualifies for.
 // Hand-maintained id arrays rot the moment a new asset lands.
-const ALL_IDS = Object.keys(window.CASE_ITEMS);
+const ALL_IDS = Object.keys(window.CASE_ITEMS).filter((id) => !window.CASE_ITEMS[id].archived);
 const idsByType = (...types) => ALL_IDS.filter((id) => types.includes(window.CASE_ITEMS[id].type));
 const idsFromTier = (minTier) => {
   const min = window.CASE_RARITY_ORDER.indexOf(minTier);

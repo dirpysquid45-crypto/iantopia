@@ -1,0 +1,483 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Iantopia Inventory</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0a0c12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script is:inline src="/pwa.js?v=1" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<!--
+  is:global is REQUIRED. Astro scopes <style> by stamping data-astro-cid-* on
+  elements in the template and rewriting selectors to match. Desktop items and
+  the inventory list are both built at runtime via createElement/innerHTML, so
+  they never receive that attribute and every scoped rule silently skips them.
+  Same trap as every other page in this project.
+-->
+<style is:global>
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0;
+    background-image: url('/video/inventory-shelf.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    color:var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+    min-height:100vh;
+    cursor:none;
+    position:relative;
+  }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background: rgba(0,0,0,0.35);
+    pointer-events:none; z-index:0;
+  }
+  /* Falling leaves sit above the shelf but below every interactive layer —
+     purely decorative, never allowed to intercept drags/clicks. */
+  #leaf-overlay {
+    position:fixed; inset:0; z-index:1; pointer-events:none;
+    background-image:url('/video/leaf-particles.gif');
+    background-repeat:repeat; background-size:340px 340px;
+    opacity:.65; mix-blend-mode:screen;
+  }
+  main { position:relative; z-index:2; max-width:900px; margin:0 auto; padding:24px; }
+
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:4px solid #000; padding-bottom:10px; }
+  header a { color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; font-weight:700; background:#000; transition:background 0.2s; font-size:10px; cursor:none; }
+  header a:hover { background:var(--gold); color:#000; }
+  header button { color:var(--gold); background:#000; border:2px solid var(--gold); padding:4px 6px; cursor:none; transition:background 0.2s; }
+  header button:hover { background:var(--gold); color:#000; }
+
+  h1 {
+    margin:0; font-size:clamp(13px,2.6vw,20px); letter-spacing:1px; color:var(--gold); font-weight:400;
+    text-shadow: 2px 2px 0 #000;
+    text-align:center;
+  }
+  .hint {
+    text-align:center; color:var(--muted); font-size:10px; line-height:1.8;
+    margin-top:18px; padding:12px; background:rgba(0,0,0,.4); border:2px solid rgba(255,215,0,.3);
+  }
+
+  /* pickers.js only toggles this class on the <video id="bg-video"> element
+     (which starts display:none inline) — without this rule the class gets
+     added correctly but nothing actually makes the video visible, so a
+     video-type background silently never shows. */
+  #bg-video { display: none; }
+  #bg-video.show { display: block; }
+
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:100;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    width:min(420px,90vw); max-height:75vh; overflow-y:auto;
+    background:#0a0a0a; border:3px solid var(--gold); padding:20px;
+    box-shadow:0 0 20px rgba(255,215,0,.4);
+  }
+  .modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; }
+  .modal-head h2{ margin:0; font-size:12px; color:var(--gold); font-weight:400; }
+  .btn{
+    color:var(--gold); text-decoration:none; border:3px solid var(--gold); padding:8px 12px;
+    background:#000; font-size:9px; transition:background .2s, color .2s; cursor:none;
+    font-family:inherit; letter-spacing:1px; text-transform:uppercase;
+  }
+  .btn:hover{ background:var(--gold); color:#000; }
+  .picker-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:11px; }
+  .picker-row:last-child { border-bottom:none; }
+
+  .volume-row{
+    display:flex; align-items:center; gap:10px; margin-bottom:16px;
+    padding-bottom:14px; border-bottom:1px solid rgba(255,215,0,0.3);
+  }
+  .volume-row input[type="range"]{ flex:1; accent-color:var(--gold); cursor:none; }
+  .volume-mute-btn{
+    all:unset; cursor:none; font-size:16px; padding:4px 8px;
+    border:1px solid var(--gold); background:#000;
+  }
+
+  /* Full item/badge/track/etc. list — same content home's inventory modal
+     used to show, ported here now that this page is the canonical
+     "Inventory" destination. */
+  .inv-category { color:#ffeb3b; font-size:10px; text-transform:uppercase; letter-spacing:1px; margin:14px 0 6px; }
+  .inv-category:first-child { margin-top:0; }
+  .modal-item {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 10px; border:1px solid #333; margin-bottom:6px;
+    background:rgba(255,255,255,.03); font-size:10px; color:var(--ink);
+  }
+  .modal-empty { color:#888; font-size:11px; padding:8px 0 4px; }
+  .modal-take-out {
+    all:unset; cursor:none; font-size:9px; letter-spacing:.5px; color:#ffeb3b;
+    border:1px solid rgba(255,235,59,.5); padding:3px 8px; flex-shrink:0;
+  }
+  .modal-take-out:hover { background:rgba(255,235,59,.12); }
+
+  #strubles-badge{
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
+    background:#000; padding:8px 12px; border:3px solid var(--gold);
+    font-weight:700; z-index:20;
+  }
+  #strubles-badge img{ width:28px; height:28px; }
+
+  /* Storage chest — drag an item here to put it away. Purely a drop target
+     on this page (there's nowhere further "in" to navigate to), unlike the
+     same-looking button on other pages which instead links here. */
+  #storage-chest {
+    position:fixed; bottom:calc(20px + env(safe-area-inset-bottom)); right:calc(20px + env(safe-area-inset-right));
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    background:rgba(0,0,0,.6); border:2px solid var(--gold); padding:10px 14px;
+    font-size:9px; color:var(--gold); z-index:20; transition:box-shadow .15s ease, border-color .15s ease;
+  }
+  #storage-chest.drag-near { box-shadow:0 0 14px rgba(255,215,0,.6); border-color:#fff; }
+  #storage-chest .chest-icon { font-size:22px; }
+
+  /* Movable item toys — see desktop-items.js. Identical to home's copy so
+     dragged items look and behave the same on both pages. */
+  #desktop-items { position:fixed; inset:0; pointer-events:none; z-index:15; }
+  .desktop-item-wrap {
+    position:fixed; pointer-events:none; border:2px solid transparent; border-radius:4px;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .desktop-item-wrap.selected { border-color:rgba(255,215,0,.6); box-shadow:0 0 12px rgba(255,215,0,.4); }
+  .desktop-item {
+    position:static; display:block; width:56px; height:56px; object-fit:contain;
+    pointer-events:auto; cursor:none; touch-action:none;
+    filter:drop-shadow(0 4px 10px rgba(0,0,0,.5));
+    transition:filter .15s ease, transform .15s ease;
+    user-select:none; -webkit-user-drag:none;
+  }
+  .desktop-item.pixel-art { image-rendering:pixelated; }
+  .desktop-item:hover {
+    filter:drop-shadow(0 4px 10px rgba(0,0,0,.5)) drop-shadow(0 0 8px rgba(255,215,0,.5));
+    transform:scale(1.06);
+  }
+  .desktop-item.dragging {
+    transition:none;
+    filter:drop-shadow(0 8px 16px rgba(0,0,0,.6)) drop-shadow(0 0 10px rgba(255,215,0,.7));
+    transform:scale(1.1);
+  }
+  .desktop-item.stashing { transition:transform .18s ease, opacity .18s ease; transform:scale(.2); opacity:0; }
+  .desktop-item-remove {
+    all:unset; position:absolute; top:-7px; right:-7px; width:18px; height:18px; line-height:16px;
+    text-align:center; border-radius:50%; background:rgba(15,15,15,.85);
+    border:1px solid rgba(255,235,59,.55); color:#ffeb3b; font-size:13px;
+    cursor:none; pointer-events:auto; opacity:0; transition:opacity .15s ease, background .15s ease; z-index:22;
+  }
+  .desktop-item-wrap:hover .desktop-item-remove, .desktop-item-remove:focus-visible { opacity:1; }
+  .desktop-item-remove:hover { background:rgba(255,235,59,.25); }
+  @media (hover:none) { .desktop-item-remove { opacity:.6; } }
+  @media (prefers-reduced-motion: reduce) { .desktop-item { transition:none; } .chest-lid { transition:none; } }
+
+  @media (max-width:768px) {
+    body { overflow-y:auto; }
+    main { padding:16px; padding-top:80px; }
+    #strubles-badge { top:calc(10px + env(safe-area-inset-top)); left:calc(10px + env(safe-area-inset-left)); font-size:11px; padding:6px 8px; }
+    #strubles-badge img { width:22px; height:22px; }
+    #storage-chest { padding:8px 10px; font-size:8px; }
+    .desktop-item { width:44px; height:44px; }
+    header { flex-direction:column; gap:8px; align-items:stretch; }
+  }
+</style>
+</head>
+<body>
+  <div id="leaf-overlay"></div>
+
+  <div id="strubles-badge">
+    <img src="/strubles.png" alt="Struble">
+    <span id="bal">0</span>
+  </div>
+
+  <div id="storage-chest" title="Drag an item here to put it away">
+    <span class="chest-icon">🗄️</span>
+    <span>Storage</span>
+  </div>
+
+  <!-- Movable item toys (see desktop-items.js) render here, positioned fixed. -->
+  <div id="desktop-items"></div>
+
+  <main>
+    <header>
+      <a href="/" title="Back to Iantopia">← Home</a>
+      <h1>INVENTORY</h1>
+      <div style="display:flex; gap:4px;">
+        <button id="now-playing" title="Music options">🎵</button>
+        <button id="bg-btn" title="Change background">🖼️</button>
+        <button id="cursor-btn" title="Change cursor">🖱️</button>
+      </div>
+    </header>
+
+    <div class="hint">
+      Drag anything you've unlocked to arrange it on the shelf. Drop it on Storage to put it away.<br>
+      <button class="btn" id="full-list-btn" type="button" style="margin-top:10px;">📋 Full List</button>
+    </div>
+  </main>
+
+  <!-- Music Playlist Modal -->
+  <div class="overlay" id="playlist-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Now Playing</h2>
+        <button class="btn" id="playlist-close" type="button">Close</button>
+      </div>
+      <div class="volume-row">
+        <button class="volume-mute-btn" id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
+        <input type="range" id="volume-slider" min="0" max="100" value="30" aria-label="Music volume" />
+      </div>
+      <div id="playlist-list"></div>
+    </div>
+  </div>
+
+  <!-- Background Picker Modal -->
+  <div class="overlay" id="bg-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Backgrounds</h2>
+        <button class="btn" id="bg-close" type="button">Close</button>
+      </div>
+      <div id="bg-list"></div>
+    </div>
+  </div>
+
+  <!-- Cursor Picker Modal -->
+  <div class="overlay" id="cursor-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Cursors</h2>
+        <button class="btn" id="cursor-close" type="button">Close</button>
+      </div>
+      <div id="cursor-list"></div>
+    </div>
+  </div>
+
+  <!-- Full inventory list (items, badges, tracks, backgrounds, cursors...) -->
+  <div class="overlay" id="inventory-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Full Inventory</h2>
+        <button class="btn" id="inventory-close" type="button">Close</button>
+      </div>
+      <div id="inventory-list"></div>
+    </div>
+  </div>
+
+  <video id="bg-video" style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1;" loop></video>
+
+  <audio id="theme-music" src="/audio/music/hotel.mp3" preload="auto" loop></audio>
+
+<script is:inline src="/music-library.js?v=6"></script>
+<script is:inline src="/music-position.js?v=1"></script>
+<script is:inline src="/background-library.js?v=3"></script>
+<script is:inline src="/cursor-library.js?v=2"></script>
+<script is:inline src="/case-data.js?v=7"></script>
+<script is:inline src="/desktop-items.js?v=4"></script>
+<script is:inline src="/cursor.js?v=3"></script>
+<script is:inline src="/strubles.js?v=2"></script>
+<script is:inline>
+  window.PAGE_DEFAULT_BG = { type: 'image', src: '/video/inventory-shelf.jpg', position: 'center', label: 'Display Shelf' };
+  // Only shelf variants are ever selectable here — never the general
+  // Taipei/casino/etc. library, even if genuinely unlocked elsewhere.
+  window.PAGE_BG_ALLOWLIST = ['inventory_shelf', 'inventory_shelf_leafy'];
+  window.PAGE_FREE_BG_KEY = 'inventory_shelf';
+  // Hotel Lounge plays for free on this page specifically (its hardcoded
+  // resting default below) without needing to be unlocked from a case — but
+  // it's still a real, separately case-unlockable track for every OTHER page.
+  window.PAGE_FREE_TRACK_KEY = 'hotel';
+</script>
+<script is:inline src="/pickers.js?v=4"></script>
+
+<script is:inline>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const balNumEl = $('bal');
+
+  function syncBalance() { try { balNumEl.textContent = Strubles.get(); } catch {} }
+  syncBalance();
+  window.addEventListener('strubles:change', syncBalance);
+  window.addEventListener('storage', syncBalance);
+
+  // --- Theme music (background loop, tied to the mute control) ---
+  let audioEnabled = true;
+  const themeMusic = $('theme-music');
+  const VOLUME_KEY = 'music_volume_v1';
+  const volumeSlider = $('volume-slider');
+  const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
+  themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.3;
+  volumeSlider.value = Math.round(themeMusic.volume * 100);
+  volumeSlider.addEventListener('input', () => {
+    themeMusic.volume = volumeSlider.value / 100;
+    localStorage.setItem(VOLUME_KEY, themeMusic.volume);
+  });
+  window.addEventListener('storage', (e) => {
+    if (e.key === VOLUME_KEY && e.newValue != null) {
+      themeMusic.volume = parseFloat(e.newValue);
+      volumeSlider.value = Math.round(themeMusic.volume * 100);
+    }
+  });
+  const MUSIC_POS_KEY = 'inventory_theme_pos_v1';
+  if (window.MusicPosition) {
+    window.MusicPosition.restore(MUSIC_POS_KEY, themeMusic);
+    window.MusicPosition.track(MUSIC_POS_KEY, themeMusic);
+  }
+  function tryPlayTheme() {
+    if (!audioEnabled) return;
+    themeMusic.play().catch(() => {});
+  }
+  tryPlayTheme();
+  const unlockTheme = () => {
+    tryPlayTheme();
+    window.removeEventListener('pointerdown', unlockTheme);
+    window.removeEventListener('keydown', unlockTheme);
+  };
+  window.addEventListener('pointerdown', unlockTheme);
+  window.addEventListener('keydown', unlockTheme);
+
+  const muteBtn = $('mute-btn');
+  muteBtn.addEventListener('click', () => {
+    audioEnabled = !audioEnabled;
+    muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
+    if (audioEnabled) tryPlayTheme();
+    else themeMusic.pause();
+  });
+
+  const INV_KEY = 'strubles_inventory_v1';
+  const CASES_KEY = 'strubles_cases_v1';
+  function loadInventory() {
+    try { const v = localStorage.getItem(INV_KEY); return v ? JSON.parse(v) : {}; } catch { return {}; }
+  }
+  function loadCases() {
+    try {
+      const v = localStorage.getItem(CASES_KEY);
+      const parsed = v ? JSON.parse(v) : {};
+      return (parsed && typeof parsed === 'object') ? parsed : {};
+    } catch { return {}; }
+  }
+
+  // --- Movable desktop items (sock, panda, display shelf, ...) ---
+  const chestEl = $('storage-chest');
+  const desktopItems = window.DesktopItems
+    ? window.DesktopItems.init($('desktop-items'), chestEl)
+    : null;
+  function loadPlacedDesktopItems() {
+    return window.DesktopItems ? window.DesktopItems.getPlaced() : {};
+  }
+  function takeOutDesktopItem(id) {
+    if (!window.DesktopItems) return;
+    window.DesktopItems.takeOut(id);
+    if (desktopItems) desktopItems.refresh();
+  }
+  function stashDesktopItem(id) {
+    if (!window.DesktopItems) return;
+    window.DesktopItems.stash(id);
+    if (desktopItems) desktopItems.refresh();
+  }
+
+  // --- Full inventory list (ported from the old home-page modal) ---
+  const inventoryOverlay = $('inventory-overlay');
+  const inventoryList = $('inventory-list');
+  const CURSOR_LIB = window.CURSOR_LIBRARY || {};
+  const BG_LIB_FOR_INV = window.BACKGROUND_LIBRARY || {};
+  const MUSIC_LIB_FOR_INV = window.MUSIC_LIBRARY || {};
+
+  const INV_CATEGORIES = [
+    { key: 'items', label: 'Items', lookup: window.CASE_ITEMS },
+    { key: 'badges', label: 'Badges', lookup: window.CASE_ITEMS },
+    { key: 'themes', label: 'Themes' },
+    { key: 'powerups', label: 'Powerups' },
+    { key: 'sfx', label: 'Sounds' },
+    { key: 'tracks', label: 'Music Tracks', lookup: MUSIC_LIB_FOR_INV },
+    { key: 'backgrounds', label: 'Backgrounds', lookup: BG_LIB_FOR_INV },
+    { key: 'cursors', label: 'Cursors', lookup: CURSOR_LIB },
+  ];
+
+  function renderInventoryList() {
+    const inv = loadInventory();
+    const cases = loadCases();
+    const caseCount = Object.values(cases).reduce((s, n) => s + n, 0);
+    const staticItems = window.DesktopItems ? window.DesktopItems.getStaticItems() : {};
+    const staticIds = Object.keys(staticItems);
+    const hasAny = INV_CATEGORIES.some((c) => Array.isArray(inv[c.key]) && inv[c.key].length > 0);
+    if (!hasAny && !caseCount && staticIds.length === 0) {
+      inventoryList.innerHTML = '<div class="modal-empty">Nothing unlocked yet — open a case to start collecting!</div>';
+      return;
+    }
+    let html = '';
+
+    if (caseCount) {
+      html += `<div class="inv-category">Unopened Cases</div>`;
+      Object.entries(cases).forEach(([key, n]) => {
+        if (!n) return;
+        const def = (window.CASES || {})[key];
+        html += `<div class="modal-item"><span>${def ? def.label : key}</span><span>×${n}</span></div>`;
+      });
+    }
+
+    const placed = loadPlacedDesktopItems();
+    function draggableRow(label, id) {
+      if (!(id in placed)) {
+        return `<div class="modal-item"><span>${label}</span><button class="modal-take-out" data-take-out="${id}">[Take Out]</button></div>`;
+      }
+      return `<div class="modal-item"><span>${label}</span><button class="modal-take-out" data-stash="${id}" title="Put back in storage">📦</button></div>`;
+    }
+
+    if (staticIds.length) {
+      html += `<div class="inv-category">Decorations</div>`;
+      staticIds.forEach((id) => { html += draggableRow(staticItems[id].label, id); });
+    }
+
+    INV_CATEGORIES.forEach((c) => {
+      const entries = Array.isArray(inv[c.key]) ? inv[c.key] : [];
+      if (entries.length === 0) return;
+      html += `<div class="inv-category">${c.label}</div>`;
+      entries.forEach((entry) => {
+        const found = c.lookup && c.lookup[entry];
+        const label = found ? found.label : entry;
+        html += (found && found.draggable) ? draggableRow(label, entry) : `<div class="modal-item"><span>${label}</span></div>`;
+      });
+    });
+    inventoryList.innerHTML = html;
+    inventoryList.querySelectorAll('[data-take-out]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        takeOutDesktopItem(btn.dataset.takeOut);
+        renderInventoryList();
+      });
+    });
+    inventoryList.querySelectorAll('[data-stash]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        stashDesktopItem(btn.dataset.stash);
+        renderInventoryList();
+      });
+    });
+  }
+
+  $('full-list-btn').addEventListener('click', () => {
+    renderInventoryList();
+    inventoryOverlay.classList.add('open');
+  });
+  $('inventory-close').addEventListener('click', () => inventoryOverlay.classList.remove('open'));
+  inventoryOverlay.addEventListener('click', (e) => {
+    if (e.target === inventoryOverlay) inventoryOverlay.classList.remove('open');
+  });
+
+  window.addEventListener('inventory:changed', () => {
+    if (inventoryOverlay.classList.contains('open')) renderInventoryList();
+  });
+
+  if (window.initPickers) setTimeout(window.initPickers, 100);
+})();
+</script>
+</body>
+</html>

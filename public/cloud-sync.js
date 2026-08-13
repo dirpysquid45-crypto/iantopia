@@ -52,6 +52,21 @@
     'lootbox_active_track_v1',
   ];
 
+  // pickers.js (blackjack/alternate-ending/minesweeper/inventory) derives its
+  // background/track keys per-page as `active_bg_v1__<pathname>` and
+  // `active_track_v1__<pathname>` — an open-ended set no static list can
+  // enumerate. Anything starting with one of these prefixes syncs too, on
+  // top of the exact names above.
+  const SYNC_KEY_PREFIXES = ['active_bg_v1__', 'active_track_v1__'];
+  function allSyncKeys() {
+    const dynamic = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && SYNC_KEY_PREFIXES.some((p) => k.startsWith(p))) dynamic.push(k);
+    }
+    return SYNC_KEYS.concat(dynamic);
+  }
+
   const SYNC_EVENTS = [
     'strubles:change', 'inventory:changed', 'cases:changed',
     'music:unlocked', 'background:unlocked', 'cursor:unlocked', 'cursor:changed',
@@ -73,9 +88,13 @@
   let applyingRemote = false; // guards against syncing our own just-applied data straight back up
   let pushTimer = null;
 
+  function isSyncKey(key) {
+    return SYNC_KEYS.includes(key) || SYNC_KEY_PREFIXES.some((p) => key.startsWith(p));
+  }
+
   function snapshotLocalState() {
     const snapshot = {};
-    SYNC_KEYS.forEach((key) => {
+    allSyncKeys().forEach((key) => {
       const value = localStorage.getItem(key);
       if (value !== null) snapshot[key] = value;
     });
@@ -84,10 +103,13 @@
 
   function applyRemoteState(data) {
     const local = snapshotLocalState();
-    const changed = SYNC_KEYS.some((key) => {
-      if (!Object.prototype.hasOwnProperty.call(data, key)) return false;
-      return data[key] !== local[key];
-    });
+    // Walks the REMOTE document's own keys (filtered to sync-eligible ones),
+    // not just ones already present locally — a per-page key like
+    // active_bg_v1__/inventory synced from another device wouldn't exist in
+    // this browser's localStorage yet, so scanning local keys alone would
+    // silently never pull it down.
+    const remoteKeys = Object.keys(data).filter(isSyncKey);
+    const changed = remoteKeys.some((key) => data[key] !== local[key]);
     // onAuthStateChanged re-fires on every page load for a persisted
     // session, not just right after sign-in — without this check we'd
     // reload every single load forever, since the remote doc always
@@ -95,10 +117,8 @@
     if (!changed) return;
 
     applyingRemote = true;
-    SYNC_KEYS.forEach((key) => {
-      if (Object.prototype.hasOwnProperty.call(data, key)) {
-        localStorage.setItem(key, data[key]);
-      }
+    remoteKeys.forEach((key) => {
+      localStorage.setItem(key, data[key]);
     });
     // Every page reads its state once at load time into JS variables/
     // closures — there's no live-update path for a bulk external change
