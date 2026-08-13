@@ -68,6 +68,18 @@
   header button { color:var(--gold); background:#000; border:2px solid var(--gold); padding:4px 6px; cursor:none; transition:background 0.2s; }
   header button:hover { background:var(--gold); color:#000; }
 
+  /* Full-page mine-hit effect. Sits above everything (including the picker
+     overlays at z-index:100) since it's a momentary reaction to losing, not
+     part of the normal UI. Opacity-only fade so the GIF's own frames keep
+     playing underneath rather than being clipped/restarted by display:none. */
+  #explosion-overlay {
+    position:fixed; inset:0; z-index:200; pointer-events:none;
+    background-image:url('/Explosion.gif');
+    background-size:cover; background-position:center; background-repeat:no-repeat;
+    opacity:0; transition:opacity .15s ease;
+  }
+  #explosion-overlay.show { opacity:1; }
+
   /* pickers.js only toggles this class on the <video id="bg-video"> element
      (which starts display:none inline) — without this rule the class gets
      added correctly but nothing actually makes the video visible, so a
@@ -342,6 +354,7 @@
        static image), so it ships already sourced + shown + autoplaying
        rather than waiting for a picker selection. -->
   <video id="bg-video" class="show" src="/video/minesweeper-drone-footage.mp4" autoplay muted loop playsinline style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1;"></video>
+  <div id="explosion-overlay"></div>
 
   <audio id="theme-music" src="/audio/music/minesweeper-desert.mp3" preload="none" loop></audio>
 
@@ -382,7 +395,10 @@
     beginner:     { rows: 9,  cols: 9,  mines: 10, mult: 1.5 },
     intermediate: { rows: 16, cols: 16, mines: 40, mult: 3 },
     expert:       { rows: 16, cols: 30, mines: 99, mult: 6 },
-    hormuz:       { rows: 30, cols: 40, mineDensity: 0.18, mult: 5 },
+    // Sweeping the water instead of the coastline covers a somewhat larger
+    // area (~55% of the grid vs. ~44% for land), so the payout comes down
+    // a little to match — same per-cell mine odds, just more cells to clear.
+    hormuz:       { rows: 30, cols: 40, mineDensity: 0.18, mult: 4.5 },
   };
   let diffKey = 'beginner';
 
@@ -507,9 +523,10 @@
     return out;
   }
 
-  // landMask[r][c] === false marks a cell as water in Hormuz mode — not
-  // part of the sweep at all (no mine, never revealed/flagged). Every
-  // other mode passes no mask, so every cell defaults to land.
+  // landMask[r][c] === true marks a cell as part of the sweep — the water
+  // in Hormuz mode, coastline excluded (no mine, never revealed/flagged,
+  // rendered via the .water CSS class despite being real land). Every
+  // other mode passes no mask, so every cell defaults to swept.
   function buildEmptyBoard(landMask) {
     board = [];
     landTotal = 0;
@@ -526,8 +543,9 @@
 
   // Mines are placed only after the first click, excluding that cell and
   // its neighbors, so the opening move is never an instant loss and
-  // usually opens up a real cascade instead of a single bare number. Water
-  // cells (land: false) are never eligible.
+  // usually opens up a real cascade instead of a single bare number.
+  // Non-swept cells (land: false — the coastline in Hormuz mode) are
+  // never eligible.
   function placeMines(safeR, safeC) {
     const forbidden = new Set([`${safeR},${safeC}`]);
     neighbors(safeR, safeC).forEach(([r, c]) => forbidden.add(`${r},${c}`));
@@ -676,7 +694,23 @@
     } else {
       setStatus(`💥 Boom. Lost ${currentBet} Strubles.`, 'lose');
       playSfx('minesweeper-mine-hit');
+      showExplosion();
     }
+  }
+
+  // Explosion.gif is ~1.8s start to finish — held for that long, then
+  // faded out. GIFs have no JS-visible "finished playing" event, so the
+  // duration below is measured from the source file rather than detected.
+  const explosionOverlay = document.getElementById('explosion-overlay');
+  let explosionTimer = null;
+  function showExplosion() {
+    if (!explosionOverlay) return;
+    if (explosionTimer) clearTimeout(explosionTimer);
+    explosionOverlay.style.backgroundImage = 'none';
+    void explosionOverlay.offsetWidth; // force reflow so the GIF below restarts from frame 1
+    explosionOverlay.style.backgroundImage = "url('/Explosion.gif')";
+    explosionOverlay.classList.add('show');
+    explosionTimer = setTimeout(() => explosionOverlay.classList.remove('show'), 1800);
   }
 
   function onCellClick(r, c) {
@@ -743,10 +777,14 @@
   });
 
   // Samples /Hormuz.jpg down to exactly rows x cols and classifies each
-  // cell as land or water by comparing red vs. blue channels — water
-  // reflects more blue light than sand/desert does, so a plain r > b
-  // comparison reproduces the coastline shape with no other processing
-  // needed (verified against the actual source image before shipping).
+  // cell by comparing red vs. blue channels — water reflects more blue
+  // light than sand/desert does, so a plain r > b comparison reproduces
+  // the coastline shape with no other processing needed (verified against
+  // the actual source image before shipping). The mask this returns feeds
+  // straight into `land` throughout the rest of the file, which really
+  // just means "part of the sweep" — Hormuz mode sweeps the WATER (mines
+  // hide in the strait, not on the coastline), so this inverts the raw
+  // red>blue land classification before returning it.
   let hormuzImagePromise = null;
   function loadHormuzImage() {
     if (!hormuzImagePromise) {
@@ -772,7 +810,7 @@
       const row = [];
       for (let c = 0; c < sampleCols; c++) {
         const i = (r * sampleCols + c) * 4;
-        row.push(data[i] > data[i + 2]); // red > blue => land
+        row.push(data[i] <= data[i + 2]); // blue >= red => water => sweepable
       }
       mask.push(row);
     }

@@ -187,67 +187,6 @@
   }
   #earn-panel button:hover, #earn-panel a:hover { background:#ffe958; }
 
-  /* ---------- Daily struble reel ---------- */
-  #daily-reel-overlay {
-    display:none; position:fixed; inset:0; z-index:50;
-    align-items:center; justify-content:center; background:rgba(0,0,0,.85);
-    padding:20px;
-  }
-  #daily-reel-overlay.open { display:flex; }
-  .daily-reel-box {
-    width:min(560px, 96vw); background:#0a0a0a; border:4px solid #ffd700;
-    padding:24px; box-shadow:0 0 40px rgba(255,215,0,.35);
-  }
-  .daily-reel-title {
-    text-align:center; color:#ffd700; font-size:13px; letter-spacing:2px;
-    margin-bottom:18px; text-transform:uppercase;
-  }
-  .daily-reel-viewport {
-    position:relative; overflow:hidden; border:3px solid #2a3242; background:#080a0f;
-    padding:14px 0; margin-bottom:18px; height:96px;
-    -webkit-mask-image:linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
-    mask-image:linear-gradient(90deg, transparent 0%, #000 12%, #000 88%, transparent 100%);
-  }
-  .daily-reel-strip { display:flex; gap:10px; will-change:transform; }
-  .daily-reel-marker {
-    position:absolute; top:0; bottom:0; left:50%; width:4px; margin-left:-2px;
-    background:#ffd700; box-shadow:0 0 12px #ffd700, 0 0 24px #ffd700; z-index:5; pointer-events:none;
-  }
-  .daily-tile {
-    flex:0 0 84px; width:84px; height:84px;
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
-    background:#10141c; border:2px solid var(--tier-c, #2a3242); border-bottom-width:5px;
-  }
-  .daily-tile img { width:36px; height:36px; object-fit:contain; }
-  .daily-tile .amt { font-size:9px; color:var(--tier-c, #9fb0cf); }
-  .daily-tile.gold { animation: daily-gold-pulse 1s ease-in-out infinite; }
-  @keyframes daily-gold-pulse {
-    0%, 100% { box-shadow: 0 0 0 rgba(255,215,0,0); }
-    50% { box-shadow: 0 0 18px rgba(255,215,0,.7); }
-  }
-  .daily-result {
-    text-align:center; min-height:44px; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:6px; margin-bottom:16px;
-  }
-  .daily-result .win-amt {
-    font-size:22px; font-weight:400; opacity:0; transform:scale(.6);
-    transition: opacity .3s ease, transform .3s cubic-bezier(.34,1.6,.64,1);
-  }
-  .daily-result .win-amt.show { opacity:1; transform:scale(1); }
-  .daily-result .win-tier {
-    font-size:9px; letter-spacing:2px; text-transform:uppercase; opacity:0; transition: opacity .3s ease .15s;
-  }
-  .daily-result .win-tier.show { opacity:1; }
-  #daily-reel-close {
-    all:unset; display:block; margin:0 auto; cursor:none; padding:10px 22px;
-    border:3px solid #ffd700; background:#000; color:#ffd700;
-    font-family:'Press Start 2P', ui-monospace, monospace; font-size:10px;
-    text-transform:uppercase; letter-spacing:1px; text-align:center;
-    opacity:0; pointer-events:none; transition: opacity .3s ease;
-  }
-  #daily-reel-close.show { opacity:1; pointer-events:auto; }
-  #daily-reel-close:hover { background:#ffd700; color:#000; }
-
   #strubles-badge{
     position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
     background:#000; padding:8px 12px; border:3px solid #ffd700;
@@ -384,26 +323,9 @@
     <div class="status" id="status">Welcome! Set a bet and press Deal.</div>
 
     <div id="earn-panel">
-      <button id="btn-daily" class="big">🗓️ Daily (500–5000)</button>
       <a href="/lootbox">🎁 루트박스 🫧 𓇼𓏲*ੈ✩‧₊˚🎐</a>
     </div>
   </main>
-
-  <!-- Daily struble reel -->
-  <div id="daily-reel-overlay">
-    <div class="daily-reel-box">
-      <div class="daily-reel-title">Daily Strubles</div>
-      <div class="daily-reel-viewport" id="daily-reel-viewport">
-        <div class="daily-reel-marker"></div>
-        <div class="daily-reel-strip" id="daily-reel-strip"></div>
-      </div>
-      <div class="daily-result">
-        <div class="win-amt" id="daily-win-amt"></div>
-        <div class="win-tier" id="daily-win-tier"></div>
-      </div>
-      <button id="daily-reel-close">Claim</button>
-    </div>
-  </div>
 
   <!-- Music Playlist Modal -->
   <div class="overlay" id="playlist-overlay">
@@ -570,129 +492,6 @@
   syncBalance();
   window.addEventListener('strubles:change', syncBalance);
   window.addEventListener('storage', syncBalance);
-
-  const dailyBtn = document.getElementById('btn-daily');
-
-  const todayUTC = () => {
-    const d = new Date();
-    return `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
-  };
-  Strubles.canDailyClaim ??= () => localStorage.getItem("daily") !== todayUTC();
-  Strubles.dailyClaim ??= (amt) => {
-    if (!Strubles.canDailyClaim()) return false;
-    Strubles.add(amt);
-    localStorage.setItem("daily", todayUTC());
-    return true;
-  };
-
-  function updateEarnUI() {
-    dailyBtn.disabled = !Strubles.canDailyClaim();
-  }
-
-  // --- Daily reel: same tier-first weighted-roll shape as the case system,
-  // just five fixed payouts instead of a full item pool. Floor 500, ceiling
-  // 5000, each step up rarer than the last.
-  const DAILY_TIERS = [
-    { amt: 500,  weight: 50, tier: 'mil_spec',        label: 'Mil-Spec',         color: '#4b69ff' },
-    { amt: 1000, weight: 27, tier: 'restricted',       label: 'Restricted',       color: '#8847ff' },
-    { amt: 2000, weight: 15, tier: 'classified',       label: 'Classified',       color: '#d32ce6' },
-    { amt: 3500, weight: 6,  tier: 'covert',           label: 'Covert',           color: '#eb4b4b' },
-    { amt: 5000, weight: 2,  tier: 'exceedingly_rare', label: 'Exceedingly Rare', color: '#ffd700' },
-  ];
-  const DAILY_WEIGHT_TOTAL = DAILY_TIERS.reduce((s, t) => s + t.weight, 0);
-
-  function pickDailyTier() {
-    let r = Math.random() * DAILY_WEIGHT_TOTAL;
-    for (const t of DAILY_TIERS) {
-      r -= t.weight;
-      if (r <= 0) return t;
-    }
-    return DAILY_TIERS[0];
-  }
-
-  const dailyReelOverlay = document.getElementById('daily-reel-overlay');
-  const dailyReelViewport = document.getElementById('daily-reel-viewport');
-  const dailyReelStrip = document.getElementById('daily-reel-strip');
-  const dailyWinAmt = document.getElementById('daily-win-amt');
-  const dailyWinTier = document.getElementById('daily-win-tier');
-  const dailyReelClose = document.getElementById('daily-reel-close');
-
-  function buildDailyTile(t) {
-    const el = document.createElement('div');
-    el.className = 'daily-tile' + (t.tier === 'exceedingly_rare' ? ' gold' : '');
-    el.style.setProperty('--tier-c', t.color);
-    el.innerHTML = `<img src="/strubles.png" alt="Struble" /><span class="amt">+${t.amt.toLocaleString()}</span>`;
-    return el;
-  }
-
-  function playDailyReel(winner) {
-    const FILLER_COUNT = 26;
-    const WINNER_INDEX = 22;
-
-    dailyReelStrip.innerHTML = '';
-    dailyReelStrip.style.transition = 'none';
-    dailyReelStrip.style.transform = 'translateX(0px)';
-    for (let i = 0; i < FILLER_COUNT; i++) {
-      dailyReelStrip.appendChild(buildDailyTile(i === WINNER_INDEX ? winner : pickDailyTier()));
-    }
-    void dailyReelStrip.offsetWidth; // force reflow so the reset above isn't coalesced
-
-    requestAnimationFrame(() => {
-      const tiles = dailyReelStrip.children;
-      const step = tiles[1].offsetLeft - tiles[0].offsetLeft;
-      const tileW = tiles[0].offsetWidth;
-      const centre = dailyReelViewport.clientWidth / 2;
-      const jitter = (Math.random() - 0.5) * tileW * 0.4;
-      const target = -(WINNER_INDEX * step + tileW / 2 - centre + jitter);
-
-      const DURATION = 3400;
-      dailyReelStrip.style.transition = `transform ${DURATION}ms cubic-bezier(.14,.7,.16,1)`;
-      dailyReelStrip.style.transform = `translateX(${target}px)`;
-
-      let settled = false;
-      const finish = (e) => {
-        if (e && (e.target !== dailyReelStrip || e.propertyName !== 'transform')) return;
-        if (settled) return;
-        settled = true;
-        dailyReelStrip.removeEventListener('transitionend', finish);
-        revealDailyResult(winner);
-      };
-      dailyReelStrip.addEventListener('transitionend', finish);
-      setTimeout(finish, DURATION + 300); // fallback if transitionend never fires
-    });
-  }
-
-  function revealDailyResult(winner) {
-    dailyWinAmt.textContent = `+${winner.amt.toLocaleString()} Strubles`;
-    dailyWinAmt.style.color = winner.color;
-    dailyWinTier.textContent = winner.label;
-    dailyWinTier.style.color = winner.color;
-    dailyWinAmt.classList.add('show');
-    dailyWinTier.classList.add('show');
-    dailyReelClose.classList.add('show');
-
-    Strubles.dailyClaim(winner.amt);
-    syncBalance();
-    updateEarnUI();
-  }
-
-  dailyReelClose.addEventListener('click', () => {
-    dailyReelOverlay.classList.remove('open');
-  });
-
-  dailyBtn.addEventListener("click", () => {
-    if (!Strubles.canDailyClaim()) return;
-    dailyBtn.disabled = true;
-    dailyWinAmt.classList.remove('show');
-    dailyWinTier.classList.remove('show');
-    dailyReelClose.classList.remove('show');
-    dailyReelOverlay.classList.add('open');
-    const winner = pickDailyTier();
-    requestAnimationFrame(() => playDailyReel(winner));
-  });
-
-  window.addEventListener("strubles:change", updateEarnUI);
-  updateEarnUI();
 
   function makeDeck() {
     const d = [];
