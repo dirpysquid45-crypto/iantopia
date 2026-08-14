@@ -296,6 +296,93 @@
     }
     button.big.neon-daily:disabled { opacity: 0.4; cursor: none; }
 
+    /* ---------- Hello Kitty theme ---------- */
+    /* Overrides every button's colors while the Hello Kitty background is
+       active, including the neon variants above — matched selector-for-
+       selector against them (rather than !important) so it wins on
+       specificity alone and stays easy to extend later. */
+    body.theme-hello-kitty a.big,
+    body.theme-hello-kitty button.big,
+    body.theme-hello-kitty a.big.neon-yt,
+    body.theme-hello-kitty a.big.neon-gamble,
+    body.theme-hello-kitty a.big.neon-never,
+    body.theme-hello-kitty a.big.neon-mines,
+    body.theme-hello-kitty button.big.neon-daily,
+    body.theme-hello-kitty #inv-btn,
+    body.theme-hello-kitty #bg-btn,
+    body.theme-hello-kitty #cursor-btn,
+    body.theme-hello-kitty #account-btn,
+    body.theme-hello-kitty #now-playing,
+    body.theme-hello-kitty #ending-link {
+      background: #ffb6d9;
+      border-color: #ff5fa8;
+      color: #9c004f;
+      text-shadow: none;
+      box-shadow: 0 10px 24px rgba(255, 95, 168, 0.4);
+    }
+    body.theme-hello-kitty a.big:hover,
+    body.theme-hello-kitty button.big:hover,
+    body.theme-hello-kitty #inv-btn:hover,
+    body.theme-hello-kitty #bg-btn:hover,
+    body.theme-hello-kitty #cursor-btn:hover,
+    body.theme-hello-kitty #account-btn:hover,
+    body.theme-hello-kitty #now-playing:hover,
+    body.theme-hello-kitty #ending-link:hover {
+      background: #ffd1e8;
+      box-shadow: 0 0 16px rgba(255, 95, 168, 0.6), 0 10px 24px rgba(255, 95, 168, 0.4);
+    }
+
+    /* Falling cherry blossom overlay — only visible while the Hello Kitty
+       theme is active. Tiled so it covers the full viewport regardless of
+       screen size, same technique as the inventory room's #leaf-overlay —
+       except that gif's background is dark and transparent (screen blend
+       hides black), while this one's is opaque white/pale blue, so it
+       needs the opposite blend mode (multiply hides white) instead of
+       actual transparency to avoid washing out everything underneath it. */
+    #sakura-overlay {
+      position: fixed; inset: 0; z-index: 2; pointer-events: none;
+      display: none;
+      background-image: url('/video/cherry-blossom.gif');
+      background-repeat: repeat;
+      background-size: 260px 115px;
+      opacity: 0.55;
+      mix-blend-mode: multiply;
+    }
+    body.theme-hello-kitty #sakura-overlay { display: block; }
+
+    /* ---------- Girl Like Me theme (PinkPantheress, 137 BPM) ---------- */
+    /* Pulses via filter:brightness rather than transform:scale so it never
+       fights the buttons' existing hover transform (translateY) — filter
+       composites independently of transform, so hover still works exactly
+       as normal while this runs continuously underneath it. 60/137bpm =
+       0.4380s per beat. */
+    @keyframes beat-pulse {
+      0%, 100% { filter: brightness(1); }
+      50%      { filter: brightness(1.28); }
+    }
+    body.theme-girl-like-me a.big,
+    body.theme-girl-like-me button.big,
+    body.theme-girl-like-me #inv-btn,
+    body.theme-girl-like-me #bg-btn,
+    body.theme-girl-like-me #cursor-btn,
+    body.theme-girl-like-me #account-btn,
+    body.theme-girl-like-me #now-playing,
+    body.theme-girl-like-me #ending-link {
+      animation: beat-pulse 0.438s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body.theme-girl-like-me a.big,
+      body.theme-girl-like-me button.big,
+      body.theme-girl-like-me #inv-btn,
+      body.theme-girl-like-me #bg-btn,
+      body.theme-girl-like-me #cursor-btn,
+      body.theme-girl-like-me #account-btn,
+      body.theme-girl-like-me #now-playing,
+      body.theme-girl-like-me #ending-link {
+        animation: none;
+      }
+    }
+
     /* ---------- Daily struble reel ---------- */
     #daily-reel-overlay {
       display:none; position:fixed; inset:0; z-index:60;
@@ -685,6 +772,8 @@
   <link rel="preload" as="image" href="/strubles.png" />
 </head>
 <body>
+  <div id="sakura-overlay" aria-hidden="true"></div>
+
   <div class="image-container" id="image-container" role="button" tabindex="0" aria-label="Spin the Iantopia image faster">
     <div class="flip-card" id="flip-card">
       <div class="flip-card-front">
@@ -877,9 +966,9 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script is:inline src="/cloud-sync.js?v=5"></script>
-  <script is:inline src="/music-library.js?v=6"></script>
+  <script is:inline src="/music-library.js?v=8"></script>
   <script is:inline src="/music-position.js?v=1"></script>
-  <script is:inline src="/background-library.js?v=3"></script>
+  <script is:inline src="/background-library.js?v=5"></script>
   <script is:inline src="/cursor-library.js?v=2"></script>
 
   <!-- Timer Script -->
@@ -1292,7 +1381,7 @@
       // Backgrounds that swap Now Playing to a matching track the moment
       // they're selected — a combo, not a separate unlock. Keyed the same
       // in both libraries on purpose (see music-library.js).
-      const BACKGROUND_MUSIC_COMBOS = ['bladee_waster', 'evian_yxguden'];
+      const BACKGROUND_MUSIC_COMBOS = ['bladee_waster', 'evian_yxguden', 'clarity', 'hello_kitty', 'girl_like_me'];
 
       function applyBackground(key) {
         const bg = BG_LIBRARY[key] || BG_LIBRARY.default;
@@ -1316,6 +1405,9 @@
           applyActiveTrack(true);
           window.dispatchEvent(new CustomEvent('active-track:changed', { detail: { key: activeTrackKey } }));
         }
+
+        document.body.classList.toggle('theme-hello-kitty', key === 'hello_kitty');
+        document.body.classList.toggle('theme-girl-like-me', key === 'girl_like_me');
       }
       applyBackground(getActiveBgKey());
 

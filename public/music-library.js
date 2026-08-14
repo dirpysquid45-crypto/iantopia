@@ -29,4 +29,7 @@ window.MUSIC_LIBRARY = {
   // is enough to also switch Now Playing to this, no independent unlock.
   bladee_waster:       { label: 'Bladee – Waster',                  src: '/audio/music/bladee-waster.mp3' },
   evian_yxguden:        { label: 'Evian Christ – Yxguden (feat. Bladee)', src: '/audio/music/evian-christ-yxguden.mp3' },
+  clarity:             { label: 'Zedd – Clarity ft. Foxes',          src: '/audio/music/clarity.mp3' },
+  hello_kitty:         { label: 'Hello Kitty',                       src: '/audio/music/hello-kitty.mp3' },
+  girl_like_me:        { label: 'PinkPantheress – Girl Like Me',     src: '/audio/music/girl-like-me.mp3' },
 };
