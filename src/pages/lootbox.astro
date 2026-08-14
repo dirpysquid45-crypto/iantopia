@@ -310,6 +310,43 @@
     }
   }
 
+  /* Deeper coverage: this page's own title, outline, and the actual
+     "open case" button (button.primary — green by default, not gold) —
+     not just the shared utility chrome above. */
+  body.theme-hello-kitty h1 { color:#ffb6d9; text-shadow:0 0 5px #ff5fa8, 0 0 12px #ff5fa8, 0 0 24px rgba(255,95,168,.6); }
+  body.theme-hello-kitty .wrap { border-color:#ff5fa8; box-shadow:0 20px 50px rgba(0,0,0,.5), 0 0 20px rgba(255,95,168,.4), 0 0 60px rgba(255,95,168,.18); }
+  body.theme-hello-kitty button.primary { border-color:#ff5fa8; background:#33001a; color:#ff8dc2; }
+  body.theme-hello-kitty button.primary:hover:not(:disabled) { background:#4d0033; }
+  body.theme-hello-kitty .small strong { color:#ff8dc2; }
+
+  body.theme-old-ppl-slot h1 { text-shadow:0 0 5px #ffd700, 0 0 12px #ffd700, 0 0 24px rgba(255,215,0,.6); }
+  body.theme-old-ppl-slot .wrap { border-color:#ffd700; box-shadow:0 20px 50px rgba(0,0,0,.5), 0 0 20px rgba(255,215,0,.45), 0 0 60px rgba(255,215,0,.2); }
+  body.theme-old-ppl-slot button.primary { border-color:#ffd700; background:#332b00; color:#ffe766; }
+  body.theme-old-ppl-slot button.primary:hover:not(:disabled) { background:#4d4000; }
+
+  body.theme-waster h1, body.theme-evian h1 { color:#e0aaff; text-shadow:0 0 5px #9d4edd, 0 0 12px #9d4edd, 0 0 24px rgba(176,38,255,.6); }
+  body.theme-waster .wrap, body.theme-evian .wrap {
+    border-color:#9d4edd; box-shadow:0 20px 50px rgba(0,0,0,.5), 0 0 20px rgba(157,78,221,.4), 0 0 60px rgba(157,78,221,.18);
+  }
+  body.theme-waster button.primary, body.theme-evian button.primary { border-color:#9d4edd; background:#1a0533; color:#e0aaff; }
+  body.theme-waster button.primary:hover:not(:disabled), body.theme-evian button.primary:hover:not(:disabled) { background:#2d0a5c; }
+  body.theme-waster .small strong, body.theme-evian .small strong { color:#e0aaff; }
+
+  body.theme-girl-like-me h1, body.theme-girl-like-me .wrap {
+    animation: beat-pulse .438s ease-in-out infinite;
+  }
+
+  body.theme-clarity h1, body.theme-clarity .wrap, body.theme-clarity button.primary:not(:disabled) {
+    animation: rgb-cycle 1.875s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body.theme-girl-like-me h1, body.theme-girl-like-me .wrap,
+    body.theme-clarity h1, body.theme-clarity .wrap, body.theme-clarity button.primary:not(:disabled) {
+      animation:none;
+    }
+  }
+
   /* This page's own bg-picker script (not pickers.js, but the same pattern)
      toggles this class on <video id="bg-video"> (display:none inline) —
      without this rule the class gets added but nothing makes it visible,
