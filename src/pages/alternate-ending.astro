@@ -124,6 +124,11 @@
     body{ overflow-y: auto; }
     #home-link{ top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); padding: 6px 10px; font-size: 12px; }
   }
+
+  #volume-slider{
+    flex:1; accent-color:#fff; cursor:none;
+    touch-action:none; padding:14px 0;
+  }
 </style>
 </head>
 <body>
@@ -152,6 +157,10 @@
   <div id="playlist-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:50; align-items:center; justify-content:center;">
     <div style="background:#000; border:2px solid #fff; padding:20px; max-width:300px; max-height:400px; overflow-y:auto; box-shadow:0 0 20px rgba(255,255,255,0.3);">
       <div style="color:#fff; margin-bottom:12px; font-size:12px; text-transform:uppercase; font-weight:bold;">Music</div>
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.3);">
+        <button id="mute-btn" type="button" aria-label="Toggle sound" title="Toggle sound" style="all:unset; cursor:none; font-size:16px; padding:4px 8px; border:1px solid #444; border-radius:8px; background:#111; color:#fff;">🔊</button>
+        <input type="range" id="volume-slider" min="0" max="100" value="30" aria-label="Music volume" />
+      </div>
       <div id="playlist-list"></div>
       <button id="playlist-close" style="margin-top:12px; width:100%; background:#fff; color:#000; border:none; padding:6px; cursor:none; font-weight:700;">Close</button>
     </div>
@@ -174,6 +183,7 @@
   </div>
 
   <video id="bg-video" style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1;" loop></video>
+  <audio id="theme-music" src="/audio/music/home-theme.mp3" preload="none" loop></audio>
 
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -272,6 +282,48 @@
 
     <div class="cr-end">THE END<small>(it is not the end)</small></div>
   `;
+
+  // --- Theme music (background loop, tied to the mute control) -----------
+  // This page had the "Music options" button and full playlist UI wired up
+  // via pickers.js, but no actual <audio> element — every track pick was a
+  // silent no-op since pickers.js guards every play() call on the element
+  // existing. Sound simply never worked here at all, on any device.
+  let audioEnabled = true;
+  const themeMusic = document.getElementById('theme-music');
+  const VOLUME_KEY = 'music_volume_v1';
+  const volumeSlider = document.getElementById('volume-slider');
+  const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
+  themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.3;
+  volumeSlider.value = Math.round(themeMusic.volume * 100);
+  volumeSlider.addEventListener('input', () => {
+    themeMusic.volume = volumeSlider.value / 100;
+    localStorage.setItem(VOLUME_KEY, themeMusic.volume);
+  });
+  window.addEventListener('storage', (e) => {
+    if (e.key === VOLUME_KEY && e.newValue != null) {
+      themeMusic.volume = parseFloat(e.newValue);
+      volumeSlider.value = Math.round(themeMusic.volume * 100);
+    }
+  });
+  function tryPlayTheme() {
+    if (!audioEnabled) return;
+    themeMusic.play().catch(() => {});
+  }
+  tryPlayTheme();
+  const unlockTheme = () => {
+    tryPlayTheme();
+    window.removeEventListener('pointerdown', unlockTheme);
+    window.removeEventListener('keydown', unlockTheme);
+  };
+  window.addEventListener('pointerdown', unlockTheme);
+  window.addEventListener('keydown', unlockTheme);
+  const muteBtn = document.getElementById('mute-btn');
+  muteBtn.addEventListener('click', () => {
+    audioEnabled = !audioEnabled;
+    muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
+    if (audioEnabled) tryPlayTheme();
+    else themeMusic.pause();
+  });
 
   // Initialize pickers
   if (window.initPickers) {
