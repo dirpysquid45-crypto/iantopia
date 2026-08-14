@@ -90,6 +90,21 @@ window.CASE_ITEMS = {
   alt_ending:  { label: 'Alternate Ending',               tier: 'exceedingly_rare', emoji: '🎬',                            type: 'unlock_page', path: '/alternate-ending' },
   cur_struble: { label: 'Cursor: Struble Coin',           tier: 'exceedingly_rare', img: '/strubles.png',                  type: 'cursor_unlock', key: 'struble_coin' },
   cur_hamood:  { label: 'Cursor: Hamood Habibi',          tier: 'exceedingly_rare', img: '/cursors/hamood-point.png',      type: 'cursor_unlock', key: 'hamood_habibi' },
+
+  // ---------- Iantopia Tycoon buildings ----------
+  // Unlike every other type above, these are NOT simple one-time
+  // collectibles — a player can own up to TYCOON_MAX_PER_TYPE (10) of the
+  // SAME building, so lootbox.js's isOwned()/applyItem() special-case
+  // `building_unlock` instead of using the generic single-flag ownership
+  // path every other type uses. Gameplay stats (production, build time,
+  // placement cost) live in tycoon-buildings.js, not here — this only
+  // defines what opening a case grants, matching how background_unlock
+  // items only grant a key that background-library.js gives meaning to.
+  bld_shabby:     { label: 'Building: Shabby Apartment',    tier: 'mil_spec',         img: '/tycoon/shabby-apartment.png', type: 'building_unlock', key: 'shabby_apartment' },
+  bld_generic:    { label: 'Building: Generic Building',    tier: 'restricted',       img: '/tycoon/generic-building.png', type: 'building_unlock', key: 'generic_building' },
+  bld_pagoda:     { label: 'Building: Pagoda',              tier: 'classified',       img: '/tycoon/pagoda.png',           type: 'building_unlock', key: 'pagoda' },
+  bld_skyscraper: { label: 'Building: Generic Skyscraper',  tier: 'covert',           img: '/tycoon/generic-building.png', type: 'building_unlock', key: 'generic_skyscraper' },
+  bld_taipei101:  { label: 'Building: Taipei 101',          tier: 'exceedingly_rare', img: '/tycoon/taipei-101.png',       type: 'building_unlock', key: 'taipei_101' },
 };
 
 // Paths an `unlock_page` item may grant. A path only belongs here once the page
@@ -167,6 +182,25 @@ window.CASES = {
       exceedingly_rare: 8.0,
     },
     items: idsFromTier('restricted'),
+  },
+
+  iantopia_tycoon_basic: {
+    label: 'Iantopia Lootbox Basic',
+    cost: 750,
+    emoji: '🏗️',
+    blurb: 'Drops a building for your Iantopia Tycoon skyline. Odds favor common stock, but Taipei 101 is in here.',
+    // Rarity tiers reused as the building rarity odds specified for this
+    // case specifically — Common/Uncommon/Rare/Epic/Legendary at
+    // 50/30/15/4/1%, mapped onto the shared mil_spec..exceedingly_rare
+    // scale rather than inventing a parallel one.
+    odds: {
+      mil_spec: 50.0,
+      restricted: 30.0,
+      classified: 15.0,
+      covert: 4.0,
+      exceedingly_rare: 1.0,
+    },
+    items: ['bld_shabby', 'bld_generic', 'bld_pagoda', 'bld_skyscraper', 'bld_taipei101'],
   },
 };
 

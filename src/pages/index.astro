@@ -296,6 +296,18 @@
     }
     button.big.neon-daily:disabled { opacity: 0.4; cursor: none; }
 
+    a.big.neon-tycoon {
+      background: #001522;
+      border: 2px solid #29b6f6;
+      color: #29b6f6;
+      text-shadow: 0 0 5px #29b6f6, 0 0 10px #29b6f6, 0 0 20px #29b6f6, 0 0 40px rgba(41, 182, 246, 0.6);
+      box-shadow: 0 0 6px #29b6f6, 0 0 16px #29b6f6, 0 0 32px rgba(41, 182, 246, 0.5), inset 0 0 10px rgba(41, 182, 246, 0.15);
+    }
+    a.big.neon-tycoon:hover {
+      text-shadow: 0 0 6px #29b6f6, 0 0 14px #29b6f6, 0 0 28px #29b6f6, 0 0 56px rgba(41, 182, 246, 0.7);
+      box-shadow: 0 0 10px #29b6f6, 0 0 24px #29b6f6, 0 0 48px rgba(41, 182, 246, 0.6), inset 0 0 14px rgba(41, 182, 246, 0.2);
+    }
+
     /* ---------- Hello Kitty theme ---------- */
     /* Overrides every button's colors while the Hello Kitty background is
        active, including the neon variants above — matched selector-for-
@@ -307,6 +319,7 @@
     body.theme-hello-kitty a.big.neon-gamble,
     body.theme-hello-kitty a.big.neon-never,
     body.theme-hello-kitty a.big.neon-mines,
+    body.theme-hello-kitty a.big.neon-tycoon,
     body.theme-hello-kitty button.big.neon-daily,
     body.theme-hello-kitty #inv-btn,
     body.theme-hello-kitty #bg-btn,
@@ -373,6 +386,7 @@
     body.theme-old-ppl-slot a.big.neon-gamble,
     body.theme-old-ppl-slot a.big.neon-never,
     body.theme-old-ppl-slot a.big.neon-mines,
+    body.theme-old-ppl-slot a.big.neon-tycoon,
     body.theme-old-ppl-slot button.big.neon-daily,
     body.theme-old-ppl-slot #inv-btn,
     body.theme-old-ppl-slot #bg-btn,
@@ -1068,6 +1082,7 @@
   <div class="button-grid">
     <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
     <a class="big neon-mines" href="/minesweeper">💣 Minesweeper</a>
+    <a class="big neon-tycoon" href="/tycoon">🏙️ Iantopia Tycoon</a>
     <button id="btn-daily" class="big neon-daily">🗓️ Daily (500–5000)</button>
     <a class="big neon-yt" href="/transcripts/">YouTube Transcripts</a>
     <a class="big neon-never" href="/never">Is Iantopia Done Yet????</a>
@@ -1179,7 +1194,7 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script is:inline src="/cloud-sync.js?v=6"></script>
+  <script is:inline src="/cloud-sync.js?v=7"></script>
   <script is:inline src="/music-library.js?v=8"></script>
   <script is:inline src="/music-position.js?v=1"></script>
   <script is:inline src="/background-library.js?v=8"></script>

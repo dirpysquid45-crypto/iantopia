@@ -51,7 +51,13 @@
     exceedingly_rare: 25000,
   };
 
-  const INV_BUCKETS = ['items', 'powerups', 'sfx', 'themes', 'badges', 'tracks', 'backgrounds', 'cursors'];
+  const INV_BUCKETS = ['items', 'powerups', 'sfx', 'themes', 'badges', 'tracks', 'backgrounds', 'cursors', 'buildings'];
+
+  // Buildings are the one type that isn't a simple own-it-once collectible —
+  // a player can hold up to this many of the SAME building, so `buildings`
+  // is allowed to contain duplicate keys (count of a key = how many owned),
+  // unlike every other bucket where `.includes()` is the ownership check.
+  const MAX_BUILDING_COPIES = (window.TYCOON_MAX_PER_TYPE) || 10;
 
   // Must hand back FRESH arrays every call. Returning a shared template and
   // letting callers push into it mutates the template itself, so every later
@@ -151,6 +157,12 @@
     if (!bucket) return false;
     const inv = state.inv;
     const key = item.key || id;
+    // Buildings aren't own-it-once — only "owned" (excluded from further
+    // rolls) once you're holding the max copies of that specific building.
+    if (item.type === 'building_unlock') {
+      const count = Array.isArray(inv[bucket]) ? inv[bucket].filter((k) => k === key).length : 0;
+      return count >= MAX_BUILDING_COPIES;
+    }
     return Array.isArray(inv[bucket]) && inv[bucket].includes(key);
   }
 
@@ -211,11 +223,30 @@
     return reel;
   }
 
-  function applyItem(item) {
+  function applyItem(item, caseCost) {
     const inv = state.inv;
     const result = { duplicate: false, refund: 0, mailto: null, unlocked: false };
 
     switch (item.type) {
+      case 'building_unlock': {
+        const key = item.key || item.id;
+        const count = inv.buildings.filter((k) => k === key).length;
+        if (count >= MAX_BUILDING_COPIES) {
+          // Maxed out on this building — refund rule is specific to
+          // buildings (10% of what this case cost), not the flat
+          // per-tier DUPLICATE_REFUND table every other type uses.
+          result.duplicate = true;
+          result.refund = Math.round((caseCost || 0) * 0.1);
+          if (result.refund) Strubles.add(result.refund);
+        } else {
+          inv.buildings.push(key);
+          state.inv = inv;
+          dispatch('building:unlocked');
+        }
+        result.unlocked = true;
+        return result; // refund already applied above — skip the generic tier-based refund below
+      }
+
       case 'strubles': {
         Strubles.add(item.amount || 0);
         result.unlocked = true;
@@ -356,7 +387,7 @@
     if (cases[caseKey] <= 0) delete cases[caseKey];
     state.cases = cases;
 
-    const applied = applyItem(Object.assign({ id: winnerId }, item));
+    const applied = applyItem(Object.assign({ id: winnerId }, item), def.cost);
 
     const reelLength = opts.reelLength || 60;
     const winnerIndex = opts.winnerIndex != null ? opts.winnerIndex : reelLength - 6;

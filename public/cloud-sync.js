@@ -50,6 +50,8 @@
     'active_track_v1',
     'home_active_track_v1',
     'lootbox_active_track_v1',
+    'tycoon_grid_v1',
+    'tycoon_last_seen_v1',
   ];
 
   // pickers.js (blackjack/alternate-ending/minesweeper/inventory) derives its
@@ -79,6 +81,7 @@
     // no guarantee of finishing before the page actually tears down). This
     // is the real cause behind "I picked X, left, came back, it reset."
     'active-background:changed', 'active-track:changed', 'desktop-items:changed',
+    'tycoon:changed', 'building:unlocked',
   ];
 
   // Firebase persists the signed-in session, so onAuthStateChanged fires on

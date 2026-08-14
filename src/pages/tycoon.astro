@@ -1,0 +1,592 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Iantopia Tycoon</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0a0c12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script is:inline src="/pwa.js?v=1" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<!--
+  is:global is REQUIRED. Astro scopes <style> by stamping data-astro-cid-* on
+  elements in the template and rewriting selectors to match. The grid and
+  every building/worker element are built at runtime via createElement, so
+  they never receive that attribute and every scoped rule silently skips
+  them. Same trap as every other page in this project.
+-->
+<style is:global>
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; }
+  body {
+    min-height:100vh;
+    color:var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+    cursor:none;
+    position:relative;
+    overflow-x:hidden;
+  }
+
+  /* Fixed sky behind everything — this page's background is thematic, not
+     user-selectable (no bg-btn/picker here), so it's just plain CSS rather
+     than going through background-library.js. */
+  #sky-bg {
+    position:fixed; inset:0; z-index:-2;
+    background-image:url('/tycoon/sky-background.gif');
+    background-size:cover; background-position:center;
+  }
+  #sky-bg::after {
+    content:''; position:absolute; inset:0; background:rgba(0,0,0,.15);
+  }
+  /* Grass sits in front of the buildings' feet but behind every interactive
+     layer — a tiled strip along the very bottom, matching the spec's "small
+     amount of the bottom of each png" note. */
+  #grass-fg {
+    position:fixed; left:0; right:0; bottom:0; z-index:5; pointer-events:none;
+    height:90px;
+    background-image:url('/tycoon/grass-foreground.png');
+    background-repeat:repeat-x; background-position:bottom left; background-size:auto 100%;
+  }
+
+  #strubles-badge{
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
+    background:#000; padding:8px 12px; border:3px solid var(--gold);
+    font-weight:700; z-index:20;
+  }
+  #strubles-badge img{ width:28px; height:28px; }
+
+  main { position:relative; z-index:2; max-width:1200px; margin:0 auto; padding:24px; padding-top:90px; }
+
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:4px solid #000; padding-bottom:10px; flex-wrap:wrap; gap:10px; }
+  header a { color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; font-weight:700; background:#000; transition:background 0.2s; font-size:10px; cursor:none; }
+  header a:hover { background:var(--gold); color:#000; }
+  header button { color:var(--gold); background:#000; border:2px solid var(--gold); padding:4px 6px; cursor:none; transition:background 0.2s; }
+  header button:hover { background:var(--gold); color:#000; }
+
+  h1 {
+    margin:0; font-size:clamp(13px,2.6vw,20px); letter-spacing:1px; color:var(--gold); font-weight:400;
+    text-shadow: 2px 2px 0 #000; text-align:center; width:100%;
+  }
+
+  #stats-bar {
+    display:flex; justify-content:center; gap:18px; flex-wrap:wrap;
+    background:rgba(0,0,0,.55); border:2px solid var(--gold); padding:10px 14px;
+    margin-bottom:20px; font-size:9px; color:#fff;
+  }
+  #stats-bar b { color:var(--gold); }
+
+  #lootbox-cta {
+    display:block; text-align:center; margin:0 auto 24px; width:fit-content;
+    color:#000; background:var(--gold); text-decoration:none; border:3px solid #000;
+    padding:10px 18px; font-size:11px; font-weight:700;
+  }
+  #lootbox-cta:hover { background:#ffe766; }
+
+  /* ---------- The skyline grid ---------- */
+  #tycoon-grid {
+    display:grid;
+    grid-template-columns: repeat(5, minmax(140px, 1fr));
+    grid-auto-rows: min-content;
+    gap:10px 6px;
+    overflow-x:auto;
+    padding-bottom:110px; /* clears the fixed grass strip */
+  }
+  .tycoon-slot {
+    position:relative;
+    display:flex; align-items:flex-end; justify-content:center;
+    min-height:180px;
+    border-bottom:3px solid rgba(255,215,0,.35);
+  }
+  .tycoon-slot.empty {
+    min-height:180px;
+    cursor:none;
+  }
+  .tycoon-slot.empty .empty-plus {
+    width:100%; height:100px; display:flex; align-items:center; justify-content:center;
+    border:2px dashed rgba(255,215,0,.4); color:rgba(255,215,0,.6); font-size:28px;
+    transition:background .15s, border-color .15s;
+  }
+  .tycoon-slot.empty:hover .empty-plus {
+    border-color:var(--gold); background:rgba(255,215,0,.08);
+  }
+  .tycoon-building-img {
+    display:block; width:auto; max-width:100%;
+    height:50vh;
+    object-fit:contain;
+    filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));
+    transition: filter .3s ease;
+  }
+  .tycoon-building-img.skyscraper { height:70vh; }
+  .tycoon-slot.building .tycoon-building-img {
+    filter: brightness(0.5) saturate(0.6) drop-shadow(0 6px 10px rgba(0,0,0,.5));
+  }
+  .tycoon-slot .label-tag {
+    position:absolute; bottom:-2px; left:50%; transform:translateX(-50%);
+    background:#000; color:var(--gold); border:2px solid var(--gold);
+    font-size:7px; padding:3px 6px; white-space:nowrap; text-align:center;
+  }
+
+  .construction-pct {
+    position:absolute; top:6px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,.8); color:var(--gold); padding:3px 8px;
+    font-size:9px; border:2px solid var(--gold); white-space:nowrap;
+  }
+  .construction-workers {
+    position:absolute; bottom:6px; left:50%; transform:translateX(-50%);
+    display:flex; gap:2px; pointer-events:none;
+  }
+  .construction-worker {
+    height:44px; width:auto; object-fit:contain;
+    animation: worker-wiggle .7s ease-in-out infinite;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,.6));
+  }
+  .construction-worker.driller { animation-delay: .25s; }
+  @keyframes worker-wiggle {
+    0%, 100% { transform: rotate(-6deg) translateY(0); }
+    50%      { transform: rotate(6deg) translateY(-4px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .construction-worker { animation:none; }
+  }
+
+  /* ---------- Placement / picker overlays (same system as every other page) ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:100;
+    display:none; align-items:center; justify-content:center; padding:20px;
+  }
+  .overlay.open{ display:flex; }
+  .modal{
+    width:min(420px,90vw); max-height:75vh; overflow-y:auto;
+    background:#0a0a0a; border:3px solid var(--gold); padding:20px;
+    box-shadow:0 0 20px rgba(255,215,0,.4);
+  }
+  .modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; }
+  .modal-head h2{ margin:0; font-size:12px; color:var(--gold); font-weight:400; }
+  .btn{
+    color:var(--gold); text-decoration:none; border:3px solid var(--gold); padding:8px 12px;
+    background:#000; font-size:9px; transition:background .2s, color .2s; cursor:none;
+    font-family:inherit; letter-spacing:1px; text-transform:uppercase;
+  }
+  .btn:hover{ background:var(--gold); color:#000; }
+  .picker-row { display:flex; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:10px; gap:10px; cursor:pointer; }
+  .picker-row:last-child { border-bottom:none; }
+  .picker-row:hover { background:rgba(255,215,0,.08); }
+  .picker-row img { width:36px; height:36px; object-fit:contain; flex-shrink:0; }
+  .picker-row .row-info { flex:1; line-height:1.6; }
+  .picker-row .row-info small { color:var(--muted); display:block; font-size:8px; }
+  .picker-empty { color:var(--muted); font-size:10px; padding:10px 0; line-height:1.8; text-align:center; }
+
+  .volume-row{
+    display:flex; align-items:center; gap:10px; margin-bottom:16px;
+    padding-bottom:14px; border-bottom:1px solid rgba(255,215,0,0.3);
+  }
+  .volume-row input[type="range"]{ flex:1; accent-color:var(--gold); cursor:none; touch-action:none; padding:14px 0; }
+  .volume-mute-btn{
+    all:unset; cursor:none; font-size:16px; padding:4px 8px;
+    border:1px solid var(--gold); background:#000;
+  }
+
+  @media (max-width:768px) {
+    .tycoon-building-img { height:36vh; }
+    .tycoon-building-img.skyscraper { height:50vh; }
+    #stats-bar { font-size:8px; gap:10px; }
+  }
+</style>
+</head>
+<body>
+  <div id="sky-bg"></div>
+
+  <div id="strubles-badge">
+    <img src="/strubles.png" alt="Struble">
+    <span id="bal">0</span>
+  </div>
+
+  <main>
+    <header>
+      <a href="/" title="Back to Iantopia">← Home</a>
+      <h1>IANTOPIA TYCOON</h1>
+      <div style="display:flex; gap:4px;">
+        <button id="now-playing" title="Music options">🎵</button>
+        <button id="cursor-btn" title="Change cursor">🖱️</button>
+      </div>
+    </header>
+
+    <div id="stats-bar">
+      <span>Production: <b id="stat-production">0</b>/min</span>
+      <span>Placed: <b id="stat-placed">0</b>/10</span>
+      <span>Under construction: <b id="stat-building">0/3</b></span>
+    </div>
+
+    <a id="lootbox-cta" href="/lootbox">🏗️ Get an Iantopia Lootbox Basic</a>
+
+    <div id="tycoon-grid"></div>
+  </main>
+
+  <div id="grass-fg"></div>
+
+  <!-- Placement picker: which owned-but-unplaced building to build here -->
+  <div class="overlay" id="place-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Build here</h2>
+        <button class="btn" id="place-close" type="button">Close</button>
+      </div>
+      <div id="place-list"></div>
+    </div>
+  </div>
+
+  <!-- Music Playlist Modal -->
+  <div class="overlay" id="playlist-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Now Playing</h2>
+        <button class="btn" id="playlist-close" type="button">Close</button>
+      </div>
+      <div class="volume-row">
+        <button class="volume-mute-btn" id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
+        <input type="range" id="volume-slider" min="0" max="100" value="30" aria-label="Music volume" />
+      </div>
+      <div id="playlist-list"></div>
+    </div>
+  </div>
+
+  <!-- Cursor Picker Modal -->
+  <div class="overlay" id="cursor-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Cursors</h2>
+        <button class="btn" id="cursor-close" type="button">Close</button>
+      </div>
+      <div id="cursor-list"></div>
+    </div>
+  </div>
+
+  <audio id="theme-music" src="/audio/music/home-theme.mp3" preload="none" loop></audio>
+
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<!-- Headless here (no account UI on this page) — see blackjack.astro for
+     why every page needs this now, not just home. -->
+<script is:inline src="/cloud-sync.js?v=7"></script>
+<script is:inline src="/music-library.js?v=8"></script>
+<script is:inline src="/music-position.js?v=1"></script>
+<script is:inline src="/cursor-library.js?v=2"></script>
+<script is:inline src="/case-data.js?v=10"></script>
+<script is:inline src="/tycoon-buildings.js?v=1"></script>
+<script is:inline src="/cursor.js?v=3"></script>
+<script is:inline src="/strubles.js?v=2"></script>
+<script is:inline src="/pickers.js?v=10"></script>
+<script is:inline>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const GRID_SIZE = 10;
+  const GRID_KEY = 'tycoon_grid_v1';
+  const LAST_SEEN_KEY = 'tycoon_last_seen_v1';
+  const INV_KEY = 'strubles_inventory_v1';
+  const ORDER = window.TYCOON_BUILDING_ORDER || [];
+  const DEFS = window.TYCOON_BUILDINGS || {};
+  const MAX_PER_TYPE = window.TYCOON_MAX_PER_TYPE || 10;
+  const MAX_CONCURRENT = window.TYCOON_MAX_CONCURRENT_BUILDS || 3;
+  const OFFLINE_CAP_MS = window.TYCOON_OFFLINE_CAP_MS || 8 * 60 * 60 * 1000;
+  const RARITY = window.CASE_RARITIES || {};
+
+  function loadJSON(k, fb) { try { const v = localStorage.getItem(k); return v != null ? JSON.parse(v) : fb; } catch { return fb; } }
+  function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+  function loadGrid() {
+    const raw = loadJSON(GRID_KEY, null);
+    if (Array.isArray(raw) && raw.length === GRID_SIZE) return raw;
+    return new Array(GRID_SIZE).fill(null);
+  }
+  function saveGrid(grid) {
+    saveJSON(GRID_KEY, grid);
+    try { window.dispatchEvent(new Event('tycoon:changed')); } catch {}
+  }
+
+  function ownedCounts() {
+    const inv = loadJSON(INV_KEY, {});
+    const buildings = Array.isArray(inv.buildings) ? inv.buildings : [];
+    const counts = {};
+    ORDER.forEach((k) => { counts[k] = 0; });
+    buildings.forEach((k) => { if (counts[k] != null) counts[k]++; });
+    return counts;
+  }
+  function placedCounts(grid) {
+    const counts = {};
+    ORDER.forEach((k) => { counts[k] = 0; });
+    grid.forEach((slot) => { if (slot && counts[slot.key] != null) counts[slot.key]++; });
+    return counts;
+  }
+  function availableCounts(grid) {
+    const owned = ownedCounts(), placed = placedCounts(grid);
+    const avail = {};
+    ORDER.forEach((k) => { avail[k] = Math.max(0, owned[k] - placed[k]); });
+    return avail;
+  }
+  function buildingCount(grid) {
+    return grid.filter((s) => s && s.status === 'building').length;
+  }
+
+  // Reconciles construction completion + production accrual since the last
+  // check-in, capped at OFFLINE_CAP_MS so a long absence doesn't retroactively
+  // finish/produce forever — the excess time beyond the cap is simply lost,
+  // not banked for later ("construction pauses" per the spec).
+  function tick(grid) {
+    const now = Date.now();
+    const lastSeen = Number(localStorage.getItem(LAST_SEEN_KEY)) || now;
+    const cappedNow = Math.min(now, lastSeen + OFFLINE_CAP_MS);
+    let earned = 0;
+    let changed = false;
+    grid.forEach((slot) => {
+      if (!slot) return;
+      const def = DEFS[slot.key];
+      if (!def) return;
+      if (slot.status === 'building' && cappedNow >= slot.completesAt) {
+        slot.status = 'complete';
+        slot.lastProductionAt = slot.completesAt;
+        changed = true;
+      }
+      if (slot.status === 'complete') {
+        const elapsedMin = Math.max(0, cappedNow - slot.lastProductionAt) / 60000;
+        const gain = Math.floor(elapsedMin * def.production);
+        if (gain > 0) {
+          earned += gain;
+          slot.lastProductionAt += (gain / def.production) * 60000;
+          changed = true;
+        }
+      }
+    });
+    localStorage.setItem(LAST_SEEN_KEY, String(now));
+    if (earned > 0) { try { Strubles.add(earned); } catch {} }
+    return changed;
+  }
+
+  function syncBalance() { try { $('bal').textContent = Strubles.get().toLocaleString(); } catch {} }
+
+  function fmtRemaining(ms) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+    if (h > 0) return `${h}h ${m}m left`;
+    if (m > 0) return `${m}m ${sec}s left`;
+    return `${sec}s left`;
+  }
+
+  let grid = loadGrid();
+  let renderTimer = null;
+
+  function render() {
+    const gridEl = $('tycoon-grid');
+    gridEl.innerHTML = '';
+    const now = Date.now();
+    let totalProduction = 0;
+
+    grid.forEach((slot, i) => {
+      const cell = document.createElement('div');
+      cell.className = 'tycoon-slot';
+      cell.dataset.slot = i;
+
+      if (!slot) {
+        cell.classList.add('empty');
+        const plus = document.createElement('div');
+        plus.className = 'empty-plus';
+        plus.textContent = '+';
+        cell.appendChild(plus);
+        cell.addEventListener('click', () => openPlacePicker(i));
+        gridEl.appendChild(cell);
+        return;
+      }
+
+      const def = DEFS[slot.key];
+      if (!def) { gridEl.appendChild(cell); return; }
+      const rarity = RARITY[def.tier] || {};
+
+      const img = document.createElement('img');
+      img.className = 'tycoon-building-img' + (def.skyscraper ? ' skyscraper' : '');
+      img.src = def.img;
+      img.alt = def.label;
+      cell.appendChild(img);
+
+      const tag = document.createElement('div');
+      tag.className = 'label-tag';
+      tag.style.color = rarity.color || 'var(--gold)';
+      tag.style.borderColor = rarity.color || 'var(--gold)';
+
+      if (slot.status === 'building') {
+        cell.classList.add('building');
+        const pct = Math.min(100, Math.round(((now - slot.startedAt) / (slot.completesAt - slot.startedAt)) * 100));
+        const badge = document.createElement('div');
+        badge.className = 'construction-pct';
+        badge.textContent = `${pct}% — ${fmtRemaining(slot.completesAt - now)}`;
+        cell.appendChild(badge);
+
+        const workers = document.createElement('div');
+        workers.className = 'construction-workers';
+        const w1 = document.createElement('img');
+        w1.className = 'construction-worker';
+        w1.src = '/tycoon/worker-pointing.png';
+        w1.alt = '';
+        const w2 = document.createElement('img');
+        w2.className = 'construction-worker driller';
+        w2.src = '/tycoon/worker-driller.png';
+        w2.alt = '';
+        workers.appendChild(w1);
+        workers.appendChild(w2);
+        cell.appendChild(workers);
+
+        tag.textContent = def.label;
+      } else {
+        totalProduction += def.production;
+        tag.textContent = `${def.label} · +${def.production}/min`;
+      }
+      cell.appendChild(tag);
+      gridEl.appendChild(cell);
+    });
+
+    $('stat-production').textContent = totalProduction;
+    $('stat-placed').textContent = grid.filter(Boolean).length;
+    $('stat-building').textContent = buildingCount(grid) + '/' + MAX_CONCURRENT;
+    syncBalance();
+  }
+
+  function scheduleReconcile() {
+    if (tick(grid)) saveGrid(grid);
+    render();
+    if (renderTimer) clearInterval(renderTimer);
+    // Re-render often enough for the percentage/timer to feel live and for
+    // production to land promptly, without hammering localStorage.
+    renderTimer = setInterval(() => {
+      const changed = tick(grid);
+      if (changed) saveGrid(grid);
+      render();
+    }, 10000);
+  }
+
+  // --- Placement flow ---
+  const placeOverlay = $('place-overlay');
+  const placeList = $('place-list');
+  let targetSlot = null;
+
+  function openPlacePicker(slotIndex) {
+    targetSlot = slotIndex;
+    const avail = availableCounts(grid);
+    const owned = ownedCounts();
+    placeList.innerHTML = '';
+    const anyAvailable = ORDER.some((k) => avail[k] > 0);
+    if (!anyAvailable) {
+      const empty = document.createElement('div');
+      empty.className = 'picker-empty';
+      empty.textContent = "You don't have any unplaced buildings — open an Iantopia Lootbox Basic on the Lootbox page to win one.";
+      placeList.appendChild(empty);
+      placeOverlay.classList.add('open');
+      return;
+    }
+    ORDER.forEach((key) => {
+      if (avail[key] <= 0) return;
+      const def = DEFS[key];
+      const rarity = RARITY[def.tier] || {};
+      const row = document.createElement('div');
+      row.className = 'picker-row';
+      const img = document.createElement('img');
+      img.src = def.img;
+      img.alt = def.label;
+      const info = document.createElement('div');
+      info.className = 'row-info';
+      info.innerHTML = `${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE} · ${avail[key]} unplaced</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done</small>`;
+      row.appendChild(img);
+      row.appendChild(info);
+      row.addEventListener('click', () => placeBuilding(key));
+      placeList.appendChild(row);
+    });
+    placeOverlay.classList.add('open');
+  }
+  function fmtDuration(min) {
+    if (min >= 1440) return (min / 1440).toFixed(min % 1440 === 0 ? 0 : 1) + 'd';
+    if (min >= 60) return (min / 60).toFixed(min % 60 === 0 ? 0 : 1) + 'h';
+    return min + 'm';
+  }
+
+  function placeBuilding(key) {
+    const def = DEFS[key];
+    if (!def || targetSlot == null) return;
+    if (buildingCount(grid) >= MAX_CONCURRENT) {
+      alert(`Only ${MAX_CONCURRENT} buildings can be under construction at once — wait for one to finish first.`);
+      return;
+    }
+    if (!Strubles.spend(def.cost)) {
+      alert(`Not enough Strubles for the permit (need ${def.cost.toLocaleString()}).`);
+      return;
+    }
+    const now = Date.now();
+    grid[targetSlot] = {
+      key,
+      status: 'building',
+      startedAt: now,
+      completesAt: now + def.buildMinutes * 60000,
+      lastProductionAt: now,
+    };
+    saveGrid(grid);
+    placeOverlay.classList.remove('open');
+    render();
+  }
+
+  document.querySelectorAll('#place-overlay, #place-close').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      if (e.target.id === 'place-overlay' || e.target.id === 'place-close') {
+        placeOverlay.classList.remove('open');
+      }
+    });
+  });
+
+  window.addEventListener('inventory:changed', () => { grid = loadGrid(); render(); });
+  window.addEventListener('strubles:change', syncBalance);
+  window.addEventListener('storage', (e) => {
+    if (e.key === GRID_KEY) { grid = loadGrid(); render(); }
+    if (e.key === INV_KEY) render();
+  });
+
+  // --- Sound (same pattern as every other page) ---
+  let audioEnabled = true;
+  const themeMusic = $('theme-music');
+  const VOLUME_KEY = 'music_volume_v1';
+  const volumeSlider = $('volume-slider');
+  const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
+  themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.3;
+  volumeSlider.value = Math.round(themeMusic.volume * 100);
+  volumeSlider.addEventListener('input', () => {
+    themeMusic.volume = volumeSlider.value / 100;
+    localStorage.setItem(VOLUME_KEY, themeMusic.volume);
+  });
+  function tryPlayTheme() { if (audioEnabled) themeMusic.play().catch(() => {}); }
+  tryPlayTheme();
+  const unlockTheme = () => {
+    tryPlayTheme();
+    window.removeEventListener('pointerdown', unlockTheme);
+    window.removeEventListener('keydown', unlockTheme);
+  };
+  window.addEventListener('pointerdown', unlockTheme);
+  window.addEventListener('keydown', unlockTheme);
+  $('mute-btn').addEventListener('click', () => {
+    audioEnabled = !audioEnabled;
+    $('mute-btn').textContent = audioEnabled ? '🔊' : '🔇';
+    if (audioEnabled) tryPlayTheme(); else themeMusic.pause();
+  });
+
+  scheduleReconcile();
+
+  if (window.initPickers) setTimeout(window.initPickers, 100);
+})();
+</script>
+</body>
+</html>
