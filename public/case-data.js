@@ -118,10 +118,15 @@ window.LOOTBOX_UNLOCKABLE_PAGES = [
 // adding an item above automatically places it in every case it qualifies for.
 // Hand-maintained id arrays rot the moment a new asset lands.
 const ALL_IDS = Object.keys(window.CASE_ITEMS).filter((id) => !window.CASE_ITEMS[id].archived);
-const idsByType = (...types) => ALL_IDS.filter((id) => types.includes(window.CASE_ITEMS[id].type));
+// Buildings are exclusive to the Iantopia Lootbox Basic case (see below) —
+// every other case's "everything"/"everything at this tier+" pools are
+// built from this instead of ALL_IDS, so a building can never turn up in
+// Starter or Vault just because it happens to fit their tier odds.
+const GENERAL_IDS = ALL_IDS.filter((id) => window.CASE_ITEMS[id].type !== 'building_unlock');
+const idsByType = (...types) => GENERAL_IDS.filter((id) => types.includes(window.CASE_ITEMS[id].type));
 const idsFromTier = (minTier) => {
   const min = window.CASE_RARITY_ORDER.indexOf(minTier);
-  return ALL_IDS.filter((id) => window.CASE_RARITY_ORDER.indexOf(window.CASE_ITEMS[id].tier) >= min);
+  return GENERAL_IDS.filter((id) => window.CASE_RARITY_ORDER.indexOf(window.CASE_ITEMS[id].tier) >= min);
 };
 
 // Case definitions. `items` are ids from CASE_ITEMS.
@@ -145,7 +150,7 @@ window.CASES = {
       covert: 4.0,
       exceedingly_rare: 1.0,
     },
-    items: ALL_IDS,
+    items: GENERAL_IDS,
   },
 
   signal: {
