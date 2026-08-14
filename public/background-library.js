@@ -22,7 +22,12 @@ window.BACKGROUND_LIBRARY = {
   taipei_nightlife: { label: 'Taipei Nightlife',  type: 'video', src: '/video/taipei-nightlife.mp4' },
   bladee_waster:    { label: 'Bladee – Waster',   type: 'video', src: '/video/bladee-waster.mp4' },
   evian_yxguden:    { label: 'Evian Christ – Yxguden (feat. Bladee)', type: 'video', src: '/video/evian-christ-yxguden.mp4' },
-  clarity:          { label: 'Zedd – Clarity ft. Foxes', type: 'video', src: '/video/clarity.mp4' },
+  // ?v=2 cache-busts the video file itself, not just this .js file — the
+  // original clarity.mp4 had baked-in black letterbox bars (cropped out in
+  // this replacement), and video files aren't covered by the site's usual
+  // <script src="...?v=N"> convention, so without this the same URL keeps
+  // serving whatever bytes a browser or edge cache already has for it.
+  clarity:          { label: 'Zedd – Clarity ft. Foxes', type: 'video', src: '/video/clarity.mp4?v=2' },
   hello_kitty:      { label: 'Hello Kitty',       type: 'video', src: '/video/hello-kitty.mp4' },
   girl_like_me:     { label: 'PinkPantheress – Girl Like Me', type: 'video', src: '/video/girl-like-me.mp4' },
 
