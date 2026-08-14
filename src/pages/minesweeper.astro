@@ -503,13 +503,14 @@
     statusEl.className = 'status' + (cls ? ' ' + cls : '');
   }
 
-  function startTimer() {
+  function startTimer(resumeElapsed) {
     stopTimer();
-    elapsed = 0;
-    timerEl.textContent = '0';
+    elapsed = resumeElapsed || 0;
+    timerEl.textContent = String(elapsed);
     timerInterval = setInterval(() => {
       elapsed++;
       timerEl.textContent = String(elapsed);
+      saveGameState();
     }, 1000);
   }
   function stopTimer() {
@@ -553,6 +554,13 @@
   // Non-swept cells (land: false — the coastline in Hormuz mode) are
   // never eligible.
   function placeMines(safeR, safeC) {
+    // Reset first — placeMinesNoGuess() below calls this repeatedly on the
+    // same board object while it searches for a solvable layout, and a
+    // stale mine/adjacent from a rejected attempt would otherwise leak into
+    // the next one.
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) { board[r][c].mine = false; board[r][c].adjacent = 0; }
+    }
     const forbidden = new Set([`${safeR},${safeC}`]);
     neighbors(safeR, safeC).forEach(([r, c]) => forbidden.add(`${r},${c}`));
 
@@ -572,6 +580,156 @@
       for (let c = 0; c < cols; c++) {
         if (board[r][c].mine || !board[r][c].land) continue;
         board[r][c].adjacent = neighbors(r, c).filter(([nr, nc]) => board[nr][nc].mine).length;
+      }
+    }
+  }
+
+  // Simulates a logic-only player against the CURRENT board's real mine
+  // layout: starting from the first-click flood, repeatedly applies two
+  // levels of deduction until nothing new can be proven —
+  //   1. single-point: a number whose remaining unknown neighbors exactly
+  //      match its remaining mine count means they're all mines (or all
+  //      safe, if it already has enough flagged);
+  //   2. subset elimination: for two numbered cells whose unknown-neighbor
+  //      sets nest inside one another (A ⊆ B), the cells in B but not A
+  //      must account for exactly (B's remaining mines − A's remaining
+  //      mines) of them — resolving them if that's 0 or all of them.
+  // Single-point alone turned out to be far too weak to ever fully clear a
+  // board Hormuz's size (~650+ cells) — it rejected essentially every
+  // layout tried, which meant placeMinesNoGuess() below was silently
+  // falling back to plain-random every single time. Subset elimination is
+  // the standard second-level technique every real "no-guess" generator
+  // uses, and is what actually gets boards this large over the line.
+  // Returns how much of the board this got through, not just pass/fail, so
+  // the caller can pick the LEAST-bad attempt even when none fully clears.
+  function attemptSolve(safeR, safeC) {
+    const revealed = board.map((row) => row.map(() => false));
+    const flagged = board.map((row) => row.map(() => false));
+    const totalSafe = landTotal - mineTotal;
+    let revealedCount = 0;
+
+    function floodReveal(r, c) {
+      const queue = [[r, c]];
+      while (queue.length) {
+        const [cr, cc] = queue.shift();
+        if (revealed[cr][cc] || flagged[cr][cc]) continue;
+        revealed[cr][cc] = true;
+        revealedCount++;
+        if (board[cr][cc].adjacent === 0) {
+          neighbors(cr, cc).forEach(([nr, nc]) => {
+            if (board[nr][nc].land && !board[nr][nc].mine && !revealed[nr][nc]) queue.push([nr, nc]);
+          });
+        }
+      }
+    }
+    floodReveal(safeR, safeC);
+
+    const cellKey = (r, c) => r * cols + c;
+    const sameCell = ([ar, ac], [br, bc]) => ar === br && ac === bc;
+
+    let progress = true;
+    while (progress && revealedCount < totalSafe) {
+      progress = false;
+
+      // Pass 1: single-point deduction. Also collects every still-ambiguous
+      // constraint (a numbered cell with unknowns left that this pass
+      // couldn't resolve) for pass 2 to work with.
+      const constraints = [];
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (!revealed[r][c] || !board[r][c].land) continue;
+          const num = board[r][c].adjacent;
+          if (num === 0) continue;
+          const landNeighbors = neighbors(r, c).filter(([nr, nc]) => board[nr][nc].land);
+          const unknown = landNeighbors.filter(([nr, nc]) => !revealed[nr][nc] && !flagged[nr][nc]);
+          if (unknown.length === 0) continue;
+          const flaggedCount = landNeighbors.filter(([nr, nc]) => flagged[nr][nc]).length;
+          const remaining = num - flaggedCount;
+          if (remaining === 0) {
+            unknown.forEach(([nr, nc]) => floodReveal(nr, nc));
+            progress = true;
+          } else if (remaining === unknown.length) {
+            unknown.forEach(([nr, nc]) => { flagged[nr][nc] = true; });
+            progress = true;
+          } else {
+            constraints.push({ cells: unknown, mines: remaining });
+          }
+        }
+      }
+      if (progress) continue; // fresh single-point info first — cheaper, and can unlock more of the same
+
+      // Pass 2: subset elimination, scoped to constraint pairs that
+      // actually share an unknown cell (found via an inverted index)
+      // rather than comparing every pair on the board.
+      const byCell = new Map();
+      constraints.forEach((cons, idx) => {
+        cons.cells.forEach(([r, c]) => {
+          const k = cellKey(r, c);
+          if (!byCell.has(k)) byCell.set(k, []);
+          byCell.get(k).push(idx);
+        });
+      });
+      const compared = new Set();
+      for (const idxList of byCell.values()) {
+        for (const i of idxList) {
+          for (const j of idxList) {
+            if (i === j) continue;
+            const pairKey = i < j ? `${i}-${j}` : `${j}-${i}`;
+            if (compared.has(pairKey)) continue;
+            compared.add(pairKey);
+            const A = constraints[i], B = constraints[j];
+            const [small, big] = A.cells.length <= B.cells.length ? [A, B] : [B, A];
+            const isSubset = small.cells.every((cell) => big.cells.some((bc) => sameCell(cell, bc)));
+            if (!isSubset) continue;
+            const diffCells = big.cells.filter((cell) => !small.cells.some((sc) => sameCell(cell, sc)));
+            if (!diffCells.length) continue;
+            const diffMines = big.mines - small.mines;
+            if (diffMines === 0) {
+              diffCells.forEach(([dr, dc]) => floodReveal(dr, dc));
+              progress = true;
+            } else if (diffMines === diffCells.length) {
+              diffCells.forEach(([dr, dc]) => { flagged[dr][dc] = true; });
+              progress = true;
+            }
+          }
+        }
+      }
+    }
+    return { solved: revealedCount === totalSafe, revealedCount, totalSafe };
+  }
+
+  // Regenerates the mine layout (same first click, same board shape),
+  // keeping whichever attempt the solver above got furthest through — the
+  // first fully-solvable one if any turns up, otherwise the closest miss —
+  // within an attempt/time budget. Hormuz's irregular coastline is what
+  // actually produces most forced 50/50s (see cleanupMask for the other
+  // half of that fix), so this stays scoped to Hormuz rather than changing
+  // the classic difficulties' character. "Best of N" rather than "first
+  // success or bust" matters at this board size: a full clean solve isn't
+  // found on every attempt even with subset elimination, so this way every
+  // game is at least as solvable as a single random attempt would be, and
+  // usually meaningfully more so — never worse.
+  function placeMinesNoGuess(safeR, safeC) {
+    const MAX_ATTEMPTS = 40;
+    const TIME_BUDGET_MS = 1500;
+    const start = performance.now();
+    let bestSnapshot = null;
+    let bestRevealed = -1;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS && performance.now() - start < TIME_BUDGET_MS; attempt++) {
+      placeMines(safeR, safeC);
+      const result = attemptSolve(safeR, safeC);
+      if (result.solved) return; // perfect — leave this layout in place
+      if (result.revealedCount > bestRevealed) {
+        bestRevealed = result.revealedCount;
+        bestSnapshot = board.map((row) => row.map((cell) => ({ mine: cell.mine, adjacent: cell.adjacent })));
+      }
+    }
+    if (bestSnapshot) {
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          board[r][c].mine = bestSnapshot[r][c].mine;
+          board[r][c].adjacent = bestSnapshot[r][c].adjacent;
+        }
       }
     }
   }
@@ -608,6 +766,50 @@
     if (resizeRaf) cancelAnimationFrame(resizeRaf);
     resizeRaf = requestAnimationFrame(fitCellSize);
   });
+
+  // Persists the whole in-progress round — including the real mine layout,
+  // which is fine since it never leaves this browser's own localStorage —
+  // so leaving the page and coming back (even after closing the tab) picks
+  // up exactly where you left off instead of losing the board and the bet
+  // already spent on it. Cleared the instant a round actually ends (see
+  // endGame above) so a finished board is never mistaken for one in progress.
+  const SAVE_KEY = 'minesweeper_game_v1';
+  function saveGameState() {
+    if (!gameActive) return;
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({
+        diffKey, rows, cols, mineTotal, landTotal, firstClickDone,
+        currentBet, flagCount, revealedSafeCount, elapsed, board,
+      }));
+    } catch {}
+  }
+  function clearSavedGame() {
+    try { localStorage.removeItem(SAVE_KEY); } catch {}
+  }
+  function tryResumeSavedGame() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch {}
+    if (!saved || !Array.isArray(saved.board) || !saved.board.length) return false;
+
+    diffKey = saved.diffKey;
+    rows = saved.rows; cols = saved.cols;
+    mineTotal = saved.mineTotal; landTotal = saved.landTotal;
+    firstClickDone = saved.firstClickDone; currentBet = saved.currentBet;
+    flagCount = saved.flagCount; revealedSafeCount = saved.revealedSafeCount;
+    board = saved.board;
+    gameActive = true;
+
+    document.querySelectorAll('.diff-btn').forEach((b) => b.classList.toggle('active', b.dataset.diff === diffKey));
+    const diff = DIFFICULTIES[diffKey];
+    payoutMultEl.textContent = diff.mult + 'x';
+    mineCountEl.textContent = String(mineTotal - flagCount);
+    betInput.value = currentBet;
+    renderBoard();
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) updateCellVisual(r, c);
+    startTimer(saved.elapsed);
+    setStatus(`Resumed your game in progress. Bet ${currentBet} Strubles.`);
+    return true;
+  }
 
   function renderBoard() {
     fitCellSize();
@@ -691,6 +893,7 @@
   function endGame(won, explodedR, explodedC) {
     gameActive = false;
     stopTimer();
+    clearSavedGame();
     if (!won) revealAllMines(explodedR, explodedC);
     if (won) {
       const payout = Math.round(currentBet * DIFFICULTIES[diffKey].mult);
@@ -730,13 +933,15 @@
       mineCountEl.textContent = String(mineTotal - flagCount);
       updateCellVisual(r, c);
       playSfx(cell.flagged ? 'minesweeper-flag' : 'minesweeper-unflag');
+      saveGameState();
       return;
     }
     if (cell.flagged) return;
 
     if (!firstClickDone) {
       firstClickDone = true;
-      placeMines(r, c);
+      if (diffKey === 'hormuz') placeMinesNoGuess(r, c);
+      else placeMines(r, c);
       startTimer();
     }
 
@@ -751,6 +956,8 @@
     revealCell(r, c);
     if (revealedSafeCount === landTotal - mineTotal) {
       endGame(true);
+    } else {
+      saveGameState();
     }
   }
 
@@ -764,6 +971,7 @@
     mineCountEl.textContent = String(mineTotal - flagCount);
     updateCellVisual(r, c);
     playSfx(cell.flagged ? 'minesweeper-flag' : 'minesweeper-unflag');
+    saveGameState();
   }
 
   boardEl.addEventListener('click', (e) => {
@@ -823,6 +1031,49 @@
     return mask;
   }
 
+  // Reclassifies small, mostly-enclosed pockets of sweepable water as shore
+  // instead. The coastline sampling above sometimes carves off a tiny 2-3
+  // cell inlet that's otherwise cut off from the rest of the strait — with
+  // no connection for logical information to flow in from, whatever's in
+  // there (mine or not) can never be deduced, only guessed. That's the
+  // "some branches just end in a 1x2/1x3 you have to guess" pattern.
+  // Cells smaller than MIN_POCKET_SIZE get folded into the shore instead of
+  // being swept at all, which removes the trap outright rather than trying
+  // to work around it during play. This only affects genuinely tiny,
+  // disconnected pockets — the main body of the strait is thousands of
+  // cells and untouched.
+  const MIN_POCKET_SIZE = 6;
+  function cleanupMask(mask) {
+    const h = mask.length, w = mask[0].length;
+    const seen = mask.map((row) => row.map(() => false));
+    for (let r = 0; r < h; r++) {
+      for (let c = 0; c < w; c++) {
+        if (!mask[r][c] || seen[r][c]) continue;
+        const stack = [[r, c]];
+        const cells = [];
+        seen[r][c] = true;
+        while (stack.length) {
+          const [cr, cc] = stack.pop();
+          cells.push([cr, cc]);
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              const nr = cr + dr, nc = cc + dc;
+              if (nr < 0 || nr >= h || nc < 0 || nc >= w) continue;
+              if (!mask[nr][nc] || seen[nr][nc]) continue;
+              seen[nr][nc] = true;
+              stack.push([nr, nc]);
+            }
+          }
+        }
+        if (cells.length < MIN_POCKET_SIZE) {
+          cells.forEach(([cr, cc]) => { mask[cr][cc] = false; });
+        }
+      }
+    }
+    return mask;
+  }
+
   // Renders the board shape for whatever difficulty is currently selected,
   // with no mines and no bet spent — purely a preview. Without this,
   // switching to the Hormuz tab left the previous mode's board on screen
@@ -836,7 +1087,7 @@
     let landMask = null;
     if (diffKey === 'hormuz') {
       try {
-        landMask = await sampleHormuzMask(rows, cols);
+        landMask = cleanupMask(await sampleHormuzMask(rows, cols));
       } catch {
         return; // real error surfaces when they actually click New Game
       }
@@ -881,7 +1132,7 @@
       newGameBtn.disabled = true;
       setStatus('Loading the strait...');
       try {
-        landMask = await sampleHormuzMask(rows, cols);
+        landMask = cleanupMask(await sampleHormuzMask(rows, cols));
       } catch {
         setStatus('Could not load the map — refund issued.', 'lose');
         Strubles.add(bet);
@@ -896,9 +1147,15 @@
     mineCountEl.textContent = String(mineTotal);
     renderBoard();
     setStatus(`Bet ${bet} Strubles. Click any cell to begin.`);
+    saveGameState();
   }
 
-  newGameBtn.addEventListener('click', newGame);
+  newGameBtn.addEventListener('click', () => {
+    if (gameActive && !confirm(`You have a game in progress with a ${currentBet} Strubles bet riding on it. Starting a new game forfeits that bet completely — it will not be refunded. Continue?`)) {
+      return;
+    }
+    newGame();
+  });
   document.getElementById('bet-minus').addEventListener('click', () => {
     betInput.value = Math.max(1, (Number(betInput.value) || 1) - 5);
   });
@@ -906,11 +1163,20 @@
     betInput.value = Math.max(1, (Number(betInput.value) || 1) + 5);
   });
 
-  // Render an empty beginner board immediately so the page isn't blank
-  // before the first "New Game" click.
-  rows = DIFFICULTIES.beginner.rows; cols = DIFFICULTIES.beginner.cols; mineTotal = DIFFICULTIES.beginner.mines;
-  buildEmptyBoard();
-  renderBoard();
+  // Resume an in-progress round if one was saved (see saveGameState above);
+  // otherwise render an empty beginner board immediately so the page isn't
+  // blank before the first "New Game" click.
+  if (!tryResumeSavedGame()) {
+    rows = DIFFICULTIES.beginner.rows; cols = DIFFICULTIES.beginner.cols; mineTotal = DIFFICULTIES.beginner.mines;
+    buildEmptyBoard();
+    renderBoard();
+  }
+
+  // Read-only debug hook — e.g. `__msDebugBoard().board` from DevTools to
+  // inspect the real mine layout without revealing it in the UI, or
+  // `__msDebugBoard().attemptSolveCheck(r, c)` to re-run the solver against
+  // the current layout from a given first click.
+  window.__msDebugBoard = () => ({ board, rows, cols, mineTotal, landTotal, diffKey, gameActive, attemptSolveCheck: attemptSolve });
 
   if (window.initPickers) setTimeout(window.initPickers, 100);
 })();
