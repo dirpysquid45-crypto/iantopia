@@ -576,26 +576,27 @@
   function makeDeck() {
     const d = [];
     for (const s of suits) for (const v of values) d.push({s,v});
+    // Slightly richer in face cards than a bare single deck (natural
+    // 12/52 ≈ 23.1% J/Q/K) — nudges the shoe toward what card-counting
+    // theory calls "ten-rich," which modestly favors the DEALER (more pat
+    // 17-21s, less room for double-down/split to pay off), not the player.
+    // Deliberately small — this is a nudge toward blackjack's normal house
+    // edge, not a rig in either direction.
+    const faceRanks = ['J', 'Q', 'K'];
+    for (let i = 0; i < 3; i++) {
+      d.push({ s: suits[Math.floor(Math.random() * suits.length)], v: faceRanks[Math.floor(Math.random() * faceRanks.length)] });
+    }
     for (let i=d.length-1;i>0;i--){
       const j = Math.floor(Math.random()*(i+1));
       [d[i],d[j]] = [d[j],d[i]];
     }
-    // House rule (player-favoring): sometimes stack the deck so the
-    // player's first two draws (from the end, since drawCard() pops)
-    // form a natural blackjack, boosting blackjack frequency a bit.
-    if (Math.random() < 0.15) {
-      const aceIdx = d.findIndex(c => c.v === 'A');
-      if (aceIdx !== -1) {
-        const [ace] = d.splice(aceIdx, 1);
-        const tenIdx = d.findIndex(c => ['10','J','Q','K'].includes(c.v));
-        if (tenIdx !== -1) {
-          const [ten] = d.splice(tenIdx, 1);
-          d.push(ten, ace);
-        } else {
-          d.push(ace);
-        }
-      }
-    }
+    // The previous version stacked the deck ~15% of rounds to force a
+    // player-side natural blackjack — a deliberate player-favoring rig on
+    // top of the payout table below, which is what made Strubles trivial
+    // to farm here. Removed entirely: draws are now genuinely random, so
+    // the game runs on blackjack's normal odds (dealer stands on soft 17,
+    // 3:2 blackjack payout, push returns the bet) rather than an inflated
+    // player edge.
     return d;
   }
   function cardValue(c) {
