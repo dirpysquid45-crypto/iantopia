@@ -708,6 +708,16 @@
       flex: 1;
       accent-color: #ffeb3b;
       cursor: none;
+      /* The visual track is only ~16px tall — comfortable for a mouse, easy
+         for a finger to miss. Padding the element itself (not the track)
+         gives it a real ~44px touch target without changing how thick the
+         bar looks. touch-action:none stops a slightly-diagonal drag from
+         being read as a page/modal scroll instead of a slider move, which
+         is the actual failure mode on a real phone — a native range input
+         handles horizontal drag itself once default touch panning is out
+         of the way. */
+      touch-action: none;
+      padding: 14px 0;
     }
     .volume-mute-btn {
       all: unset;
