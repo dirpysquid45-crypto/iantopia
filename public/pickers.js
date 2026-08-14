@@ -123,6 +123,13 @@ window.initPickers = function() {
         target.style.backgroundImage = `url('${bg.src}')`;
         target.style.backgroundPosition = bg.position || 'center';
       }
+      // Themed backgrounds (Hello Kitty, Old People Slot, etc. — see
+      // background-library.js) recolor this page's chrome the same way
+      // home's own picker does, always on document.body regardless of
+      // PAGE_BG_TARGET — the background image can be redirected elsewhere,
+      // but the button/outline styling always lives on body.
+      if (window.BACKGROUND_THEME_CLASSES) document.body.classList.remove(...window.BACKGROUND_THEME_CLASSES);
+      if (bg.theme) document.body.classList.add(bg.theme);
     }
     bgBtn.addEventListener('click', () => {
       renderBgPicker();

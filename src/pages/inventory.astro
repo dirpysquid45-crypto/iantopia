@@ -130,6 +130,75 @@
     border:1px solid var(--gold); background:#000;
   }
 
+  /* ---------- Background themes ----------
+     Universal across every page — see background-library.js's `theme`
+     field and pickers.js's applyBg() (and home's/lootbox's own copies of
+     the same lookup). Whichever background is active on THIS page (each
+     page's active background is still independent, same as always) picks
+     up the matching class here automatically. Scoped to the chrome shared
+     by every page — the utility button row, modal buttons, and the mute
+     button — not this page's own bespoke game buttons. */
+  body.theme-hello-kitty header a, body.theme-hello-kitty header button,
+  body.theme-hello-kitty .btn, body.theme-hello-kitty .volume-mute-btn {
+    background:#ffb6d9; border-color:#ff5fa8; color:#9c004f; text-shadow:none;
+    box-shadow:0 0 12px rgba(255,95,168,.4);
+  }
+  body.theme-hello-kitty header a:hover, body.theme-hello-kitty header button:hover,
+  body.theme-hello-kitty .btn:hover, body.theme-hello-kitty .volume-mute-btn:hover {
+    background:#ffd1e8;
+  }
+
+  body.theme-old-ppl-slot header a, body.theme-old-ppl-slot header button,
+  body.theme-old-ppl-slot .btn, body.theme-old-ppl-slot .volume-mute-btn {
+    background:#ffd700; border-color:#c9a227; color:#3a2a00; text-shadow:none;
+    box-shadow:0 0 12px rgba(255,215,0,.45);
+  }
+  body.theme-old-ppl-slot header a:hover, body.theme-old-ppl-slot header button:hover,
+  body.theme-old-ppl-slot .btn:hover, body.theme-old-ppl-slot .volume-mute-btn:hover {
+    background:#ffe766;
+  }
+
+  @keyframes uv-glow {
+    0%, 100% { box-shadow:0 0 10px rgba(157,78,221,.35); }
+    50%      { box-shadow:0 0 22px rgba(176,38,255,.65); }
+  }
+  body.theme-waster header a, body.theme-waster header button, body.theme-waster .btn, body.theme-waster .volume-mute-btn,
+  body.theme-evian header a, body.theme-evian header button, body.theme-evian .btn, body.theme-evian .volume-mute-btn {
+    background:#1a0533; border-color:#9d4edd; color:#e0aaff; text-shadow:0 0 8px rgba(176,38,255,.6);
+    animation: uv-glow 2.4s ease-in-out infinite;
+  }
+  body.theme-waster header a:hover, body.theme-waster header button:hover, body.theme-waster .btn:hover, body.theme-waster .volume-mute-btn:hover,
+  body.theme-evian header a:hover, body.theme-evian header button:hover, body.theme-evian .btn:hover, body.theme-evian .volume-mute-btn:hover {
+    background:#2d0a5c;
+  }
+
+  @keyframes beat-pulse {
+    0%, 100% { filter:brightness(1); }
+    50%      { filter:brightness(1.28); }
+  }
+  body.theme-girl-like-me header a, body.theme-girl-like-me header button,
+  body.theme-girl-like-me .btn, body.theme-girl-like-me .volume-mute-btn {
+    animation: beat-pulse .438s ease-in-out infinite;
+  }
+
+  @keyframes rgb-cycle {
+    0%   { filter:hue-rotate(0deg); }
+    100% { filter:hue-rotate(360deg); }
+  }
+  body.theme-clarity header a, body.theme-clarity header button,
+  body.theme-clarity .btn, body.theme-clarity .volume-mute-btn {
+    animation: rgb-cycle 1.875s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body.theme-waster header a, body.theme-waster header button, body.theme-waster .btn, body.theme-waster .volume-mute-btn,
+    body.theme-evian header a, body.theme-evian header button, body.theme-evian .btn, body.theme-evian .volume-mute-btn,
+    body.theme-girl-like-me header a, body.theme-girl-like-me header button, body.theme-girl-like-me .btn, body.theme-girl-like-me .volume-mute-btn,
+    body.theme-clarity header a, body.theme-clarity header button, body.theme-clarity .btn, body.theme-clarity .volume-mute-btn {
+      animation:none;
+    }
+  }
+
   /* Full item/badge/track/etc. list — same content home's inventory modal
      used to show, ported here now that this page is the canonical
      "Inventory" destination. */
@@ -317,7 +386,7 @@
 <script is:inline src="/cloud-sync.js?v=6"></script>
 <script is:inline src="/music-library.js?v=8"></script>
 <script is:inline src="/music-position.js?v=1"></script>
-<script is:inline src="/background-library.js?v=7"></script>
+<script is:inline src="/background-library.js?v=8"></script>
 <script is:inline src="/cursor-library.js?v=2"></script>
 <script is:inline src="/case-data.js?v=9"></script>
 <script is:inline src="/desktop-items.js?v=6"></script>
@@ -337,7 +406,7 @@
   // it's still a real, separately case-unlockable track for every OTHER page.
   window.PAGE_FREE_TRACK_KEY = 'hotel';
 </script>
-<script is:inline src="/pickers.js?v=9"></script>
+<script is:inline src="/pickers.js?v=10"></script>
 
 <script is:inline>
 (() => {

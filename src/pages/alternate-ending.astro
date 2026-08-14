@@ -129,6 +129,62 @@
     flex:1; accent-color:#fff; cursor:none;
     touch-action:none; padding:14px 0;
   }
+
+  /* ---------- Background themes ----------
+     Universal across every page — see background-library.js's `theme`
+     field and pickers.js's applyBg(). This page's buttons are inline-styled
+     rather than classed like the others, so the theme targets their IDs
+     directly instead of a shared .btn/header selector. */
+  body.theme-hello-kitty #home-link, body.theme-hello-kitty #now-playing,
+  body.theme-hello-kitty #bg-btn, body.theme-hello-kitty #cursor-btn,
+  body.theme-hello-kitty #mute-btn {
+    background:#ffb6d9 !important; border-color:#ff5fa8 !important; color:#9c004f !important;
+    box-shadow:0 0 12px rgba(255,95,168,.4);
+  }
+
+  body.theme-old-ppl-slot #home-link, body.theme-old-ppl-slot #now-playing,
+  body.theme-old-ppl-slot #bg-btn, body.theme-old-ppl-slot #cursor-btn,
+  body.theme-old-ppl-slot #mute-btn {
+    background:#ffd700 !important; border-color:#c9a227 !important; color:#3a2a00 !important;
+    box-shadow:0 0 12px rgba(255,215,0,.45);
+  }
+
+  @keyframes uv-glow {
+    0%, 100% { box-shadow:0 0 10px rgba(157,78,221,.35); }
+    50%      { box-shadow:0 0 22px rgba(176,38,255,.65); }
+  }
+  body.theme-waster #home-link, body.theme-waster #now-playing, body.theme-waster #bg-btn, body.theme-waster #cursor-btn, body.theme-waster #mute-btn,
+  body.theme-evian #home-link, body.theme-evian #now-playing, body.theme-evian #bg-btn, body.theme-evian #cursor-btn, body.theme-evian #mute-btn {
+    background:#1a0533 !important; border-color:#9d4edd !important; color:#e0aaff !important;
+    animation: uv-glow 2.4s ease-in-out infinite;
+  }
+
+  @keyframes beat-pulse {
+    0%, 100% { filter:brightness(1); }
+    50%      { filter:brightness(1.28); }
+  }
+  body.theme-girl-like-me #home-link, body.theme-girl-like-me #now-playing,
+  body.theme-girl-like-me #bg-btn, body.theme-girl-like-me #cursor-btn, body.theme-girl-like-me #mute-btn {
+    animation: beat-pulse .438s ease-in-out infinite;
+  }
+
+  @keyframes rgb-cycle {
+    0%   { filter:hue-rotate(0deg); }
+    100% { filter:hue-rotate(360deg); }
+  }
+  body.theme-clarity #home-link, body.theme-clarity #now-playing,
+  body.theme-clarity #bg-btn, body.theme-clarity #cursor-btn, body.theme-clarity #mute-btn {
+    animation: rgb-cycle 1.875s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    body.theme-waster #home-link, body.theme-waster #now-playing, body.theme-waster #bg-btn, body.theme-waster #cursor-btn, body.theme-waster #mute-btn,
+    body.theme-evian #home-link, body.theme-evian #now-playing, body.theme-evian #bg-btn, body.theme-evian #cursor-btn, body.theme-evian #mute-btn,
+    body.theme-girl-like-me #home-link, body.theme-girl-like-me #now-playing, body.theme-girl-like-me #bg-btn, body.theme-girl-like-me #cursor-btn, body.theme-girl-like-me #mute-btn,
+    body.theme-clarity #home-link, body.theme-clarity #now-playing, body.theme-clarity #bg-btn, body.theme-clarity #cursor-btn, body.theme-clarity #mute-btn {
+      animation:none;
+    }
+  }
 </style>
 </head>
 <body>
@@ -193,12 +249,12 @@
 <script is:inline src="/cloud-sync.js?v=6"></script>
 <script is:inline src="/music-library.js?v=8"></script>
 <script is:inline src="/music-position.js?v=1"></script>
-<script is:inline src="/background-library.js?v=7"></script>
+<script is:inline src="/background-library.js?v=8"></script>
 <script is:inline src="/cursor-library.js?v=2"></script>
 <script is:inline src="/case-data.js?v=9"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/strubles.js?v=2"></script>
-<script is:inline src="/pickers.js?v=9"></script>
+<script is:inline src="/pickers.js?v=10"></script>
 <script is:inline>
 (() => {
   const UNLOCKS_KEY = 'strubles_unlocks_v1';

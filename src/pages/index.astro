@@ -363,6 +363,50 @@
       box-shadow: 0 0 20px rgba(255, 95, 168, 0.5), inset 0 0 10px rgba(255, 95, 168, 0.1);
     }
 
+    /* ---------- Old People Slot theme ---------- */
+    /* Same treatment as Hello Kitty above — static recolor, no motion —
+       just yellow/gold instead of pink, matching the shared theme classes
+       every other page also reacts to (see background-library.js). */
+    body.theme-old-ppl-slot a.big,
+    body.theme-old-ppl-slot button.big,
+    body.theme-old-ppl-slot a.big.neon-yt,
+    body.theme-old-ppl-slot a.big.neon-gamble,
+    body.theme-old-ppl-slot a.big.neon-never,
+    body.theme-old-ppl-slot a.big.neon-mines,
+    body.theme-old-ppl-slot button.big.neon-daily,
+    body.theme-old-ppl-slot #inv-btn,
+    body.theme-old-ppl-slot #bg-btn,
+    body.theme-old-ppl-slot #cursor-btn,
+    body.theme-old-ppl-slot #account-btn,
+    body.theme-old-ppl-slot #now-playing,
+    body.theme-old-ppl-slot #ending-link {
+      background: #ffd700;
+      border-color: #c9a227;
+      color: #3a2a00;
+      text-shadow: none;
+      box-shadow: 0 10px 24px rgba(255, 215, 0, 0.45);
+    }
+    body.theme-old-ppl-slot a.big:hover,
+    body.theme-old-ppl-slot button.big:hover,
+    body.theme-old-ppl-slot #inv-btn:hover,
+    body.theme-old-ppl-slot #bg-btn:hover,
+    body.theme-old-ppl-slot #cursor-btn:hover,
+    body.theme-old-ppl-slot #account-btn:hover,
+    body.theme-old-ppl-slot #now-playing:hover,
+    body.theme-old-ppl-slot #ending-link:hover {
+      background: #ffe766;
+      box-shadow: 0 0 16px rgba(255, 215, 0, 0.6), 0 10px 24px rgba(255, 215, 0, 0.4);
+    }
+    body.theme-old-ppl-slot .flip-card {
+      filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.6)) drop-shadow(0 0 60px rgba(255, 231, 102, 0.4));
+    }
+    body.theme-old-ppl-slot #topia-timer {
+      background: linear-gradient(135deg, #332b00 0%, #4d4000 100%);
+      color: #ffd700;
+      border-color: #c9a227;
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.5), inset 0 0 10px rgba(255, 215, 0, 0.1);
+    }
+
     /* ---------- Girl Like Me theme (PinkPantheress, 137 BPM) ---------- */
     /* Pulses via filter:brightness rather than transform:scale so it never
        fights the buttons' existing hover transform (translateY) — filter
@@ -1138,7 +1182,7 @@
   <script is:inline src="/cloud-sync.js?v=6"></script>
   <script is:inline src="/music-library.js?v=8"></script>
   <script is:inline src="/music-position.js?v=1"></script>
-  <script is:inline src="/background-library.js?v=7"></script>
+  <script is:inline src="/background-library.js?v=8"></script>
   <script is:inline src="/cursor-library.js?v=2"></script>
 
   <!-- Timer Script -->
@@ -1576,11 +1620,14 @@
           window.dispatchEvent(new CustomEvent('active-track:changed', { detail: { key: activeTrackKey } }));
         }
 
-        document.body.classList.toggle('theme-hello-kitty', key === 'hello_kitty');
-        document.body.classList.toggle('theme-girl-like-me', key === 'girl_like_me');
-        document.body.classList.toggle('theme-waster', key === 'bladee_waster');
-        document.body.classList.toggle('theme-evian', key === 'evian_yxguden');
-        document.body.classList.toggle('theme-clarity', key === 'clarity');
+        // Generic now — reads which theme class (if any) this key declares
+        // in background-library.js rather than hardcoding each key here, so
+        // adding a themed background never means touching this function
+        // again. Every other page's picker does the same lookup, which is
+        // what makes a theme "universal": whichever page has this
+        // background active picks up the same class automatically.
+        if (window.BACKGROUND_THEME_CLASSES) document.body.classList.remove(...window.BACKGROUND_THEME_CLASSES);
+        if (bg.theme) document.body.classList.add(bg.theme);
       }
       applyBackground(getActiveBgKey());
 
