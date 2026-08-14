@@ -70,10 +70,23 @@
   const SYNC_EVENTS = [
     'strubles:change', 'inventory:changed', 'cases:changed',
     'music:unlocked', 'background:unlocked', 'cursor:unlocked', 'cursor:changed',
+    // Actually picking a background/track/desktop-item placement never
+    // dispatched anything these listeners recognized — cursor picks were
+    // the only ones wired up correctly. Those three changes were only ever
+    // reaching the cloud via the 15s periodic sync or the beforeunload/
+    // visibilitychange handlers, both of which can lose the write entirely
+    // on a fast navigation (an async Firestore call started that late has
+    // no guarantee of finishing before the page actually tears down). This
+    // is the real cause behind "I picked X, left, came back, it reset."
+    'active-background:changed', 'active-track:changed', 'desktop-items:changed',
   ];
 
   const PERIODIC_SYNC_MS = 15000;
-  const PUSH_DEBOUNCE_MS = 1200;
+  // Short enough that a deliberate pick (background/track/cursor/item) is
+  // on the wire well before a realistic click-then-navigate sequence
+  // completes, long enough to still coalesce genuinely rapid-fire writes
+  // (e.g. every mousemove tick while dragging a desktop item).
+  const PUSH_DEBOUNCE_MS = 400;
 
   if (!window.firebase) {
     console.error('[cloud-sync] Firebase SDK not loaded — check script order.');

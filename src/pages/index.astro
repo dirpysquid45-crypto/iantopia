@@ -876,7 +876,7 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script is:inline src="/cloud-sync.js?v=4"></script>
+  <script is:inline src="/cloud-sync.js?v=5"></script>
   <script is:inline src="/music-library.js?v=6"></script>
   <script is:inline src="/music-position.js?v=1"></script>
   <script is:inline src="/background-library.js?v=3"></script>
@@ -1187,6 +1187,8 @@
             applyActiveTrack(true);
             playlistOverlay.classList.remove('open');
             renderPlaylist();
+            // Previously dispatched nothing — see cloud-sync.js's SYNC_EVENTS.
+            window.dispatchEvent(new CustomEvent('active-track:changed', { detail: { key: activeTrackKey } }));
           });
         });
       }
@@ -1312,6 +1314,7 @@
           activeTrackKey = key;
           localStorage.setItem(ACTIVE_TRACK_KEY, activeTrackKey);
           applyActiveTrack(true);
+          window.dispatchEvent(new CustomEvent('active-track:changed', { detail: { key: activeTrackKey } }));
         }
       }
       applyBackground(getActiveBgKey());
@@ -1336,6 +1339,8 @@
             applyBackground(key);
             backgroundOverlay.classList.remove('open');
             renderBackgroundList();
+            // Previously dispatched nothing — see cloud-sync.js's SYNC_EVENTS.
+            window.dispatchEvent(new CustomEvent('active-background:changed', { detail: { key } }));
           });
         });
       }

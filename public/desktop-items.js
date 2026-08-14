@@ -74,6 +74,10 @@
   }
   function savePlaced(placed) {
     saveJSON(PLACED_KEY, placed);
+    // Previously dispatched nothing at all, so dragging/taking-out/stashing
+    // an item had no path to the cloud faster than the 15s periodic sync —
+    // see cloud-sync.js's SYNC_EVENTS.
+    try { window.dispatchEvent(new Event('desktop-items:changed')); } catch {}
   }
   function getSeen() {
     return loadJSON(SEEN_KEY, []);

@@ -159,6 +159,9 @@ window.initPickers = function() {
         themeMusic.src = MUSIC_LIB[key].src;
         themeMusic.play().catch(() => {});
       }
+      // Previously dispatched nothing at all, so a track pick had no path
+      // to the cloud faster than the 15s periodic sync — see cloud-sync.js.
+      window.dispatchEvent(new CustomEvent('active-track:changed', { detail: { key } }));
     }
     function renderPlaylist() {
       playlistList.innerHTML = '';
