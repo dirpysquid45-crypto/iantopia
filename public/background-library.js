@@ -26,8 +26,16 @@ window.BACKGROUND_LIBRARY = {
   hello_kitty:      { label: 'Hello Kitty',       type: 'video', src: '/video/hello-kitty.mp4' },
   girl_like_me:     { label: 'PinkPantheress – Girl Like Me', type: 'video', src: '/video/girl-like-me.mp4' },
 
-  // Inventory-page-only backgrounds — restricted there via PAGE_BG_ALLOWLIST
-  // in pickers.js, never selectable on any other page.
-  inventory_shelf:       { label: 'Display Shelf', type: 'image', src: '/video/inventory-shelf.jpg', position: 'center' },
-  inventory_shelf_leafy: { label: 'Leafy Shelf',    type: 'image', src: '/video/inventory-shelf-leafy.jpg', position: 'center' },
+  // Inventory-page-only backgrounds. `restricted: true` means every picker
+  // (pickers.js, and home's and lootbox's own separate copies) skips this
+  // entry entirely UNLESS the current page's own PAGE_BG_ALLOWLIST names it
+  // explicitly — PAGE_BG_ALLOWLIST alone only ever restricted the inventory
+  // page's OWN picker down to shelf-only, it never stopped these from also
+  // showing up as ordinary options on every other page's full library list.
+  // `desktopOnly: true` (leafy variant only) additionally hides it below
+  // the site's usual 768px mobile breakpoint — it's a fairly busy image and
+  // reads cluttered at phone width, and item-space on the shelf is already
+  // tighter there to begin with.
+  inventory_shelf:       { label: 'Display Shelf', type: 'image', src: '/video/inventory-shelf.jpg', position: 'center', restricted: true },
+  inventory_shelf_leafy: { label: 'Leafy Shelf',    type: 'image', src: '/video/inventory-shelf-leafy.jpg', position: 'center', restricted: true, desktopOnly: true },
 };

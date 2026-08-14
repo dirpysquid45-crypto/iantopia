@@ -51,9 +51,19 @@ window.initPickers = function() {
       // PAGE_FREE_BG_KEY rather than relying on 'default' being free.
       const allowlist = window.PAGE_BG_ALLOWLIST;
       const keys = allowlist || Object.keys(BG_LIB);
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
       keys.forEach((key) => {
         const bg = BG_LIB[key];
         if (!bg) return;
+        // `restricted` backgrounds (the inventory shelf variants) only ever
+        // show up on a page whose OWN allowlist names them explicitly —
+        // otherwise they'd leak into every other page's picker just for
+        // being present in the shared library at all.
+        if (bg.restricted && !(allowlist && allowlist.includes(key))) return;
+        // `desktopOnly` backgrounds (Leafy Shelf) are hidden below the
+        // site's usual 768px breakpoint — it's a busy image that doesn't
+        // read well at phone width.
+        if (bg.desktopOnly && isMobile) return;
         // Locked backgrounds are hidden entirely, not shown-and-greyed —
         // you can't see it until you've actually unlocked it.
         const owned = loadInventory().backgrounds?.includes(key) || key === 'default' || key === window.PAGE_FREE_BG_KEY;
@@ -128,7 +138,12 @@ window.initPickers = function() {
     // page load, silently overwriting e.g. blackjack's casino-entrance.gif
     // with Taipei for anyone who'd never opened the picker.
     const savedBgKey = localStorage.getItem(ACTIVE_BG_KEY);
-    if (savedBgKey && savedBgKey !== 'default' && BG_LIB[savedBgKey]) applyBg(savedBgKey);
+    const savedBg = savedBgKey && BG_LIB[savedBgKey];
+    // A saved Leafy Shelf pick still shouldn't render on a phone even if it
+    // was chosen from a desktop session earlier — falls back to this page's
+    // own hardcoded default instead (matches the picker itself hiding it).
+    const savedIsMobileBlocked = savedBg?.desktopOnly && window.matchMedia('(max-width: 768px)').matches;
+    if (savedBgKey && savedBgKey !== 'default' && savedBg && !savedIsMobileBlocked) applyBg(savedBgKey);
   }
 
   // Music player (only init if all required elements exist)

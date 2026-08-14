@@ -350,6 +350,19 @@
     }
     body.theme-hello-kitty #sakura-overlay { display: block; }
 
+    /* Spinning strubles image + Topia countdown recolored to match — same
+       pink, static (no pulse; Hello Kitty's own motion is the falling
+       petals, not a beat). */
+    body.theme-hello-kitty .flip-card {
+      filter: drop-shadow(0 0 30px rgba(255, 95, 168, 0.6)) drop-shadow(0 0 60px rgba(255, 209, 232, 0.4));
+    }
+    body.theme-hello-kitty #topia-timer {
+      background: linear-gradient(135deg, #33001a 0%, #4d0033 100%);
+      color: #ffb6d9;
+      border-color: #ff5fa8;
+      box-shadow: 0 0 20px rgba(255, 95, 168, 0.5), inset 0 0 10px rgba(255, 95, 168, 0.1);
+    }
+
     /* ---------- Girl Like Me theme (PinkPantheress, 137 BPM) ---------- */
     /* Pulses via filter:brightness rather than transform:scale so it never
        fights the buttons' existing hover transform (translateY) — filter
@@ -367,8 +380,21 @@
     body.theme-girl-like-me #cursor-btn,
     body.theme-girl-like-me #account-btn,
     body.theme-girl-like-me #now-playing,
-    body.theme-girl-like-me #ending-link {
+    body.theme-girl-like-me #ending-link,
+    body.theme-girl-like-me #topia-timer {
       animation: beat-pulse 0.438s ease-in-out infinite;
+    }
+    /* .flip-card already carries its own glow via `filter: drop-shadow(...)`
+       — beat-pulse alone would clobber that (an element's `filter` keyframe
+       fully replaces the property each frame, it doesn't merge with the
+       base rule), so the spinning image gets its own keyframe that pulses
+       brightness while keeping the same drop-shadow glow present throughout. */
+    @keyframes beat-pulse-flip {
+      0%, 100% { filter: brightness(1) drop-shadow(0 0 30px rgba(255, 235, 59, 0.6)) drop-shadow(0 0 60px rgba(255, 152, 86, 0.4)); }
+      50%      { filter: brightness(1.28) drop-shadow(0 0 30px rgba(255, 235, 59, 0.6)) drop-shadow(0 0 60px rgba(255, 152, 86, 0.4)); }
+    }
+    body.theme-girl-like-me .flip-card {
+      animation: beat-pulse-flip 0.438s ease-in-out infinite;
     }
     @media (prefers-reduced-motion: reduce) {
       body.theme-girl-like-me a.big,
@@ -378,7 +404,141 @@
       body.theme-girl-like-me #cursor-btn,
       body.theme-girl-like-me #account-btn,
       body.theme-girl-like-me #now-playing,
-      body.theme-girl-like-me #ending-link {
+      body.theme-girl-like-me #ending-link,
+      body.theme-girl-like-me #topia-timer,
+      body.theme-girl-like-me .flip-card {
+        animation: none;
+      }
+    }
+
+    /* ---------- Waster / Evian Christ theme (deep UV purple, gentle glow) ---------- */
+    /* Slow ambient breathing glow, not beat-locked like Girl Like Me below —
+       "gentle" reads as atmospheric rather than a hard pulse, so this uses a
+       long, soft ease-in-out cycle instead of a tempo-derived duration. */
+    @keyframes uv-glow {
+      0%, 100% { box-shadow: 0 10px 24px rgba(157, 78, 221, 0.35), 0 0 10px rgba(157, 78, 221, 0.25); }
+      50%      { box-shadow: 0 10px 24px rgba(157, 78, 221, 0.55), 0 0 26px rgba(176, 38, 255, 0.65); }
+    }
+    body.theme-waster a.big,
+    body.theme-waster button.big,
+    body.theme-waster #inv-btn,
+    body.theme-waster #bg-btn,
+    body.theme-waster #cursor-btn,
+    body.theme-waster #account-btn,
+    body.theme-waster #now-playing,
+    body.theme-waster #ending-link,
+    body.theme-evian a.big,
+    body.theme-evian button.big,
+    body.theme-evian #inv-btn,
+    body.theme-evian #bg-btn,
+    body.theme-evian #cursor-btn,
+    body.theme-evian #account-btn,
+    body.theme-evian #now-playing,
+    body.theme-evian #ending-link {
+      background: #1a0533;
+      border-color: #9d4edd;
+      color: #e0aaff;
+      text-shadow: 0 0 8px rgba(176, 38, 255, 0.6);
+      animation: uv-glow 2.4s ease-in-out infinite;
+    }
+    body.theme-waster a.big:hover,
+    body.theme-waster button.big:hover,
+    body.theme-waster #inv-btn:hover,
+    body.theme-waster #bg-btn:hover,
+    body.theme-waster #cursor-btn:hover,
+    body.theme-waster #account-btn:hover,
+    body.theme-waster #now-playing:hover,
+    body.theme-waster #ending-link:hover,
+    body.theme-evian a.big:hover,
+    body.theme-evian button.big:hover,
+    body.theme-evian #inv-btn:hover,
+    body.theme-evian #bg-btn:hover,
+    body.theme-evian #cursor-btn:hover,
+    body.theme-evian #account-btn:hover,
+    body.theme-evian #now-playing:hover,
+    body.theme-evian #ending-link:hover {
+      background: #2d0a5c;
+    }
+    /* Spinning strubles image + Topia countdown, recolored and breathing the
+       same way as the buttons above. #topia-timer already glows via
+       `box-shadow` (not `filter`), so it can reuse the uv-glow keyframe
+       directly — .flip-card glows via `filter: drop-shadow(...)` instead,
+       which the same keyframe would clobber, so it gets its own filter-based
+       version of the same breathing motion. */
+    body.theme-waster #topia-timer,
+    body.theme-evian #topia-timer {
+      background: linear-gradient(135deg, #1a0533 0%, #2d0a5c 100%);
+      color: #e0aaff;
+      border-color: #9d4edd;
+      animation: uv-glow 2.4s ease-in-out infinite;
+    }
+    @keyframes uv-glow-flip {
+      0%, 100% { filter: drop-shadow(0 0 20px rgba(157, 78, 221, 0.5)) drop-shadow(0 0 40px rgba(176, 38, 255, 0.3)); }
+      50%      { filter: drop-shadow(0 0 30px rgba(157, 78, 221, 0.75)) drop-shadow(0 0 55px rgba(176, 38, 255, 0.55)); }
+    }
+    body.theme-waster .flip-card,
+    body.theme-evian .flip-card {
+      animation: uv-glow-flip 2.4s ease-in-out infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body.theme-waster a.big, body.theme-waster button.big,
+      body.theme-waster #inv-btn, body.theme-waster #bg-btn,
+      body.theme-waster #cursor-btn, body.theme-waster #account-btn,
+      body.theme-waster #now-playing, body.theme-waster #ending-link,
+      body.theme-waster #topia-timer,
+      body.theme-evian a.big, body.theme-evian button.big,
+      body.theme-evian #inv-btn, body.theme-evian #bg-btn,
+      body.theme-evian #cursor-btn, body.theme-evian #account-btn,
+      body.theme-evian #now-playing, body.theme-evian #ending-link,
+      body.theme-evian #topia-timer {
+        animation: none;
+        box-shadow: 0 10px 24px rgba(157, 78, 221, 0.45), 0 0 16px rgba(176, 38, 255, 0.45);
+      }
+      body.theme-waster .flip-card, body.theme-evian .flip-card {
+        animation: none;
+        filter: drop-shadow(0 0 26px rgba(157, 78, 221, 0.6)) drop-shadow(0 0 48px rgba(176, 38, 255, 0.4));
+      }
+    }
+
+    /* ---------- Clarity theme (Zedd ft. Foxes, 128 BPM) ---------- */
+    /* Smooth continuous RGB hue-cycle rather than a discrete per-beat jump —
+       "RGB style" reads as the gamer-peripheral rainbow sweep. Duration is
+       still tempo-derived (one full 360° cycle every 4 beats, a normal
+       musical phrase length) so it still visibly rides the track's pace:
+       60/128bpm = 0.46875s/beat * 4 = 1.875s. */
+    @keyframes rgb-cycle {
+      0%   { filter: hue-rotate(0deg); }
+      100% { filter: hue-rotate(360deg); }
+    }
+    body.theme-clarity a.big,
+    body.theme-clarity button.big,
+    body.theme-clarity #inv-btn,
+    body.theme-clarity #bg-btn,
+    body.theme-clarity #cursor-btn,
+    body.theme-clarity #account-btn,
+    body.theme-clarity #now-playing,
+    body.theme-clarity #ending-link,
+    body.theme-clarity #topia-timer {
+      animation: rgb-cycle 1.875s linear infinite;
+    }
+    /* #topia-timer has no `filter` of its own, so it can reuse rgb-cycle as-is
+       (hue-rotate rotates its whole rendered box — bg, border, box-shadow,
+       text — together). .flip-card already uses `filter` for its own glow,
+       so like the other themes above it needs the hue-rotate combined into
+       the same filter list as its drop-shadows, not a bare swap. */
+    @keyframes rgb-cycle-flip {
+      0%   { filter: hue-rotate(0deg) drop-shadow(0 0 30px rgba(255, 235, 59, 0.6)) drop-shadow(0 0 60px rgba(255, 152, 86, 0.4)); }
+      100% { filter: hue-rotate(360deg) drop-shadow(0 0 30px rgba(255, 235, 59, 0.6)) drop-shadow(0 0 60px rgba(255, 152, 86, 0.4)); }
+    }
+    body.theme-clarity .flip-card {
+      animation: rgb-cycle-flip 1.875s linear infinite;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      body.theme-clarity a.big, body.theme-clarity button.big,
+      body.theme-clarity #inv-btn, body.theme-clarity #bg-btn,
+      body.theme-clarity #cursor-btn, body.theme-clarity #account-btn,
+      body.theme-clarity #now-playing, body.theme-clarity #ending-link,
+      body.theme-clarity #topia-timer, body.theme-clarity .flip-card {
         animation: none;
       }
     }
@@ -965,10 +1125,10 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script is:inline src="/cloud-sync.js?v=5"></script>
+  <script is:inline src="/cloud-sync.js?v=6"></script>
   <script is:inline src="/music-library.js?v=8"></script>
   <script is:inline src="/music-position.js?v=1"></script>
-  <script is:inline src="/background-library.js?v=5"></script>
+  <script is:inline src="/background-library.js?v=6"></script>
   <script is:inline src="/cursor-library.js?v=2"></script>
 
   <!-- Timer Script -->
@@ -1408,6 +1568,9 @@
 
         document.body.classList.toggle('theme-hello-kitty', key === 'hello_kitty');
         document.body.classList.toggle('theme-girl-like-me', key === 'girl_like_me');
+        document.body.classList.toggle('theme-waster', key === 'bladee_waster');
+        document.body.classList.toggle('theme-evian', key === 'evian_yxguden');
+        document.body.classList.toggle('theme-clarity', key === 'clarity');
       }
       applyBackground(getActiveBgKey());
 
@@ -1420,6 +1583,9 @@
         } else {
           unlocked.forEach((key) => {
             if (!BG_LIBRARY[key]) return;
+            // Inventory-only shelf backgrounds never show up here — they're
+            // restricted to the dedicated Inventory Room picker.
+            if (BG_LIBRARY[key].restricted) return;
             html += bgRow(key, BG_LIBRARY[key].label);
           });
         }

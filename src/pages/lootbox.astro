@@ -395,9 +395,9 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <!-- Headless here (no account UI on this page) — see blackjack.astro for
        why every page needs this now, not just home. -->
-  <script is:inline src="/cloud-sync.js?v=5"></script>
+  <script is:inline src="/cloud-sync.js?v=6"></script>
   <script is:inline src="/music-library.js?v=8"></script>
-  <script is:inline src="/background-library.js?v=5"></script>
+  <script is:inline src="/background-library.js?v=6"></script>
   <script is:inline src="/case-data.js?v=9"></script>
   <script is:inline src="/lootbox.js?v=5"></script>
   <script is:inline src="/cursor-library.js?v=2"></script>
@@ -426,6 +426,9 @@
         function renderBgPicker() {
           bgList.innerHTML = '';
           Object.entries(BG_LIB).forEach(([key, bg]) => {
+            // Inventory-only shelf backgrounds never show up here — they're
+            // restricted to the dedicated Inventory Room picker.
+            if (bg.restricted) return;
             // Locked backgrounds are hidden entirely, not shown-and-greyed —
             // you can't see it until you've actually unlocked it.
             const owned = loadInventory().backgrounds?.includes(key) || key === 'default';

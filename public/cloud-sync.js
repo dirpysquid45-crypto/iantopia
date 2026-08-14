@@ -81,6 +81,24 @@
     'active-background:changed', 'active-track:changed', 'desktop-items:changed',
   ];
 
+  // Firebase persists the signed-in session, so onAuthStateChanged fires on
+  // EVERY page load, not just right after a real sign-in — and since
+  // cloud-sync.js now loads on every page (previously home only), that
+  // meant every single navigation between pages ran its own async
+  // Firestore read, and reloaded the page a SECOND time the instant that
+  // read found any byte-level difference from local (including a diff
+  // where local was actually the newer, correct copy — e.g. you dragged an
+  // item, navigated before the 400ms debounced push finished writing, and
+  // the still-stale remote doc clobbered your fresh local change on
+  // arrival). That's what read as "laggy" (a full extra load+reload on
+  // every navigation) and "reverts when I come back" at once.
+  // RECONCILE_KEY caps the reconcile-with-cloud pull to once per tab
+  // session (sessionStorage, not localStorage — a fresh tab/device still
+  // pulls once to pick up progress made elsewhere) instead of once per
+  // page load, so navigating around the site while signed in trusts the
+  // already-reconciled local state instead of re-fetching and potentially
+  // re-reloading on every single page.
+  const RECONCILE_KEY = 'cloudsync_reconciled_v1';
   const PERIODIC_SYNC_MS = 15000;
   // Short enough that a deliberate pick (background/track/cursor/item) is
   // on the wire well before a realistic click-then-navigate sequence
@@ -190,7 +208,13 @@
     // pushes resume rather than staying permanently suppressed.
     applyingRemote = false;
     window.dispatchEvent(new CustomEvent('cloudsync:authchanged', { detail: { user } }));
-    if (user) pullFromCloud(user.uid);
+    // Set BEFORE the pull, not after — applyRemoteState()'s reload re-enters
+    // this same handler on the next load, and the flag has to already be
+    // set by then or it'd pull-and-potentially-reload every time forever.
+    if (user && !sessionStorage.getItem(RECONCILE_KEY)) {
+      try { sessionStorage.setItem(RECONCILE_KEY, '1'); } catch {}
+      pullFromCloud(user.uid);
+    }
   });
 
   window.CloudSync = {
