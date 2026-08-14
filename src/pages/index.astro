@@ -375,6 +375,19 @@
       border-color: #ff5fa8;
       box-shadow: 0 0 20px rgba(255, 95, 168, 0.5), inset 0 0 10px rgba(255, 95, 168, 0.1);
     }
+    /* "Glorious Iantopia" heading recolored to match, keeping the same
+       pulsing-glow motion as the default titleGlow keyframe — just
+       redefined in this theme's own color instead of overriding the
+       shared keyframe (which every other theme also needs its own copy
+       of for the same reason). */
+    @keyframes titleGlowPink {
+      0%, 100%  { text-shadow: 0 0 10px rgba(255, 95, 168, 0.4), 0 0 20px rgba(255, 182, 217, 0.3); }
+      50%       { text-shadow: 0 0 20px rgba(255, 95, 168, 0.7), 0 0 40px rgba(255, 182, 217, 0.5), 0 0 60px rgba(255, 95, 168, 0.3); }
+    }
+    body.theme-hello-kitty h1 {
+      color: #ffb6d9;
+      animation: titleScale 0.8s ease-out, titleGlowPink 3s ease-in-out infinite 0.8s;
+    }
 
     /* ---------- Old People Slot theme ---------- */
     /* Same treatment as Hello Kitty above — static recolor, no motion —
@@ -420,6 +433,14 @@
       border-color: #c9a227;
       box-shadow: 0 0 20px rgba(255, 215, 0, 0.5), inset 0 0 10px rgba(255, 215, 0, 0.1);
     }
+    @keyframes titleGlowGold {
+      0%, 100%  { text-shadow: 0 0 10px rgba(255, 215, 0, 0.4), 0 0 20px rgba(255, 231, 102, 0.3); }
+      50%       { text-shadow: 0 0 20px rgba(255, 215, 0, 0.7), 0 0 40px rgba(255, 231, 102, 0.5), 0 0 60px rgba(255, 215, 0, 0.3); }
+    }
+    body.theme-old-ppl-slot h1 {
+      color: #ffd700;
+      animation: titleScale 0.8s ease-out, titleGlowGold 3s ease-in-out infinite 0.8s;
+    }
 
     /* ---------- Girl Like Me theme (PinkPantheress, 137 BPM) ---------- */
     /* Pulses via filter:brightness rather than transform:scale so it never
@@ -454,6 +475,12 @@
     body.theme-girl-like-me .flip-card {
       animation: beat-pulse-flip 0.438s ease-in-out infinite;
     }
+    /* h1's own default animation (titleScale + titleGlow) never touches
+       `filter`, so beat-pulse layers on cleanly without needing a combined
+       keyframe the way .flip-card above did. */
+    body.theme-girl-like-me h1 {
+      animation: titleScale 0.8s ease-out, titleGlow 3s ease-in-out infinite 0.8s, beat-pulse 0.438s ease-in-out infinite;
+    }
     @media (prefers-reduced-motion: reduce) {
       body.theme-girl-like-me a.big,
       body.theme-girl-like-me button.big,
@@ -466,6 +493,9 @@
       body.theme-girl-like-me #topia-timer,
       body.theme-girl-like-me .flip-card {
         animation: none;
+      }
+      body.theme-girl-like-me h1 {
+        animation: titleScale 0.8s ease-out, titleGlow 3s ease-in-out infinite 0.8s;
       }
     }
 
@@ -538,6 +568,14 @@
     body.theme-evian .flip-card {
       animation: uv-glow-flip 2.4s ease-in-out infinite;
     }
+    @keyframes titleGlowPurple {
+      0%, 100%  { text-shadow: 0 0 10px rgba(157, 78, 221, 0.4), 0 0 20px rgba(224, 170, 255, 0.3); }
+      50%       { text-shadow: 0 0 20px rgba(176, 38, 255, 0.7), 0 0 40px rgba(224, 170, 255, 0.5), 0 0 60px rgba(157, 78, 221, 0.3); }
+    }
+    body.theme-waster h1, body.theme-evian h1 {
+      color: #e0aaff;
+      animation: titleScale 0.8s ease-out, titleGlowPurple 2.4s ease-in-out infinite 0.8s;
+    }
     @media (prefers-reduced-motion: reduce) {
       body.theme-waster a.big, body.theme-waster button.big,
       body.theme-waster #inv-btn, body.theme-waster #bg-btn,
@@ -555,6 +593,10 @@
       body.theme-waster .flip-card, body.theme-evian .flip-card {
         animation: none;
         filter: drop-shadow(0 0 26px rgba(157, 78, 221, 0.6)) drop-shadow(0 0 48px rgba(176, 38, 255, 0.4));
+      }
+      body.theme-waster h1, body.theme-evian h1 {
+        animation: titleScale 0.8s ease-out;
+        text-shadow: 0 0 16px rgba(176, 38, 255, 0.6), 0 0 32px rgba(224, 170, 255, 0.4);
       }
     }
 
@@ -591,6 +633,12 @@
     body.theme-clarity .flip-card {
       animation: rgb-cycle-flip 1.875s linear infinite;
     }
+    /* h1 has no `filter` of its own either (titleGlow only sets
+       text-shadow), so — like #topia-timer above — rgb-cycle just layers
+       on as a second animation, no combined keyframe needed. */
+    body.theme-clarity h1 {
+      animation: titleScale 0.8s ease-out, titleGlow 3s ease-in-out infinite 0.8s, rgb-cycle 1.875s linear infinite;
+    }
     @media (prefers-reduced-motion: reduce) {
       body.theme-clarity a.big, body.theme-clarity button.big,
       body.theme-clarity #inv-btn, body.theme-clarity #bg-btn,
@@ -598,6 +646,9 @@
       body.theme-clarity #now-playing, body.theme-clarity #ending-link,
       body.theme-clarity #topia-timer, body.theme-clarity .flip-card {
         animation: none;
+      }
+      body.theme-clarity h1 {
+        animation: titleScale 0.8s ease-out, titleGlow 3s ease-in-out infinite 0.8s;
       }
     }
 
