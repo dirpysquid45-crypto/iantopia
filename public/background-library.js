@@ -28,16 +28,21 @@ window.BACKGROUND_LIBRARY = {
   circus:           { label: 'Circus',            type: 'gif',   src: '/video/circus.gif', position: 'center' },
   raining_money:    { label: 'Raining Money',     type: 'gif',   src: '/video/raining-money.gif', position: 'center' },
   taipei_nightlife: { label: 'Taipei Nightlife',  type: 'video', src: '/video/taipei-nightlife.mp4' },
-  bladee_waster:    { label: 'Bladee – Waster',   type: 'video', src: '/video/bladee-waster.mp4', theme: 'theme-waster' },
-  evian_yxguden:    { label: 'Evian Christ – Yxguden (feat. Bladee)', type: 'video', src: '/video/evian-christ-yxguden.mp4', theme: 'theme-evian' },
+  // `comboTrack` (when present) is a MUSIC_LIBRARY key this background
+  // auto-switches Now Playing to — see pickers.js's applyBg(). Previously
+  // only home's own hand-rolled picker did this (BACKGROUND_MUSIC_COMBOS,
+  // still in index.astro), so picking e.g. Waster on minesweeper changed
+  // the video but left whatever track was already playing untouched.
+  bladee_waster:    { label: 'Bladee – Waster',   type: 'video', src: '/video/bladee-waster.mp4', theme: 'theme-waster', comboTrack: 'bladee_waster' },
+  evian_yxguden:    { label: 'Evian Christ – Yxguden (feat. Bladee)', type: 'video', src: '/video/evian-christ-yxguden.mp4', theme: 'theme-evian', comboTrack: 'evian_yxguden' },
   // ?v=2 cache-busts the video file itself, not just this .js file — the
   // original clarity.mp4 had baked-in black letterbox bars (cropped out in
   // this replacement), and video files aren't covered by the site's usual
   // <script src="...?v=N"> convention, so without this the same URL keeps
   // serving whatever bytes a browser or edge cache already has for it.
-  clarity:          { label: 'Zedd – Clarity ft. Foxes', type: 'video', src: '/video/clarity.mp4?v=2', theme: 'theme-clarity' },
-  hello_kitty:      { label: 'Hello Kitty',       type: 'video', src: '/video/hello-kitty.mp4', theme: 'theme-hello-kitty' },
-  girl_like_me:     { label: 'PinkPantheress – Girl Like Me', type: 'video', src: '/video/girl-like-me.mp4', theme: 'theme-girl-like-me' },
+  clarity:          { label: 'Zedd – Clarity ft. Foxes', type: 'video', src: '/video/clarity.mp4?v=2', theme: 'theme-clarity', comboTrack: 'clarity' },
+  hello_kitty:      { label: 'Hello Kitty',       type: 'video', src: '/video/hello-kitty.mp4', theme: 'theme-hello-kitty', comboTrack: 'hello_kitty' },
+  girl_like_me:     { label: 'PinkPantheress – Girl Like Me', type: 'video', src: '/video/girl-like-me.mp4', theme: 'theme-girl-like-me', comboTrack: 'girl_like_me' },
 
   // Inventory-page-only backgrounds. `restricted: true` means every picker
   // (pickers.js, and home's and lootbox's own separate copies) skips this

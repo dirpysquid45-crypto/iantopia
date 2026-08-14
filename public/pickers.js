@@ -20,9 +20,20 @@ window.initPickers = function() {
   const PAGE_PATH = location.pathname.replace(/\/$/, '') || '/';
   const ACTIVE_BG_KEY = 'active_bg_v1__' + PAGE_PATH;
   const ACTIVE_TRACK_KEY = 'active_track_v1__' + PAGE_PATH;
+  const VIDEO_POS_KEY = 'bg_video_pos_v1__' + PAGE_PATH;
   const BG_LIB = window.BACKGROUND_LIBRARY || {};
   const MUSIC_LIB = window.MUSIC_LIBRARY || {};
   const CURSOR_LIB = window.CURSOR_LIBRARY || {};
+
+  // Set once the music block below actually runs (it's gated on this page
+  // having the playlist elements at all) — applyBg() needs to be able to
+  // trigger a combo background's paired track even though it's defined
+  // before the music section, and a function declared inside that section's
+  // own `if` block isn't reachable from here directly (block-scoped). By
+  // the time applyBg() is ever actually CALLED (on click, or the on-load
+  // auto-apply at the bottom of this file), the music block has already
+  // run and populated this if it exists on the page.
+  let playTrackRef = null;
 
   // Utility: load inventory from localStorage
   function loadInventory() {
@@ -110,9 +121,28 @@ window.initPickers = function() {
         target.style.backgroundImage = 'none';
         const vid = document.getElementById('bg-video');
         if (vid) {
+          const isSameVideo = vid.src && vid.src.endsWith(bg.src);
           vid.src = bg.src;
           vid.classList.add('show');
+          // Resumes where this exact video last left off, same as
+          // MusicPosition already does for audio tracks — previously every
+          // video-type background restarted from 0:00 on every page load
+          // or re-pick, even the same one you were already watching.
+          if (window.MusicPosition) {
+            window.MusicPosition.restore(VIDEO_POS_KEY, vid);
+            if (!vid.dataset.positionTracked) {
+              vid.dataset.positionTracked = '1';
+              window.MusicPosition.track(VIDEO_POS_KEY, vid);
+            }
+          }
           vid.play().catch(() => {});
+          // Combo backgrounds (Waster, Evian Christ, Clarity, etc. — see
+          // background-library.js's `comboTrack`) switch Now Playing to
+          // their paired track automatically, same as home's own picker
+          // already does — this was home-only before, so picking one of
+          // these on minesweeper/blackjack/etc. changed the video but left
+          // whatever track was already playing untouched.
+          if (bg.comboTrack && !isSameVideo && playTrackRef) playTrackRef(bg.comboTrack);
         }
       } else {
         const vid = document.getElementById('bg-video');
@@ -185,6 +215,7 @@ window.initPickers = function() {
       // to the cloud faster than the 15s periodic sync — see cloud-sync.js.
       window.dispatchEvent(new CustomEvent('active-track:changed', { detail: { key } }));
     }
+    playTrackRef = playTrack;
     function renderPlaylist() {
       playlistList.innerHTML = '';
       Object.entries(MUSIC_LIB).forEach(([key, track]) => {

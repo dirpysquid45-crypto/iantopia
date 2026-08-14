@@ -28,14 +28,28 @@
 <style is:global>
   :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
   * { box-sizing:border-box; }
-  html, body { margin:0; }
+  html, body { margin:0; height:100%; }
   body {
-    min-height:100vh;
+    /* A flex column filling exactly one screen, not vh-sized content
+       stacked in normal flow — vh units for the buildings don't know
+       about the header/stats-bar/CTA taking up their own space above,
+       so on a real (short-ish) viewport the grass strip and even the
+       building labels ended up below the fold entirely. Flex instead
+       gives the grid whatever space is ACTUALLY left after everything
+       else takes what it needs, so the full skyline (labels and grass
+       included) always fits on screen without scrolling, on any
+       viewport size. */
+    height:100dvh;
+    display:flex; flex-direction:column;
     color:var(--ink);
     font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
     cursor:none;
     position:relative;
-    overflow-x:hidden;
+    /* y-scroll as a safety net, not the plan — on a very short viewport
+       (phone landscape) the grid still gets a min-height floor below, so
+       the flex column can end up taller than 100dvh; scrolling then is
+       far better than collapsed, unclickable slots. */
+    overflow-x:hidden; overflow-y:auto;
   }
 
   /* Fixed sky behind everything — this page's background is thematic, not
@@ -57,7 +71,8 @@
      exactly where the buildings' feet are, at any scroll position or
      page height. */
   #grass-fg {
-    width:100%; height:90px; pointer-events:none;
+    flex:0 0 70px;
+    width:100%; pointer-events:none;
     background-image:url('/tycoon/grass-foreground.png');
     background-repeat:repeat-x; background-position:bottom left; background-size:auto 100%;
     margin-top:-3px; /* tuck under the slots' border so there's no seam */
@@ -70,9 +85,14 @@
   }
   #strubles-badge img{ width:28px; height:28px; }
 
-  main { position:relative; z-index:2; max-width:1200px; margin:0 auto; padding:24px; padding-top:90px; }
+  main {
+    position:relative; z-index:2; max-width:1200px; width:100%; margin:0 auto;
+    padding:16px 24px 0; padding-top:calc(80px + env(safe-area-inset-top));
+    flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column;
+  }
 
-  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:4px solid #000; padding-bottom:10px; flex-wrap:wrap; gap:10px; }
+  header { flex:0 0 auto; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:4px solid #000; padding-bottom:10px; flex-wrap:wrap; gap:10px; }
   header a { color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; font-weight:700; background:#000; transition:background 0.2s; font-size:10px; cursor:none; }
   header a:hover { background:var(--gold); color:#000; }
   header button { color:var(--gold); background:#000; border:2px solid var(--gold); padding:4px 6px; cursor:none; transition:background 0.2s; }
@@ -84,40 +104,45 @@
   }
 
   #stats-bar {
+    flex:0 0 auto;
     display:flex; justify-content:center; gap:18px; flex-wrap:wrap;
-    background:rgba(0,0,0,.55); border:2px solid var(--gold); padding:10px 14px;
-    margin-bottom:20px; font-size:9px; color:#fff;
+    background:rgba(0,0,0,.55); border:2px solid var(--gold); padding:8px 14px;
+    margin-bottom:12px; font-size:9px; color:#fff;
   }
   #stats-bar b { color:var(--gold); }
 
   #lootbox-cta {
-    display:block; text-align:center; margin:0 auto 24px; width:fit-content;
+    flex:0 0 auto;
+    display:block; text-align:center; margin:0 auto 14px; width:fit-content;
     color:#000; background:var(--gold); text-decoration:none; border:3px solid #000;
     padding:10px 18px; font-size:11px; font-weight:700;
   }
   #lootbox-cta:hover { background:#ffe766; }
 
   /* ---------- The skyline: a single row of 5 ---------- */
+  /* flex:1 + min-height:0 gives this whatever vertical space is actually
+     left after header/stats-bar/CTA/grass take theirs — NOT a share of
+     the raw viewport. Building heights below are then percentages of
+     THIS element's real height, so the tallest (skyscraper) always fits
+     with room to spare, on any screen. */
   #tycoon-grid {
+    flex:1 1 auto; min-height:140px;
     display:grid;
-    grid-template-columns: repeat(5, minmax(140px, 1fr));
-    grid-template-rows: min-content;
+    /* No column minimum — a floor here forces 5×min > available width on
+       narrow phones, which pushes the last building off-screen behind a
+       horizontal scroll instead of shrinking it to fit like everything
+       else on this page does. 1fr alone still splits the space evenly. */
+    grid-template-columns: repeat(5, 1fr);
     gap:0 6px;
     overflow-x:auto;
-    align-items:end; /* every slot's bottom shares the same line, whatever its own height */
   }
   .tycoon-slot {
     position:relative;
     display:flex; align-items:flex-end; justify-content:center;
-    min-height:180px;
     border-bottom:3px solid rgba(255,215,0,.35);
   }
-  .tycoon-slot.empty {
-    min-height:180px;
-    cursor:none;
-  }
   .tycoon-slot.empty .empty-plus {
-    width:100%; height:100px; display:flex; align-items:center; justify-content:center;
+    width:100%; height:60%; max-height:100px; display:flex; align-items:center; justify-content:center;
     border:2px dashed rgba(255,215,0,.4); color:rgba(255,215,0,.6); font-size:28px;
     transition:background .15s, border-color .15s;
   }
@@ -126,7 +151,14 @@
   }
   .tycoon-building-img {
     display:block; width:auto; max-width:100%;
-    height:50vh;
+    /* Percentage of the SLOT's own height, which stretches to match
+       #tycoon-grid's real (flex-computed) height by grid's default
+       align-items:stretch — this is what makes the sizing adapt to
+       whatever room is actually available instead of raw vh. Regular
+       buildings sit at ~70% of what a skyscraper gets, echoing the
+       spec's "half the page" vs. "70% of the page" ratio, just resolved
+       against the grid's real height rather than the whole viewport. */
+    height:66%;
     object-fit:contain;
     /* When max-width kicks in (narrow columns vs. a wide/square source
        image), height and width stop matching the image's own aspect
@@ -137,16 +169,21 @@
        dimension ends up constrained. */
     object-position: center bottom;
     filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));
-    transition: filter .3s ease;
+    transition: filter .3s ease, height .2s ease;
   }
-  .tycoon-building-img.skyscraper { height:70vh; }
+  .tycoon-building-img.skyscraper { height:94%; }
   .tycoon-slot.building .tycoon-building-img {
     filter: brightness(0.5) saturate(0.6) drop-shadow(0 6px 10px rgba(0,0,0,.5));
   }
   .tycoon-slot .label-tag {
     position:absolute; bottom:-2px; left:50%; transform:translateX(-50%);
     background:#000; color:var(--gold); border:2px solid var(--gold);
-    font-size:7px; padding:3px 6px; white-space:nowrap; text-align:center;
+    font-size:7px; padding:3px 6px; text-align:center;
+    /* Full label can be wider than a narrow mobile column — nowrap alone
+       let neighboring labels run into and overlap each other; capping the
+       width to the slot itself and truncating keeps each one inside its
+       own lane. */
+    max-width: 100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
 
   .construction-pct {
@@ -210,9 +247,11 @@
   }
 
   @media (max-width:768px) {
-    .tycoon-building-img { height:36vh; }
-    .tycoon-building-img.skyscraper { height:50vh; }
+    /* Building heights are already percentages of the grid's own real
+       (flex-computed) height, so they adapt on their own — no vh
+       overrides needed here anymore. */
     #stats-bar { font-size:8px; gap:10px; }
+    main { padding-left:12px; padding-right:12px; }
   }
 </style>
 </head>
@@ -298,7 +337,7 @@
 <script is:inline src="/tycoon-buildings.js?v=1"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/strubles.js?v=2"></script>
-<script is:inline src="/pickers.js?v=10"></script>
+<script is:inline src="/pickers.js?v=11"></script>
 <script is:inline>
 (() => {
   const $ = (id) => document.getElementById(id);
