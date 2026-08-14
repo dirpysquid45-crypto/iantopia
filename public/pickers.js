@@ -9,8 +9,17 @@ window.initPickers = function() {
   // active_bg_v1/active_track_v1, so a pick on one silently applied to the
   // others too. Home and lootbox already have their own dedicated keys
   // outside this shared file.
-  const ACTIVE_BG_KEY = 'active_bg_v1__' + location.pathname;
-  const ACTIVE_TRACK_KEY = 'active_track_v1__' + location.pathname;
+  //
+  // Trailing slash stripped before using it as a key: "/blackjack" and
+  // "/blackjack/" are the same page, but nginx doesn't always normalize a
+  // bare-directory request to the slash form before the app ever sees it
+  // (and a service worker sitting in front of that can obscure whichever
+  // form actually got requested) — without this, a pick made under one
+  // form is invisible from the other, which reads as "my choice keeps
+  // getting reset" even though it's really just reading the wrong key.
+  const PAGE_PATH = location.pathname.replace(/\/$/, '') || '/';
+  const ACTIVE_BG_KEY = 'active_bg_v1__' + PAGE_PATH;
+  const ACTIVE_TRACK_KEY = 'active_track_v1__' + PAGE_PATH;
   const BG_LIB = window.BACKGROUND_LIBRARY || {};
   const MUSIC_LIB = window.MUSIC_LIBRARY || {};
   const CURSOR_LIB = window.CURSOR_LIBRARY || {};

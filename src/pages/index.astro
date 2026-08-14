@@ -21,9 +21,9 @@
   <!--
     is:global is REQUIRED. Astro scopes <style> by stamping data-astro-cid-* on
     template elements and rewriting selectors to match. The modal rows here
-    (.modal-track, .modal-item, .inv-category, .cursor-swatch) are all built at
+    (.modal-track, .cursor-swatch) are all built at
     runtime via innerHTML, so they never get that attribute and every scoped
-    rule silently skips them — the playlist, inventory, background and cursor
+    rule silently skips them — the playlist, background and cursor
     pickers all render as unstyled text. This is a standalone document, so
     scoping buys nothing.
   -->
@@ -497,7 +497,7 @@
       font-size: 16px;
       font-family: 'Press Start 2P', cursive;
     }
-    .modal-track, .modal-item {
+    .modal-track {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -515,13 +515,11 @@
       all: unset; cursor: none; margin-top: 14px; padding: 8px 16px;
       border: 1px solid #2a3245; background: #1d2330; color: #fff; display: inline-block;
     }
-    .inv-category { color: #ffeb3b; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 6px; }
-    .inv-category:first-child { margin-top: 0; }
 
-    /* Inventory button — a small CSS chest with a hinged lid. The lid opens
-       on hover, and also gets the .drag-near class while a desktop item is
-       being dragged close by (see the desktop-items script), so the chest
-       reads as an open drop target before the item is actually released. */
+    /* Inventory button — a plain nav link to the dedicated Inventory Room
+       page. Used to also be a CSS chest and a drag-to-stash target for
+       collectibles rendered directly on home; that whole system moved to
+       the Inventory Room so it's not the sole one still doing it. */
     #inv-btn {
       position: fixed;
       top: calc(120px + env(safe-area-inset-top));
@@ -542,153 +540,6 @@
 
     #inv-btn:hover {
       transform: translateY(-1px);
-    }
-
-    .chest {
-      position: relative;
-      width: 26px;
-      height: 20px;
-      flex-shrink: 0;
-      perspective: 60px;
-    }
-    .chest-base {
-      position: absolute;
-      left: 0; right: 0; bottom: 0;
-      height: 13px;
-      background: linear-gradient(180deg, #7a4a1e 0%, #5c3614 100%);
-      border: 1.5px solid #ffd700;
-      border-top: none;
-      border-radius: 0 0 4px 4px;
-    }
-    .chest-base::after {
-      content: '';
-      position: absolute;
-      left: 50%; top: -1px;
-      width: 5px; height: 5px;
-      transform: translate(-50%, -50%);
-      background: #ffd700;
-      border-radius: 50%;
-      box-shadow: 0 0 3px rgba(255, 215, 0, 0.8);
-    }
-    .chest-lid {
-      position: absolute;
-      left: 0; right: 0; top: 0;
-      height: 11px;
-      background: linear-gradient(180deg, #a8681f 0%, #7a4a1e 100%);
-      border: 1.5px solid #ffd700;
-      border-bottom: none;
-      border-radius: 4px 4px 1px 1px;
-      transform-origin: 50% 100%;
-      transform: rotateX(0deg);
-      transition: transform 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
-    }
-
-    #inv-btn:hover .chest-lid,
-    #inv-btn.drag-near .chest-lid {
-      transform: rotateX(-115deg) translateY(-1px);
-    }
-    #inv-btn.drag-near {
-      border-color: #ffd700;
-      box-shadow: 0 0 10px rgba(255, 215, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.25);
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      .chest-lid { transition: none; }
-    }
-
-
-    /* Movable item toys — see desktop-items.js */
-    #desktop-items {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 15;
-    }
-    .desktop-item-wrap {
-      position: fixed;
-      pointer-events: none;
-      border: 2px solid transparent;
-      border-radius: 4px;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-    .desktop-item-wrap.selected {
-      border-color: rgba(255, 215, 0, 0.6);
-      box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
-    }
-    .desktop-item {
-      position: static;
-      display: block;
-      width: 56px;
-      height: 56px;
-      object-fit: contain;
-      pointer-events: auto;
-      cursor: none;
-      touch-action: none;
-      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
-      transition: filter 0.15s ease, transform 0.15s ease;
-      user-select: none;
-      -webkit-user-drag: none;
-    }
-    .desktop-item.pixel-art { image-rendering: pixelated; }
-    .desktop-item:hover {
-      filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 8px rgba(255, 215, 0, 0.5));
-      transform: scale(1.06);
-    }
-    .desktop-item.dragging {
-      transition: none;
-      filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 10px rgba(255, 215, 0, 0.7));
-      transform: scale(1.1);
-    }
-    .desktop-item.stashing {
-      transition: transform 0.18s ease, opacity 0.18s ease;
-      transform: scale(0.2);
-      opacity: 0;
-    }
-    .desktop-item-remove {
-      all: unset;
-      position: absolute;
-      top: -7px;
-      right: -7px;
-      width: 18px;
-      height: 18px;
-      line-height: 16px;
-      text-align: center;
-      border-radius: 50%;
-      background: rgba(15, 15, 15, 0.85);
-      border: 1px solid rgba(255, 235, 59, 0.55);
-      color: #ffeb3b;
-      font-size: 13px;
-      cursor: none;
-      pointer-events: auto;
-      opacity: 0;
-      transition: opacity 0.15s ease, background 0.15s ease;
-      z-index: 22;
-    }
-    .desktop-item-wrap:hover .desktop-item-remove,
-    .desktop-item-remove:focus-visible {
-      opacity: 1;
-    }
-    .desktop-item-remove:hover {
-      background: rgba(255, 235, 59, 0.25);
-    }
-    @media (hover: none) {
-      .desktop-item-remove { opacity: 0.6; }
-    }
-    .modal-take-out {
-      all: unset;
-      cursor: none;
-      font-size: 10px;
-      letter-spacing: 0.5px;
-      color: #ffeb3b;
-      border: 1px solid rgba(255, 235, 59, 0.5);
-      padding: 3px 8px;
-      border-radius: 4px;
-      flex-shrink: 0;
-    }
-    .modal-take-out:hover { background: rgba(255, 235, 59, 0.12); }
-
-    @media (prefers-reduced-motion: reduce) {
-      .desktop-item { transition: none; }
     }
 
     #bg-btn {
@@ -798,7 +649,13 @@
     }
 
     @media (max-width: 768px) {
-      body { overflow-y: auto; }
+      /* justify-content:center (the desktop layout) pulls short content up
+         toward viewport center — on a phone that put the spinning image
+         right underneath the fixed strubles badge / countdown timer instead
+         of below them. Flowing from the top with padding clearing both
+         fixed badges fixes that regardless of how tall the rest of the
+         page's content ends up being. */
+      body { overflow-y: auto; justify-content: flex-start; padding-top: calc(64px + env(safe-area-inset-top)); }
       .image-container { width: min(150px, 60vw); margin-bottom: 12px; }
       h1 { font-size: clamp(1rem, 4vw, 1.8rem); margin: 12px 0 8px; }
       a.big, button.big { padding: 12px 20px; font-size: clamp(16px, 3vw, 24px); margin: 10px auto; }
@@ -828,13 +685,6 @@
   <link rel="preload" as="image" href="/strubles.png" />
 </head>
 <body>
-  <!-- Static decorations, purely visual -->
-  <!-- Movable item toys (see desktop-items.js) render here, positioned fixed. -->
-  <div id="desktop-items"></div>
-  <div style="position:fixed; bottom:20px; left:20px; font-size:11px; color:#888; line-height:1.4; pointer-events:none; z-index:5;">
-    Drag to move • Shift+Click to multi-select • Click × to remove
-  </div>
-
   <div class="image-container" id="image-container" role="button" tabindex="0" aria-label="Spin the Iantopia image faster">
     <div class="flip-card" id="flip-card">
       <div class="flip-card-front">
@@ -945,13 +795,7 @@
     <span id="strubles-amt">0</span>
   </div>
 
-  <button id="inv-btn" title="Inventory">
-    <span class="chest" aria-hidden="true">
-      <span class="chest-lid"></span>
-      <span class="chest-base"></span>
-    </span>
-    Inventory
-  </button>
+  <button id="inv-btn" title="Inventory">🎒 Inventory</button>
   <button id="bg-btn" title="Change background">🖼️ Background</button>
   <button id="cursor-btn" title="Change cursor">🖱️ Cursor</button>
   <!-- Revealed only once /never has been pulled from a case. -->
@@ -1037,8 +881,6 @@
   <script is:inline src="/music-position.js?v=1"></script>
   <script is:inline src="/background-library.js?v=3"></script>
   <script is:inline src="/cursor-library.js?v=2"></script>
-  <script is:inline src="/case-data.js?v=7"></script>
-  <script is:inline src="/desktop-items.js?v=5"></script>
 
   <!-- Timer Script -->
   <script is:inline>
@@ -1363,15 +1205,10 @@
       });
 
       // --- Inventory button: navigates to the dedicated Inventory Room page
-      // (shelf display + full categorized list) instead of opening a local
-      // modal — kept as the same chest icon/drag target it always was, since
-      // dragging an item near it to stash still works independently of what
-      // a plain click does.
+      // (shelf display + full categorized list + item placement) instead of
+      // opening a local modal or rendering items directly on home.
       const invBtn = document.getElementById('inv-btn');
       invBtn.addEventListener('click', () => { window.location.href = '/inventory'; });
-
-      // --- Movable desktop items (sock, panda, ...) ---
-      if (window.DesktopItems) window.DesktopItems.init(document.getElementById('desktop-items'), invBtn);
 
       const CURSOR_LIB = window.CURSOR_LIBRARY || {};
 
