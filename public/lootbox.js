@@ -123,10 +123,32 @@
     return (window.CASES && window.CASES[caseKey]) || null;
   }
 
+  // Pagoda's flavor text: "increases chances of everything that is not a
+  // common." Every owned Pagoda (up to the 10-copy cap) shifts 1 point off
+  // mil_spec's odds, redistributed across the other tiers proportional to
+  // their existing weight — so 10 Pagodas moves a full 10% off Common onto
+  // Uncommon/Rare/Epic/Legendary. Scoped to whichever case declares
+  // `pagodaBuff: true` (currently just Iantopia Lootbox Basic) rather than
+  // hardcoding a case key here.
+  const PAGODA_BUFF_PER_COPY = 1;
+  function applyPagodaBuff(odds) {
+    const pagodaCount = state.inv.buildings.filter((k) => k === 'pagoda').length;
+    const shift = Math.min(pagodaCount, MAX_BUILDING_COPIES) * PAGODA_BUFF_PER_COPY;
+    if (shift <= 0 || !odds.mil_spec || odds.mil_spec <= shift) return odds;
+    const nonCommonTotal = 100 - odds.mil_spec;
+    if (nonCommonTotal <= 0) return odds;
+    const scale = (nonCommonTotal + shift) / nonCommonTotal;
+    const out = { mil_spec: odds.mil_spec - shift };
+    Object.keys(odds).forEach((tier) => {
+      if (tier === 'mil_spec') return;
+      out[tier] = odds[tier] * scale;
+    });
+    return out;
+  }
+
   function oddsFor(def) {
-    if (def.odds) return def.odds;
-    const R = window.CASE_RARITIES || {};
-    return Object.fromEntries(Object.entries(R).map(([k, v]) => [k, v.chance]));
+    const base = def.odds || Object.fromEntries(Object.entries(window.CASE_RARITIES || {}).map(([k, v]) => [k, v.chance]));
+    return def.pagodaBuff ? applyPagodaBuff(base) : base;
   }
 
   function pickTier(def) {

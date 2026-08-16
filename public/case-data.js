@@ -100,11 +100,20 @@ window.CASE_ITEMS = {
   // placement cost) live in tycoon-buildings.js, not here — this only
   // defines what opening a case grants, matching how background_unlock
   // items only grant a key that background-library.js gives meaning to.
-  bld_shabby:     { label: 'Building: Shabby Apartment',    tier: 'mil_spec',         img: '/tycoon/shabby-apartment.png', type: 'building_unlock', key: 'shabby_apartment' },
-  bld_generic:    { label: 'Building: Generic Building',    tier: 'restricted',       img: '/tycoon/generic-building.png', type: 'building_unlock', key: 'generic_building' },
-  bld_pagoda:     { label: 'Building: Pagoda',              tier: 'classified',       img: '/tycoon/pagoda.png',           type: 'building_unlock', key: 'pagoda' },
-  bld_skyscraper: { label: 'Building: Generic Skyscraper',  tier: 'covert',           img: '/tycoon/generic-building.png', type: 'building_unlock', key: 'generic_skyscraper' },
-  bld_taipei101:  { label: 'Building: Taipei 101',          tier: 'exceedingly_rare', img: '/tycoon/taipei-101.png',       type: 'building_unlock', key: 'taipei_101' },
+  // `description` mirrors tycoon-buildings.js's copy (kept short and
+  // duplicated rather than cross-file-referenced, same as `label` already
+  // is) so the reveal card on /lootbox can show what you just won without
+  // needing tycoon-buildings.js loaded on that page.
+  bld_shabby:     { label: 'Building: Shabby Apartment',    tier: 'mil_spec',         img: '/tycoon/shabby-apartment.png', type: 'building_unlock', key: 'shabby_apartment',
+    description: "A run-down walk-up that's seen better decades. Barely pays rent, but it's honest work." },
+  bld_generic:    { label: 'Building: Generic Building',    tier: 'restricted',       img: '/tycoon/generic-building.png', type: 'building_unlock', key: 'generic_building',
+    description: 'A perfectly ordinary mid-rise. Nobody remembers its name, but the tenants pay on time.' },
+  bld_pagoda:     { label: 'Building: Pagoda',              tier: 'classified',       img: '/tycoon/pagoda.png',           type: 'building_unlock', key: 'pagoda',
+    description: 'An ornate tower channeling old-world prosperity. Owning one quietly improves your luck on every Iantopia Lootbox Basic you open afterward.' },
+  bld_skyscraper: { label: 'Building: Generic Skyscraper',  tier: 'covert',           img: '/tycoon/skyscraper.png', type: 'building_unlock', key: 'generic_skyscraper',
+    description: 'A gleaming corporate tower. Excellent return on investment, brutal commute for everyone inside.' },
+  bld_taipei101:  { label: 'Building: Taipei 101',          tier: 'exceedingly_rare', img: '/tycoon/taipei-101.png',       type: 'building_unlock', key: 'taipei_101',
+    description: 'The crown jewel of the skyline. Owning one is basically bragging rights with a paycheck attached.' },
 };
 
 // Paths an `unlock_page` item may grant. A path only belongs here once the page
@@ -191,20 +200,27 @@ window.CASES = {
 
   iantopia_tycoon_basic: {
     label: 'Iantopia Lootbox Basic',
-    cost: 750,
+    // Raised alongside the Taipei 101 odds bump below — 750 was priced
+    // for a 1% Legendary shot, not 5%.
+    cost: 2500,
     emoji: '🏗️',
-    blurb: 'Drops a building for your Iantopia Tycoon skyline. Odds favor common stock, but Taipei 101 is in here.',
+    blurb: 'Drops a building for your Iantopia Tycoon skyline. Taipei 101 is a real shot at 5% — and owning Pagodas nudges every future pull further from Common.',
     // Rarity tiers reused as the building rarity odds specified for this
-    // case specifically — Common/Uncommon/Rare/Epic/Legendary at
-    // 50/30/15/4/1%, mapped onto the shared mil_spec..exceedingly_rare
-    // scale rather than inventing a parallel one.
+    // case specifically, mapped onto the shared mil_spec..exceedingly_rare
+    // scale rather than inventing a parallel one. Taipei 101 bumped from
+    // 1% to 5% per request; the 4-point difference comes out of Common
+    // (50 -> 46) so the total still lands on 100.
     odds: {
-      mil_spec: 50.0,
+      mil_spec: 46.0,
       restricted: 30.0,
       classified: 15.0,
       covert: 4.0,
-      exceedingly_rare: 1.0,
+      exceedingly_rare: 5.0,
     },
+    // Owning Pagodas shifts these odds further off mil_spec at open time —
+    // see lootbox.js's oddsFor(), which checks this flag rather than
+    // hardcoding this case's key.
+    pagodaBuff: true,
     items: ['bld_shabby', 'bld_generic', 'bld_pagoda', 'bld_skyscraper', 'bld_taipei101'],
   },
 };

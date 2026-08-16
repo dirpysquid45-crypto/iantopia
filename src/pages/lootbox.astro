@@ -226,6 +226,8 @@
   .reveal-emoji{ font-size:104px; line-height:1; }
   .reveal-rarity{ font-size:9px; letter-spacing:2px; text-transform:uppercase; color:var(--rc,#fff); }
   .reveal-label{ font-size:13px; color:#fff; line-height:1.6; max-width:340px; }
+  .reveal-desc{ font-size:9px; color:var(--muted); line-height:1.7; max-width:320px; margin:0 auto; }
+  .reveal-desc:empty{ display:none; }
   .reveal-note{ font-size:9px; color:var(--money); line-height:1.8; }
   .reveal-actions{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:6px; }
 
@@ -375,6 +377,7 @@
   .tier-item img{ width:26px; height:26px; object-fit:contain; flex:0 0 26px; }
   .tier-item .te{ font-size:20px; flex:0 0 26px; text-align:center; }
   .tier-item span{ color:var(--ink); }
+  .tier-item small{ display:block; color:var(--muted); font-size:7px; line-height:1.5; margin-top:3px; }
 
   @media (max-width:768px){
     :root{ --tile-w: 132px; }
@@ -432,6 +435,7 @@
           <div class="reveal-rarity" id="reveal-rarity"></div>
           <div id="reveal-visual"></div>
           <div class="reveal-label" id="reveal-label"></div>
+          <div class="reveal-desc" id="reveal-desc"></div>
           <div class="reveal-note" id="reveal-note"></div>
         </div>
         <div class="reveal-actions">
@@ -504,8 +508,8 @@
   <script is:inline src="/cloud-sync.js?v=7"></script>
   <script is:inline src="/music-library.js?v=8"></script>
   <script is:inline src="/background-library.js?v=9"></script>
-  <script is:inline src="/case-data.js?v=11"></script>
-  <script is:inline src="/lootbox.js?v=6"></script>
+  <script is:inline src="/case-data.js?v=12"></script>
+  <script is:inline src="/lootbox.js?v=7"></script>
   <script is:inline src="/cursor-library.js?v=2"></script>
   <script is:inline src="/cursor.js?v=3"></script>
   <script is:inline src="/music-position.js?v=1"></script>
@@ -1003,6 +1007,7 @@
       document.getElementById('reveal-rarity').textContent = res.rarity.label;
       document.getElementById('reveal-visual').innerHTML = visual(res.item, 'reveal-emoji');
       document.getElementById('reveal-label').textContent = res.item.label;
+      document.getElementById('reveal-desc').textContent = res.item.description || '';
 
       const note = document.getElementById('reveal-note');
       if (res.duplicate) {
@@ -1060,7 +1065,12 @@
         html += `<div class="tier-items">` + ids.map((id) => {
           const it = ITEMS[id];
           const vis = it.img ? `<img src="${it.img}" alt="">` : `<span class="te">${it.emoji || '❓'}</span>`;
-          return `<div class="tier-item" style="color:${r.color}">${vis}<span>${it.label}</span></div>`;
+          // Most items are self-explanatory from their name (a background,
+          // a cursor skin) — description is only worth showing when one
+          // actually exists (currently just the Tycoon buildings), rather
+          // than padding every row with empty space.
+          const desc = it.description ? `<small>${it.description}</small>` : '';
+          return `<div class="tier-item" style="color:${r.color}">${vis}<span>${it.label}${desc}</span></div>`;
         }).join('') + `</div>`;
       });
       document.getElementById('contents-body').innerHTML = html;

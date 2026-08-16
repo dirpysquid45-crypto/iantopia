@@ -71,12 +71,36 @@
      exactly where the buildings' feet are, at any scroll position or
      page height. */
   #grass-fg {
-    flex:0 0 70px;
+    flex:0 0 130px;
     width:100%; pointer-events:none;
     background-image:url('/tycoon/grass-foreground.png');
     background-repeat:repeat-x; background-position:bottom left; background-size:auto 100%;
-    margin-top:-3px; /* tuck under the slots' border so there's no seam */
+    /* Comes after the grid in the DOM, so it paints in front of the
+       buildings — this negative margin pulls it up so the blades actually
+       cover the bottom of each building's feet, not just touch the grid's
+       border like before. */
+    margin-top:-55px;
+    position:relative; z-index:1;
   }
+
+  /* Pedestrians wander along the grass line, layered above it (z-index:2 >
+     grass's 1) so they read as walking IN FRONT of the strip, not behind
+     it. Positioned relative to <main> (position:relative already), bottom-
+     anchored so it always lines up with the grass regardless of viewport
+     height. */
+  #pedestrian-layer {
+    position:absolute; left:0; right:0; bottom:0; height:130px;
+    pointer-events:none; overflow:hidden; z-index:2;
+  }
+  .pedestrian {
+    position:absolute; object-fit:contain;
+    filter:drop-shadow(0 3px 4px rgba(0,0,0,.4));
+    animation-timing-function:linear; animation-fill-mode:forwards;
+  }
+  @keyframes walk-right { from { left:-80px; } to { left:calc(100% + 80px); } }
+  @keyframes walk-left  { from { left:calc(100% + 80px); } to { left:-80px; } }
+  .pedestrian.walk-right { animation-name: walk-right; }
+  .pedestrian.walk-left  { animation-name: walk-left; transform:scaleX(-1); }
 
   #strubles-badge{
     position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
@@ -111,13 +135,23 @@
   }
   #stats-bar b { color:var(--gold); }
 
-  #lootbox-cta {
+  #cta-row {
     flex:0 0 auto;
-    display:block; text-align:center; margin:0 auto 14px; width:fit-content;
+    display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap;
+    margin-bottom:14px;
+  }
+  #lootbox-cta {
+    display:block; text-align:center; width:fit-content;
     color:#000; background:var(--gold); text-decoration:none; border:3px solid #000;
     padding:10px 18px; font-size:11px; font-weight:700;
   }
   #lootbox-cta:hover { background:#ffe766; }
+  #guide-btn {
+    color:var(--gold); background:#000; border:3px solid var(--gold);
+    padding:10px 14px; font-size:11px; font-weight:700; cursor:none;
+    font-family:inherit; transition:background .2s, color .2s;
+  }
+  #guide-btn:hover { background:var(--gold); color:#000; }
 
   /* ---------- The skyline: a single row of 5 ---------- */
   /* flex:1 + min-height:0 gives this whatever vertical space is actually
@@ -234,7 +268,19 @@
   .picker-row img { width:36px; height:36px; object-fit:contain; flex-shrink:0; }
   .picker-row .row-info { flex:1; line-height:1.6; }
   .picker-row .row-info small { color:var(--muted); display:block; font-size:8px; }
+  .picker-row .row-info small.row-desc { font-style:italic; margin-top:3px; }
   .picker-empty { color:var(--muted); font-size:10px; padding:10px 0; line-height:1.8; text-align:center; }
+
+  /* ---------- Building Guide (legend) ---------- */
+  .guide-row {
+    display:flex; align-items:center; gap:10px; padding:10px 0;
+    border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:10px;
+  }
+  .guide-row:last-child { border-bottom:none; }
+  .guide-row img { width:40px; height:40px; object-fit:contain; flex-shrink:0; }
+  .guide-row .row-info { flex:1; line-height:1.6; }
+  .guide-row .row-info small { color:var(--muted); display:block; font-size:8px; }
+  .guide-row .row-info small.row-desc { font-style:italic; margin-top:3px; }
 
   .volume-row{
     display:flex; align-items:center; gap:10px; margin-bottom:16px;
@@ -279,10 +325,14 @@
       <span>Under construction: <b id="stat-building">0/3</b></span>
     </div>
 
-    <a id="lootbox-cta" href="/lootbox">🏗️ Get an Iantopia Lootbox Basic</a>
+    <div id="cta-row">
+      <a id="lootbox-cta" href="/lootbox">🏗️ Get an Iantopia Lootbox Basic</a>
+      <button id="guide-btn" type="button">📖 Building Guide</button>
+    </div>
 
     <div id="tycoon-grid"></div>
     <div id="grass-fg"></div>
+    <div id="pedestrian-layer" aria-hidden="true"></div>
   </main>
 
   <!-- Placement picker: which owned-but-unplaced building to build here -->
@@ -293,6 +343,32 @@
         <button class="btn" id="place-close" type="button">Close</button>
       </div>
       <div id="place-list"></div>
+    </div>
+  </div>
+
+  <!-- Manage an already-placed building: remove it, or swap for a different one -->
+  <div class="overlay" id="manage-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2 id="manage-title">Manage</h2>
+        <button class="btn" id="manage-close" type="button">Close</button>
+      </div>
+      <div id="manage-info"></div>
+      <div id="manage-actions" style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+        <button class="btn" id="manage-swap" type="button">🔁 Swap</button>
+        <button class="btn" id="manage-remove" type="button">🗑️ Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Building Guide: every tier's stats + description, regardless of ownership -->
+  <div class="overlay" id="guide-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Building Guide</h2>
+        <button class="btn" id="guide-close" type="button">Close</button>
+      </div>
+      <div id="guide-list"></div>
     </div>
   </div>
 
@@ -333,8 +409,8 @@
 <script is:inline src="/music-library.js?v=8"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/cursor-library.js?v=2"></script>
-<script is:inline src="/case-data.js?v=11"></script>
-<script is:inline src="/tycoon-buildings.js?v=1"></script>
+<script is:inline src="/case-data.js?v=12"></script>
+<script is:inline src="/tycoon-buildings.js?v=2"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/strubles.js?v=2"></script>
 <script is:inline src="/pickers.js?v=11"></script>
@@ -501,6 +577,7 @@
         tag.textContent = `${def.label} · +${def.production}/min`;
       }
       cell.appendChild(tag);
+      cell.addEventListener('click', () => openManagePicker(i));
       gridEl.appendChild(cell);
     });
 
@@ -553,7 +630,7 @@
       img.alt = def.label;
       const info = document.createElement('div');
       info.className = 'row-info';
-      info.innerHTML = `${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE} · ${avail[key]} unplaced</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done</small>`;
+      info.innerHTML = `${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE} · ${avail[key]} unplaced</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done</small>${def.description ? `<small class="row-desc">${def.description}</small>` : ''}`;
       row.appendChild(img);
       row.appendChild(info);
       row.addEventListener('click', () => placeBuilding(key));
@@ -599,6 +676,90 @@
     });
   });
 
+  // --- Manage an occupied slot: remove it, or swap it for something else.
+  // Swap reuses openPlacePicker as-is — placeBuilding() already just
+  // overwrites whatever's in the target slot unconditionally, so the old
+  // occupant naturally becomes "unplaced" again (ownership is owned minus
+  // placed, scanned fresh from the current grid) with no separate
+  // bookkeeping needed. ---
+  const manageOverlay = $('manage-overlay');
+  let manageSlot = null;
+
+  function openManagePicker(slotIndex) {
+    const slot = grid[slotIndex];
+    if (!slot) return;
+    manageSlot = slotIndex;
+    const def = DEFS[slot.key];
+    const rarity = RARITY[def.tier] || {};
+    $('manage-title').textContent = def.label;
+    const statusLine = slot.status === 'building'
+      ? 'Currently under construction — removing forfeits progress, no refund.'
+      : `Producing +${def.production}/min.`;
+    $('manage-info').innerHTML = `
+      <div class="guide-row">
+        <img src="${def.img}" alt="${def.label}">
+        <div class="row-info">
+          ${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''}</small>
+          <small>${statusLine}</small>
+          ${def.description ? `<small class="row-desc">${def.description}</small>` : ''}
+        </div>
+      </div>`;
+    manageOverlay.classList.add('open');
+  }
+
+  $('manage-swap').addEventListener('click', () => {
+    if (manageSlot == null) return;
+    manageOverlay.classList.remove('open');
+    openPlacePicker(manageSlot);
+  });
+  $('manage-remove').addEventListener('click', () => {
+    if (manageSlot == null) return;
+    grid[manageSlot] = null;
+    saveGrid(grid);
+    manageOverlay.classList.remove('open');
+    render();
+  });
+  document.querySelectorAll('#manage-overlay, #manage-close').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      if (e.target.id === 'manage-overlay' || e.target.id === 'manage-close') {
+        manageOverlay.classList.remove('open');
+      }
+    });
+  });
+
+  // --- Building Guide: every tier, regardless of ownership — the "no
+  // legend" gap. Rendered fresh each open so owned-count stays current if
+  // you check it again mid-session. ---
+  const guideOverlay = $('guide-overlay');
+  const guideList = $('guide-list');
+  $('guide-btn').addEventListener('click', () => {
+    const owned = ownedCounts();
+    guideList.innerHTML = '';
+    ORDER.forEach((key) => {
+      const def = DEFS[key];
+      const rarity = RARITY[def.tier] || {};
+      const row = document.createElement('div');
+      row.className = 'guide-row';
+      const img = document.createElement('img');
+      img.src = def.img;
+      img.alt = def.label;
+      const info = document.createElement('div');
+      info.className = 'row-info';
+      info.innerHTML = `${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE}</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done</small>${def.description ? `<small class="row-desc">${def.description}</small>` : ''}`;
+      row.appendChild(img);
+      row.appendChild(info);
+      guideList.appendChild(row);
+    });
+    guideOverlay.classList.add('open');
+  });
+  document.querySelectorAll('#guide-overlay, #guide-close').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      if (e.target.id === 'guide-overlay' || e.target.id === 'guide-close') {
+        guideOverlay.classList.remove('open');
+      }
+    });
+  });
+
   window.addEventListener('inventory:changed', () => { grid = loadGrid(); render(); });
   window.addEventListener('strubles:change', syncBalance);
   window.addEventListener('storage', (e) => {
@@ -634,6 +795,39 @@
   });
 
   scheduleReconcile();
+
+  // --- Pedestrians: purely decorative, but their frequency scales with
+  // how developed the city is (complete buildings), so a fresh empty grid
+  // feels quiet and a full skyline feels lively. ---
+  const PEDESTRIANS = window.TYCOON_PEDESTRIANS || [];
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function spawnPedestrian() {
+    const layer = $('pedestrian-layer');
+    if (!layer || !PEDESTRIANS.length) return;
+    const p = PEDESTRIANS[Math.floor(Math.random() * PEDESTRIANS.length)];
+    const el = document.createElement('img');
+    el.src = p.img;
+    el.alt = '';
+    el.style.height = p.height + 'px';
+    el.style.bottom = (8 + Math.random() * 50) + 'px';
+    const duration = 9 + Math.random() * 6; // 9-15s to cross
+    el.style.animationDuration = duration + 's';
+    el.className = 'pedestrian ' + (Math.random() < 0.5 ? 'walk-right' : 'walk-left');
+    layer.appendChild(el);
+    setTimeout(() => el.remove(), duration * 1000 + 200);
+  }
+  function scheduleNextPedestrian() {
+    // 0 complete buildings -> ~8-9.5s between walkers; a full skyline (5
+    // complete) -> ~2-3.5s. Complete only, not under-construction — a
+    // building site isn't foot traffic yet.
+    const completedCount = grid.filter((s) => s && s.status === 'complete').length;
+    const base = Math.max(2000, 8000 - completedCount * 1200);
+    setTimeout(() => {
+      spawnPedestrian();
+      scheduleNextPedestrian();
+    }, base + Math.random() * 1500);
+  }
+  if (!reduceMotion) scheduleNextPedestrian();
 
   if (window.initPickers) setTimeout(window.initPickers, 100);
 })();
