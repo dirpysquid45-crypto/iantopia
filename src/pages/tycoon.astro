@@ -63,6 +63,22 @@
   #sky-bg::after {
     content:''; position:absolute; inset:0; background:rgba(0,0,0,.15);
   }
+
+  /* Silly airplane — purely decorative, drifts across the upper sky every
+     so often. Fixed like the sky itself (not tied to the grid/grass) so it
+     reads as "way up there" regardless of scroll or how tall the skyline
+     grid ends up. */
+  #airplane-layer {
+    position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden;
+  }
+  .airplane {
+    position:absolute; height:56px; width:auto; object-fit:contain;
+    animation-timing-function:linear; animation-fill-mode:forwards;
+  }
+  @keyframes fly-right { from { left:-100px; } to { left:calc(100% + 100px); } }
+  @keyframes fly-left  { from { left:calc(100% + 100px); } to { left:-100px; } }
+  .airplane.fly-right { animation-name: fly-right; }
+  .airplane.fly-left  { animation-name: fly-left; transform:scaleX(-1); }
   /* Grass sits directly below the grid in normal document flow, NOT fixed
      to the viewport — a fixed strip stays glued to the bottom of the
      screen regardless of scroll, while the building row lives in the
@@ -83,24 +99,36 @@
     position:relative; z-index:1;
   }
 
-  /* Pedestrians wander along the grass line, layered above it (z-index:2 >
-     grass's 1) so they read as walking IN FRONT of the strip, not behind
-     it. Positioned relative to <main> (position:relative already), bottom-
+  /* Pedestrians wander along the grass line, layered BEHIND it (z-index:0 <
+     grass's 1) so they read as walking through the grass, partially
+     hidden by the blades, rather than standing in front of the strip.
+     Positioned relative to <main> (position:relative already), bottom-
      anchored so it always lines up with the grass regardless of viewport
-     height. */
+     height. Split into a wrapper (handles horizontal walk + the static
+     left/right flip) and an inner image (handles its own independent
+     bob) so the two transforms never fight over the same property the
+     way a single combined animation would. */
   #pedestrian-layer {
     position:absolute; left:0; right:0; bottom:0; height:130px;
-    pointer-events:none; overflow:hidden; z-index:2;
+    pointer-events:none; overflow:hidden; z-index:0;
   }
-  .pedestrian {
-    position:absolute; object-fit:contain;
-    filter:drop-shadow(0 3px 4px rgba(0,0,0,.4));
+  .pedestrian-wrap {
+    position:absolute;
     animation-timing-function:linear; animation-fill-mode:forwards;
   }
+  .pedestrian-wrap.walk-right { animation-name: walk-right; }
+  .pedestrian-wrap.walk-left  { animation-name: walk-left; transform:scaleX(-1); }
   @keyframes walk-right { from { left:-80px; } to { left:calc(100% + 80px); } }
   @keyframes walk-left  { from { left:calc(100% + 80px); } to { left:-80px; } }
-  .pedestrian.walk-right { animation-name: walk-right; }
-  .pedestrian.walk-left  { animation-name: walk-left; transform:scaleX(-1); }
+  .pedestrian {
+    display:block; object-fit:contain;
+    filter:drop-shadow(0 3px 4px rgba(0,0,0,.4));
+    animation: pedestrian-bob .5s ease-in-out infinite;
+  }
+  @keyframes pedestrian-bob {
+    0%, 100% { transform:translateY(0); }
+    50%      { transform:translateY(-7px); }
+  }
 
   #strubles-badge{
     position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
@@ -210,7 +238,10 @@
     filter: brightness(0.5) saturate(0.6) drop-shadow(0 6px 10px rgba(0,0,0,.5));
   }
   .tycoon-slot .label-tag {
-    position:absolute; bottom:-2px; left:50%; transform:translateX(-50%);
+    /* Above the building, not below — bottom used to sit right where the
+       taller/overlapping grass now covers it, making every label
+       unreadable. */
+    position:absolute; top:-2px; left:50%; transform:translateX(-50%);
     background:#000; color:var(--gold); border:2px solid var(--gold);
     font-size:7px; padding:3px 6px; text-align:center;
     /* Full label can be wider than a narrow mobile column — nowrap alone
@@ -221,7 +252,11 @@
   }
 
   .construction-pct {
-    position:absolute; top:6px; left:50%; transform:translateX(-50%);
+    /* Sits below the label-tag now that the label moved to top:-2px (was
+       bottom, hidden by the taller grass) — the two would otherwise stack
+       right on top of each other during construction, when both show at
+       once. */
+    position:absolute; top:22px; left:50%; transform:translateX(-50%);
     background:rgba(0,0,0,.8); color:var(--gold); padding:3px 8px;
     font-size:9px; border:2px solid var(--gold); white-space:nowrap;
   }
@@ -303,6 +338,7 @@
 </head>
 <body>
   <div id="sky-bg"></div>
+  <div id="airplane-layer" aria-hidden="true"></div>
 
   <div id="strubles-badge">
     <img src="/strubles.png" alt="Struble">
@@ -410,7 +446,7 @@
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/cursor-library.js?v=2"></script>
 <script is:inline src="/case-data.js?v=12"></script>
-<script is:inline src="/tycoon-buildings.js?v=2"></script>
+<script is:inline src="/tycoon-buildings.js?v=3"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/strubles.js?v=2"></script>
 <script is:inline src="/pickers.js?v=11"></script>
@@ -423,7 +459,7 @@
   const INV_KEY = 'strubles_inventory_v1';
   const ORDER = window.TYCOON_BUILDING_ORDER || [];
   const DEFS = window.TYCOON_BUILDINGS || {};
-  const MAX_PER_TYPE = window.TYCOON_MAX_PER_TYPE || 10;
+  const MAX_PER_TYPE = window.TYCOON_MAX_PER_TYPE || 5;
   const MAX_CONCURRENT = window.TYCOON_MAX_CONCURRENT_BUILDS || 3;
   const OFFLINE_CAP_MS = window.TYCOON_OFFLINE_CAP_MS || 8 * 60 * 60 * 1000;
   const RARITY = window.CASE_RARITIES || {};
@@ -805,16 +841,19 @@
     const layer = $('pedestrian-layer');
     if (!layer || !PEDESTRIANS.length) return;
     const p = PEDESTRIANS[Math.floor(Math.random() * PEDESTRIANS.length)];
+    const wrap = document.createElement('div');
+    wrap.style.bottom = (8 + Math.random() * 50) + 'px';
+    const duration = 9 + Math.random() * 6; // 9-15s to cross
+    wrap.style.animationDuration = duration + 's';
+    wrap.className = 'pedestrian-wrap ' + (Math.random() < 0.5 ? 'walk-right' : 'walk-left');
     const el = document.createElement('img');
     el.src = p.img;
     el.alt = '';
     el.style.height = p.height + 'px';
-    el.style.bottom = (8 + Math.random() * 50) + 'px';
-    const duration = 9 + Math.random() * 6; // 9-15s to cross
-    el.style.animationDuration = duration + 's';
-    el.className = 'pedestrian ' + (Math.random() < 0.5 ? 'walk-right' : 'walk-left');
-    layer.appendChild(el);
-    setTimeout(() => el.remove(), duration * 1000 + 200);
+    el.className = 'pedestrian';
+    wrap.appendChild(el);
+    layer.appendChild(wrap);
+    setTimeout(() => wrap.remove(), duration * 1000 + 200);
   }
   function scheduleNextPedestrian() {
     // 0 complete buildings -> ~8-9.5s between walkers; a full skyline (5
@@ -828,6 +867,28 @@
     }, base + Math.random() * 1500);
   }
   if (!reduceMotion) scheduleNextPedestrian();
+
+  // --- Silly airplane: rare, purely for fun, doesn't scale with anything ---
+  function spawnAirplane() {
+    const layer = $('airplane-layer');
+    if (!layer) return;
+    const el = document.createElement('img');
+    el.src = '/tycoon/silly-airplane.gif';
+    el.alt = '';
+    el.style.top = (6 + Math.random() * 18) + '%';
+    const duration = 16 + Math.random() * 10; // 16-26s, a leisurely drift
+    el.style.animationDuration = duration + 's';
+    el.className = 'airplane ' + (Math.random() < 0.5 ? 'fly-right' : 'fly-left');
+    layer.appendChild(el);
+    setTimeout(() => el.remove(), duration * 1000 + 200);
+  }
+  function scheduleNextAirplane() {
+    setTimeout(() => {
+      spawnAirplane();
+      scheduleNextAirplane();
+    }, 45000 + Math.random() * 45000); // one every 45-90s
+  }
+  if (!reduceMotion) scheduleNextAirplane();
 
   if (window.initPickers) setTimeout(window.initPickers, 100);
 })();

@@ -60,7 +60,7 @@ window.TYCOON_BUILDINGS = {
 // Rarity-ascending order — drives grid picker ordering and the case's item list.
 window.TYCOON_BUILDING_ORDER = ['shabby_apartment', 'generic_building', 'pagoda', 'generic_skyscraper', 'taipei_101'];
 
-window.TYCOON_MAX_PER_TYPE = 10;
+window.TYCOON_MAX_PER_TYPE = 5;
 window.TYCOON_MAX_CONCURRENT_BUILDS = 3;
 window.TYCOON_OFFLINE_CAP_MS = 8 * 60 * 60 * 1000;
 

@@ -57,7 +57,7 @@
   // a player can hold up to this many of the SAME building, so `buildings`
   // is allowed to contain duplicate keys (count of a key = how many owned),
   // unlike every other bucket where `.includes()` is the ownership check.
-  const MAX_BUILDING_COPIES = (window.TYCOON_MAX_PER_TYPE) || 10;
+  const MAX_BUILDING_COPIES = (window.TYCOON_MAX_PER_TYPE) || 5;
 
   // Must hand back FRESH arrays every call. Returning a shared template and
   // letting callers push into it mutates the template itself, so every later
@@ -124,10 +124,11 @@
   }
 
   // Pagoda's flavor text: "increases chances of everything that is not a
-  // common." Every owned Pagoda (up to the 10-copy cap) shifts 1 point off
-  // mil_spec's odds, redistributed across the other tiers proportional to
-  // their existing weight — so 10 Pagodas moves a full 10% off Common onto
-  // Uncommon/Rare/Epic/Legendary. Scoped to whichever case declares
+  // common." Every owned Pagoda (up to the per-type ownership cap) shifts
+  // 1 point off mil_spec's odds, redistributed across the other tiers
+  // proportional to their existing weight — so owning the max moves that
+  // same number of points off Common onto Uncommon/Rare/Epic/Legendary.
+  // Scoped to whichever case declares
   // `pagodaBuff: true` (currently just Iantopia Lootbox Basic) rather than
   // hardcoding a case key here.
   const PAGODA_BUFF_PER_COPY = 1;
