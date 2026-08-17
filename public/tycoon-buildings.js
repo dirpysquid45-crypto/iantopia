@@ -68,8 +68,8 @@ window.TYCOON_OFFLINE_CAP_MS = 8 * 60 * 60 * 1000;
 // More of the city built (buildings placed) means more people around,
 // implemented as a shorter average spawn interval, not more sprites at once.
 window.TYCOON_PEDESTRIANS = [
-  { img: '/tycoon/chibi-gojo-walking.png', height: 64 },
-  { img: '/tycoon/duck-walking.gif', height: 48 },
-  { img: '/tycoon/hollowknight-walking.gif', height: 56 },
-  { img: '/tycoon/skeleton-walking.gif', height: 72 },
+  { img: '/tycoon/chibi-gojo-walking.png', height: 100 },
+  { img: '/tycoon/duck-walking.gif', height: 76 },
+  { img: '/tycoon/hollowknight-walking.gif', height: 88 },
+  { img: '/tycoon/skeleton-walking.gif', height: 112 },
 ];

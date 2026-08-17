@@ -1663,6 +1663,12 @@
       // in both libraries on purpose (see music-library.js).
       const BACKGROUND_MUSIC_COMBOS = ['bladee_waster', 'evian_yxguden', 'clarity', 'hello_kitty', 'girl_like_me'];
 
+      // Same fix as every other page's pickers.js already has: without this,
+      // the video restarted from 0:00 on every trip back to the homescreen
+      // while the audio track kept its place, so the two drifted out of sync
+      // (worse under lag, where the video reload itself takes a beat).
+      const VIDEO_POS_KEY = 'home_video_pos_v1';
+
       function applyBackground(key) {
         const bg = BG_LIBRARY[key] || BG_LIBRARY.default;
         activeBgKey = key;
@@ -1670,6 +1676,13 @@
           document.body.style.backgroundImage = 'none';
           bgVideo.src = bg.src;
           bgVideo.classList.add('show');
+          if (window.MusicPosition) {
+            window.MusicPosition.restore(VIDEO_POS_KEY, bgVideo);
+            if (!bgVideo.dataset.positionTracked) {
+              bgVideo.dataset.positionTracked = '1';
+              window.MusicPosition.track(VIDEO_POS_KEY, bgVideo);
+            }
+          }
           bgVideo.play().catch(() => {});
         } else {
           bgVideo.classList.remove('show');

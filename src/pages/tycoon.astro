@@ -211,16 +211,31 @@
   .tycoon-slot.empty:hover .empty-plus {
     border-color:var(--gold); background:rgba(255,215,0,.08);
   }
-  .tycoon-building-img {
-    display:block; width:auto; max-width:100%;
-    /* Percentage of the SLOT's own height, which stretches to match
-       #tycoon-grid's real (flex-computed) height by grid's default
-       align-items:stretch — this is what makes the sizing adapt to
-       whatever room is actually available instead of raw vh. Regular
-       buildings sit at ~70% of what a skyscraper gets, echoing the
-       spec's "half the page" vs. "70% of the page" ratio, just resolved
-       against the grid's real height rather than the whole viewport. */
+  /* Percentage of the SLOT's own height, which stretches to match
+     #tycoon-grid's real (flex-computed) height by grid's default
+     align-items:stretch — this is what makes the sizing adapt to
+     whatever room is actually available instead of raw vh. Regular
+     buildings sit at ~70% of what a skyscraper gets, echoing the
+     spec's "half the page" vs. "70% of the page" ratio, just resolved
+     against the grid's real height rather than the whole viewport.
+     This has to live here (not on the img) — a percentage height only
+     resolves against a definite ancestor, and .tycoon-slot's own
+     align-items:flex-end means only a flex item positioned directly
+     against IT (this element) gets that definite height; a plain child
+     of an auto-sized box would just fall back to intrinsic size and
+     ignore the percentage entirely. Sizing it here also means the
+     label/badge/workers below (all position:absolute inside this box)
+     hug exactly this building's own tier height instead of the row's
+     shared height. */
+  .building-visual {
+    position:relative;
     height:66%;
+    transition: height .2s ease;
+  }
+  .building-visual.skyscraper { height:82%; }
+  .building-visual.prestige { height:98%; }
+  .tycoon-building-img {
+    display:block; width:auto; max-width:100%; height:100%;
     object-fit:contain;
     /* When max-width kicks in (narrow columns vs. a wide/square source
        image), height and width stop matching the image's own aspect
@@ -231,9 +246,8 @@
        dimension ends up constrained. */
     object-position: center bottom;
     filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));
-    transition: filter .3s ease, height .2s ease;
+    transition: filter .3s ease;
   }
-  .tycoon-building-img.skyscraper { height:94%; }
   .tycoon-slot.building .tycoon-building-img {
     filter: brightness(0.5) saturate(0.6) drop-shadow(0 6px 10px rgba(0,0,0,.5));
   }
@@ -446,7 +460,7 @@
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/cursor-library.js?v=2"></script>
 <script is:inline src="/case-data.js?v=12"></script>
-<script is:inline src="/tycoon-buildings.js?v=3"></script>
+<script is:inline src="/tycoon-buildings.js?v=4"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/strubles.js?v=2"></script>
 <script is:inline src="/pickers.js?v=11"></script>
@@ -574,11 +588,19 @@
       if (!def) { gridEl.appendChild(cell); return; }
       const rarity = RARITY[def.tier] || {};
 
+      // Wraps just the image (shrinks to its actual rendered size, not the
+      // slot/row's full height) so the label/badge below position relative
+      // to THIS building's own top edge — a short building sharing a row
+      // with a tall one used to leave its label floating way up near the
+      // row's top, since it was positioned relative to the slot instead.
+      const visual = document.createElement('div');
+      visual.className = 'building-visual' + (def.prestige ? ' prestige' : (def.skyscraper ? ' skyscraper' : ''));
+
       const img = document.createElement('img');
-      img.className = 'tycoon-building-img' + (def.skyscraper ? ' skyscraper' : '');
+      img.className = 'tycoon-building-img';
       img.src = def.img;
       img.alt = def.label;
-      cell.appendChild(img);
+      visual.appendChild(img);
 
       const tag = document.createElement('div');
       tag.className = 'label-tag';
@@ -591,7 +613,7 @@
         const badge = document.createElement('div');
         badge.className = 'construction-pct';
         badge.textContent = `${pct}% — ${fmtRemaining(slot.completesAt - now)}`;
-        cell.appendChild(badge);
+        visual.appendChild(badge);
 
         const workers = document.createElement('div');
         workers.className = 'construction-workers';
@@ -605,14 +627,15 @@
         w2.alt = '';
         workers.appendChild(w1);
         workers.appendChild(w2);
-        cell.appendChild(workers);
+        visual.appendChild(workers);
 
         tag.textContent = def.label;
       } else {
         totalProduction += def.production;
         tag.textContent = `${def.label} · +${def.production}/min`;
       }
-      cell.appendChild(tag);
+      visual.appendChild(tag);
+      cell.appendChild(visual);
       cell.addEventListener('click', () => openManagePicker(i));
       gridEl.appendChild(cell);
     });
@@ -842,7 +865,10 @@
     if (!layer || !PEDESTRIANS.length) return;
     const p = PEDESTRIANS[Math.floor(Math.random() * PEDESTRIANS.length)];
     const wrap = document.createElement('div');
-    wrap.style.bottom = (8 + Math.random() * 50) + 'px';
+    // Higher and with bigger sprites than before — enough was getting
+    // swallowed by the grass that "walking through it" read as "barely
+    // visible." Still dips low enough on the bob to graze the blades.
+    wrap.style.bottom = (25 + Math.random() * 55) + 'px';
     const duration = 9 + Math.random() * 6; // 9-15s to cross
     wrap.style.animationDuration = duration + 's';
     wrap.className = 'pedestrian-wrap ' + (Math.random() < 0.5 ? 'walk-right' : 'walk-left');
