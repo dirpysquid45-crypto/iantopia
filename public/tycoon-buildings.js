@@ -20,6 +20,10 @@ window.TYCOON_BUILDINGS = {
     tier: 'restricted',
     img: '/tycoon/generic-building.png',
     description: 'A perfectly ordinary mid-rise. Nobody remembers its name, but the tenants pay on time.',
+    // The source art is proportionally wide — contain letterboxed it to
+    // roughly half its box height, making it read as shorter than Shabby
+    // Apartment despite the identical box. cover fills the full height.
+    fillMode: 'cover',
     production: 2,
     buildMinutes: 30,
     cost: 100,
@@ -40,6 +44,9 @@ window.TYCOON_BUILDINGS = {
     img: '/tycoon/skyscraper.png',
     description: 'A gleaming corporate tower. Excellent return on investment, brutal commute for everyone inside.',
     skyscraper: true,
+    // Same letterboxing issue as Generic Building — its crop is wider than
+    // its box, so contain was only using ~60% of the height it was given.
+    fillMode: 'cover',
     production: 8,
     buildMinutes: 300,
     cost: 500,
@@ -67,9 +74,16 @@ window.TYCOON_OFFLINE_CAP_MS = 8 * 60 * 60 * 1000;
 // Pedestrians that wander past the skyline — see tycoon.astro's spawner.
 // More of the city built (buildings placed) means more people around,
 // implemented as a shorter average spawn interval, not more sprites at once.
+//
+// facesRight: which way the source art faces/steps by default (unflipped).
+// The spawner flips the sprite whenever its direction of travel doesn't
+// match this. Duck (beak) and Skeleton (arm/legs) both lead right by
+// default; Gojo and Hollowknight's art leads left, the opposite — treating
+// all four the same (flip only when walking left) made those two always
+// appear to walk backwards regardless of direction.
 window.TYCOON_PEDESTRIANS = [
-  { img: '/tycoon/chibi-gojo-walking.png', height: 100 },
-  { img: '/tycoon/duck-walking.gif', height: 76 },
-  { img: '/tycoon/hollowknight-walking.gif', height: 88 },
-  { img: '/tycoon/skeleton-walking.gif', height: 112 },
+  { img: '/tycoon/chibi-gojo-walking.png', height: 100, facesRight: false },
+  { img: '/tycoon/duck-walking.gif', height: 76, facesRight: true },
+  { img: '/tycoon/hollowknight-walking.gif', height: 88, facesRight: false },
+  { img: '/tycoon/skeleton-walking.gif', height: 112, facesRight: true },
 ];

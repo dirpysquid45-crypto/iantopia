@@ -109,7 +109,12 @@
      bob) so the two transforms never fight over the same property the
      way a single combined animation would. */
   #pedestrian-layer {
-    position:absolute; left:0; right:0; bottom:0; height:130px;
+    /* Tall enough for the biggest sprite (112px) at its highest spawn point
+       (bottom:80px) plus the bob's -7px lift, with a little headroom —
+       130px used to clip the top of anything spawning near the high/tall
+       end of that range, since overflow:hidden cut off right at the grass
+       strip's own height instead of the sprites' actual reach. */
+    position:absolute; left:0; right:0; bottom:0; height:210px;
     pointer-events:none; overflow:hidden; z-index:0;
   }
   .pedestrian-wrap {
@@ -117,7 +122,11 @@
     animation-timing-function:linear; animation-fill-mode:forwards;
   }
   .pedestrian-wrap.walk-right { animation-name: walk-right; }
-  .pedestrian-wrap.walk-left  { animation-name: walk-left; transform:scaleX(-1); }
+  .pedestrian-wrap.walk-left  { animation-name: walk-left; }
+  /* Mirrors the sprite — applied per-pedestrian by JS based on which way
+     its art actually faces by default, not hardcoded to one travel
+     direction (see facesRight in tycoon-buildings.js). */
+  .pedestrian-wrap.flipped { transform:scaleX(-1); }
   @keyframes walk-right { from { left:-80px; } to { left:calc(100% + 80px); } }
   @keyframes walk-left  { from { left:calc(100% + 80px); } to { left:-80px; } }
   .pedestrian {
@@ -248,6 +257,13 @@
     filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));
     transition: filter .3s ease;
   }
+  /* Some source art (Generic Building, Generic Skyscraper) is proportionally
+     wider than the portrait-shaped box `contain` has to fit it into, so it
+     was only using ~50-60% of its allotted height with empty space above —
+     making a "regular" building look shorter than Shabby Apartment despite
+     having the exact same box. `cover` fills the full height instead and
+     crops the sides, which reads fine for a building facade. */
+  .tycoon-building-img.fit-cover { object-fit: cover; }
   .tycoon-slot.building .tycoon-building-img {
     filter: brightness(0.5) saturate(0.6) drop-shadow(0 6px 10px rgba(0,0,0,.5));
   }
@@ -460,7 +476,7 @@
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/cursor-library.js?v=2"></script>
 <script is:inline src="/case-data.js?v=12"></script>
-<script is:inline src="/tycoon-buildings.js?v=4"></script>
+<script is:inline src="/tycoon-buildings.js?v=5"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/strubles.js?v=2"></script>
 <script is:inline src="/pickers.js?v=11"></script>
@@ -597,7 +613,7 @@
       visual.className = 'building-visual' + (def.prestige ? ' prestige' : (def.skyscraper ? ' skyscraper' : ''));
 
       const img = document.createElement('img');
-      img.className = 'tycoon-building-img';
+      img.className = 'tycoon-building-img' + (def.fillMode === 'cover' ? ' fit-cover' : '');
       img.src = def.img;
       img.alt = def.label;
       visual.appendChild(img);
@@ -871,7 +887,10 @@
     wrap.style.bottom = (25 + Math.random() * 55) + 'px';
     const duration = 9 + Math.random() * 6; // 9-15s to cross
     wrap.style.animationDuration = duration + 's';
-    wrap.className = 'pedestrian-wrap ' + (Math.random() < 0.5 ? 'walk-right' : 'walk-left');
+    const goingRight = Math.random() < 0.5;
+    const facesRight = p.facesRight !== false;
+    const needsFlip = goingRight ? !facesRight : facesRight;
+    wrap.className = 'pedestrian-wrap ' + (goingRight ? 'walk-right' : 'walk-left') + (needsFlip ? ' flipped' : '');
     const el = document.createElement('img');
     el.src = p.img;
     el.alt = '';
