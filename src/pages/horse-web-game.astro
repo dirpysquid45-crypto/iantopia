@@ -40,7 +40,8 @@
 
   #sky-bg {
     position:fixed; inset:0; z-index:-2;
-    background:linear-gradient(180deg, #6ec6ff 0%, #a7dcff 55%, #cdeaff 100%);
+    background-image:url('/horse-game/plain.gif');
+    background-size:cover; background-position:center;
   }
 
   #strubles-badge{
@@ -82,7 +83,8 @@
     flex:1 1 auto; min-height:200px; max-height:380px;
     border:3px solid #000; outline:2px solid var(--gold); outline-offset:-2px;
     overflow:hidden;
-    background:linear-gradient(180deg, #bfe8ff 0%, #eaf7ff 100%);
+    background-image:url('/horse-game/plain.gif');
+    background-size:cover; background-position:center;
     touch-action:none;
   }
   #ground {
@@ -156,6 +158,10 @@
     font-family:inherit;
   }
   .stage-box .btn:hover { background:#ffe766; }
+  #sound-hint {
+    margin:14px 0 0; font-size:7px; color:var(--muted); line-height:1.7;
+    max-width:260px;
+  }
 
   #hint {
     flex:0 0 auto; text-align:center; font-size:8px; color:var(--muted);
@@ -196,6 +202,7 @@
           <h2>🐴 Horse Web Game</h2>
           <p>Space / ↑ / tap to jump.<br>Every hurdle you clear = <b>1 Struble</b>.</p>
           <button class="btn" id="start-btn" type="button">▶ Start Running</button>
+          <p id="sound-hint">🔇 Browsers block audio until you interact — sound starts the moment you press Start.</p>
         </div>
       </div>
 
@@ -260,6 +267,9 @@
   });
 
   function tryPlayTheme() { if (audioEnabled) themeMusic.play().catch(() => {}); }
+  // Only relevant until the browser's autoplay block actually lifts --
+  // once real playback begins there's nothing left to explain.
+  themeMusic.addEventListener('play', () => { const h = $('sound-hint'); if (h) h.remove(); }, { once: true });
   applyTrack(false);
   tryPlayTheme();
   const unlockTheme = () => {
@@ -286,8 +296,12 @@
   const gameoverOverlay = $('gameover-overlay');
   const BEST_KEY = 'horse_game_best_v1';
 
-  const GRAVITY = -2600;      // px/s^2
-  const JUMP_VELOCITY = 850;  // px/s
+  // Softer arc than the first pass: a first-timer has zero warning before
+  // the first hurdle, so a taller/floatier jump (higher velocity, same
+  // gravity) buys more margin for a mistimed press instead of demanding
+  // frame-perfect reaction on attempt one.
+  const GRAVITY = -2200;      // px/s^2
+  const JUMP_VELOCITY = 900;  // px/s
   const HURDLE_W = 26;
   const HURDLE_H = 55;
   const GROUND_OFFSET = 44;   // matches #horse/.hurdle's `bottom` in CSS
