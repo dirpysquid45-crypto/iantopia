@@ -211,7 +211,7 @@
     <div id="hint">Now playing: <span id="np-label">Amazing Wild Horse</span></div>
   </main>
 
-  <audio id="theme-music" src="/audio/music/wild-horse.mp3" preload="none" loop></audio>
+  <audio id="theme-music" src="/audio/music/wild-horse.mp3" preload="auto" loop></audio>
   <audio id="sfx-clear" src="/audio/sfx/minesweeper-flag.mp3" preload="none"></audio>
   <audio id="sfx-hit" src="/audio/sfx/minesweeper-mine-hit.mp3" preload="none"></audio>
 
@@ -220,6 +220,8 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script is:inline src="/cloud-sync.js?v=7"></script>
 <script is:inline src="/strubles.js?v=2"></script>
+<script is:inline src="/cursor-library.js?v=2"></script>
+<script is:inline src="/cursor.js?v=3"></script>
 
 <script is:inline>
 (function () {
@@ -311,8 +313,13 @@
   window.addEventListener('resize', measure);
 
   function jump() {
-    if (state === 'idle') { startGame(); return; }
-    if (state !== 'playing') return;
+    // Space/tap also doubles as "start" and "restart" -- previously the
+    // very first press only started the run without also jumping (felt
+    // unresponsive), and pressing anything at all during game-over did
+    // nothing since only the small Try Again button could restart, which
+    // reads as "the horse doesn't jump" to anyone who loses their first
+    // hurdle and keeps mashing the same key that worked a second ago.
+    if (state === 'idle' || state === 'over') { startGame(); }
     if (y <= 0.5) { vy = JUMP_VELOCITY; }
   }
 
@@ -438,8 +445,12 @@
     }
   });
   stage.addEventListener('pointerdown', () => jump());
-  $('start-btn').addEventListener('click', startGame);
-  $('restart-btn').addEventListener('click', startGame);
+  // Belt-and-suspenders alongside the window-level pointerdown/keydown
+  // unlock above -- a direct click handler is the most unambiguous user
+  // gesture there is, so it shouldn't depend on the generic listener
+  // having already fired first.
+  $('start-btn').addEventListener('click', () => { startGame(); tryPlayTheme(); });
+  $('restart-btn').addEventListener('click', () => { startGame(); tryPlayTheme(); });
 })();
 </script>
 </body>
