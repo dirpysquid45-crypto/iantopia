@@ -679,11 +679,21 @@
     // ---------- Audio ----------
     const AUDIO_BASE = '/assets/casino/audio/';
     let audioEnabled = true;
+    // Both sfx pools used to hardcode their volume once at creation (.5 and
+    // .35) completely independent of the music slider below — dragging the
+    // slider only ever touched themeMusic, so the loudest, most frequent
+    // sound on this page (the reel ticks during a spin) never changed no
+    // matter where it was set. Reading the slider fresh on every play keeps
+    // these proportional to it instead: each boost is picked so sfx sound
+    // exactly as loud as before at the slider's default position (0.3), but
+    // now actually move with it in either direction.
+    function sfxVolume(boost) { return Math.min(1, (parseFloat(volumeSlider.value) / 100) + boost); }
     const cache = {};
     function sound(name){
       if (!audioEnabled) return null;
       let a = cache[name];
-      if (!a) { a = new Audio(`${AUDIO_BASE}${name}.ogg`); a.volume = .5; cache[name] = a; }
+      if (!a) { a = new Audio(`${AUDIO_BASE}${name}.ogg`); cache[name] = a; }
+      a.volume = sfxVolume(0.2);
       return a;
     }
     function play(name){ const a = sound(name); if (a) { a.currentTime = 0; a.play().catch(()=>{}); } }
@@ -695,14 +705,13 @@
     const TICK_POOL_SIZE = 6;
     const tickPool = [];
     for (let i = 0; i < TICK_POOL_SIZE; i++) {
-      const a = new Audio(`${AUDIO_BASE}chip-lay-1.ogg`);
-      a.volume = .35;
-      tickPool.push(a);
+      tickPool.push(new Audio(`${AUDIO_BASE}chip-lay-1.ogg`));
     }
     let tickIdx = 0;
     function playTick(){
       if (!audioEnabled) return;
       const a = tickPool[tickIdx = (tickIdx + 1) % TICK_POOL_SIZE];
+      a.volume = sfxVolume(0.05);
       a.currentTime = 0;
       a.play().catch(()=>{});
     }
