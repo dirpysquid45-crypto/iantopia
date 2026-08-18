@@ -1,0 +1,446 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Horse Web Game</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0a0c12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script is:inline src="/pwa.js?v=1" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<!--
+  is:global is REQUIRED — the horse and every hurdle are created at
+  runtime via createElement, so Astro's scoped data-astro-cid-* attribute
+  never lands on them and a scoped <style> would silently skip them. Same
+  trap documented on every other page in this project (tycoon, etc).
+-->
+<style is:global>
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body {
+    height:100dvh;
+    display:flex; flex-direction:column;
+    background:var(--bg); color:var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+    cursor:none;
+    position:relative;
+    overflow-x:hidden; overflow-y:auto;
+  }
+
+  #sky-bg {
+    position:fixed; inset:0; z-index:-2;
+    background:linear-gradient(180deg, #6ec6ff 0%, #a7dcff 55%, #cdeaff 100%);
+  }
+
+  #strubles-badge{
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
+    background:#000; padding:8px 12px; border:3px solid var(--gold);
+    font-weight:700; z-index:20;
+  }
+  #strubles-badge img{ width:28px; height:28px; }
+
+  main {
+    position:relative; z-index:2; max-width:900px; width:100%; margin:0 auto;
+    padding:16px 24px 24px; padding-top:calc(80px + env(safe-area-inset-top));
+    flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column;
+  }
+
+  header { flex:0 0 auto; display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:4px solid #000; padding-bottom:10px; flex-wrap:wrap; gap:10px; }
+  header a { color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; font-weight:700; background:#000; transition:background 0.2s; font-size:10px; cursor:none; }
+  header a:hover { background:var(--gold); color:#000; }
+  header button { color:var(--gold); background:#000; border:2px solid var(--gold); padding:4px 6px; cursor:none; transition:background 0.2s; font-size:14px; }
+  header button:hover { background:var(--gold); color:#000; }
+
+  h1 {
+    margin:0; font-size:clamp(12px,2.4vw,18px); letter-spacing:1px; color:var(--gold); font-weight:400;
+    text-shadow: 2px 2px 0 #000; text-align:center; width:100%;
+  }
+
+  #stats-bar {
+    flex:0 0 auto;
+    display:flex; justify-content:center; gap:18px; flex-wrap:wrap;
+    background:rgba(0,0,0,.55); border:2px solid var(--gold); padding:8px 14px;
+    margin-bottom:14px; font-size:9px; color:#fff;
+  }
+  #stats-bar b { color:var(--gold); }
+
+  /* ---------- Game stage ---------- */
+  #game-stage {
+    position:relative;
+    flex:1 1 auto; min-height:200px; max-height:380px;
+    border:3px solid #000; outline:2px solid var(--gold); outline-offset:-2px;
+    overflow:hidden;
+    background:linear-gradient(180deg, #bfe8ff 0%, #eaf7ff 100%);
+    touch-action:none;
+  }
+  #ground {
+    position:absolute; left:0; right:0; bottom:0; height:56px;
+    background-image:url('/tycoon/grass-foreground.png');
+    background-repeat:repeat-x; background-position:bottom left; background-size:auto 100%;
+    z-index:2;
+  }
+  #horse {
+    position:absolute; left:48px; bottom:44px;
+    width:104px; height:auto;
+    /* Faces right in the source art, which is the direction hurdles
+       approach from and the horse "runs toward" -- no flip needed. */
+    filter: drop-shadow(0 6px 6px rgba(0,0,0,.35));
+    z-index:5;
+    will-change: transform;
+  }
+  #horse.running { animation: horse-gallop .22s steps(2) infinite; }
+  @keyframes horse-gallop {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-4px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #horse.running { animation:none; }
+  }
+
+  /* Hurdle: a pair of posts with striped rails, like a show-jumping fence
+     — drawn entirely in CSS so the game doesn't need another art asset. */
+  .hurdle {
+    position:absolute; bottom:44px;
+    width:26px;
+    z-index:4;
+  }
+  .hurdle .post {
+    position:absolute; bottom:0; width:5px; height:100%;
+    background:#6b4423; border:1px solid #3e2812;
+  }
+  .hurdle .post.left { left:0; }
+  .hurdle .post.right { right:0; }
+  .hurdle .rail {
+    position:absolute; left:-3px; right:-3px; height:7px;
+    background:repeating-linear-gradient(90deg, #fff 0 8px, #d0342c 8px 16px);
+    border:1px solid #00000055;
+  }
+  .hurdle .rail.top { top:2px; }
+  .hurdle .rail.mid { top:42%; }
+
+  #score-float {
+    position:absolute; z-index:6; color:var(--gold); font-size:10px;
+    text-shadow:1px 1px 0 #000; pointer-events:none;
+    animation: score-float-up .7s ease-out forwards;
+  }
+  @keyframes score-float-up {
+    0%   { opacity:1; transform:translateY(0); }
+    100% { opacity:0; transform:translateY(-30px); }
+  }
+
+  .stage-overlay {
+    position:absolute; inset:0; z-index:10;
+    background:rgba(0,0,0,.72);
+    display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:20px;
+  }
+  .stage-overlay[hidden] { display:none; }
+  .stage-box h2 { margin:0 0 12px; font-size:14px; color:var(--gold); text-shadow:2px 2px 0 #000; }
+  .stage-box p { margin:0 0 16px; font-size:9px; line-height:1.9; color:var(--ink); }
+  .stage-box b { color:var(--gold); }
+  .stage-box .btn {
+    color:#000; background:var(--gold); text-decoration:none; border:3px solid #000;
+    padding:10px 18px; font-size:11px; font-weight:700; cursor:none;
+    font-family:inherit;
+  }
+  .stage-box .btn:hover { background:#ffe766; }
+
+  #hint {
+    flex:0 0 auto; text-align:center; font-size:8px; color:var(--muted);
+    margin-top:10px; line-height:1.8;
+  }
+</style>
+</head>
+<body>
+  <div id="sky-bg"></div>
+
+  <div id="strubles-badge">
+    <img src="/strubles.png" alt="Struble">
+    <span id="bal">0</span>
+  </div>
+
+  <main>
+    <header>
+      <a href="/" title="Back to Iantopia">← Home</a>
+      <h1>HORSE WEB GAME</h1>
+      <div style="display:flex; gap:4px;">
+        <button id="track-btn" title="Switch music">🎵</button>
+        <button id="mute-btn" title="Toggle sound">🔊</button>
+      </div>
+    </header>
+
+    <div id="stats-bar">
+      <span>Hurdles cleared: <b id="stat-cleared">0</b></span>
+      <span>Best: <b id="stat-best">0</b></span>
+      <span>Strubles this run: <b id="stat-earned">0</b></span>
+    </div>
+
+    <div id="game-stage">
+      <div id="ground"></div>
+      <img id="horse" src="/horse-game/horse.png" alt="Horse">
+
+      <div class="stage-overlay" id="start-overlay">
+        <div class="stage-box">
+          <h2>🐴 Horse Web Game</h2>
+          <p>Space / ↑ / tap to jump.<br>Every hurdle you clear = <b>1 Struble</b>.</p>
+          <button class="btn" id="start-btn" type="button">▶ Start Running</button>
+        </div>
+      </div>
+
+      <div class="stage-overlay" id="gameover-overlay" hidden>
+        <div class="stage-box">
+          <h2>Wiped Out!</h2>
+          <p>Hurdles cleared: <b id="final-cleared">0</b><br>Strubles earned: <b id="final-earned">0</b><br>Best: <b id="final-best">0</b></p>
+          <button class="btn" id="restart-btn" type="button">↻ Try Again</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="hint">Now playing: <span id="np-label">Amazing Wild Horse</span></div>
+  </main>
+
+  <audio id="theme-music" src="/audio/music/wild-horse.mp3" preload="none" loop></audio>
+  <audio id="sfx-clear" src="/audio/sfx/minesweeper-flag.mp3" preload="none"></audio>
+  <audio id="sfx-hit" src="/audio/sfx/minesweeper-mine-hit.mp3" preload="none"></audio>
+
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/cloud-sync.js?v=7"></script>
+<script is:inline src="/strubles.js?v=2"></script>
+
+<script is:inline>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- Strubles balance ----------
+  function syncBalance() { try { $('bal').textContent = Strubles.get().toLocaleString(); } catch {} }
+  syncBalance();
+  window.addEventListener('strubles:change', syncBalance);
+
+  // ---------- Sound (same pattern as every other page) ----------
+  let audioEnabled = true;
+  const themeMusic = $('theme-music');
+  const sfxClear = $('sfx-clear');
+  const sfxHit = $('sfx-hit');
+  const VOLUME_KEY = 'music_volume_v1';
+  const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
+  const vol = isFinite(savedVolume) ? savedVolume : 0.3;
+  themeMusic.volume = vol;
+  sfxClear.volume = Math.min(1, vol + 0.3);
+  sfxHit.volume = Math.min(1, vol + 0.3);
+
+  const TRACKS = [
+    { src: '/audio/music/wild-horse.mp3', label: 'Amazing Wild Horse' },
+    { src: '/audio/music/arvan-khoyor-jil.mp3', label: 'Arvan Khoyor Jil' },
+  ];
+  let trackIdx = 0;
+  function applyTrack(restart) {
+    themeMusic.src = TRACKS[trackIdx].src;
+    $('np-label').textContent = TRACKS[trackIdx].label;
+    if (restart) tryPlayTheme();
+  }
+  $('track-btn').addEventListener('click', () => {
+    trackIdx = (trackIdx + 1) % TRACKS.length;
+    applyTrack(true);
+  });
+
+  function tryPlayTheme() { if (audioEnabled) themeMusic.play().catch(() => {}); }
+  applyTrack(false);
+  tryPlayTheme();
+  const unlockTheme = () => {
+    tryPlayTheme();
+    window.removeEventListener('pointerdown', unlockTheme);
+    window.removeEventListener('keydown', unlockTheme);
+  };
+  window.addEventListener('pointerdown', unlockTheme);
+  window.addEventListener('keydown', unlockTheme);
+  $('mute-btn').addEventListener('click', () => {
+    audioEnabled = !audioEnabled;
+    $('mute-btn').textContent = audioEnabled ? '🔊' : '🔇';
+    if (audioEnabled) tryPlayTheme(); else themeMusic.pause();
+  });
+  function playSfx(el) {
+    if (!audioEnabled) return;
+    try { el.currentTime = 0; el.play().catch(() => {}); } catch {}
+  }
+
+  // ---------- Game ----------
+  const stage = $('game-stage');
+  const horse = $('horse');
+  const startOverlay = $('start-overlay');
+  const gameoverOverlay = $('gameover-overlay');
+  const BEST_KEY = 'horse_game_best_v1';
+
+  const GRAVITY = -2600;      // px/s^2
+  const JUMP_VELOCITY = 850;  // px/s
+  const HURDLE_W = 26;
+  const HURDLE_H = 55;
+  const GROUND_OFFSET = 44;   // matches #horse/.hurdle's `bottom` in CSS
+  const HORSE_X = 48;         // matches #horse's `left` in CSS
+  const MAX_SPEED = 620;
+
+  let state = 'idle'; // idle | playing | over
+  let horseW = 104;
+  let stageW = 0;
+  let y = 0, vy = 0;
+  let speed = 260;
+  let spawnTimer = 0;
+  let hurdles = [];
+  let cleared = 0, earned = 0;
+  let best = parseInt(localStorage.getItem(BEST_KEY), 10) || 0;
+  $('stat-best').textContent = best.toLocaleString();
+
+  function measure() {
+    stageW = stage.clientWidth;
+    horseW = horse.getBoundingClientRect().width;
+  }
+  measure();
+  window.addEventListener('resize', measure);
+
+  function jump() {
+    if (state === 'idle') { startGame(); return; }
+    if (state !== 'playing') return;
+    if (y <= 0.5) { vy = JUMP_VELOCITY; }
+  }
+
+  function startGame() {
+    state = 'playing';
+    y = 0; vy = 0; speed = 260; spawnTimer = 0.9;
+    cleared = 0; earned = 0;
+    hurdles.forEach((h) => h.el.remove());
+    hurdles = [];
+    $('stat-cleared').textContent = '0';
+    $('stat-earned').textContent = '0';
+    startOverlay.hidden = true;
+    gameoverOverlay.hidden = true;
+    horse.classList.add('running');
+    measure();
+    lastT = performance.now();
+    requestAnimationFrame(loop);
+  }
+
+  function endGame() {
+    state = 'over';
+    horse.classList.remove('running');
+    playSfx(sfxHit);
+    if (cleared > best) {
+      best = cleared;
+      localStorage.setItem(BEST_KEY, String(best));
+    }
+    $('final-cleared').textContent = cleared.toLocaleString();
+    $('final-earned').textContent = earned.toLocaleString();
+    $('final-best').textContent = best.toLocaleString();
+    $('stat-best').textContent = best.toLocaleString();
+    gameoverOverlay.hidden = false;
+  }
+
+  function spawnHurdle() {
+    const el = document.createElement('div');
+    el.className = 'hurdle';
+    el.style.height = HURDLE_H + 'px';
+    el.innerHTML = '<div class="post left"></div><div class="post right"></div><div class="rail top"></div><div class="rail mid"></div>';
+    stage.appendChild(el);
+    hurdles.push({ el, x: stageW + 20, cleared: false });
+  }
+
+  function floatScore(x) {
+    const f = document.createElement('div');
+    f.id = 'score-float';
+    f.textContent = '+1';
+    f.style.left = x + 'px';
+    f.style.bottom = (GROUND_OFFSET + 70) + 'px';
+    stage.appendChild(f);
+    setTimeout(() => f.remove(), 700);
+  }
+
+  let lastT = 0;
+  function loop(t) {
+    if (state !== 'playing') return;
+    let dt = (t - lastT) / 1000;
+    lastT = t;
+    dt = Math.min(dt, 0.05); // guard against huge jumps after tab-switch
+
+    speed = Math.min(MAX_SPEED, speed + 14 * dt);
+
+    // Physics
+    vy += GRAVITY * dt;
+    y += vy * dt;
+    if (y <= 0) { y = 0; vy = 0; }
+    horse.style.transform = `translateY(${-y}px)`;
+
+    // Hurdles: move, collide, clear, cull. Horse and hurdles share the same
+    // ground baseline, so vertical overlap is just "hasn't jumped past the
+    // hurdle's height yet" (y < HURDLE_H) — a few px of grace (-6) so a
+    // visual near-clear doesn't feel like a cheap loss. Horizontal hitbox
+    // is inset from the sprite's full width since the source art has some
+    // empty margin around the horse itself (mane/tail/legs at full gallop).
+    const hitboxInsetX = horseW * 0.22;
+    const horseLeft = HORSE_X + hitboxInsetX;
+    const horseRight = HORSE_X + horseW - hitboxInsetX;
+
+    for (let i = hurdles.length - 1; i >= 0; i--) {
+      const h = hurdles[i];
+      h.x -= speed * dt;
+      h.el.style.left = h.x + 'px';
+
+      const hurdleLeft = h.x;
+      const hurdleRight = h.x + HURDLE_W;
+      const xOverlap = horseRight > hurdleLeft && horseLeft < hurdleRight;
+      if (xOverlap && y < HURDLE_H - 6) {
+        endGame();
+        return;
+      }
+
+      if (!h.cleared && hurdleRight < HORSE_X) {
+        h.cleared = true;
+        cleared++; earned++;
+        try { Strubles.add(1); } catch {}
+        $('stat-cleared').textContent = cleared.toLocaleString();
+        $('stat-earned').textContent = earned.toLocaleString();
+        floatScore(HORSE_X + horseW * 0.5);
+        playSfx(sfxClear);
+      }
+
+      if (h.x + HURDLE_W < -30) {
+        h.el.remove();
+        hurdles.splice(i, 1);
+      }
+    }
+
+    // Spawn
+    spawnTimer -= dt;
+    if (spawnTimer <= 0) {
+      spawnHurdle();
+      const base = Math.max(0.65, 1.5 - speed / 700);
+      spawnTimer = base + Math.random() * 0.5;
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === ' ' || e.key === 'ArrowUp' || e.code === 'Space') {
+      e.preventDefault();
+      jump();
+    }
+  });
+  stage.addEventListener('pointerdown', () => jump());
+  $('start-btn').addEventListener('click', startGame);
+  $('restart-btn').addEventListener('click', startGame);
+})();
+</script>
+</body>
+</html>
