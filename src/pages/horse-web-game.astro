@@ -218,7 +218,12 @@
     <div id="hint">Now playing: <span id="np-label">Amazing Wild Horse</span></div>
   </main>
 
-  <audio id="theme-music" src="/audio/music/wild-horse.mp3" preload="auto" loop></audio>
+  <!-- "auto" would start an eager full 15MB download the instant the page
+       loads, competing for bandwidth with cursor.js and plain.gif right
+       when they need it most -- metadata is enough for playback to begin
+       immediately on .play() (audio streams progressively), without that
+       contention. -->
+  <audio id="theme-music" src="/audio/music/wild-horse.mp3" preload="metadata" loop></audio>
   <audio id="sfx-clear" src="/audio/sfx/minesweeper-flag.mp3" preload="none"></audio>
   <audio id="sfx-hit" src="/audio/sfx/minesweeper-mine-hit.mp3" preload="none"></audio>
 
@@ -309,6 +314,7 @@
   const MAX_SPEED = 620;
 
   let state = 'idle'; // idle | playing | over
+  let looping = false;
   let horseW = 104;
   let stageW = 0;
   let y = 0, vy = 0;
@@ -350,11 +356,16 @@
     horse.classList.add('running');
     measure();
     lastT = performance.now();
-    requestAnimationFrame(loop);
+    // Guards against any accidental double-call (e.g. two input paths
+    // firing for the same gesture) ever spinning up a second, parallel
+    // physics loop -- see the note above stage's pointerdown listener for
+    // exactly how that happened before.
+    if (!looping) { looping = true; requestAnimationFrame(loop); }
   }
 
   function endGame() {
     state = 'over';
+    looping = false;
     horse.classList.remove('running');
     playSfx(sfxHit);
     if (cleared > best) {
@@ -458,13 +469,22 @@
       jump();
     }
   });
+  // A single click on Start/Try Again fires a pointerdown that bubbles up
+  // through the button's ancestors -- including this stage listener --
+  // BEFORE the click event itself. That pointerdown alone already reaches
+  // jump(), which starts the run (state is idle/over) and fires off the
+  // opening jump. The buttons below used to ALSO call startGame() directly
+  // in their own click handler, so every mouse/touch start double-fired
+  // it: the second call reset y/vy back to 0 (silently canceling the jump
+  // the first call had just begun) and, worse, kicked off a SECOND
+  // parallel requestAnimationFrame(loop) chain racing the first one every
+  // frame from then on, corrupting the shared lastT timestamp both chains
+  // read from -- which is exactly the kind of bug that reads as "jumping
+  // doesn't work" without ever throwing a visible error. Keyboard-only
+  // starts never hit this since only one listener handles keydown.
   stage.addEventListener('pointerdown', () => jump());
-  // Belt-and-suspenders alongside the window-level pointerdown/keydown
-  // unlock above -- a direct click handler is the most unambiguous user
-  // gesture there is, so it shouldn't depend on the generic listener
-  // having already fired first.
-  $('start-btn').addEventListener('click', () => { startGame(); tryPlayTheme(); });
-  $('restart-btn').addEventListener('click', () => { startGame(); tryPlayTheme(); });
+  $('start-btn').addEventListener('click', () => tryPlayTheme());
+  $('restart-btn').addEventListener('click', () => tryPlayTheme());
 })();
 </script>
 </body>
