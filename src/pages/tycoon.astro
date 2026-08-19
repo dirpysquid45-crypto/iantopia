@@ -211,6 +211,22 @@
     position:relative;
     display:flex; align-items:flex-end; justify-content:center;
     border-bottom:3px solid rgba(255,215,0,.35);
+    /* Grid items get an implicit min-height:auto that floors them to their
+       content's intrinsic size unless overflow is non-visible -- and
+       .building-visual's height:66% can't resolve against THIS element
+       until ITS OWN height is settled, so during that circular pass the
+       browser falls back to sizing the img by its raw intrinsic/content
+       size instead. On a tall viewport that fallback happens to be
+       smaller than the grid row's real height and nothing looks wrong;
+       on a short one (a real laptop window, not just a phone) the
+       fallback is BIGGER than the row's actual computed height, and
+       without this the slot refuses to shrink to match -- it silently
+       overflows past #tycoon-grid's bottom into the grass strip below,
+       burying the shorter buildings behind it almost entirely. Zeroing
+       the floor lets the row's real height win, which is what makes the
+       percentage below resolve correctly at any viewport size.
+     */
+    min-height:0;
   }
   .tycoon-slot.empty .empty-plus {
     width:100%; height:60%; max-height:100px; display:flex; align-items:center; justify-content:center;
