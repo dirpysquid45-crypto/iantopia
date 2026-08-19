@@ -19,10 +19,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <!--
-  is:global is REQUIRED — the horse and every hurdle are created at
-  runtime via createElement, so Astro's scoped data-astro-cid-* attribute
-  never lands on them and a scoped <style> would silently skip them. Same
-  trap documented on every other page in this project (tycoon, etc).
+  Rewritten as a canvas game (chrome://dino's own architecture: a single
+  Runner object owns state, one requestAnimationFrame loop both advances
+  physics AND draws every frame from that state). Everything on screen is
+  a draw call, not a DOM node someone can attach a second, competing
+  listener to -- which is what caused the last version's real bug (a
+  button's click handler and its ancestor's pointerdown handler both
+  reacting to the same click, racing two physics loops against each
+  other). is:global is kept for the same reason as every other page here:
+  the canvas and overlays still get manipulated at runtime.
 -->
 <style is:global>
   :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
@@ -87,59 +92,13 @@
     background-size:cover; background-position:center;
     touch-action:none;
   }
-  #ground {
-    position:absolute; left:0; right:0; bottom:0; height:56px;
-    background-image:url('/tycoon/grass-foreground.png');
-    background-repeat:repeat-x; background-position:bottom left; background-size:auto 100%;
-    z-index:2;
-  }
-  #horse {
-    position:absolute; left:48px; bottom:44px;
-    width:104px; height:auto;
-    /* Faces right in the source art, which is the direction hurdles
-       approach from and the horse "runs toward" -- no flip needed. */
-    filter: drop-shadow(0 6px 6px rgba(0,0,0,.35));
-    z-index:5;
-    will-change: transform;
-  }
-  #horse.running { animation: horse-gallop .22s steps(2) infinite; }
-  @keyframes horse-gallop {
-    0%, 100% { transform: translateY(0); }
-    50%      { transform: translateY(-4px); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    #horse.running { animation:none; }
-  }
-
-  /* Hurdle: a pair of posts with striped rails, like a show-jumping fence
-     — drawn entirely in CSS so the game doesn't need another art asset. */
-  .hurdle {
-    position:absolute; bottom:44px;
-    width:26px;
-    z-index:4;
-  }
-  .hurdle .post {
-    position:absolute; bottom:0; width:5px; height:100%;
-    background:#6b4423; border:1px solid #3e2812;
-  }
-  .hurdle .post.left { left:0; }
-  .hurdle .post.right { right:0; }
-  .hurdle .rail {
-    position:absolute; left:-3px; right:-3px; height:7px;
-    background:repeating-linear-gradient(90deg, #fff 0 8px, #d0342c 8px 16px);
-    border:1px solid #00000055;
-  }
-  .hurdle .rail.top { top:2px; }
-  .hurdle .rail.mid { top:42%; }
-
-  #score-float {
-    position:absolute; z-index:6; color:var(--gold); font-size:10px;
-    text-shadow:1px 1px 0 #000; pointer-events:none;
-    animation: score-float-up .7s ease-out forwards;
-  }
-  @keyframes score-float-up {
-    0%   { opacity:1; transform:translateY(0); }
-    100% { opacity:0; transform:translateY(-30px); }
+  /* The photo backdrop stays a plain CSS background (the browser already
+     animates its gif frames for free); the canvas on top only ever draws
+     the parts of the scene that actually move -- ground, horse, hurdles,
+     dust, flashes -- so none of that huge image has to be re-drawn by JS
+     every frame. */
+  #game-canvas {
+    position:absolute; inset:0; display:block; width:100%; height:100%;
   }
 
   .stage-overlay {
@@ -194,13 +153,12 @@
     </div>
 
     <div id="game-stage">
-      <div id="ground"></div>
-      <img id="horse" src="/horse-game/horse.png" alt="Horse">
+      <canvas id="game-canvas"></canvas>
 
       <div class="stage-overlay" id="start-overlay">
         <div class="stage-box">
           <h2>🐴 Horse Web Game</h2>
-          <p>Space / ↑ / tap to jump.<br>Every hurdle you clear = <b>1 Struble</b>.</p>
+          <p>Space / ↑ / tap to jump — hold for a higher jump.<br>Every hurdle you clear = <b>1 Struble</b>.</p>
           <button class="btn" id="start-btn" type="button">▶ Start Running</button>
           <p id="sound-hint">🔇 Browsers block audio until you interact — sound starts the moment you press Start.</p>
         </div>
@@ -225,7 +183,6 @@
        contention. -->
   <audio id="theme-music" src="/audio/music/wild-horse.mp3" preload="metadata" loop></audio>
   <audio id="sfx-clear" src="/audio/sfx/minesweeper-flag.mp3" preload="none"></audio>
-  <audio id="sfx-hit" src="/audio/sfx/minesweeper-mine-hit.mp3" preload="none"></audio>
 
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -244,17 +201,15 @@
   syncBalance();
   window.addEventListener('strubles:change', syncBalance);
 
-  // ---------- Sound (same pattern as every other page) ----------
+  // ---------- Sound ----------
   let audioEnabled = true;
   const themeMusic = $('theme-music');
   const sfxClear = $('sfx-clear');
-  const sfxHit = $('sfx-hit');
   const VOLUME_KEY = 'music_volume_v1';
   const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
   const vol = isFinite(savedVolume) ? savedVolume : 0.3;
   themeMusic.volume = vol;
   sfxClear.volume = Math.min(1, vol + 0.3);
-  sfxHit.volume = Math.min(1, vol + 0.3);
 
   const TRACKS = [
     { src: '/audio/music/wild-horse.mp3', label: 'Amazing Wild Horse' },
@@ -272,8 +227,6 @@
   });
 
   function tryPlayTheme() { if (audioEnabled) themeMusic.play().catch(() => {}); }
-  // Only relevant until the browser's autoplay block actually lifts --
-  // once real playback begins there's nothing left to explain.
   themeMusic.addEventListener('play', () => { const h = $('sound-hint'); if (h) h.remove(); }, { once: true });
   applyTrack(false);
   tryPlayTheme();
@@ -289,85 +242,125 @@
     $('mute-btn').textContent = audioEnabled ? '🔊' : '🔇';
     if (audioEnabled) tryPlayTheme(); else themeMusic.pause();
   });
-  function playSfx(el) {
+  function playClearSfx() {
     if (!audioEnabled) return;
-    try { el.currentTime = 0; el.play().catch(() => {}); } catch {}
+    try { sfxClear.currentTime = 0; sfxClear.play().catch(() => {}); } catch {}
   }
 
-  // ---------- Game ----------
+  // ================= Game =================
+  // One state object; the render loop is a pure function of it. Every
+  // input path (keyboard, pointer, the two buttons) only ever calls
+  // beginRun()/jump()/releaseJump() below -- none of them touch DOM
+  // elements or spin up their own animation frame chain, so there's no
+  // way for two of them firing off the same physical gesture to fight
+  // each other the way the DOM-node version could.
   const stage = $('game-stage');
-  const horse = $('horse');
+  const canvas = $('game-canvas');
+  const ctx = canvas.getContext('2d');
   const startOverlay = $('start-overlay');
   const gameoverOverlay = $('gameover-overlay');
   const BEST_KEY = 'horse_game_best_v1';
 
-  // Softer arc than the first pass: a first-timer has zero warning before
-  // the first hurdle, so a taller/floatier jump (higher velocity, same
-  // gravity) buys more margin for a mistimed press instead of demanding
-  // frame-perfect reaction on attempt one.
-  const GRAVITY = -2200;      // px/s^2
-  const JUMP_VELOCITY = 900;  // px/s
-  const HURDLE_W = 26;
-  const HURDLE_H = 55;
-  const GROUND_OFFSET = 44;   // matches #horse/.hurdle's `bottom` in CSS
-  const HORSE_X = 48;         // matches #horse's `left` in CSS
-  const MAX_SPEED = 620;
+  const horseImg = new Image();
+  horseImg.src = '/horse-game/horse.png';
+  const HORSE_ASPECT = 602 / 760; // native horse.png h/w, in case it loads late
+  const grassImg = new Image();
+  grassImg.src = '/tycoon/grass-foreground.png';
+  const GRASS_ASPECT = 130 / 1085;
+
+  // Physics constants researched from chromium's actual trex-runner
+  // (GRAVITY 0.6, INITIAL_JUMP_VELOCITY ~12, SPEED 6->13 px/frame @60fps --
+  // https://github.com/wayou/t-rex-runner/blob/gh-pages/index.js), scaled
+  // to px/s for this dt-based loop and tuned a bit floatier so a
+  // first-timer's mistimed opening jump isn't an instant loss.
+  const GRAVITY = -2200;
+  const JUMP_VELOCITY = 900;
+  // Releasing early clamps the upward speed instead of letting gravity
+  // keep fighting full momentum -- same short-hop-vs-full-jump feel as
+  // the real game's endJump()/DROP_VELOCITY.
+  const RELEASE_CLAMP = 260;
+  const GROUND_H = 46;
+  const HORSE_X = 56;
+  const START_SPEED = 250;
+  const MAX_SPEED = 640;
+  const ACCEL = 16; // px/s^2 of *speed* -- world keeps getting faster
+
+  // Two obstacle sizes (the real game's CACTUS_SMALL/CACTUS_LARGE) so the
+  // skyline of hurdles reads as varied rather than one shape on a loop;
+  // large ones start appearing once the run has picked up some speed.
+  const HURDLE_TYPES = [
+    { w: 20, h: 40, weight: 3 },
+    { w: 28, h: 60, weight: 1 },
+  ];
+
+  let W = 0, H = 0, groundY = 0;
+  let horseW = 96, horseH = 96 * HORSE_ASPECT;
+  let dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  function resize() {
+    W = stage.clientWidth;
+    H = stage.clientHeight;
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    groundY = H - GROUND_H;
+    horseW = Math.min(112, W * 0.13);
+    horseH = horseW * HORSE_ASPECT;
+  }
+  window.addEventListener('resize', resize);
+  resize();
 
   let state = 'idle'; // idle | playing | over
-  let looping = false;
-  let horseW = 104;
-  let stageW = 0;
-  let y = 0, vy = 0;
-  let speed = 260;
-  let spawnTimer = 0;
+  let horse = { y: 0, vy: 0, holding: false };
   let hurdles = [];
+  let dust = [];
+  let bursts = []; // brief celebratory flashes on streak milestones
+  let shake = 0;
+  let groundScroll = 0;
+  let speed = START_SPEED;
+  let spawnTimer = 0;
+  let dustTimer = 0;
   let cleared = 0, earned = 0;
   let best = parseInt(localStorage.getItem(BEST_KEY), 10) || 0;
   $('stat-best').textContent = best.toLocaleString();
 
-  function measure() {
-    stageW = stage.clientWidth;
-    horseW = horse.getBoundingClientRect().width;
-  }
-  measure();
-  window.addEventListener('resize', measure);
+  function hurdleHitbox(w) { return { inset: w * 0.12 }; }
 
-  function jump() {
-    // Space/tap also doubles as "start" and "restart" -- previously the
-    // very first press only started the run without also jumping (felt
-    // unresponsive), and pressing anything at all during game-over did
-    // nothing since only the small Try Again button could restart, which
-    // reads as "the horse doesn't jump" to anyone who loses their first
-    // hurdle and keeps mashing the same key that worked a second ago.
-    if (state === 'idle' || state === 'over') { startGame(); }
-    if (y <= 0.5) { vy = JUMP_VELOCITY; }
-  }
-
-  function startGame() {
+  function beginRun() {
+    // Idempotent by design -- if this somehow fires twice for one
+    // gesture, the second call is a harmless no-op instead of quietly
+    // resetting a run that already started.
+    if (state === 'playing') return;
     state = 'playing';
-    y = 0; vy = 0; speed = 260; spawnTimer = 0.9;
+    horse.y = 0; horse.vy = 0; horse.holding = false;
+    speed = START_SPEED;
+    spawnTimer = 1.1;
+    dustTimer = 0;
     cleared = 0; earned = 0;
-    hurdles.forEach((h) => h.el.remove());
-    hurdles = [];
+    hurdles = []; dust = []; bursts = []; shake = 0;
     $('stat-cleared').textContent = '0';
     $('stat-earned').textContent = '0';
     startOverlay.hidden = true;
     gameoverOverlay.hidden = true;
-    horse.classList.add('running');
-    measure();
-    lastT = performance.now();
-    // Guards against any accidental double-call (e.g. two input paths
-    // firing for the same gesture) ever spinning up a second, parallel
-    // physics loop -- see the note above stage's pointerdown listener for
-    // exactly how that happened before.
-    if (!looping) { looping = true; requestAnimationFrame(loop); }
+  }
+
+  function jump() {
+    if (state !== 'playing') { beginRun(); return; }
+    if (horse.y <= 0.5 && horse.vy <= 0) {
+      horse.vy = JUMP_VELOCITY;
+      horse.holding = true;
+    }
+  }
+
+  function releaseJump() {
+    if (horse.holding && horse.vy > RELEASE_CLAMP) horse.vy = RELEASE_CLAMP;
+    horse.holding = false;
   }
 
   function endGame() {
     state = 'over';
-    looping = false;
-    horse.classList.remove('running');
-    playSfx(sfxHit);
+    shake = 0.25;
     if (cleared > best) {
       best = cleared;
       localStorage.setItem(BEST_KEY, String(best));
@@ -379,112 +372,279 @@
     gameoverOverlay.hidden = false;
   }
 
-  function spawnHurdle() {
-    const el = document.createElement('div');
-    el.className = 'hurdle';
-    el.style.height = HURDLE_H + 'px';
-    el.innerHTML = '<div class="post left"></div><div class="post right"></div><div class="rail top"></div><div class="rail mid"></div>';
-    stage.appendChild(el);
-    hurdles.push({ el, x: stageW + 20, cleared: false });
+  function pickHurdleType() {
+    const pool = speed > 380 ? HURDLE_TYPES : [HURDLE_TYPES[0]];
+    const total = pool.reduce((s, t) => s + t.weight, 0);
+    let r = Math.random() * total;
+    for (const t of pool) { if ((r -= t.weight) <= 0) return t; }
+    return pool[0];
   }
 
-  function floatScore(x) {
-    const f = document.createElement('div');
-    f.id = 'score-float';
-    f.textContent = '+1';
-    f.style.left = x + 'px';
-    f.style.bottom = (GROUND_OFFSET + 70) + 'px';
-    stage.appendChild(f);
-    setTimeout(() => f.remove(), 700);
+  let nextHurdleId = 1;
+  function spawnHurdle() {
+    const type = pickHurdleType();
+    hurdles.push({ id: nextHurdleId++, x: W + 20, w: type.w, h: type.h, cleared: false });
+    // A brief run of speed occasionally spawns a close pair -- the real
+    // game's MAX_OBSTACLE_LENGTH grouping -- only once things are moving
+    // fast enough that a lone hurdle would otherwise feel too easy.
+    if (speed > 460 && Math.random() < 0.22) {
+      const type2 = pickHurdleType();
+      hurdles.push({ id: nextHurdleId++, x: W + 20 + type.w + 46 + Math.random() * 30, w: type2.w, h: type2.h, cleared: false });
+    }
+  }
+
+  function spawnDust(vx) {
+    dust.push({
+      x: HORSE_X + horseW * 0.25 + (Math.random() - 0.5) * 10,
+      y: groundY - 2,
+      vx: -vx * 0.4 - 30 - Math.random() * 30,
+      vy: -20 - Math.random() * 30,
+      life: 0.5 + Math.random() * 0.25,
+      age: 0,
+      r: 2 + Math.random() * 2.5,
+    });
   }
 
   let lastT = 0;
-  function loop(t) {
-    if (state !== 'playing') return;
-    let dt = (t - lastT) / 1000;
-    lastT = t;
-    dt = Math.min(dt, 0.05); // guard against huge jumps after tab-switch
+  function update(dt) {
+    speed = Math.min(MAX_SPEED, speed + ACCEL * dt);
+    groundScroll = (groundScroll + speed * dt) % (grassImg.naturalWidth ? grassImg.naturalWidth * (GROUND_H / (grassImg.naturalHeight || 130)) : 200);
 
-    speed = Math.min(MAX_SPEED, speed + 14 * dt);
+    // Horse physics
+    horse.vy += GRAVITY * dt;
+    horse.y += horse.vy * dt;
+    if (horse.y <= 0) { horse.y = 0; horse.vy = 0; horse.holding = false; }
 
-    // Physics
-    vy += GRAVITY * dt;
-    y += vy * dt;
-    if (y <= 0) { y = 0; vy = 0; }
-    horse.style.transform = `translateY(${-y}px)`;
+    // Dust while grounded and running
+    dustTimer -= dt;
+    if (horse.y <= 0.5 && dustTimer <= 0) {
+      spawnDust(speed);
+      dustTimer = 0.09;
+    }
+    for (let i = dust.length - 1; i >= 0; i--) {
+      const d = dust[i];
+      d.age += dt;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.vy += 260 * dt;
+      if (d.age >= d.life) dust.splice(i, 1);
+    }
 
-    // Hurdles: move, collide, clear, cull. Horse and hurdles share the same
-    // ground baseline, so vertical overlap is just "hasn't jumped past the
-    // hurdle's height yet" (y < HURDLE_H) — a few px of grace (-6) so a
-    // visual near-clear doesn't feel like a cheap loss. Horizontal hitbox
-    // is inset from the sprite's full width since the source art has some
-    // empty margin around the horse itself (mane/tail/legs at full gallop).
-    const hitboxInsetX = horseW * 0.22;
-    const horseLeft = HORSE_X + hitboxInsetX;
-    const horseRight = HORSE_X + horseW - hitboxInsetX;
-
+    // Hurdles
+    const horseLeft = HORSE_X + horseW * 0.24;
+    const horseRight = HORSE_X + horseW * 0.86;
     for (let i = hurdles.length - 1; i >= 0; i--) {
       const h = hurdles[i];
       h.x -= speed * dt;
-      h.el.style.left = h.x + 'px';
-
-      const hurdleLeft = h.x;
-      const hurdleRight = h.x + HURDLE_W;
+      const hb = hurdleHitbox(h.w);
+      const hurdleLeft = h.x + hb.inset;
+      const hurdleRight = h.x + h.w - hb.inset;
       const xOverlap = horseRight > hurdleLeft && horseLeft < hurdleRight;
-      if (xOverlap && y < HURDLE_H - 6) {
+      if (xOverlap && horse.y < h.h - 8) {
         endGame();
         return;
       }
-
-      if (!h.cleared && hurdleRight < HORSE_X) {
+      if (!h.cleared && h.x + h.w < HORSE_X) {
         h.cleared = true;
         cleared++; earned++;
         try { Strubles.add(1); } catch {}
         $('stat-cleared').textContent = cleared.toLocaleString();
         $('stat-earned').textContent = earned.toLocaleString();
-        floatScore(HORSE_X + horseW * 0.5);
-        playSfx(sfxClear);
+        playClearSfx();
+        if (cleared % 10 === 0) {
+          bursts.push({ x: HORSE_X + horseW * 0.5, y: groundY - horseH * 0.6, age: 0, life: 0.9, text: `${cleared} STREAK!` });
+        }
       }
-
-      if (h.x + HURDLE_W < -30) {
-        h.el.remove();
-        hurdles.splice(i, 1);
-      }
+      if (h.x + h.w < -30) hurdles.splice(i, 1);
     }
 
     // Spawn
     spawnTimer -= dt;
     if (spawnTimer <= 0) {
       spawnHurdle();
-      const base = Math.max(0.65, 1.5 - speed / 700);
-      spawnTimer = base + Math.random() * 0.5;
+      const base = Math.max(0.6, 1.45 - speed / 750);
+      spawnTimer = base + Math.random() * 0.45;
     }
 
-    requestAnimationFrame(loop);
+    for (let i = bursts.length - 1; i >= 0; i--) {
+      bursts[i].age += dt;
+      if (bursts[i].age >= bursts[i].life) bursts.splice(i, 1);
+    }
+    if (shake > 0) shake = Math.max(0, shake - dt);
   }
 
+  function drawGround() {
+    const h = GROUND_H;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, groundY, W, h);
+    ctx.clip();
+    if (grassImg.complete && grassImg.naturalWidth) {
+      const tileW = h / GRASS_ASPECT;
+      let x = -groundScroll;
+      while (x < W) {
+        ctx.drawImage(grassImg, x, groundY, tileW, h);
+        x += tileW;
+      }
+    } else {
+      ctx.fillStyle = '#2f6d2f';
+      ctx.fillRect(0, groundY, W, h);
+    }
+    ctx.restore();
+  }
+
+  function drawHurdle(h) {
+    const baseY = groundY;
+    const topY = baseY - h.h;
+    ctx.fillStyle = '#6b4423';
+    ctx.strokeStyle = '#3e2812';
+    ctx.lineWidth = 1;
+    const postW = 4;
+    ctx.fillRect(h.x, topY, postW, h.h);
+    ctx.strokeRect(h.x, topY, postW, h.h);
+    ctx.fillRect(h.x + h.w - postW, topY, postW, h.h);
+    ctx.strokeRect(h.x + h.w - postW, topY, postW, h.h);
+    const rails = h.h > 45 ? [topY + 3, topY + h.h * 0.42, topY + h.h * 0.74] : [topY + 3, topY + h.h * 0.55];
+    for (const ry of rails) {
+      const grad = ctx.createLinearGradient(h.x, 0, h.x + h.w, 0);
+      grad.addColorStop(0, '#ffffff'); grad.addColorStop(0.5, '#d0342c'); grad.addColorStop(1, '#ffffff');
+      ctx.fillStyle = grad;
+      ctx.fillRect(h.x - 2, ry, h.w + 4, 6);
+      ctx.strokeStyle = 'rgba(0,0,0,.35)';
+      ctx.strokeRect(h.x - 2, ry, h.w + 4, 6);
+    }
+  }
+
+  function drawHorse() {
+    const w = horseW, h = horseH;
+    const x = HORSE_X;
+    const y = groundY - h - horse.y;
+    // Gallop bob only while grounded and actually running -- airborne
+    // motion already reads from the jump arc itself.
+    const bob = (state === 'playing' && horse.y <= 0.5)
+      ? Math.sin(performance.now() / 90) * 3
+      : 0;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,.35)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 4;
+    if (horseImg.complete && horseImg.naturalWidth) {
+      ctx.drawImage(horseImg, x, y + bob, w, h);
+    } else {
+      ctx.fillStyle = '#5b3a24';
+      ctx.fillRect(x, y + bob, w, h);
+    }
+    ctx.restore();
+  }
+
+  function drawDust() {
+    for (const d of dust) {
+      const t = 1 - d.age / d.life;
+      ctx.fillStyle = `rgba(196,168,120,${(t * 0.55).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, d.r * (1.4 - t * 0.6), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawSpeedLines() {
+    // Kicks in as the run approaches max speed -- a purely visual cue
+    // that things are getting hairier, echoing the real game's inverted
+    // day/night escalation without needing to invert this page's photo
+    // background.
+    const t = Math.max(0, (speed - MAX_SPEED * 0.72) / (MAX_SPEED * 0.28));
+    if (t <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = t * 0.35;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const ly = (H / (n + 1)) * (i + 1) + Math.sin(performance.now() / 200 + i) * 6;
+      const lw = 30 + t * 60;
+      const lx = (W - ((performance.now() / 4 + i * 137) % (W + lw)));
+      ctx.beginPath();
+      ctx.moveTo(lx, ly);
+      ctx.lineTo(lx + lw, ly);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawBursts() {
+    for (const b of bursts) {
+      const t = b.age / b.life;
+      ctx.save();
+      ctx.globalAlpha = 1 - t;
+      ctx.fillStyle = '#ffd700';
+      ctx.font = '700 13px "Press Start 2P", monospace';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#000';
+      ctx.shadowBlur = 3;
+      ctx.fillText(b.text, b.x, b.y - t * 24);
+      ctx.restore();
+    }
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.save();
+    if (shake > 0) {
+      const s = shake * 10;
+      ctx.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
+    }
+    drawSpeedLines();
+    drawDust();
+    for (const h of hurdles) drawHurdle(h);
+    drawHorse();
+    drawGround();
+    drawBursts();
+    ctx.restore();
+  }
+
+  // One perpetual loop, started exactly once below and never again --
+  // physics only advance while playing, but a frame is always drawn, so
+  // the canvas never goes blank/stale behind the start or game-over
+  // overlay and there is no second "idle loop" that could ever race this
+  // one the way the old dual-listener setup did.
+  function frame(t) {
+    let dt = (t - lastT) / 1000;
+    lastT = t;
+    dt = Math.min(dt, 0.05);
+    if (state === 'playing') update(dt);
+    render();
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Input: every path funnels into the same three functions ----------
   window.addEventListener('keydown', (e) => {
     if (e.key === ' ' || e.key === 'ArrowUp' || e.code === 'Space') {
       e.preventDefault();
-      jump();
+      if (!e.repeat) jump();
     }
   });
-  // A single click on Start/Try Again fires a pointerdown that bubbles up
-  // through the button's ancestors -- including this stage listener --
-  // BEFORE the click event itself. That pointerdown alone already reaches
-  // jump(), which starts the run (state is idle/over) and fires off the
-  // opening jump. The buttons below used to ALSO call startGame() directly
-  // in their own click handler, so every mouse/touch start double-fired
-  // it: the second call reset y/vy back to 0 (silently canceling the jump
-  // the first call had just begun) and, worse, kicked off a SECOND
-  // parallel requestAnimationFrame(loop) chain racing the first one every
-  // frame from then on, corrupting the shared lastT timestamp both chains
-  // read from -- which is exactly the kind of bug that reads as "jumping
-  // doesn't work" without ever throwing a visible error. Keyboard-only
-  // starts never hit this since only one listener handles keydown.
+  window.addEventListener('keyup', (e) => {
+    if (e.key === ' ' || e.key === 'ArrowUp' || e.code === 'Space') releaseJump();
+  });
   stage.addEventListener('pointerdown', () => jump());
+  stage.addEventListener('pointerup', () => releaseJump());
+  stage.addEventListener('pointerleave', () => releaseJump());
   $('start-btn').addEventListener('click', () => tryPlayTheme());
   $('restart-btn').addEventListener('click', () => tryPlayTheme());
+
+  lastT = performance.now();
+  requestAnimationFrame(frame);
+
+  // Read-only introspection for QA -- same idea as window.Strubles, just
+  // for this page's own run state. Nothing here can mutate gameplay.
+  window.HorseGame = {
+    getState: () => ({
+      state, speed, cleared, earned, best,
+      horse: { y: horse.y, vy: horse.vy },
+      hurdles: hurdles.map((h) => ({ id: h.id, x: h.x, w: h.w, h: h.h, cleared: h.cleared })),
+      horseX: HORSE_X, horseW,
+    }),
+  };
 })();
 </script>
 </body>
