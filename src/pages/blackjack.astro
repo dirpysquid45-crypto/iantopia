@@ -622,16 +622,12 @@
   function makeDeck() {
     const d = [];
     for (const s of suits) for (const v of values) d.push({s,v});
-    // Slightly richer in face cards than a bare single deck (natural
-    // 12/52 ≈ 23.1% J/Q/K) — nudges the shoe toward what card-counting
-    // theory calls "ten-rich," which modestly favors the DEALER (more pat
-    // 17-21s, less room for double-down/split to pay off), not the player.
-    // Deliberately small — this is a nudge toward blackjack's normal house
-    // edge, not a rig in either direction.
-    const faceRanks = ['J', 'Q', 'K'];
-    for (let i = 0; i < 3; i++) {
-      d.push({ s: suits[Math.floor(Math.random() * suits.length)], v: faceRanks[Math.floor(Math.random() * faceRanks.length)] });
-    }
+    // Used to add 3 extra face cards here to nudge the shoe "ten-rich,"
+    // which favors the DEALER (more pat 17-21s). Removed — a standard,
+    // neutral single deck is the baseline this game should be dealing
+    // from; see drawCardForDealerHit below for where the player-favoring
+    // adjustment actually lives now, deliberately kept out of the initial
+    // shuffle so it can never touch natural-blackjack odds.
     for (let i=d.length-1;i>0;i--){
       const j = Math.floor(Math.random()*(i+1));
       [d[i],d[j]] = [d[j],d[i]];
@@ -639,10 +635,9 @@
     // The previous version stacked the deck ~15% of rounds to force a
     // player-side natural blackjack — a deliberate player-favoring rig on
     // top of the payout table below, which is what made Strubles trivial
-    // to farm here. Removed entirely: draws are now genuinely random, so
-    // the game runs on blackjack's normal odds (dealer stands on soft 17,
-    // 3:2 blackjack payout, push returns the bet) rather than an inflated
-    // player edge.
+    // to farm here. Removed entirely: the initial two-card deal for both
+    // player and dealer is genuinely random, so blackjack frequency sits
+    // at its natural, un-nudged rate either way.
     return d;
   }
   function cardValue(c) {
@@ -657,6 +652,30 @@
     return total;
   }
   function drawCard(){ if (deck.length===0) deck = makeDeck(); return deck.pop(); }
+
+  // A modest player-favoring nudge, deliberately confined to the DEALER's
+  // forced hits on a stiff total (12-16) -- everywhere else (the initial
+  // two-card deal, every player hit/double/split draw) still calls the
+  // plain, unweighted drawCard() above, so this can never touch
+  // natural-blackjack odds; blackjack is decided entirely by cards dealt
+  // before this function is ever called. About 1 in 6 stiff dealer hits
+  // peeks at two cards instead of one and keeps whichever pushes the
+  // dealer's real (ace-aware) total higher, sliding the other back into
+  // the shoe at a random spot rather than discarding it -- a small lift
+  // to dealer bust rate, not a guaranteed one.
+  function drawCardForDealerHit(dealerHand){
+    const total = handValue(dealerHand);
+    if (total >= 12 && total <= 16 && deck.length >= 2 && Math.random() < 0.16) {
+      const a = deck.pop(), b = deck.pop();
+      const totalA = handValue([...dealerHand, a]);
+      const totalB = handValue([...dealerHand, b]);
+      const worse = totalA >= totalB ? a : b;
+      const better = worse === a ? b : a;
+      deck.splice(Math.floor(Math.random() * (deck.length + 1)), 0, better);
+      return worse;
+    }
+    return drawCard();
+  }
 
   // --- Card image mapping (presentation only, reads existing card objects) ---
   function suitName(s) {
@@ -821,7 +840,7 @@
       holeRevealed = true;
       renderHand(dealer, dealerEl, false);
       updateDealerScore();
-      while (handValue(dealer) < 17) { dealer.push(drawCard()); renderHand(dealer, dealerEl, false); updateDealerScore(); }
+      while (handValue(dealer) < 17) { dealer.push(drawCardForDealerHit(dealer)); renderHand(dealer, dealerEl, false); updateDealerScore(); }
       const dv = handValue(dealer);
       // Standard rule: only a dealer NATURAL blackjack (their first two
       // cards, no hits) pushes against the player's natural blackjack.
@@ -940,7 +959,7 @@
     const anyHandAlive = playerHands.some(h => handValue(h) <= 21);
     if (anyHandAlive) {
       while (handValue(dealer) < 17) {
-        dealer.push(drawCard());
+        dealer.push(drawCardForDealerHit(dealer));
         renderHand(dealer, dealerEl, false);
         updateDealerScore();
       }
