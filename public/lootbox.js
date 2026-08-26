@@ -345,6 +345,51 @@
     return result;
   }
 
+  // --- Shopkeep: direct-buy for cosmetics only (music/background/cursor
+  // unlocks) -- deliberately excludes buildings, badges, draggable items,
+  // Strubles-grant items, and the narrative unlock_page item. Buildings stay
+  // a pure-chance Tycoon case pull, and the Alternate Ending stays something
+  // you find, not something you buy. Priced off DUPLICATE_REFUND, the same
+  // per-tier value the game already treats as a floor (what a fully-cleaned-
+  // out case pays out), so a direct buy is never cheaper than that -- just a
+  // deliberately modest markup on top of it, since the point of the shop is
+  // "skip the RNG for the one specific thing I want," not to outcompete
+  // opening a case on expected value.
+  const SHOP_TYPES = ['music_unlock', 'background_unlock', 'cursor_unlock'];
+  const SHOP_MARKUP = 2;
+
+  function shopPrice(item) {
+    return (DUPLICATE_REFUND[item.tier] || 0) * SHOP_MARKUP;
+  }
+
+  function getShopListings() {
+    const I = window.CASE_ITEMS || {};
+    return Object.keys(I)
+      .filter((id) => !I[id].archived && SHOP_TYPES.includes(I[id].type))
+      .map((id) => {
+        const item = I[id];
+        return Object.assign({ id, price: shopPrice(item), owned: isOwned(id, item) }, item);
+      });
+  }
+
+  function buyItemDirect(itemId) {
+    const I = window.CASE_ITEMS || {};
+    const item = I[itemId];
+    if (!item || item.archived || !SHOP_TYPES.includes(item.type)) {
+      return { ok: false, message: 'That item is not for sale.' };
+    }
+    if (isOwned(itemId, item)) {
+      return { ok: false, message: 'You already own that.' };
+    }
+    const price = shopPrice(item);
+    if (!Strubles.spend(price)) {
+      return { ok: false, message: `Not enough Strubles (need ${price.toLocaleString()}).` };
+    }
+    const applied = applyItem(Object.assign({ id: itemId }, item), price);
+    bumpStats((s) => { s.spent += price; });
+    return { ok: true, message: `Bought ${item.label}.`, item, price, applied };
+  }
+
   function pushHistory(entry) {
     const h = loadJSON(HISTORY_KEY, []);
     const list = Array.isArray(h) ? h : [];
@@ -465,6 +510,8 @@
     getInventory: () => state.inv,
     getFlags: () => state.flags,
     getUnlocks: () => state.unlocks,
+    getShopListings,
+    buyItemDirect,
     // Exposed for the odds table in the UI and for tests.
     oddsFor: (caseKey) => { const d = getCaseDef(caseKey); return d ? oddsFor(d) : null; },
     itemsInTier: (caseKey, tier) => { const d = getCaseDef(caseKey); return d ? itemsInTier(d, tier) : []; },

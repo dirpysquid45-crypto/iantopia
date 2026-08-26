@@ -200,9 +200,12 @@ window.CASES = {
 
   iantopia_tycoon_basic: {
     label: 'Iantopia Lootbox Basic',
-    // Raised alongside the Taipei 101 odds bump below — 750 was priced
-    // for a 1% Legendary shot, not 5%.
-    cost: 2500,
+    // Raised to 2500 alongside the Taipei 101 odds bump below (750 was
+    // priced for a 1% Legendary shot, not 5%), then eased back down 20%
+    // now that the Shopkeep gives high-balance players another place to
+    // spend — the case didn't need to carry the full weight of the sink
+    // on its own anymore.
+    cost: 2000,
     emoji: '🏗️',
     blurb: 'Drops a building for your Iantopia Tycoon skyline. Taipei 101 is a real shot at 5% — and owning Pagodas nudges every future pull further from Common.',
     // Rarity tiers reused as the building rarity odds specified for this

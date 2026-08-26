@@ -1,0 +1,314 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Shopkeep</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#2b1a10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script is:inline src="/pwa.js?v=1" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<!--
+  is:global is REQUIRED — every case/cosmetic card is built at runtime via
+  createElement (the listings come from window.IantopiaCase.getShopListings()
+  and window.CASES, not static markup), so Astro's scoped data-astro-cid-*
+  attribute never lands on them and a scoped <style> would silently skip
+  them. Same trap documented on every other page in this project.
+-->
+<style is:global>
+  :root {
+    /* Warm oak/tavern palette — deliberately distinct from the neon pixel-
+       casino look everywhere else on the site. --brass stands in for
+       --gold: same role (accents, borders, price text) but warmer. */
+    --bg:#1c1108; --oak-dark:#2b1a10; --oak-mid:#5c3b22; --oak-light:#8a5a34;
+    --brass:#d4a656; --parchment:#f0dfb8; --parchment-ink:#3a2a14; --ink:#f3e6cc; --muted:#c9ac82;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body {
+    height:100dvh;
+    display:flex; flex-direction:column;
+    background:var(--bg); color:var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+    cursor:none;
+    position:relative;
+    overflow-x:hidden; overflow-y:auto;
+  }
+
+  #tavern-bg {
+    position:fixed; inset:0; z-index:-2;
+    background-image:url('/shopkeep/tavern-background.gif');
+    background-size:cover; background-position:center;
+  }
+  #tavern-bg::after {
+    content:''; position:absolute; inset:0;
+    /* Darkens the scene enough for text/cards to read without hiding the
+       fireplace glow that makes it feel like a tavern in the first place. */
+    background:rgba(20,10,4,.55);
+  }
+
+  #strubles-badge{
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); left:calc(20px + env(safe-area-inset-left)); display:flex; align-items:center; gap:8px;
+    background:#000; padding:8px 12px; border:3px solid var(--brass);
+    font-weight:700; z-index:20;
+  }
+  #strubles-badge img{ width:28px; height:28px; }
+
+  main {
+    position:relative; z-index:2; max-width:1100px; width:100%; margin:0 auto;
+    padding:16px 24px 40px; padding-top:calc(80px + env(safe-area-inset-top));
+    flex:1 1 auto;
+  }
+
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:4px solid #000; padding-bottom:10px; flex-wrap:wrap; gap:10px; }
+  header a { color:var(--brass); text-decoration:none; border:3px solid #000; padding:8px 12px; font-weight:700; background:#000; transition:background 0.2s; font-size:10px; cursor:none; }
+  header a:hover { background:var(--brass); color:#1c1108; }
+  header button { color:var(--brass); background:#000; border:2px solid var(--brass); padding:4px 6px; cursor:none; transition:background 0.2s; font-size:14px; }
+  header button:hover { background:var(--brass); color:#1c1108; }
+
+  h1 {
+    margin:0; font-size:clamp(13px,2.6vw,20px); letter-spacing:1px; color:var(--brass); font-weight:400;
+    text-shadow: 2px 2px 0 #000; text-align:center; width:100%;
+  }
+
+  /* "Carved wood sign" section headers — a beveled block instead of a bare
+     line of text, echoing hand-carved tavern signage rather than a neon
+     arcade label. */
+  .section-sign {
+    display:inline-block; margin:28px 0 16px; padding:8px 20px;
+    background:var(--oak-mid);
+    border:3px solid #1c1108;
+    box-shadow: inset 2px 2px 0 var(--oak-light), inset -2px -2px 0 #000, 0 4px 8px rgba(0,0,0,.5);
+    color:var(--parchment); font-size:12px; letter-spacing:1px;
+  }
+  .section-sub { font-size:8px; color:var(--muted); margin:-10px 0 16px; line-height:1.8; }
+
+  #status-bar {
+    background:rgba(0,0,0,.6); border:2px solid var(--brass); padding:8px 14px;
+    margin-bottom:6px; font-size:9px; color:var(--ink); min-height:14px;
+  }
+
+  .shop-grid {
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:14px;
+  }
+
+  /* Plank-textured parchment card: wood-grain border via a repeating
+     gradient, parchment fill so item art/price reads clearly against the
+     dark tavern backdrop behind it. */
+  .shop-card {
+    position:relative;
+    background: var(--parchment);
+    border: 6px solid transparent;
+    border-image: repeating-linear-gradient(115deg, #4a2f1a 0 6px, #5c3b22 6px 12px, #3a2412 12px 18px) 6;
+    box-shadow: 0 6px 14px rgba(0,0,0,.55);
+    padding:14px 12px 12px;
+    display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px;
+  }
+  .shop-card.owned { opacity:.55; filter:grayscale(.5); }
+  .shop-card .art {
+    width:100%; height:64px; display:flex; align-items:center; justify-content:center;
+    font-size:36px;
+  }
+  .shop-card .art img { max-width:100%; max-height:100%; object-fit:contain; }
+  .shop-card .tier-tag {
+    font-size:7px; padding:2px 6px; border:1px solid; text-transform:uppercase; letter-spacing:.5px;
+  }
+  .shop-card .name { color:var(--parchment-ink); font-size:9px; line-height:1.5; min-height:27px; }
+  .shop-card .blurb { color:#5c4a30; font-size:7px; line-height:1.6; min-height:22px; }
+  .shop-card .price { color:#8a5a1a; font-size:11px; font-weight:700; }
+  .shop-card .buy-btn {
+    width:100%; margin-top:4px; padding:8px 6px;
+    background:var(--brass); color:#1c1108; border:3px solid #1c1108;
+    font-family:inherit; font-size:8px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+    cursor:none; transition:background .15s;
+  }
+  .shop-card .buy-btn:hover:not(:disabled) { background:#e8c176; }
+  .shop-card .buy-btn:disabled { background:#8a7a5a; color:#4a4030; cursor:none; }
+
+  #hint {
+    text-align:center; font-size:8px; color:var(--muted);
+    margin-top:24px; line-height:1.8;
+  }
+</style>
+</head>
+<body>
+  <div id="tavern-bg"></div>
+
+  <div id="strubles-badge">
+    <img src="/strubles.png" alt="Struble">
+    <span id="bal">0</span>
+  </div>
+
+  <main>
+    <header>
+      <a href="/" title="Back to Iantopia">← Home</a>
+      <h1>🍺 THE SHOPKEEP</h1>
+      <button id="mute-btn" title="Toggle sound">🔊</button>
+    </header>
+
+    <div id="status-bar">Welcome, traveler. Coin spends the same here as anywhere.</div>
+
+    <div class="section-sign">📦 Cases</div>
+    <div class="section-sub">The full gamble, same as the Lootbox room — carried here for convenience.</div>
+    <div class="shop-grid" id="case-grid"></div>
+
+    <div class="section-sign">✨ Cosmetics</div>
+    <div class="section-sub">No RNG — pay a bit more, walk out with exactly what you came for. Buildings and the Alternate Ending aren't sold here on purpose.</div>
+    <div class="shop-grid" id="cosmetic-grid"></div>
+
+    <div id="hint">Prices here run above a case's expected value on purpose — gambling on a case is still the better deal on average.</div>
+  </main>
+
+  <audio id="theme-music" src="/audio/music/hotel.mp3" preload="metadata" loop></audio>
+
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/cloud-sync.js?v=7"></script>
+<script is:inline src="/strubles.js?v=2"></script>
+<script is:inline src="/case-data.js?v=13"></script>
+<script is:inline src="/lootbox.js?v=9"></script>
+<script is:inline src="/cursor-library.js?v=2"></script>
+<script is:inline src="/cursor.js?v=3"></script>
+
+<script is:inline>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  function syncBalance() { try { $('bal').textContent = Strubles.get().toLocaleString(); } catch {} }
+  syncBalance();
+  window.addEventListener('strubles:change', syncBalance);
+
+  // ---------- Sound: fixed ambient track, no picker -- the backdrop here
+  // is a fixed tavern scene (not user-swappable like the homepage), so the
+  // music follows the same "one thematic default + mute" pattern tycoon.astro
+  // uses rather than the full picker modal every generic page gets. ----------
+  let audioEnabled = true;
+  const themeMusic = $('theme-music');
+  const VOLUME_KEY = 'music_volume_v1';
+  const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
+  themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.3;
+  function tryPlayTheme() { if (audioEnabled) themeMusic.play().catch(() => {}); }
+  tryPlayTheme();
+  const unlockTheme = () => {
+    tryPlayTheme();
+    window.removeEventListener('pointerdown', unlockTheme);
+    window.removeEventListener('keydown', unlockTheme);
+  };
+  window.addEventListener('pointerdown', unlockTheme);
+  window.addEventListener('keydown', unlockTheme);
+  $('mute-btn').addEventListener('click', () => {
+    audioEnabled = !audioEnabled;
+    $('mute-btn').textContent = audioEnabled ? '🔊' : '🔇';
+    if (audioEnabled) tryPlayTheme(); else themeMusic.pause();
+  });
+
+  // ---------- Shop ----------
+  const statusBar = $('status-bar');
+  function setStatus(msg) { statusBar.textContent = msg; }
+
+  function rarityMeta(tier) {
+    return (window.CASE_RARITIES || {})[tier] || { label: tier, color: '#ccc' };
+  }
+
+  function renderCases() {
+    const grid = $('case-grid');
+    grid.innerHTML = '';
+    const cases = window.CASES || {};
+    Object.keys(cases).forEach((key) => {
+      const def = cases[key];
+      const card = document.createElement('div');
+      card.className = 'shop-card';
+      const art = document.createElement('div');
+      art.className = 'art';
+      art.textContent = def.emoji || '📦';
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = def.label;
+      const blurb = document.createElement('div');
+      blurb.className = 'blurb';
+      blurb.textContent = def.blurb || '';
+      const price = document.createElement('div');
+      price.className = 'price';
+      price.textContent = `${def.cost.toLocaleString()} 🪙`;
+      const btn = document.createElement('button');
+      btn.className = 'buy-btn';
+      btn.type = 'button';
+      btn.textContent = 'Buy Case';
+      btn.addEventListener('click', () => {
+        const res = IantopiaCase.buyCase(key);
+        setStatus(res.ok ? `Bought ${def.label}. Open it from the Lootbox room.` : res.message);
+      });
+      card.append(art, name, blurb, price, btn);
+      grid.appendChild(card);
+    });
+  }
+
+  function renderCosmetics() {
+    const grid = $('cosmetic-grid');
+    grid.innerHTML = '';
+    const listings = IantopiaCase.getShopListings()
+      .sort((a, b) => a.price - b.price);
+    listings.forEach((item) => {
+      const rarity = rarityMeta(item.tier);
+      const card = document.createElement('div');
+      card.className = 'shop-card' + (item.owned ? ' owned' : '');
+
+      const art = document.createElement('div');
+      art.className = 'art';
+      if (item.img) {
+        const img = document.createElement('img');
+        img.src = item.img;
+        img.alt = item.label;
+        art.appendChild(img);
+      } else {
+        art.textContent = item.emoji || '❔';
+      }
+
+      const tier = document.createElement('div');
+      tier.className = 'tier-tag';
+      tier.textContent = rarity.label;
+      tier.style.color = rarity.color;
+      tier.style.borderColor = rarity.color;
+
+      const name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = item.label;
+
+      const price = document.createElement('div');
+      price.className = 'price';
+      price.textContent = item.owned ? 'Owned' : `${item.price.toLocaleString()} 🪙`;
+
+      const btn = document.createElement('button');
+      btn.className = 'buy-btn';
+      btn.type = 'button';
+      btn.textContent = item.owned ? 'Owned' : 'Buy';
+      btn.disabled = item.owned;
+      btn.addEventListener('click', () => {
+        const res = IantopiaCase.buyItemDirect(item.id);
+        setStatus(res.message);
+        if (res.ok) renderCosmetics();
+      });
+
+      card.append(art, tier, name, price, btn);
+      grid.appendChild(card);
+    });
+  }
+
+  renderCases();
+  renderCosmetics();
+  window.addEventListener('inventory:changed', renderCosmetics);
+})();
+</script>
+</body>
+</html>
