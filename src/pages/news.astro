@@ -1,0 +1,335 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Iantopia Herald</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#e8dfc8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script is:inline src="/pwa.js?v=1" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Times New Roman is a system font (no webfont needed) for the Paper wing;
+     Share Tech Mono gives the Matrix wing an actual terminal/hacker feel
+     distinct from the pixel-arcade font every game page uses. -->
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<!--
+  is:global is REQUIRED — the headline cards and the Matrix rain canvas are
+  built/driven at runtime via JS, so Astro's scoped data-astro-cid-*
+  attribute never lands on them. Same trap documented on every other page.
+-->
+<style is:global>
+  :root {
+    /* Paper wing */
+    --paper-bg:#e8dfc8; --paper-ink:#1c1a14; --paper-muted:#6b6247; --paper-rule:#1c1a14; --paper-accent:#7a2020;
+    /* Matrix wing */
+    --matrix-bg:#000; --matrix-green:#00ff41; --matrix-dim:#0a3d1a; --matrix-card:#04120a;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body {
+    min-height:100dvh;
+    background: var(--paper-bg);
+    color: var(--paper-ink);
+    font-family: 'Times New Roman', Times, serif;
+    cursor:none;
+    position:relative;
+  }
+  /* Subtle aged-paper texture — layered radial noise, no image asset needed. */
+  body::before {
+    content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(120,100,60,.05) 0, transparent 40%),
+      radial-gradient(circle at 80% 70%, rgba(120,100,60,.05) 0, transparent 45%),
+      radial-gradient(circle at 50% 90%, rgba(120,100,60,.04) 0, transparent 50%);
+  }
+
+  main { max-width:960px; width:100%; margin:0 auto; padding:20px 20px 60px; }
+
+  header.masthead {
+    text-align:center; border-bottom:4px double var(--paper-rule); padding-bottom:14px; margin-bottom:6px;
+    position:relative;
+  }
+  #home-link {
+    position:absolute; left:0; top:0; color:var(--paper-ink); text-decoration:none;
+    border:1px solid var(--paper-ink); padding:4px 10px; font-size:12px; font-family:inherit; cursor:none;
+  }
+  #home-link:hover { background:var(--paper-ink); color:var(--paper-bg); }
+  .masthead h1 {
+    margin:6px 0 4px; font-size:clamp(32px,7vw,58px); font-weight:700; letter-spacing:1px;
+    text-transform:uppercase;
+  }
+  .masthead .tagline { font-style:italic; font-size:13px; color:var(--paper-muted); }
+  .dateline {
+    display:flex; justify-content:space-between; font-size:11px; letter-spacing:.5px; text-transform:uppercase;
+    border-top:1px solid var(--paper-rule); border-bottom:1px solid var(--paper-rule);
+    padding:6px 2px; margin:10px 0 24px;
+  }
+
+  #wing-tabs { display:flex; justify-content:center; gap:10px; margin:0 0 26px; }
+  .wing-tab {
+    all:unset; cursor:none; padding:8px 18px; border:2px solid var(--paper-ink); font-family:inherit;
+    font-size:12px; letter-spacing:1px; text-transform:uppercase; background:transparent; color:var(--paper-ink);
+  }
+  .wing-tab.active { background:var(--paper-ink); color:var(--paper-bg); }
+
+  .digest {
+    border:1px solid var(--paper-rule); padding:20px 24px; margin-bottom:32px; background:rgba(255,251,240,.4);
+  }
+  .digest h2 {
+    margin:0 0 10px; font-size:14px; text-transform:uppercase; letter-spacing:2px; color:var(--paper-accent);
+    border-bottom:2px solid var(--paper-accent); padding-bottom:6px;
+  }
+  .digest p { line-height:1.7; font-size:16px; margin:0 0 10px; }
+  .digest .byline { font-size:11px; font-style:italic; color:var(--paper-muted); }
+
+  .section-head {
+    font-size:13px; text-transform:uppercase; letter-spacing:2px; border-bottom:2px solid var(--paper-rule);
+    padding-bottom:6px; margin:0 0 16px;
+  }
+  .placeholder-note {
+    font-size:11px; color:var(--paper-muted); font-style:italic; margin:-8px 0 20px;
+  }
+
+  .headline-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:0; column-gap:28px; }
+  .headline-card {
+    border-top:1px solid var(--paper-rule); padding:16px 0; break-inside:avoid;
+  }
+  .headline-card .kicker {
+    font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:var(--paper-accent); font-weight:700;
+  }
+  .headline-card h3 {
+    margin:6px 0 8px; font-size:19px; line-height:1.3; font-weight:700;
+  }
+  .headline-card p { margin:0 0 8px; font-size:14px; line-height:1.55; color:#3a3628; }
+  .headline-card .source-row {
+    display:flex; justify-content:space-between; font-size:11px; color:var(--paper-muted); flex-wrap:wrap; gap:6px;
+  }
+  .lean-tag {
+    padding:1px 6px; border:1px solid currentColor; font-size:9px; text-transform:uppercase; letter-spacing:.5px;
+  }
+  .lean-left { color:#2255aa; }
+  .lean-center { color:#6b6247; }
+  .lean-right { color:#aa2222; }
+
+  /* ---------- Matrix wing ---------- */
+  body[data-wing="matrix"] {
+    background: var(--matrix-bg); color: var(--matrix-green);
+    font-family:'Share Tech Mono', ui-monospace, monospace;
+  }
+  body[data-wing="matrix"]::before { display:none; }
+  #matrix-rain {
+    position:fixed; inset:0; z-index:-1; display:none;
+  }
+  body[data-wing="matrix"] #matrix-rain { display:block; }
+
+  body[data-wing="matrix"] header.masthead { border-bottom-color: var(--matrix-green); }
+  body[data-wing="matrix"] #home-link { border-color: var(--matrix-green); color: var(--matrix-green); }
+  body[data-wing="matrix"] #home-link:hover { background: var(--matrix-green); color:#000; }
+  body[data-wing="matrix"] .masthead h1 {
+    text-shadow: 0 0 8px var(--matrix-green), 0 0 20px rgba(0,255,65,.5);
+  }
+  body[data-wing="matrix"] .masthead .tagline { color:#4ecb7a; font-style:normal; }
+  body[data-wing="matrix"] .dateline { border-color: var(--matrix-dim); color:#4ecb7a; }
+  body[data-wing="matrix"] .wing-tab { border-color: var(--matrix-green); color: var(--matrix-green); }
+  body[data-wing="matrix"] .wing-tab.active { background: var(--matrix-green); color:#000; }
+  body[data-wing="matrix"] .digest {
+    border-color: var(--matrix-green); background: rgba(0,20,8,.7);
+    box-shadow: 0 0 20px rgba(0,255,65,.15), inset 0 0 20px rgba(0,255,65,.05);
+  }
+  body[data-wing="matrix"] .digest h2 { color: var(--matrix-green); border-color: var(--matrix-green); }
+  body[data-wing="matrix"] .digest .byline { color:#4ecb7a; }
+  body[data-wing="matrix"] .section-head { border-color: var(--matrix-dim); color: var(--matrix-green); }
+  body[data-wing="matrix"] .placeholder-note { color:#4ecb7a; }
+  body[data-wing="matrix"] .headline-card {
+    border-color: var(--matrix-dim); background: rgba(0,20,8,.35); padding:16px 14px; margin-bottom:2px;
+  }
+  body[data-wing="matrix"] .headline-card .kicker { color:#7fffb0; }
+  body[data-wing="matrix"] .headline-card h3 { color: var(--matrix-green); }
+  body[data-wing="matrix"] .headline-card p { color:#7fcf9a; }
+  body[data-wing="matrix"] .headline-card .source-row { color:#4ecb7a; }
+  body[data-wing="matrix"] .lean-left { color:#4aa3ff; }
+  body[data-wing="matrix"] .lean-center { color:#4ecb7a; }
+  body[data-wing="matrix"] .lean-right { color:#ff5c5c; }
+
+  @media (max-width:640px) {
+    .masthead h1 { font-size:clamp(24px,9vw,36px); }
+    #home-link { position:static; display:inline-block; margin-bottom:10px; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="matrix-rain"></canvas>
+
+  <main>
+    <header class="masthead">
+      <a href="/" id="home-link">← Home</a>
+      <h1 id="masthead-title">The Iantopia Herald</h1>
+      <div class="tagline" id="masthead-tagline">Geopolitics, Aggregated Honestly — No Paywall Tricks, No Spin Unlabeled</div>
+    </header>
+
+    <div class="dateline">
+      <span id="dateline-date"></span>
+      <span>Vol. I — Iantopia Wire Service</span>
+    </div>
+
+    <div id="wing-tabs">
+      <button class="wing-tab" id="tab-paper" type="button">📰 Paper</button>
+      <button class="wing-tab" id="tab-matrix" type="button">💊 Matrix</button>
+    </div>
+
+    <section class="digest">
+      <h2>Morning Digest</h2>
+      <p id="digest-text">
+        The daily digest isn't wired to a live pipeline yet — this is where a locally-run
+        LLM will synthesize the day's clustered headlines (below) into one written summary,
+        sourced and linked back to every outlet it drew from, not reproduced from any single
+        one of them.
+      </p>
+      <div class="byline">— Generated locally, not yet live. Check back once the ingestion pipeline ships.</div>
+    </section>
+
+    <div class="section-head">Coverage Comparison</div>
+    <p class="placeholder-note">
+      SAMPLE DATA — these are placeholder stories from Iantopia's own fictional universe,
+      not real reporting, standing in for what the real cross-outlet clustering (à la Ground
+      News) will look like once the ingestion pipeline is connected.
+    </p>
+    <div class="headline-grid" id="headline-grid"></div>
+  </main>
+
+<script is:inline src="/cursor-library.js?v=2"></script>
+<script is:inline src="/cursor.js?v=3"></script>
+<script is:inline>
+(function () {
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- Dateline ----------
+  $('dateline-date').textContent = new Date().toLocaleDateString(undefined, {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+
+  // ---------- Sample data ----------
+  // Deliberately fictional (Iantopia's own in-universe "geopolitics") rather
+  // than realistic-sounding real-world headlines -- placeholder content that
+  // could be mistaken for actual reporting is worse than no content at all.
+  // Replace this block wholesale once the real ingestion pipeline lands.
+  const SAMPLE_CLUSTERS = [
+    {
+      kicker: 'Struble Markets',
+      title: 'Struble Reserve Signals Rate Hold Amid Tycoon Skyline Boom',
+      summary: 'Analysts across the wire diverge sharply on what a construction surge in the Iantopia skyline means for the currency peg.',
+      coverage: [
+        { outlet: 'The Iantopia Herald', lean: 'center', angle: 'Reserve holds steady, cites "balanced growth."' },
+        { outlet: 'Qasim Daily Signal', lean: 'left', angle: 'Frames the hold as capitulation to skyline developers.' },
+        { outlet: 'Tavern Ledger', lean: 'right', angle: 'Praises the hold as fiscal discipline.' },
+      ],
+    },
+    {
+      kicker: 'Diplomacy',
+      title: 'Cloudflare Tunnel Summit Ends Without Communiqué',
+      summary: 'Talks over home-server routing rights adjourned Tuesday with no joint statement, the second such breakdown this quarter.',
+      coverage: [
+        { outlet: 'The Iantopia Herald', lean: 'center', angle: 'Reports "constructive but inconclusive" talks.' },
+        { outlet: 'Qasim Daily Signal', lean: 'left', angle: 'Blames rigid routing demands for the collapse.' },
+        { outlet: 'Tavern Ledger', lean: 'right', angle: 'Blames delegation overreach on tunnel scope.' },
+      ],
+    },
+  ];
+
+  const headlineGrid = $('headline-grid');
+  headlineGrid.innerHTML = SAMPLE_CLUSTERS.map((c) => {
+    const coverageHTML = c.coverage.map((row) =>
+      `<div class="source-row"><span>${row.outlet} — ${row.angle}</span><span class="lean-tag lean-${row.lean}">${row.lean}</span></div>`
+    ).join('');
+    return `<div class="headline-card">
+      <div class="kicker">${c.kicker}</div>
+      <h3>${c.title}</h3>
+      <p>${c.summary}</p>
+      ${coverageHTML}
+    </div>`;
+  }).join('');
+
+  // ---------- Wing toggle ----------
+  let wing = 'paper';
+  const tabPaper = $('tab-paper');
+  const tabMatrix = $('tab-matrix');
+  const mastheadTitle = $('masthead-title');
+  const mastheadTagline = $('masthead-tagline');
+
+  function setWing(next) {
+    wing = next;
+    document.body.dataset.wing = wing;
+    tabPaper.classList.toggle('active', wing === 'paper');
+    tabMatrix.classList.toggle('active', wing === 'matrix');
+    if (wing === 'matrix') {
+      mastheadTitle.textContent = 'IANTOPIA://SIGNAL';
+      mastheadTagline.textContent = 'wire intercepted. source verified. spin flagged.';
+      startRain();
+    } else {
+      mastheadTitle.textContent = 'The Iantopia Herald';
+      mastheadTagline.textContent = 'Geopolitics, Aggregated Honestly — No Paywall Tricks, No Spin Unlabeled';
+      stopRain();
+    }
+  }
+  tabPaper.addEventListener('click', () => setWing('paper'));
+  tabMatrix.addEventListener('click', () => setWing('matrix'));
+
+  // ---------- Matrix digital rain (canvas, no assets needed) ----------
+  const canvas = $('matrix-rain');
+  const ctx = canvas.getContext('2d');
+  const CHARS = 'アイウエオカキクケコサシスセソタチツテト0123456789';
+  let columns = [];
+  let rainInterval = null;
+
+  function resizeRain() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const fontSize = 16;
+    const colCount = Math.floor(canvas.width / fontSize);
+    columns = new Array(colCount).fill(0).map(() => Math.random() * -50);
+  }
+  window.addEventListener('resize', () => { if (wing === 'matrix') resizeRain(); });
+
+  function drawRain() {
+    ctx.fillStyle = 'rgba(0,0,0,.08)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#00ff41';
+    ctx.font = '16px monospace';
+    columns.forEach((y, i) => {
+      const char = CHARS[Math.floor(Math.random() * CHARS.length)];
+      ctx.fillText(char, i * 16, y * 16);
+      columns[i] = (y * 16 > canvas.height && Math.random() > 0.975) ? 0 : y + 1;
+    });
+  }
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function startRain() {
+    if (rainInterval) return;
+    resizeRain();
+    // Paint one static frame so reduced-motion users still see the Matrix
+    // look, just not the animated rain -- an empty canvas would read as a
+    // rendering bug, not a deliberate accessibility choice.
+    if (reduceMotion) { drawRain(); return; }
+    rainInterval = setInterval(drawRain, 40);
+  }
+  function stopRain() {
+    if (rainInterval) { clearInterval(rainInterval); rainInterval = null; }
+  }
+
+  // Runs only after startRain/stopRain exist above -- setWing('paper')'s
+  // else-branch calls stopRain(), which threw a temporal-dead-zone error
+  // when this ran up where setWing itself is defined, before `let
+  // rainInterval` (further down the script) had executed.
+  setWing('paper');
+})();
+</script>
+</body>
+</html>
