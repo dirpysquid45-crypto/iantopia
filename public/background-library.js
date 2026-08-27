@@ -56,6 +56,12 @@ window.BACKGROUND_LIBRARY = {
   // tighter there to begin with.
   inventory_shelf:       { label: 'Display Shelf', type: 'image', src: '/video/inventory-shelf.jpg', position: 'center', restricted: true },
   inventory_shelf_leafy: { label: 'Leafy Shelf',    type: 'image', src: '/video/inventory-shelf-leafy.jpg', position: 'center', restricted: true, desktopOnly: true },
+
+  // The Shopkeep tavern wing's own default backdrop (lootbox.astro) — not
+  // gated behind a lootbox unlock, same as how blackjack's casino-entrance
+  // default works: the page's own picker resolves its "Default" option to
+  // this directly rather than requiring ownership first.
+  tavern: { label: 'Tavern', type: 'gif', src: '/video/tavern.gif', position: 'center' },
 };
 
 // Every theme class any background can apply, derived from the library

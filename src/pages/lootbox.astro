@@ -33,6 +33,11 @@
     --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf;
     --accent:#22d3ee; --gold:#ffd700; --money:#39ff14;
     --tile-w: 186px; --tile-gap: 10px;
+    /* Tavern wing palette — see body[data-wing="tavern"] below. Kept as
+       root-level tokens (not hardcoded per-rule) so the wing-scoped block
+       only has to swap variables/visibility, not redeclare every rule. */
+    --oak-dark:#2b1a10; --oak-mid:#5c3b22; --oak-light:#8a5a34;
+    --brass:#d4a656; --parchment:#f0dfb8; --parchment-ink:#3a2a14;
   }
   *{box-sizing:border-box}
   body{
@@ -102,6 +107,21 @@
   .small{ color:var(--muted); font-size:9px; line-height:1.8; }
   .small strong{ color:var(--money); }
 
+  /* ---------- Wing toggle (Cases / Shop) ---------- */
+  /* One page, two rooms — this and the oak Shop tile below (in .case-grid)
+     are the two ways in from the Casino side; from the Tavern side this
+     same pill is how you get back. Kept persistent/visible in both wings
+     rather than only-forward navigation. */
+  .wing-tabs{ display:flex; gap:8px; justify-content:center; margin-bottom:18px; }
+  .wing-tab{
+    all:unset; cursor:none; padding:8px 16px; border:3px solid var(--gold); color:var(--gold);
+    background:#000; font-family:inherit; font-size:9px; letter-spacing:1px; text-transform:uppercase;
+    transition:background .15s, color .15s;
+  }
+  .wing-tab.active{ background:var(--gold); color:#000; }
+  body[data-wing="tavern"] .wing-tab{ border-color:var(--brass); color:var(--brass); }
+  body[data-wing="tavern"] .wing-tab.active{ background:var(--brass); color:var(--oak-dark); }
+
   /* ---------- Case select ---------- */
   .case-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; }
   .case-card{
@@ -115,6 +135,30 @@
   .case-cost{ font-size:10px; color:var(--money); }
   .case-owned{ font-size:8px; color:var(--accent); min-height:1.4em; }
   .case-actions{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+
+  /* The Shop tile: a 5th, hardcoded card (not data-driven like the 4 case
+     cards) that reads as a wooden sign bolted onto the casino wall rather
+     than another case. Spans 2 of the grid's auto-fit columns so 4 normal
+     cards + this one reads as "6 units across 5 tiles" instead of an odd
+     5-up row. Gold lettering (var(--gold), not the oak/brass palette) on
+     purpose — ties it to the site's existing identity color rather than
+     introducing a new hue, per request. */
+  .case-card.shop-tile{
+    grid-column: span 2;
+    background:
+      linear-gradient(115deg, rgba(255,255,255,.12) 0%, transparent 30%),
+      repeating-linear-gradient(115deg, #4a2f1a 0 6px, #5c3b22 6px 12px, #3a2412 12px 18px);
+    border-color: var(--gold);
+    justify-content:center;
+  }
+  .case-card.shop-tile:hover{ border-color:#ffe766; }
+  .case-card.shop-tile .case-name{
+    color:var(--gold); font-size:13px; text-shadow:1px 1px 0 #000;
+  }
+  .case-card.shop-tile .case-blurb{ color:#e8d9be; min-height:0; }
+  @media (max-width:768px){
+    .case-card.shop-tile{ grid-column: span 1; }
+  }
 
   button{ font-family:inherit; cursor:none; }
   button:disabled{ opacity:.4; }
@@ -349,6 +393,62 @@
     }
   }
 
+  /* ---------- Tavern wing ---------- */
+  /* Scoped entirely under this one attribute selector so both palettes
+     coexist in one stylesheet without fighting — switching wings just
+     flips this attribute (see setWing() in the page script) plus which
+     section is visible; nothing here needs its own separate stylesheet
+     or duplicated markup. */
+  body[data-wing="tavern"] .wrap{
+    border-color: var(--brass);
+    box-shadow: 0 20px 50px rgba(0,0,0,.5), 0 0 20px rgba(212,166,86,.35), 0 0 60px rgba(212,166,86,.15);
+  }
+  body[data-wing="tavern"] header{ border-bottom-color: var(--brass); }
+  body[data-wing="tavern"] header a,
+  body[data-wing="tavern"] .btn{
+    color: var(--brass); border-color: var(--brass);
+  }
+  body[data-wing="tavern"] header a:hover,
+  body[data-wing="tavern"] .btn:hover{ background: var(--brass); color: var(--oak-dark); }
+  body[data-wing="tavern"] h1{
+    color: var(--brass); text-shadow: 2px 2px 0 #000;
+  }
+  body[data-wing="tavern"] #np-btn,
+  body[data-wing="tavern"] .volume-mute-btn{ border-color: var(--brass); color: var(--brass); }
+
+  #tavern-shop{ display:none; }
+  body[data-wing="tavern"] #tavern-shop{ display:block; }
+  body[data-wing="tavern"] #case-select{ display:none; }
+
+  .tavern-hint{ text-align:center; font-size:8px; color:var(--muted); line-height:1.8; margin:-6px 0 16px; }
+
+  .shop-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); gap:14px; }
+  /* Plank-textured parchment card — same wood-grain border technique as
+     the Shop tile above, but filled with parchment so item art/price
+     reads clearly against the card itself rather than the dark oak. */
+  .shop-card{
+    position:relative;
+    background: var(--parchment);
+    border: 6px solid transparent;
+    border-image: repeating-linear-gradient(115deg, #4a2f1a 0 6px, #5c3b22 6px 12px, #3a2412 12px 18px) 6;
+    box-shadow: 0 6px 14px rgba(0,0,0,.5);
+    padding:14px 12px 12px;
+    display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px;
+  }
+  .shop-card.owned{ opacity:.55; filter:grayscale(.5); }
+  .shop-card .art{ width:100%; height:56px; display:flex; align-items:center; justify-content:center; font-size:32px; }
+  .shop-card .art img{ max-width:100%; max-height:100%; object-fit:contain; }
+  .shop-card .tier-tag{ font-size:7px; padding:2px 6px; border:1px solid; text-transform:uppercase; letter-spacing:.5px; }
+  .shop-card .name{ color:var(--parchment-ink); font-size:9px; line-height:1.5; min-height:27px; }
+  .shop-card .price{ color:#8a5a1a; font-size:11px; font-weight:700; }
+  .shop-card .buy-btn{
+    all:unset; width:100%; margin-top:4px; padding:8px 6px; box-sizing:border-box; text-align:center;
+    background:var(--brass); color:#1c1108; border:3px solid #1c1108; cursor:none;
+    font-family:inherit; font-size:8px; font-weight:700; letter-spacing:.5px; text-transform:uppercase;
+  }
+  .shop-card .buy-btn:hover{ background:#e8c176; }
+  .shop-card .buy-btn.disabled{ background:#8a7a5a; color:#4a4030; }
+
   /* This page's own bg-picker script (not pickers.js, but the same pattern)
      toggles this class on <video id="bg-video"> (display:none inline) —
      without this rule the class gets added but nothing makes it visible,
@@ -407,9 +507,17 @@
   <main class="wrap">
     <header>
       <a href="/">← Home</a>
-      <h1>Iantopia Cases</h1>
-      <a href="/shopkeep">🍺 Shopkeep</a>
+      <h1 id="wing-title">Iantopia Cases</h1>
+      <div style="width:86px;"></div>
     </header>
+
+    <!-- Wing toggle: same room, two entrances -- the Shop tile inside
+         .case-grid is the thematic way in, this pill is the always-visible
+         way back out (or in, from a bookmark/reload landing on Casino). -->
+    <div class="wing-tabs">
+      <button class="wing-tab" id="tab-casino" type="button">🎰 Cases</button>
+      <button class="wing-tab" id="tab-tavern" type="button">🍺 Shop</button>
+    </div>
 
     <!-- Case select -->
     <section id="case-select">
@@ -417,6 +525,14 @@
       <p class="small" style="text-align:center;margin-top:18px">
         Buy a case, then open it. Duplicates refund <strong>Strubles</strong> based on rarity.
       </p>
+    </section>
+
+    <!-- Tavern: direct-buy cosmetics, no RNG. Same getShopListings()/
+         buyItemDirect() lootbox.js already exposes for this -- ported over
+         rather than reimplemented. -->
+    <section id="tavern-shop">
+      <p class="tavern-hint">No RNG here — pay a bit more, walk out with exactly what you came for. Buildings and the Alternate Ending aren't sold here on purpose.</p>
+      <div class="shop-grid" id="cosmetic-grid"></div>
     </section>
 
     <!-- Opening -->
@@ -498,6 +614,10 @@
 
   <video id="bg-video" style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1;" loop></video>
   <audio id="theme-music" src="/audio/music/lootbox-theme.mp3" preload="none" loop></audio>
+  <!-- Tavern wing keeps a single fixed ambient track (matching the original
+       standalone Shopkeep page), not the full picker Casino gets -- that
+       wasn't part of this consolidation's scope. -->
+  <audio id="tavern-music" src="/audio/music/hotel.mp3" preload="none" loop></audio>
 
   <script is:inline src="/strubles.js?v=2"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -507,7 +627,7 @@
        why every page needs this now, not just home. -->
   <script is:inline src="/cloud-sync.js?v=7"></script>
   <script is:inline src="/music-library.js?v=8"></script>
-  <script is:inline src="/background-library.js?v=9"></script>
+  <script is:inline src="/background-library.js?v=10"></script>
   <script is:inline src="/case-data.js?v=13"></script>
   <!-- lootbox.js reads window.TYCOON_MAX_PER_TYPE for the building
        ownership cap — without this, it silently falls back to its own
@@ -531,22 +651,55 @@
           return { cursors: [], backgrounds: [] };
         }
       }
-      // Background
+      // Background — wing-aware: Casino and Tavern each keep their own
+      // independent choice (two separate storage keys), so switching wings
+      // never clobbers the other one's pick. Casino keeps its original key
+      // (active_bg_v1) untouched, preserving whatever's already saved from
+      // before this page had a Tavern wing at all.
       const bgBtn = document.getElementById('bg-btn');
       const bgOverlay = document.getElementById('bg-overlay');
       const bgList = document.getElementById('bg-list');
       const bgClose = document.getElementById('bg-close');
       if (bgBtn && bgOverlay && bgList && bgClose) {
-        const ACTIVE_BG_KEY = 'active_bg_v1';
+        const BG_KEY_BY_WING = { casino: 'active_bg_v1', tavern: 'shopkeep_active_bg_v1' };
+        // "Default" resolves differently per wing rather than always meaning
+        // BG_LIB.default (Taipei) — same override idea pickers.js's
+        // PAGE_DEFAULT_BG uses elsewhere, just inlined since this page
+        // hand-rolls its own picker instead of including pickers.js.
+        const WING_DEFAULT_BG = {
+          casino: BG_LIB.ny_skyline || { type:'gif', src:'/video/nyskyline.gif', position:'center', label:'NY Skyline' },
+          tavern: BG_LIB.tavern || { type:'gif', src:'/video/tavern.gif', position:'center', label:'Tavern' },
+        };
+        function activeBgKey(){ return BG_KEY_BY_WING[window.__wing] || BG_KEY_BY_WING.casino; }
+        function resolveBg(key){
+          if (key === 'default' || !BG_LIB[key]) return WING_DEFAULT_BG[window.__wing] || BG_LIB.default;
+          return BG_LIB[key];
+        }
+        function applyBg(bg){
+          const vid = document.getElementById('bg-video');
+          if (bg.type === 'video') {
+            document.body.style.backgroundImage = 'none';
+            if (vid) { vid.src = bg.src; vid.classList.add('show'); vid.play().catch(() => {}); }
+          } else {
+            if (vid) { vid.classList.remove('show'); vid.pause(); }
+            document.body.style.backgroundImage = `url('${bg.src}')`;
+            document.body.style.backgroundPosition = bg.position || 'center';
+          }
+          if (window.BACKGROUND_THEME_CLASSES) document.body.classList.remove(...window.BACKGROUND_THEME_CLASSES);
+          if (bg.theme) document.body.classList.add(bg.theme);
+        }
         function renderBgPicker() {
           bgList.innerHTML = '';
+          const activeKey = localStorage.getItem(activeBgKey()) || 'default';
           Object.entries(BG_LIB).forEach(([key, bg]) => {
             // Inventory-only shelf backgrounds never show up here — they're
             // restricted to the dedicated Inventory Room picker.
             if (bg.restricted) return;
             // Locked backgrounds are hidden entirely, not shown-and-greyed —
-            // you can't see it until you've actually unlocked it.
-            const owned = loadInventory().backgrounds?.includes(key) || key === 'default';
+            // you can't see it until you've actually unlocked it. The
+            // Tavern's own default background is always available here,
+            // same as 'default' always is, regardless of wing.
+            const owned = loadInventory().backgrounds?.includes(key) || key === 'default' || key === 'tavern';
             if (!owned) return;
             const row = document.createElement('div');
             row.className = 'picker-row';
@@ -555,31 +708,12 @@
             label.textContent = bg.label;
             const indicator = document.createElement('span');
             indicator.style.marginLeft = 'auto';
-            indicator.textContent = localStorage.getItem(ACTIVE_BG_KEY) === key ? '✓' : '';
+            indicator.textContent = activeKey === key ? '✓' : '';
             row.appendChild(label);
             row.appendChild(indicator);
             row.addEventListener('click', () => {
-              localStorage.setItem(ACTIVE_BG_KEY, key);
-              const bg2 = BG_LIB[key] || {};
-              if (bg2.type === 'video') {
-                document.body.style.backgroundImage = 'none';
-                const vid = document.getElementById('bg-video');
-                if (vid) {
-                  vid.src = bg2.src;
-                  vid.classList.add('show');
-                  vid.play().catch(() => {});
-                }
-              } else {
-                const vid = document.getElementById('bg-video');
-                if (vid) {
-                  vid.classList.remove('show');
-                  vid.pause();
-                }
-                document.body.style.backgroundImage = `url('${bg2.src}')`;
-                document.body.style.backgroundPosition = bg2.position || 'center';
-              }
-              if (window.BACKGROUND_THEME_CLASSES) document.body.classList.remove(...window.BACKGROUND_THEME_CLASSES);
-              if (bg2.theme) document.body.classList.add(bg2.theme);
+              localStorage.setItem(activeBgKey(), key);
+              applyBg(resolveBg(key));
               renderBgPicker();
               // Previously dispatched nothing — see cloud-sync.js's SYNC_EVENTS.
               window.dispatchEvent(new CustomEvent('active-background:changed', { detail: { key } }));
@@ -593,22 +727,13 @@
         });
         bgClose.addEventListener('click', () => bgOverlay.classList.remove('open'));
         bgOverlay.addEventListener('click', (e) => { if (e.target === bgOverlay) bgOverlay.classList.remove('open'); });
-        const bgKey = localStorage.getItem(ACTIVE_BG_KEY) || 'default';
-        if (BG_LIB[bgKey]) {
-          const bg = BG_LIB[bgKey];
-          if (bg.type === 'video') {
-            const vid = document.getElementById('bg-video');
-            if (vid) {
-              vid.src = bg.src;
-              vid.classList.add('show');
-              vid.play().catch(() => {});
-            }
-          } else {
-            document.body.style.backgroundImage = `url('${bg.src}')`;
-            document.body.style.backgroundPosition = bg.position || 'center';
-          }
-          if (bg.theme) document.body.classList.add(bg.theme);
-        }
+
+        // Called on init AND on every wing switch (see setWing() above).
+        window.applyWingBackground = function(w){
+          const key = localStorage.getItem(BG_KEY_BY_WING[w] || BG_KEY_BY_WING.casino) || 'default';
+          applyBg(resolveBg(key));
+        };
+        window.applyWingBackground('casino');
       }
       // Cursor
       const cursorBtn = document.getElementById('cursor-btn');
@@ -670,6 +795,43 @@
 
     let currentCaseKey = null;
     let spinning = false;
+
+    // ---------- Wing (Casino / Tavern) ----------
+    // Always starts on Casino, never persisted -- "the lootbox page's
+    // default is the skyline" is a fresh-load guarantee, not a remembered
+    // preference. setWing() is called after the bg/music systems below are
+    // defined (see the bottom of this script), not here.
+    let wing = 'casino';
+    // Mirrored onto window because initPickersForBgAndCursor lives in an
+    // earlier, separate <script> block (not nested in this IIFE) and needs
+    // to read the current wing too -- a bare closure reference to `wing`
+    // from there would be undefined, not this scope's value.
+    window.__wing = wing;
+    const wingTitle = document.getElementById('wing-title');
+    const tabCasino = document.getElementById('tab-casino');
+    const tabTavern = document.getElementById('tab-tavern');
+
+    function setWing(next){
+      // If a reel is mid-flight, treat a wing switch the same as "Back to
+      // Cases" first -- there's no sensible "leave a spinning reel" state.
+      if (spinning) return;
+      if (openView.classList.contains('active')) {
+        openView.classList.remove('active');
+        reveal.classList.remove('active');
+        caseSelect.classList.remove('hidden');
+      }
+      wing = next;
+      window.__wing = wing;
+      document.body.dataset.wing = wing;
+      wingTitle.textContent = wing === 'tavern' ? 'The Tavern' : 'Iantopia Cases';
+      tabCasino.classList.toggle('active', wing === 'casino');
+      tabTavern.classList.toggle('active', wing === 'tavern');
+      if (wing === 'tavern') renderCosmetics();
+      if (window.applyWingBackground) window.applyWingBackground(wing);
+      if (window.applyWingMusic) window.applyWingMusic(wing);
+    }
+    tabCasino.addEventListener('click', () => setWing('casino'));
+    tabTavern.addEventListener('click', () => setWing('tavern'));
 
     const syncBal = () => { balEl.textContent = Strubles.get().toLocaleString(); };
     syncBal();
@@ -786,14 +948,36 @@
     const tryPlayTheme = () => { if (audioEnabled) themeMusic.play().catch(()=>{}); };
     applyTrack(trackKey, false);
 
-    const unlock = () => { tryPlayTheme(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock); };
+    // Tavern wing: one fixed track, no picker (see the <audio id="tavern-music">
+    // note near its tag) — but it shares the same mute state and volume
+    // slider as Casino, so there's still just one dial for the whole page.
+    const tavernMusic = document.getElementById('tavern-music');
+    tavernMusic.volume = themeMusic.volume;
+    volumeSlider.addEventListener('input', () => { tavernMusic.volume = volumeSlider.value / 100; });
+
+    window.applyWingMusic = function(w){
+      if (w === 'tavern') {
+        themeMusic.pause();
+        if (audioEnabled) tavernMusic.play().catch(() => {});
+      } else {
+        tavernMusic.pause();
+        if (audioEnabled) themeMusic.play().catch(() => {});
+      }
+    };
+
+    const unlock = () => {
+      if (wing === 'tavern') { if (audioEnabled) tavernMusic.play().catch(() => {}); }
+      else tryPlayTheme();
+      window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock);
+    };
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
 
     document.getElementById('mute-btn').addEventListener('click', (e) => {
       audioEnabled = !audioEnabled;
       e.currentTarget.textContent = audioEnabled ? '🔊' : '🔇';
-      if (audioEnabled) tryPlayTheme(); else themeMusic.pause();
+      const active = wing === 'tavern' ? tavernMusic : themeMusic;
+      if (audioEnabled) active.play().catch(() => {}); else active.pause();
     });
 
     const playlistOverlay = document.getElementById('playlist-overlay');
@@ -868,7 +1052,15 @@
           </div>
           <button class="btn" data-contents="${key}" type="button">Contents</button>
         </div>`;
-      }).join('');
+      }).join('')
+      // 5th tile, hardcoded rather than data-driven — not a case, just a
+      // door into the Tavern wing. Spans 2 grid columns (see .shop-tile
+      // CSS) so it reads as double-width against the 4 normal cards.
+      + `<div class="case-card shop-tile" id="shop-tile">
+          <div class="case-emoji">🍺</div>
+          <div class="case-name">The Shopkeep</div>
+          <div class="case-blurb">Skip the RNG — buy exactly what you want, no rolling required.</div>
+        </div>`;
 
       caseGrid.querySelectorAll('[data-buy]').forEach((b) => {
         b.addEventListener('click', () => {
@@ -884,6 +1076,8 @@
       caseGrid.querySelectorAll('[data-contents]').forEach((b) => {
         b.addEventListener('click', () => showContents(b.dataset.contents));
       });
+      const shopTile = document.getElementById('shop-tile');
+      if (shopTile) shopTile.addEventListener('click', () => setWing('tavern'));
     }
 
     function flashCase(btn, msg){
@@ -894,6 +1088,37 @@
       el.style.color = '#eb4b4b';
       setTimeout(() => { el.textContent = prev; el.style.color = ''; }, 1800);
     }
+
+    // ---------- Tavern: direct-buy cosmetics ----------
+    // Ported from the standalone Shopkeep page — same getShopListings()/
+    // buyItemDirect() calls, same card markup, just living in this page's
+    // #tavern-shop section instead of its own route now.
+    const cosmeticGrid = document.getElementById('cosmetic-grid');
+    function renderCosmetics(){
+      const listings = IantopiaCase.getShopListings().sort((a, b) => a.price - b.price);
+      cosmeticGrid.innerHTML = listings.map((item) => {
+        const rarity = RARITIES[item.tier] || { label: item.tier, color: '#ccc' };
+        const art = item.img
+          ? `<img src="${item.img}" alt="${item.label}">`
+          : (item.emoji || '❔');
+        return `<div class="shop-card${item.owned ? ' owned' : ''}" data-id="${item.id}">
+          <div class="art">${art}</div>
+          <div class="tier-tag" style="color:${rarity.color};border-color:${rarity.color}">${rarity.label}</div>
+          <div class="name">${item.label}</div>
+          <div class="price">${item.owned ? 'Owned' : `${item.price.toLocaleString()} Strubles`}</div>
+          <button class="buy-btn${item.owned ? ' disabled' : ''}" type="button" ${item.owned ? 'disabled' : ''}>${item.owned ? 'Owned' : 'Buy'}</button>
+        </div>`;
+      }).join('');
+
+      cosmeticGrid.querySelectorAll('.buy-btn:not(.disabled)').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.closest('.shop-card').dataset.id;
+          const res = IantopiaCase.buyItemDirect(id);
+          if (res.ok) { playRandom('chips-stack', 6); renderCosmetics(); syncBal(); }
+        });
+      });
+    }
+    window.addEventListener('inventory:changed', () => { if (wing === 'tavern') renderCosmetics(); });
 
     // ---------- Opening ----------
     function startOpen(caseKey){
@@ -1094,6 +1319,7 @@
     contentsOverlay.addEventListener('click', (e) => { if (e.target === contentsOverlay) contentsOverlay.classList.remove('open'); });
 
     renderCases();
+    setWing('casino');
 
     // Initialize pickers (background and cursor only; lootbox has its own music logic)
     if (window.initPickersForBgAndCursor) {
