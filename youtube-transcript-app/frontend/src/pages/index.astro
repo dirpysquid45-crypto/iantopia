@@ -271,7 +271,7 @@
         font-family: 'Courier New', monospace;
         font-weight: bold;
         font-size: 24px;
-        opacity: 0.8;
+        opacity: 0.95;
         animation: matrix-fall 8s linear infinite;
         text-shadow: 0 0 10px #00ff00, 0 0 20px rgba(0, 255, 0, 0.5);
         display: flex;
@@ -287,7 +287,7 @@
       .matrix-char.slow {
         animation: matrix-fall-slow linear infinite;
         font-size: 18px;
-        opacity: 0.6;
+        opacity: 0.85;
         color: #00aa00;
         text-shadow: 0 0 8px #00aa00;
         will-change: transform;
@@ -296,7 +296,7 @@
       .matrix-char.drift {
         animation: matrix-drift linear infinite;
         font-size: 16px;
-        opacity: 0.4;
+        opacity: 0.7;
         color: #008800;
         text-shadow: 0 0 4px #008800;
         will-change: transform;
@@ -305,7 +305,7 @@
       .matrix-char.drift-left {
         animation: matrix-drift-left linear infinite;
         font-size: 16px;
-        opacity: 0.4;
+        opacity: 0.65;
         color: #005500;
         text-shadow: 0 0 4px #005500;
         will-change: transform;
@@ -875,7 +875,7 @@
           const delay = (i / 40) * 0.8 + Math.random() * 0.5;
           char.style.animationDuration = duration + 's';
           char.style.animationDelay = delay + 's';
-          char.style.opacity = String(0.5 + Math.random() * 0.2);
+          char.style.opacity = String(0.75 + Math.random() * 0.15);
           matrixBg.appendChild(char);
           totalChars++;
         }
@@ -890,7 +890,7 @@
           const delay = (i / 30) * 1.2 + Math.random() * 0.8;
           char.style.animationDuration = duration + 's';
           char.style.animationDelay = delay + 's';
-          char.style.opacity = String(0.3 + Math.random() * 0.15);
+          char.style.opacity = String(0.6 + Math.random() * 0.15);
           matrixBg.appendChild(char);
           totalChars++;
         }
@@ -905,7 +905,7 @@
           const delay = (i / 30) * 1.2 + Math.random() * 0.8;
           char.style.animationDuration = duration + 's';
           char.style.animationDelay = delay + 's';
-          char.style.opacity = String(0.25 + Math.random() * 0.1);
+          char.style.opacity = String(0.55 + Math.random() * 0.1);
           matrixBg.appendChild(char);
           totalChars++;
         }
