@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the Iantopia news pipeline every morning
+
+[Timer]
+# Qasim's system clock is UTC. 11:00 UTC = 7am EDT / 6am EST -- adjust if
+# that drifts from what "morning" means once DST changes, or just switch
+# to a fixed local offset if the box ever gets a real timezone set.
+OnCalendar=*-*-* 11:00:00
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

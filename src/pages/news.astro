@@ -84,7 +84,7 @@
 
   #wing-tabs { display:flex; justify-content:center; gap:10px; margin:0 0 26px; }
   .wing-tab {
-    all:unset; cursor:none; padding:8px 18px; border:2px solid var(--paper-ink); font-family:inherit;
+    all:unset; cursor:pointer; padding:8px 18px; border:2px solid var(--paper-ink); font-family:inherit;
     font-size:12px; letter-spacing:1px; text-transform:uppercase; background:transparent; color:var(--paper-ink);
   }
   .wing-tab.active { background:var(--paper-ink); color:var(--paper-bg); }
@@ -107,6 +107,19 @@
     font-size:11px; color:var(--paper-muted); font-style:italic; margin:-8px 0 20px;
   }
 
+  /* Stock ticks are the SECOND (and last) explicit exception to the
+     no-color rule, alongside the lean tags -- up/down is the one place
+     color legitimately carries information here. */
+  .stock-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:0; column-gap:24px; margin-bottom:32px; }
+  .stock-card { border-top:1px solid var(--paper-rule); padding:12px 0; display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .stock-card .label { font-size:12px; font-weight:700; }
+  .stock-card .figures { text-align:right; }
+  .stock-card .price { font-size:13px; }
+  .stock-card .tick { font-size:12px; font-weight:700; }
+  .tick-up { color:#1a7a1a; }
+  .tick-down { color:#aa2222; }
+  .tick-flat { color:var(--paper-muted); }
+
   .headline-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:0; column-gap:28px; }
   .headline-card {
     border-top:1px solid var(--paper-rule); padding:16px 0; break-inside:avoid;
@@ -121,6 +134,8 @@
   .headline-card .source-row {
     display:flex; justify-content:space-between; font-size:11px; color:var(--paper-muted); flex-wrap:wrap; gap:6px;
   }
+  .headline-card .source-row a { color:inherit; font-weight:700; text-decoration:none; }
+  .headline-card .source-row a:hover { text-decoration:underline; }
   .lean-tag {
     padding:1px 6px; border:1px solid currentColor; font-size:9px; text-transform:uppercase; letter-spacing:.5px;
   }
@@ -153,15 +168,18 @@
   body[data-wing="matrix"] .wing-tab { border-color: var(--matrix-green); color: var(--matrix-green); }
   body[data-wing="matrix"] .wing-tab.active { background: var(--matrix-green); color:#000; }
   body[data-wing="matrix"] .digest {
-    border-color: var(--matrix-green); background: rgba(0,20,8,.7);
+    border-color: var(--matrix-green); background: rgba(0,12,5,.95);
     box-shadow: 0 0 20px rgba(0,255,65,.15), inset 0 0 20px rgba(0,255,65,.05);
   }
   body[data-wing="matrix"] .digest h2 { color: var(--matrix-green); border-color: var(--matrix-green); }
   body[data-wing="matrix"] .digest .byline { color:#4ecb7a; }
   body[data-wing="matrix"] .section-head { border-color: var(--matrix-dim); color: var(--matrix-green); }
   body[data-wing="matrix"] .placeholder-note { color:#4ecb7a; }
+  /* Panels sit on top of moving rain, not a static image -- .35 opacity let
+     the animation wash out the text underneath. Near-solid keeps the rain
+     visible around the edges without fighting legibility. */
   body[data-wing="matrix"] .headline-card {
-    border-color: var(--matrix-dim); background: rgba(0,20,8,.35); padding:16px 14px; margin-bottom:2px;
+    border-color: var(--matrix-dim); background: rgba(0,12,5,.94); padding:16px 14px; margin-bottom:2px;
   }
   body[data-wing="matrix"] .headline-card .kicker { color:#7fffb0; }
   body[data-wing="matrix"] .headline-card h3 { color: var(--matrix-green); }
@@ -170,6 +188,13 @@
   body[data-wing="matrix"] .lean-left { color:#4aa3ff; }
   body[data-wing="matrix"] .lean-center { color:#4ecb7a; }
   body[data-wing="matrix"] .lean-right { color:#ff5c5c; }
+  body[data-wing="matrix"] .stock-grid { background: rgba(0,12,5,.94); border:1px solid var(--matrix-dim); padding:4px 14px; }
+  body[data-wing="matrix"] .stock-card { border-top-color: var(--matrix-dim); }
+  body[data-wing="matrix"] .stock-card .label { color: var(--matrix-green); }
+  body[data-wing="matrix"] .stock-card .price { color:#7fcf9a; }
+  body[data-wing="matrix"] .tick-up { color:#39ff6a; }
+  body[data-wing="matrix"] .tick-down { color:#ff5c5c; }
+  body[data-wing="matrix"] .tick-flat { color:#4ecb7a; }
 
   @media (max-width:640px) {
     .masthead h1 { font-size:clamp(24px,9vw,36px); }
@@ -197,27 +222,26 @@
 
     <div id="wing-tabs">
       <button class="wing-tab" id="tab-paper" type="button">📰 Paper</button>
-      <button class="wing-tab" id="tab-matrix" type="button">💊 Matrix</button>
+      <button class="wing-tab" id="tab-matrix" type="button">🖥️ Matrix</button>
     </div>
 
     <section class="digest">
       <h2>Morning Digest</h2>
-      <p id="digest-text">
-        The daily digest isn't wired to a live pipeline yet — this is where a locally-run
-        LLM will synthesize the day's clustered headlines (below) into one written summary,
-        sourced and linked back to every outlet it drew from, not reproduced from any single
-        one of them.
-      </p>
-      <div class="byline">— Generated locally, not yet live. Check back once the ingestion pipeline ships.</div>
+      <p id="digest-text">Loading digest…</p>
+      <div class="byline" id="digest-byline"></div>
     </section>
 
+    <div class="section-head">Market Movers</div>
+    <p class="placeholder-note" id="stock-note">Loading live market data…</p>
+    <div class="stock-grid" id="stock-grid"></div>
+
     <div class="section-head">Coverage Comparison</div>
-    <p class="placeholder-note">
-      SAMPLE DATA — these are placeholder stories from Iantopia's own fictional universe,
-      not real reporting, standing in for what the real cross-outlet clustering (à la Ground
-      News) will look like once the ingestion pipeline is connected.
-    </p>
+    <p class="placeholder-note" id="coverage-note">Loading today's headlines…</p>
     <div class="headline-grid" id="headline-grid"></div>
+
+    <div class="section-head">Research &amp; Context</div>
+    <p class="placeholder-note" id="research-note">Loading Pew Research context…</p>
+    <div class="headline-grid" id="research-grid"></div>
   </main>
 
 <script is:inline src="/cursor-library.js?v=2"></script>
@@ -231,46 +255,129 @@
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
   });
 
-  // ---------- Sample data ----------
-  // Deliberately fictional (Iantopia's own in-universe "geopolitics") rather
-  // than realistic-sounding real-world headlines -- placeholder content that
-  // could be mistaken for actual reporting is worse than no content at all.
-  // Replace this block wholesale once the real ingestion pipeline lands.
-  const SAMPLE_CLUSTERS = [
-    {
-      kicker: 'Struble Markets',
-      title: 'Struble Reserve Signals Rate Hold Amid Tycoon Skyline Boom',
-      summary: 'Analysts across the wire diverge sharply on what a construction surge in the Iantopia skyline means for the currency peg.',
-      coverage: [
-        { outlet: 'The Iantopia Times', lean: 'center', angle: 'Reserve holds steady, cites "balanced growth."' },
-        { outlet: 'Qasim Daily Signal', lean: 'left', angle: 'Frames the hold as capitulation to skyline developers.' },
-        { outlet: 'Tavern Ledger', lean: 'right', angle: 'Praises the hold as fiscal discipline.' },
-      ],
-    },
-    {
-      kicker: 'Diplomacy',
-      title: 'Cloudflare Tunnel Summit Ends Without Communiqué',
-      summary: 'Talks over home-server routing rights adjourned Tuesday with no joint statement, the second such breakdown this quarter.',
-      coverage: [
-        { outlet: 'The Iantopia Times', lean: 'center', angle: 'Reports "constructive but inconclusive" talks.' },
-        { outlet: 'Qasim Daily Signal', lean: 'left', angle: 'Blames rigid routing demands for the collapse.' },
-        { outlet: 'Tavern Ledger', lean: 'right', angle: 'Blames delegation overreach on tunnel scope.' },
-      ],
-    },
-  ];
+  // ---------- Shared helpers ----------
+  // Everything below is real, externally-sourced text (RSS feed content,
+  // LLM output) going into innerHTML -- unlike the old hardcoded sample
+  // strings, this needs escaping. A compromised or malformed feed item is
+  // the threat model, not this site's own code.
+  function esc(s) {
+    const div = document.createElement('div');
+    div.textContent = s == null ? '' : String(s);
+    return div.innerHTML;
+  }
+  function safeHref(url) {
+    try {
+      const u = new URL(url, location.href);
+      return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : '#';
+    } catch { return '#'; }
+  }
 
+  // ---------- Morning digest ----------
+  const digestText = $('digest-text');
+  const digestByline = $('digest-byline');
+  fetch('/news-data/digest.json')
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((data) => {
+      if (!data.available || !data.text) {
+        digestText.textContent = data.note || 'The digest is not available right now — the ingestion pipeline may not have run yet, or the local model is offline.';
+        digestByline.textContent = '';
+        return;
+      }
+      digestText.textContent = data.text;
+      digestByline.textContent = `— Generated locally on Qasim (${data.model}), ${new Date(data.generated_at).toLocaleString()}.`;
+    })
+    .catch(() => {
+      digestText.textContent = 'The digest is not available right now.';
+      digestByline.textContent = '';
+    });
+
+  // ---------- Coverage comparison (real cross-outlet clusters) ----------
   const headlineGrid = $('headline-grid');
-  headlineGrid.innerHTML = SAMPLE_CLUSTERS.map((c) => {
-    const coverageHTML = c.coverage.map((row) =>
-      `<div class="source-row"><span>${row.outlet} — ${row.angle}</span><span class="lean-tag lean-${row.lean}">${row.lean}</span></div>`
-    ).join('');
+  const coverageNote = $('coverage-note');
+  function renderHeadlineCard({ kicker, title, body }) {
     return `<div class="headline-card">
-      <div class="kicker">${c.kicker}</div>
-      <h3>${c.title}</h3>
-      <p>${c.summary}</p>
-      ${coverageHTML}
+      <div class="kicker">${esc(kicker)}</div>
+      <h3>${esc(title)}</h3>
+      ${body}
     </div>`;
-  }).join('');
+  }
+  fetch('/news-data/clusters.json')
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((data) => {
+      const clusters = data.clusters || [];
+      const unclustered = (data.unclustered || []).slice(0, 12);
+      if (!clusters.length && !unclustered.length) throw new Error('no coverage yet');
+
+      const clusterCards = clusters.map((c) => {
+        const rows = c.items.map((item) =>
+          `<div class="source-row"><a href="${safeHref(item.link)}" target="_blank" rel="noopener noreferrer">${esc(item.source)}</a><span>${esc(item.title)}</span></div>`
+        ).join('');
+        return renderHeadlineCard({
+          kicker: `Cross-outlet — ${c.items.length} outlets`,
+          title: c.title,
+          body: rows,
+        });
+      });
+      const singleCards = unclustered.map((item) => renderHeadlineCard({
+        kicker: item.source,
+        title: item.title,
+        body: `<p>${esc(item.summary)}</p><div class="source-row"><a href="${safeHref(item.link)}" target="_blank" rel="noopener noreferrer">Read at ${esc(item.source)} →</a></div>`,
+      }));
+
+      headlineGrid.innerHTML = clusterCards.concat(singleCards).join('');
+      coverageNote.textContent = clusters.length
+        ? `${clusters.length} stories covered by multiple outlets today, plus other headlines below.`
+        : 'No story was covered by more than one outlet in this run — showing today’s headlines individually instead.';
+    })
+    .catch(() => {
+      coverageNote.textContent = 'Coverage data is not available right now.';
+    });
+
+  // ---------- Research & context (Pew Research) ----------
+  const researchGrid = $('research-grid');
+  const researchNote = $('research-note');
+  fetch('/news-data/headlines.json')
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((data) => {
+      const research = (data.items || []).filter((i) => i.category === 'research').slice(0, 8);
+      if (!research.length) throw new Error('no research items');
+      researchGrid.innerHTML = research.map((item) => renderHeadlineCard({
+        kicker: item.source,
+        title: item.title,
+        body: `<p>${esc(item.summary)}</p><div class="source-row"><a href="${safeHref(item.link)}" target="_blank" rel="noopener noreferrer">Read at ${esc(item.source)} →</a></div>`,
+      })).join('');
+      researchNote.textContent = 'Analysis and survey data from Pew Research Center — periodic, not daily, so not clustered against wire headlines above.';
+    })
+    .catch(() => {
+      researchNote.textContent = 'Research context is not available right now.';
+    });
+
+  // ---------- Market movers (real data — first pipeline stage) ----------
+  const stockGrid = $('stock-grid');
+  const stockNote = $('stock-note');
+  fetch('/news-data/stocks.json')
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((data) => {
+      const movers = data.movers || [];
+      if (!movers.length) throw new Error('no movers');
+      stockGrid.innerHTML = movers.map((m) => {
+        const pct = m.change_percent;
+        const tickClass = pct > 0 ? 'tick-up' : pct < 0 ? 'tick-down' : 'tick-flat';
+        const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '—';
+        const sign = pct > 0 ? '+' : '';
+        return `<div class="stock-card">
+          <span class="label">${m.label}</span>
+          <span class="figures">
+            <span class="price">${m.price.toLocaleString()}</span>
+            <span class="tick ${tickClass}">${arrow} ${sign}${pct.toFixed(2)}%</span>
+          </span>
+        </div>`;
+      }).join('');
+      stockNote.textContent = `As of ${movers[0].as_of} — sorted by magnitude of change.`;
+    })
+    .catch(() => {
+      stockNote.textContent = 'Live market data unavailable.';
+    });
 
   // ---------- Wing toggle ----------
   let wing = 'paper';
@@ -314,7 +421,7 @@
   window.addEventListener('resize', () => { if (wing === 'matrix') resizeRain(); });
 
   function drawRain() {
-    ctx.fillStyle = 'rgba(0,0,0,.08)';
+    ctx.fillStyle = 'rgba(0,0,0,.2)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#00ff41';
     ctx.font = '16px monospace';

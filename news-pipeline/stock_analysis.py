@@ -3,21 +3,22 @@
 Stage 5 of the news pipeline (see architecture discussion) — no LLM involved,
 just numbers. Pulls a geopolitically-relevant watchlist via yfinance, computes
 each symbol's most recent trading-day change, and writes the "prevalent
-movers" (sorted by absolute % change) to data/stocks.json for the news page
-to read.
+movers" (sorted by absolute % change) to public/news-data/stocks.json for
+the news page to read.
 
 Deliberately its own script, not folded into the ingest/cluster/digest
 stages -- it's a different kind of job (numbers, not text) and this run
 independently on its own schedule (see the note in the architecture chat
 about daily vs. higher-frequency updates later).
 """
-import json
 import math
 import sys
 from datetime import datetime, timezone
 from typing import Optional
 
 import yfinance as yf
+
+from common import write_json
 
 # Indices, commodities, and currencies tied to the regions/themes this site's
 # geopolitics coverage actually cares about -- not a generic "top tickers"
@@ -83,14 +84,11 @@ def main() -> None:
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "movers": results,
     }
-
-    out_path = "data/stocks.json"
-    with open(out_path, "w") as f:
-        # allow_nan=False: fail loudly here if a NaN ever slips past the
-        # guard in fetch_change() instead of silently writing invalid JSON
-        # (json.dump's default happily emits a bare NaN token, which
-        # JSON.parse on the page's end would throw on).
-        json.dump(output, f, indent=2, allow_nan=False)
+    # write_json uses allow_nan=False: fail loudly here if a NaN ever slips
+    # past the guard in fetch_change() instead of silently writing invalid
+    # JSON (json.dump's default happily emits a bare NaN token, which
+    # JSON.parse on the page's end would throw on).
+    out_path = write_json("stocks.json", output)
 
     print(f"[stock_analysis] wrote {len(results)}/{len(WATCHLIST)} symbols to {out_path}")
 

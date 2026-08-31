@@ -1,0 +1,15 @@
+[Unit]
+Description=Iantopia news pipeline (ingest, cluster, digest, stocks)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/user/iantopia/news-pipeline
+ExecStart=/home/user/iantopia/news-pipeline/run_pipeline.sh
+User=user
+# Outbound-only: RSS pulls, yfinance, and a localhost-only call to Ollama.
+# No inbound port opened by this unit. Capped anyway, matching the
+# project's "minimize exposure" posture for anything touching external
+# HTTP responses.
+MemoryMax=2G
