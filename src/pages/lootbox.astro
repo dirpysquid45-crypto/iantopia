@@ -87,6 +87,10 @@
     box-shadow:0 0 10px rgba(255,215,0,.3); font-size:12px;
   }
   .badge img{ width:28px; height:28px; }
+  .top-actions{
+    position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(20px + env(safe-area-inset-right));
+    z-index:30; display:flex; gap:6px;
+  }
   #np-btn{
     background:#000; border:3px solid var(--gold); color:var(--gold);
     font-family:inherit; font-size:9px; padding:10px 12px; cursor:none; line-height:1.4;
@@ -482,10 +486,16 @@
   @media (max-width:768px){
     :root{ --tile-w: 132px; }
     body{ padding:10px; background-attachment:scroll; align-items:flex-start; }
-    .wrap{ width:100%; padding:14px; }
+    /* Top clearance for the fixed badge + icon cluster below -- without it,
+       the header (which starts almost immediately under body's own small
+       mobile padding) renders directly underneath both fixed elements
+       instead of below them. */
+    .wrap{ width:100%; padding:14px; margin-top:56px; }
     h1{ font-size:clamp(11px,3.4vw,14px); }
     .badge{ top:calc(6px + env(safe-area-inset-top)); left:calc(6px + env(safe-area-inset-left)); font-size:10px; padding:6px 8px; }
     .badge img{ width:20px; height:20px; }
+    .top-actions{ top:calc(6px + env(safe-area-inset-top)); right:calc(6px + env(safe-area-inset-right)); gap:4px; }
+    .top-actions .btn{ padding:6px 8px; font-size:11px; }
     .tile{ height:150px; padding:10px 8px 8px; }
     .tile-emoji{ font-size:48px; }
     .reveal-card{ padding:18px 20px; }
@@ -497,7 +507,7 @@
 </head>
 <body>
   <div class="badge"><img src="/strubles.png" alt="Strubles"><span id="bal">0</span></div>
-  <div style="position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(20px + env(safe-area-inset-right)); z-index:30; display:flex; gap:6px;">
+  <div class="top-actions">
     <a class="btn" href="/inventory" title="Inventory">🎒</a>
     <button class="btn" id="np-btn" type="button" title="Music options">🎵</button>
     <button class="btn" id="bg-btn" type="button" title="Change background">🖼️</button>
