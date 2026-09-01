@@ -120,6 +120,18 @@
   .tick-down { color:#aa2222; }
   .tick-flat { color:var(--paper-muted); }
 
+  /* TradingView's own widget, not ours -- see the comment by the markup.
+     Height is fixed (not aspect-ratio) since the widget's autosize option
+     fills whatever box it's given; a tall thin box on mobile would just
+     squash the chart otherwise. */
+  .tv-widget-wrap { height:480px; margin-bottom:32px; border:1px solid var(--paper-rule); }
+  .tv-widget-wrap .tradingview-widget-container,
+  .tv-widget-wrap .tradingview-widget-container__widget { height:100%; }
+  .tv-widget-matrix { display:none; }
+  body[data-wing="matrix"] .tv-widget-paper { display:none; }
+  body[data-wing="matrix"] .tv-widget-matrix { display:block; border-color: var(--matrix-dim); }
+  @media (max-width:640px) { .tv-widget-wrap { height:360px; } }
+
   .headline-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:0; column-gap:28px; }
   .headline-card {
     border-top:1px solid var(--paper-rule); padding:16px 0; break-inside:avoid;
@@ -234,6 +246,64 @@
     <div class="section-head">Market Movers</div>
     <p class="placeholder-note" id="stock-note">Loading live market data…</p>
     <div class="stock-grid" id="stock-grid"></div>
+
+    <!-- S&P 500 live chart -- TradingView's own embed, not our backend.
+         Genuine per-second tick data isn't something any free API hands
+         out (real-time consolidated market data is a paid, licensed
+         product); TradingView already carries that licensing cost and
+         republishes it live via this free widget, so the browser talks
+         straight to them instead of us trying to poll yfinance every
+         second (which would just get rate-limited and still only be
+         Yahoo's delayed feed underneath). Two containers, swapped by
+         wing via CSS -- the widget's theme is baked in at load time, so
+         re-theming it live like the rest of the page isn't possible
+         without reloading the iframe, but a light/dark pair covers both
+         wings without needing to. */ -->
+    <div class="section-head">S&amp;P 500 — Live</div>
+    <div class="tv-widget-wrap tv-widget-paper">
+      <div class="tradingview-widget-container">
+        <div class="tradingview-widget-container__widget"></div>
+        <script is:inline type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+        {
+          "autosize": true,
+          "symbol": "FOREXCOM:SPXUSD",
+          "interval": "1",
+          "timezone": "America/New_York",
+          "theme": "light",
+          "style": "1",
+          "locale": "en",
+          "enable_publishing": false,
+          "hide_top_toolbar": false,
+          "hide_legend": false,
+          "save_image": false,
+          "calendar": false,
+          "support_host": "https://www.tradingview.com"
+        }
+        </script>
+      </div>
+    </div>
+    <div class="tv-widget-wrap tv-widget-matrix">
+      <div class="tradingview-widget-container">
+        <div class="tradingview-widget-container__widget"></div>
+        <script is:inline type="text/javascript" src="https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js" async>
+        {
+          "autosize": true,
+          "symbol": "FOREXCOM:SPXUSD",
+          "interval": "1",
+          "timezone": "America/New_York",
+          "theme": "dark",
+          "style": "1",
+          "locale": "en",
+          "enable_publishing": false,
+          "hide_top_toolbar": false,
+          "hide_legend": false,
+          "save_image": false,
+          "calendar": false,
+          "support_host": "https://www.tradingview.com"
+        }
+        </script>
+      </div>
+    </div>
 
     <div class="section-head">Coverage Comparison</div>
     <p class="placeholder-note" id="coverage-note">Loading today's headlines…</p>
