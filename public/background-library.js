@@ -43,6 +43,7 @@ window.BACKGROUND_LIBRARY = {
   clarity:          { label: 'Zedd – Clarity ft. Foxes', type: 'video', src: '/video/clarity.mp4?v=2', theme: 'theme-clarity', comboTrack: 'clarity' },
   hello_kitty:      { label: 'Hello Kitty',       type: 'video', src: '/video/hello-kitty.mp4', theme: 'theme-hello-kitty', comboTrack: 'hello_kitty' },
   girl_like_me:     { label: 'PinkPantheress – Girl Like Me', type: 'video', src: '/video/girl-like-me.mp4', theme: 'theme-girl-like-me', comboTrack: 'girl_like_me' },
+  minecraft:        { label: 'Minecraft',          type: 'video', src: '/video/minecraft-panorama.mp4', theme: 'theme-minecraft', comboTrack: 'minecraft_ost' },
 
   // Inventory-page-only backgrounds. `restricted: true` means every picker
   // (pickers.js, and home's and lootbox's own separate copies) skips this

@@ -704,6 +704,92 @@
       }
     }
 
+    /* ---------- Minecraft theme (stone GUI buttons, diamond-block countdown) ---------- */
+    /* Static, like Hello Kitty / Old People Slot above -- the panorama loop
+       and OST already carry all the motion/atmosphere this theme needs, so
+       buttons don't also need their own pulse. The stone look is built from
+       plain CSS (bevel via mismatched border-side colors, a speckle texture
+       via tiled radial-gradients) rather than a sprite, since it's a flat
+       color/border effect the vanilla button widget actually uses -- no
+       image asset needed to get close to it. */
+    body.theme-minecraft a.big,
+    body.theme-minecraft button.big,
+    body.theme-minecraft #inv-btn,
+    body.theme-minecraft #bg-btn,
+    body.theme-minecraft #cursor-btn,
+    body.theme-minecraft #account-btn,
+    body.theme-minecraft #now-playing,
+    body.theme-minecraft #ending-link {
+      background-color: #8b8b8b;
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,.08) 0 2px, transparent 2px),
+        radial-gradient(circle at 62% 68%, rgba(0,0,0,.12) 0 2px, transparent 2px),
+        radial-gradient(circle at 82% 24%, rgba(255,255,255,.06) 0 2px, transparent 2px),
+        radial-gradient(circle at 38% 82%, rgba(0,0,0,.1) 0 2px, transparent 2px);
+      background-size: 16px 16px;
+      border-style: solid;
+      border-width: 4px;
+      border-top-color: #d8d8d8;
+      border-left-color: #d8d8d8;
+      border-bottom-color: #2b2b2b;
+      border-right-color: #2b2b2b;
+      color: #ffffff;
+      text-shadow: 2px 2px 0 #3f3f3f;
+      box-shadow: none;
+      image-rendering: pixelated;
+    }
+    body.theme-minecraft a.big:hover,
+    body.theme-minecraft button.big:hover,
+    body.theme-minecraft #inv-btn:hover,
+    body.theme-minecraft #bg-btn:hover,
+    body.theme-minecraft #cursor-btn:hover,
+    body.theme-minecraft #account-btn:hover,
+    body.theme-minecraft #now-playing:hover,
+    body.theme-minecraft #ending-link:hover {
+      background-color: #a3a3a3;
+      color: #ffff5c;
+    }
+    /* Pressed feedback: bevel inverts, like a real GUI button being pushed
+       in, instead of the default lift-up translateY every other theme
+       keeps -- flatter and truer to the source than a floaty hover. */
+    body.theme-minecraft a.big:active,
+    body.theme-minecraft button.big:active {
+      border-top-color: #2b2b2b;
+      border-left-color: #2b2b2b;
+      border-bottom-color: #d8d8d8;
+      border-right-color: #d8d8d8;
+      transform: none;
+    }
+    body.theme-minecraft .flip-card {
+      filter: drop-shadow(0 0 24px rgba(90, 165, 60, 0.65)) drop-shadow(0 0 48px rgba(63, 145, 48, 0.4));
+    }
+    @keyframes titleGlowGrass {
+      0%, 100%  { text-shadow: 2px 2px 0 #294a1c, 0 0 12px rgba(106, 170, 60, 0.5); }
+      50%       { text-shadow: 2px 2px 0 #294a1c, 0 0 22px rgba(140, 209, 90, 0.7), 0 0 40px rgba(106, 170, 60, 0.4); }
+    }
+    body.theme-minecraft h1 {
+      color: #6aaa3c;
+      animation: titleScale 0.8s ease-out, titleGlowGrass 3s ease-in-out infinite 0.8s;
+    }
+    /* The countdown, styled as a diamond block face -- four gem facets
+       (light top-right, dark bottom-left) tiled via a repeating
+       conic-gradient, which is the one CSS primitive that can fake a cut-
+       gem look without an actual sprite: each tile is a small pie split
+       into alternating light/dark quarters, and tiling it small enough
+       reads as a faceted grid rather than a spinning wheel. */
+    body.theme-minecraft #topia-timer {
+      background-color: #4a9c92;
+      background-image: conic-gradient(from 45deg, #bff5ec 0deg 90deg, #6dd6c9 90deg 180deg, #2f7d75 180deg 270deg, #6dd6c9 270deg 360deg);
+      background-size: 18px 18px;
+      border-style: solid;
+      border-width: 3px;
+      border-color: #1f2321;
+      color: #ffffff;
+      text-shadow: 2px 2px 0 #14312d;
+      box-shadow: none;
+      image-rendering: pixelated;
+    }
+
     /* ---------- Daily struble reel ---------- */
     #daily-reel-overlay {
       display:none; position:fixed; inset:0; z-index:60;
@@ -1301,9 +1387,9 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script is:inline src="/cloud-sync.js?v=7"></script>
-  <script is:inline src="/music-library.js?v=8"></script>
+  <script is:inline src="/music-library.js?v=9"></script>
   <script is:inline src="/music-position.js?v=1"></script>
-  <script is:inline src="/background-library.js?v=10"></script>
+  <script is:inline src="/background-library.js?v=11"></script>
   <script is:inline src="/cursor-library.js?v=2"></script>
 
   <!-- Timer Script -->

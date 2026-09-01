@@ -32,4 +32,5 @@ window.MUSIC_LIBRARY = {
   clarity:             { label: 'Zedd – Clarity ft. Foxes',          src: '/audio/music/clarity.mp3' },
   hello_kitty:         { label: 'Hello Kitty',                       src: '/audio/music/hello-kitty.mp3' },
   girl_like_me:        { label: 'PinkPantheress – Girl Like Me',     src: '/audio/music/girl-like-me.mp3' },
+  minecraft_ost:       { label: 'Minecraft OST (C418)',              src: '/audio/music/minecraft-ost.mp3' },
 };

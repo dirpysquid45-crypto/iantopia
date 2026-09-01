@@ -79,6 +79,7 @@ window.CASE_ITEMS = {
   bg_clarity:  { label: 'Background: Zedd – Clarity',     tier: 'covert',     emoji: '💎',                                  type: 'background_unlock', key: 'clarity' },
   bg_hellokitty: { label: 'Background: Hello Kitty',      tier: 'covert',     emoji: '🎀',                                  type: 'background_unlock', key: 'hello_kitty' },
   bg_girllikeme: { label: 'Background: PinkPantheress – Girl Like Me', tier: 'covert', emoji: '🐆',                        type: 'background_unlock', key: 'girl_like_me' },
+  bg_minecraft: { label: 'Background: Minecraft',        tier: 'covert',     emoji: '🟩',                                  type: 'background_unlock', key: 'minecraft' },
   // Archived: kept so existing owners' history/labels still resolve, but
   // excluded from ALL_IDS below so it can no longer be rolled.
   finish_ian:  { label: 'Email Ian to Finish Iantopia',   tier: 'covert',     emoji: '📧',                                  type: 'action', effect: 'email_finish', archived: true },
