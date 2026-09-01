@@ -777,10 +777,19 @@
        gem look without an actual sprite: each tile is a small pie split
        into alternating light/dark quarters, and tiling it small enough
        reads as a faceted grid rather than a spinning wheel. */
+    /* Real diamond block texture now (was a hand-rolled conic-gradient
+       facet pattern before the actual asset existed) -- stretched to
+       exactly fill the badge's rectangle rather than tiled, since it's a
+       single square swatch, not a repeating pattern. #topia-timer's text
+       is normal element content, which browsers always paint above its
+       own background by default, so no z-index/layering needed to keep
+       the countdown readable over the texture -- the existing text-shadow
+       is what carries readability against the busier image underneath. */
     body.theme-minecraft #topia-timer {
       background-color: #4a9c92;
-      background-image: conic-gradient(from 45deg, #bff5ec 0deg 90deg, #6dd6c9 90deg 180deg, #2f7d75 180deg 270deg, #6dd6c9 270deg 360deg);
-      background-size: 18px 18px;
+      background-image: url('/assets/decorations/diamond-block.webp');
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
       border-style: solid;
       border-width: 3px;
       border-color: #1f2321;
@@ -1971,6 +1980,23 @@
         [playlistOverlay, backgroundOverlay, cursorOverlay].forEach((overlay) => {
           overlay.classList.remove('open');
         });
+      });
+
+      // --- Minecraft theme: button click SFX ---
+      // Delegated on document rather than bound per-button, since the
+      // button set here is the same open-ended list the stone-texture CSS
+      // already targets (.big, the icon buttons, etc.) -- one listener
+      // covers all of them without needing to enumerate or re-bind on
+      // every re-render. Only fires while the theme is actually active,
+      // reuses audioEnabled (the same mute flag the music picker above
+      // already respects) so muting silences this too.
+      const minecraftClickSfx = new Audio('/audio/sfx/minecraft-click.mp3');
+      minecraftClickSfx.volume = 0.5;
+      document.addEventListener('click', (e) => {
+        if (!audioEnabled || !document.body.classList.contains('theme-minecraft')) return;
+        if (!e.target.closest('a.big, button.big, #inv-btn, #bg-btn, #cursor-btn, #account-btn, #now-playing, #ending-link')) return;
+        minecraftClickSfx.currentTime = 0;
+        minecraftClickSfx.play().catch(() => {});
       });
     })();
   </script>
