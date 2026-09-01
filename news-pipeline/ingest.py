@@ -5,11 +5,20 @@ RSS feed -- exactly what's rendered to any anonymous visitor, nothing
 scraped past a paywall and no user-agent spoofing. Writes the normalized
 result to headlines.json for cluster.py to pick up.
 
-BBC and NPR are tagged category="news" (daily wire-style stories, eligible
-for cross-outlet clustering). Pew Research is tagged category="research"
--- it publishes periodic analysis/survey reports, not daily breaking news,
-so it gets its own section on the page instead of being forced into
-headline-comparison clusters where it would rarely match anything.
+BBC, NPR, WSJ, Bloomberg, and NYT are tagged category="news" (daily
+wire-style stories, eligible for cross-outlet clustering). Pew Research
+is tagged category="research" -- it publishes periodic analysis/survey
+reports, not daily breaking news, so it gets its own section on the page
+instead of being forced into headline-comparison clusters where it would
+rarely match anything.
+
+AP and Reuters are NOT included: both discontinued their public RSS
+feeds years ago (confirmed dead -- 404/blocked -- as of this writing,
+not just assumed). Nothing to honestly pull from either without scraping
+their sites directly, which is a different (heavier, more fragile, more
+paywall-adjacent) mechanism than the RSS approach everything else here
+uses -- if that's wanted later, it's a deliberate follow-up, not a
+oversight.
 """
 import html
 import re
@@ -25,6 +34,9 @@ from common import write_json
 FEEDS = [
     {"url": "http://feeds.bbci.co.uk/news/world/rss.xml", "source": "BBC News", "category": "news"},
     {"url": "https://feeds.npr.org/1004/rss.xml", "source": "NPR", "category": "news"},
+    {"url": "https://feeds.a.dj.com/rss/RSSWorldNews.xml", "source": "Wall Street Journal", "category": "news"},
+    {"url": "https://feeds.bloomberg.com/politics/news.rss", "source": "Bloomberg", "category": "news"},
+    {"url": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml", "source": "New York Times", "category": "news"},
     {"url": "https://www.pewresearch.org/feed/", "source": "Pew Research Center", "category": "research"},
 ]
 

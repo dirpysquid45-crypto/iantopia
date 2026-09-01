@@ -8,14 +8,18 @@ data immediately, with no rebuild and no extra service.
 
 ## Stages
 
-- **ingest.py** — RSS pull (`feedparser`) of BBC News World, NPR, and Pew
-  Research Center's own public feeds — headline + dek exactly as rendered
-  to any anonymous visitor, nothing scraped past a paywall, no user-agent
-  spoofing. Writes `headlines.json`.
-- **cluster.py** — groups same-story headlines across BBC/NPR by keyword
-  overlap (plain set similarity, no LLM). Pew is research/analysis, not
-  daily wire news, so it's excluded from clustering and read directly from
-  `headlines.json` instead. Writes `clusters.json`.
+- **ingest.py** — RSS pull (`feedparser`) of BBC News World, NPR, Wall
+  Street Journal, Bloomberg, and New York Times' own public feeds —
+  headline + dek exactly as rendered to any anonymous visitor, nothing
+  scraped past a paywall, no user-agent spoofing — plus Pew Research
+  Center for context. AP and Reuters aren't included: both discontinued
+  their public RSS feeds years ago (confirmed dead, not assumed).
+  Writes `headlines.json`.
+- **cluster.py** — groups same-story headlines across the five news
+  outlets by keyword overlap (plain set similarity, no LLM). Pew is
+  research/analysis, not daily wire news, so it's excluded from
+  clustering and read directly from `headlines.json` instead. Writes
+  `clusters.json`.
 - **digest.py** — synthesizes the day's clusters + Pew context into one
   written digest via a local Ollama model (`qwen2.5:7b`), talking to
   `127.0.0.1:11434` only. Degrades to a clear "unavailable" note (not a
