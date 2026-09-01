@@ -153,6 +153,9 @@
       text-align: center;
       text-transform: uppercase;
     }
+    /* Hidden outside the Minecraft theme -- every other theme just shows
+       the plain "a" text next to it normally. */
+    .letter-a-creeper { display: none; }
 
     a.big,
     button.big {
@@ -773,6 +776,13 @@
        pulsing, on purpose -- the real thing doesn't animate either. */
     body.theme-minecraft h1 {
       color: transparent;
+      /* Some browsers only reliably clip a background to text when this is
+         set explicitly alongside color:transparent -- without it, a few
+         engines fall back to painting the glyphs in their default color
+         instead of clipping, which read as the black shadow sitting
+         directly on top of solid (uncut) letters instead of behind a
+         grey-filled ones. */
+      -webkit-text-fill-color: transparent;
       background:
         repeating-linear-gradient(115deg, transparent 0 22px, rgba(0,0,0,.22) 22px 25px, transparent 25px 70px),
         repeating-linear-gradient(25deg, transparent 0 40px, rgba(0,0,0,.15) 40px 42px, transparent 42px 90px),
@@ -782,49 +792,24 @@
       text-shadow: 3px 3px 0 #000, 6px 6px 0 rgba(0,0,0,.75);
       animation: titleScale 0.8s ease-out;
     }
-    /* The letter A's in "Iantopia" become creeper faces -- a pixel grid
-       drawn via box-shadow (one 0-size "pixel" per shadow entry, sized in
-       em so it scales with the heading's font-size) rather than an image
-       asset, matching how the stone button texture earlier in this theme
-       was also hand-built in CSS. The real "A" glyph is hidden
-       (color:transparent) but still occupies the letter's natural width,
-       so kerning/spacing stays correct; the face is layered on top via
-       ::before (green base square) and ::after (the black pixel dots). */
-    body.theme-minecraft .letter-a {
-      position: relative;
-      color: transparent;
+    /* The real Minecraft logo cuts an actual hole through the letter A,
+       shaped like a creeper's face -- not a face drawn on top of it. That
+       can't be done with live browser-rendered text (no way to punch an
+       arbitrary hole out of one glyph's counter via CSS alone), so this
+       swaps the two A's for a pre-rendered image instead: a solid stone
+       "A" silhouette with the grey gradient and hard shadow baked in
+       (composited in the correct paint order directly, sidestepping the
+       background-clip fallback risk above) and the creeper silhouette
+       genuinely cut out with real alpha transparency -- through it you
+       see whatever's actually behind the heading, same as the reference. */
+    body.theme-minecraft .letter-a-plain { display: none; }
+    body.theme-minecraft .letter-a-creeper {
       display: inline-block;
-    }
-    body.theme-minecraft .letter-a::before {
-      content: '';
-      position: absolute; left: 0.06em; top: 0.14em;
-      width: 0.96em; height: 0.96em;
-      background: #6ec656;
-      border: 2px solid #000;
-      box-shadow: 3px 3px 0 rgba(0,0,0,.6);
-    }
-    body.theme-minecraft .letter-a::after {
-      content: '';
-      position: absolute;
-      left: calc(0.06em + 2 * 0.12em); top: calc(0.14em + 1 * 0.12em);
-      width: 0.12em; height: 0.12em;
-      background: #1b1b1b;
-      box-shadow:
-        0.36em 0 0 0 #1b1b1b,
-        0em 0.12em 0 0 #1b1b1b,
-        0.36em 0.12em 0 0 #1b1b1b,
-        0.12em 0.36em 0 0 #1b1b1b,
-        0.24em 0.36em 0 0 #1b1b1b,
-        0em 0.48em 0 0 #1b1b1b,
-        0.12em 0.48em 0 0 #1b1b1b,
-        0.24em 0.48em 0 0 #1b1b1b,
-        0.36em 0.48em 0 0 #1b1b1b,
-        0em 0.6em 0 0 #1b1b1b,
-        0.12em 0.6em 0 0 #1b1b1b,
-        0.24em 0.6em 0 0 #1b1b1b,
-        0.36em 0.6em 0 0 #1b1b1b,
-        0em 0.72em 0 0 #1b1b1b,
-        0.36em 0.72em 0 0 #1b1b1b;
+      width: 0.86em; height: 0.95em;
+      background-image: url('/assets/decorations/creeper-a.png');
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
+      vertical-align: -0.06em;
     }
     /* Real diamond block texture now (was a hand-rolled conic-gradient
        facet pattern before the actual asset existed) -- stretched to
@@ -1324,7 +1309,7 @@
     })();
   </script>
 
-  <h1>Glorious I<span class="letter-a">a</span>ntopi<span class="letter-a">a</span></h1>
+  <h1>Glorious I<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span>ntopi<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span></h1>
 
   <div class="button-grid">
     <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
