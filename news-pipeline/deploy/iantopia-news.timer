@@ -1,11 +1,12 @@
 [Unit]
-Description=Run the Iantopia news pipeline every morning
+Description=Run the Iantopia news pipeline twice daily (6am/6pm)
 
 [Timer]
-# Qasim's system clock is UTC. 11:00 UTC = 7am EDT / 6am EST -- adjust if
-# that drifts from what "morning" means once DST changes, or just switch
-# to a fixed local offset if the box ever gets a real timezone set.
-OnCalendar=*-*-* 11:00:00
+# Qasim's system clock is UTC. 10:00/22:00 UTC = 6am/6pm EDT -- both shift
+# an hour once DST ends (6am/6pm EST = 11:00/23:00 UTC); update then, or
+# switch to a fixed local offset if the box ever gets a real timezone set.
+OnCalendar=*-*-* 10:00:00
+OnCalendar=*-*-* 22:00:00
 RandomizedDelaySec=300
 Persistent=true
 
