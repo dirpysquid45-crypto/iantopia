@@ -763,20 +763,69 @@
     body.theme-minecraft .flip-card {
       filter: drop-shadow(0 0 24px rgba(90, 165, 60, 0.65)) drop-shadow(0 0 48px rgba(63, 145, 48, 0.4));
     }
-    @keyframes titleGlowGrass {
-      0%, 100%  { text-shadow: 2px 2px 0 #294a1c, 0 0 12px rgba(106, 170, 60, 0.5); }
-      50%       { text-shadow: 2px 2px 0 #294a1c, 0 0 22px rgba(140, 209, 90, 0.7), 0 0 40px rgba(106, 170, 60, 0.4); }
-    }
+    /* Stone-block title, matching the real Minecraft logo's look: a grey
+       bevel gradient clipped to the text (not a flat color), a hard
+       stepped black shadow (no blur -- Minecraft's own title font shadow
+       is a flat offset, not a soft glow) and a couple of thin diagonal
+       "crack" streaks layered into the same gradient. text-shadow and
+       background-clip:text are independent paint layers, so both apply
+       to the same glyphs without fighting each other. Static, not
+       pulsing, on purpose -- the real thing doesn't animate either. */
     body.theme-minecraft h1 {
-      color: #6aaa3c;
-      animation: titleScale 0.8s ease-out, titleGlowGrass 3s ease-in-out infinite 0.8s;
+      color: transparent;
+      background:
+        repeating-linear-gradient(115deg, transparent 0 22px, rgba(0,0,0,.22) 22px 25px, transparent 25px 70px),
+        repeating-linear-gradient(25deg, transparent 0 40px, rgba(0,0,0,.15) 40px 42px, transparent 42px 90px),
+        linear-gradient(180deg, #e6e6e6 0%, #b8b8b8 30%, #8f8f8f 55%, #6e6e6e 80%, #5a5a5a 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      text-shadow: 3px 3px 0 #000, 6px 6px 0 rgba(0,0,0,.75);
+      animation: titleScale 0.8s ease-out;
     }
-    /* The countdown, styled as a diamond block face -- four gem facets
-       (light top-right, dark bottom-left) tiled via a repeating
-       conic-gradient, which is the one CSS primitive that can fake a cut-
-       gem look without an actual sprite: each tile is a small pie split
-       into alternating light/dark quarters, and tiling it small enough
-       reads as a faceted grid rather than a spinning wheel. */
+    /* The letter A's in "Iantopia" become creeper faces -- a pixel grid
+       drawn via box-shadow (one 0-size "pixel" per shadow entry, sized in
+       em so it scales with the heading's font-size) rather than an image
+       asset, matching how the stone button texture earlier in this theme
+       was also hand-built in CSS. The real "A" glyph is hidden
+       (color:transparent) but still occupies the letter's natural width,
+       so kerning/spacing stays correct; the face is layered on top via
+       ::before (green base square) and ::after (the black pixel dots). */
+    body.theme-minecraft .letter-a {
+      position: relative;
+      color: transparent;
+      display: inline-block;
+    }
+    body.theme-minecraft .letter-a::before {
+      content: '';
+      position: absolute; left: 0.06em; top: 0.14em;
+      width: 0.96em; height: 0.96em;
+      background: #6ec656;
+      border: 2px solid #000;
+      box-shadow: 3px 3px 0 rgba(0,0,0,.6);
+    }
+    body.theme-minecraft .letter-a::after {
+      content: '';
+      position: absolute;
+      left: calc(0.06em + 2 * 0.12em); top: calc(0.14em + 1 * 0.12em);
+      width: 0.12em; height: 0.12em;
+      background: #1b1b1b;
+      box-shadow:
+        0.36em 0 0 0 #1b1b1b,
+        0em 0.12em 0 0 #1b1b1b,
+        0.36em 0.12em 0 0 #1b1b1b,
+        0.12em 0.36em 0 0 #1b1b1b,
+        0.24em 0.36em 0 0 #1b1b1b,
+        0em 0.48em 0 0 #1b1b1b,
+        0.12em 0.48em 0 0 #1b1b1b,
+        0.24em 0.48em 0 0 #1b1b1b,
+        0.36em 0.48em 0 0 #1b1b1b,
+        0em 0.6em 0 0 #1b1b1b,
+        0.12em 0.6em 0 0 #1b1b1b,
+        0.24em 0.6em 0 0 #1b1b1b,
+        0.36em 0.6em 0 0 #1b1b1b,
+        0em 0.72em 0 0 #1b1b1b,
+        0.36em 0.72em 0 0 #1b1b1b;
+    }
     /* Real diamond block texture now (was a hand-rolled conic-gradient
        facet pattern before the actual asset existed) -- stretched to
        exactly fill the badge's rectangle rather than tiled, since it's a
@@ -1275,7 +1324,7 @@
     })();
   </script>
 
-  <h1>Glorious Iantopia</h1>
+  <h1>Glorious I<span class="letter-a">a</span>ntopi<span class="letter-a">a</span></h1>
 
   <div class="button-grid">
     <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
