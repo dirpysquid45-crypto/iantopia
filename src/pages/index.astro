@@ -766,30 +766,25 @@
     body.theme-minecraft .flip-card {
       filter: drop-shadow(0 0 24px rgba(90, 165, 60, 0.65)) drop-shadow(0 0 48px rgba(63, 145, 48, 0.4));
     }
-    /* Stone-block title, matching the real Minecraft logo's look: a grey
-       bevel gradient clipped to the text (not a flat color), a hard
-       stepped black shadow (no blur -- Minecraft's own title font shadow
-       is a flat offset, not a soft glow) and a couple of thin diagonal
-       "crack" streaks layered into the same gradient. text-shadow and
-       background-clip:text are independent paint layers, so both apply
-       to the same glyphs without fighting each other. Static, not
-       pulsing, on purpose -- the real thing doesn't animate either. */
+    /* Stone-block title, matching the real Minecraft logo's look. The
+       first version used background-clip:text for the grey gradient --
+       confirmed (via an actual screenshot) to silently fail in at least
+       one real browser, falling back to solid black text with the shadow
+       stacked on top instead of behind it. Rebuilt on `color` +
+       `text-shadow` only, which every browser supports the same way: a
+       flat mid-grey fill, a light 1-2px offset highlight (catching the
+       light from the upper-left, same direction real beveled block
+       lettering highlights from), then the hard black depth shadow
+       stacked down-right. No background-clip anywhere, so there's no
+       silent-failure mode left for it to fall into. Static, not pulsing
+       -- the real logo doesn't animate either. */
     body.theme-minecraft h1 {
-      color: transparent;
-      /* Some browsers only reliably clip a background to text when this is
-         set explicitly alongside color:transparent -- without it, a few
-         engines fall back to painting the glyphs in their default color
-         instead of clipping, which read as the black shadow sitting
-         directly on top of solid (uncut) letters instead of behind a
-         grey-filled ones. */
-      -webkit-text-fill-color: transparent;
-      background:
-        repeating-linear-gradient(115deg, transparent 0 22px, rgba(0,0,0,.22) 22px 25px, transparent 25px 70px),
-        repeating-linear-gradient(25deg, transparent 0 40px, rgba(0,0,0,.15) 40px 42px, transparent 42px 90px),
-        linear-gradient(180deg, #e6e6e6 0%, #b8b8b8 30%, #8f8f8f 55%, #6e6e6e 80%, #5a5a5a 100%);
-      -webkit-background-clip: text;
-      background-clip: text;
-      text-shadow: 3px 3px 0 #000, 6px 6px 0 rgba(0,0,0,.75);
+      color: #9c9c9c;
+      text-shadow:
+        -1px -1px 0 #d8d8d8,
+        -2px -2px 0 #c2c2c2,
+        3px 3px 0 #000,
+        6px 6px 0 rgba(0,0,0,.75);
       animation: titleScale 0.8s ease-out;
     }
     /* The real Minecraft logo cuts an actual hole through the letter A,
