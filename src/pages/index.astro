@@ -710,11 +710,14 @@
     /* ---------- Minecraft theme (stone GUI buttons, diamond-block countdown) ---------- */
     /* Static, like Hello Kitty / Old People Slot above -- the panorama loop
        and OST already carry all the motion/atmosphere this theme needs, so
-       buttons don't also need their own pulse. The stone look is built from
-       plain CSS (bevel via mismatched border-side colors, a speckle texture
-       via tiled radial-gradients) rather than a sprite, since it's a flat
-       color/border effect the vanilla button widget actually uses -- no
-       image asset needed to get close to it. */
+       buttons don't also need their own pulse. Real polished-stone texture
+       (was a hand-rolled radial-gradient speckle pattern before the actual
+       asset existed), stretched to exactly fill each button's rectangle --
+       same no-repeat/100% 100% treatment as the diamond-block countdown,
+       since it's one texture swatch, not a repeating tile. Button label
+       text is normal element content, which always paints above its own
+       background by default, so it stays legible over the texture with no
+       extra z-index/layering needed -- same as the countdown badge. */
     body.theme-minecraft a.big,
     body.theme-minecraft button.big,
     body.theme-minecraft #inv-btn,
@@ -724,12 +727,9 @@
     body.theme-minecraft #now-playing,
     body.theme-minecraft #ending-link {
       background-color: #8b8b8b;
-      background-image:
-        radial-gradient(circle at 20% 30%, rgba(255,255,255,.08) 0 2px, transparent 2px),
-        radial-gradient(circle at 62% 68%, rgba(0,0,0,.12) 0 2px, transparent 2px),
-        radial-gradient(circle at 82% 24%, rgba(255,255,255,.06) 0 2px, transparent 2px),
-        radial-gradient(circle at 38% 82%, rgba(0,0,0,.1) 0 2px, transparent 2px);
-      background-size: 16px 16px;
+      background-image: url('/assets/decorations/polished-stone.png');
+      background-size: 100% 100%;
+      background-repeat: no-repeat;
       border-style: solid;
       border-width: 4px;
       border-top-color: #d8d8d8;
@@ -749,7 +749,11 @@
     body.theme-minecraft #account-btn:hover,
     body.theme-minecraft #now-playing:hover,
     body.theme-minecraft #ending-link:hover {
-      background-color: #a3a3a3;
+      /* background-color alone would go invisible now -- the opaque
+         texture image sits on top of it and fully occludes it. A
+         brightness filter lightens the actual visible texture instead,
+         same lit-up-on-hover read as the old color swap gave. */
+      filter: brightness(1.18);
       color: #ffff5c;
     }
     /* Pressed feedback: bevel inverts, like a real GUI button being pushed
