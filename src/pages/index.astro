@@ -1799,11 +1799,6 @@
         const key = localStorage.getItem(ACTIVE_BG_KEY);
         return (key && BG_LIBRARY[key]) ? key : 'default';
       }
-      // Backgrounds that swap Now Playing to a matching track the moment
-      // they're selected — a combo, not a separate unlock. Keyed the same
-      // in both libraries on purpose (see music-library.js).
-      const BACKGROUND_MUSIC_COMBOS = ['bladee_waster', 'evian_yxguden', 'clarity', 'hello_kitty', 'girl_like_me'];
-
       // Same fix as every other page's pickers.js already has: without this,
       // the video restarted from 0:00 on every trip back to the homescreen
       // while the audio track kept its place, so the two drifted out of sync
@@ -1833,8 +1828,15 @@
           document.body.style.backgroundPosition = bg.position || 'center';
         }
 
-        if (BACKGROUND_MUSIC_COMBOS.includes(key) && LIBRARY[key]) {
-          activeTrackKey = key;
+        // Combo track: reads bg.comboTrack from background-library.js
+        // instead of a hardcoded per-key list here (that list assumed the
+        // music key always matched the background key, which broke the
+        // moment a background needed a differently-named track -- e.g.
+        // 'minecraft' the background vs. 'minecraft_ost' the track. Every
+        // other page's pickers.js already does this the generic way; home
+        // was the one place still on the old pattern.
+        if (bg.comboTrack && LIBRARY[bg.comboTrack]) {
+          activeTrackKey = bg.comboTrack;
           localStorage.setItem(ACTIVE_TRACK_KEY, activeTrackKey);
           applyActiveTrack(true);
           window.dispatchEvent(new CustomEvent('active-track:changed', { detail: { key: activeTrackKey } }));
