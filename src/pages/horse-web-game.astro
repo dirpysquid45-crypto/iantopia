@@ -141,6 +141,7 @@
       <a href="/" title="Back to Iantopia">← Home</a>
       <h1>HORSE GAME</h1>
       <div style="display:flex; gap:4px;">
+        <button id="duck-btn" title="Duck (or hold ↓ / S)">⬇</button>
         <button id="track-btn" title="Switch music">🎵</button>
         <button id="mute-btn" title="Toggle sound">🔊</button>
       </div>
@@ -158,7 +159,10 @@
       <div class="stage-overlay" id="start-overlay">
         <div class="stage-box">
           <h2>🐴 Horse Game</h2>
-          <p>Space / ↑ / tap to jump — hold for a higher jump.<br>Every hurdle you clear = <b>1 Struble</b>.</p>
+          <p>Space / ↑ / tap to jump — hold for a higher jump.<br>
+          Walk off a gap's edge and you'll fall in — jump clear of it instead. Big gaps have a glowing orb: jump toward it, then tap jump again while touching it to boost across.<br>
+          After 50 hurdles cleared, low planes start flying in — ↓ / S / the ⬇ button to duck under one, or it's game over.<br>
+          Hurdles cleared and coins collected both pay <b>Strubles</b>.</p>
           <button class="btn" id="start-btn" type="button">▶ Start Running</button>
           <p id="sound-hint">🔇 Browsers block audio until you interact — sound starts the moment you press Start.</p>
         </div>
@@ -166,14 +170,14 @@
 
       <div class="stage-overlay" id="gameover-overlay" hidden>
         <div class="stage-box">
-          <h2>Wiped Out!</h2>
+          <h2 id="gameover-title">Wiped Out!</h2>
           <p>Hurdles cleared: <b id="final-cleared">0</b><br>Strubles earned: <b id="final-earned">0</b><br>Best: <b id="final-best">0</b></p>
           <button class="btn" id="restart-btn" type="button">↻ Try Again</button>
         </div>
       </div>
     </div>
 
-    <div id="hint">Now playing: <span id="np-label">Amazing Wild Horse</span></div>
+    <div id="hint">Now playing: <span id="np-label">Arvan Khoyor Jil</span></div>
   </main>
 
   <!-- "auto" would start an eager full 15MB download the instant the page
@@ -181,7 +185,7 @@
        when they need it most -- metadata is enough for playback to begin
        immediately on .play() (audio streams progressively), without that
        contention. -->
-  <audio id="theme-music" src="/audio/music/wild-horse.mp3" preload="metadata" loop></audio>
+  <audio id="theme-music" src="/audio/music/arvan-khoyor-jil.mp3" preload="metadata" loop></audio>
   <audio id="sfx-clear" src="/audio/sfx/minesweeper-flag.mp3" preload="none"></audio>
 
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -212,8 +216,8 @@
   sfxClear.volume = Math.min(1, vol + 0.3);
 
   const TRACKS = [
-    { src: '/audio/music/wild-horse.mp3', label: 'Amazing Wild Horse' },
     { src: '/audio/music/arvan-khoyor-jil.mp3', label: 'Arvan Khoyor Jil' },
+    { src: '/audio/music/wild-horse.mp3', label: 'Amazing Wild Horse' },
   ];
   let trackIdx = 0;
   function applyTrack(restart) {
@@ -264,9 +268,25 @@
   const horseImg = new Image();
   horseImg.src = '/horse-game/horse.png';
   const HORSE_ASPECT = 602 / 760; // native horse.png h/w, in case it loads late
+  // Duck sprite: the same horse squashed wide and short (built offline via
+  // PIL -- non-uniform resize + a shear so it reads as "comedically
+  // stretched", not just a scaled-down copy).
+  const horseDuckImg = new Image();
+  horseDuckImg.src = '/horse-game/horse-duck.png';
+  const DUCK_ASPECT = 301 / 1146;
   const grassImg = new Image();
   grassImg.src = '/tycoon/grass-foreground.png';
   const GRASS_ASPECT = 130 / 1085;
+  // Plane obstacle reuses the tycoon page's existing silly-airplane.gif.
+  // drawImage() on a gif-backed Image only ever paints its first frame --
+  // deliberate: this keeps the file's "everything on screen is a draw
+  // call, not a DOM node" rule intact instead of syncing an animated <img>
+  // overlay to canvas state for one obstacle type.
+  const planeImg = new Image();
+  planeImg.src = '/tycoon/silly-airplane.gif';
+  const PLANE_ASPECT = 325 / 512;
+  const strubleImg = new Image();
+  strubleImg.src = '/strubles.png';
 
   // Physics constants researched from chromium's actual trex-runner
   // (GRAVITY 0.6, INITIAL_JUMP_VELOCITY ~12, SPEED 6->13 px/frame @60fps --
@@ -293,6 +313,32 @@
     { w: 28, h: 60, weight: 1 },
   ];
 
+  // Ducking shrinks the horse's own hitbox height so it can pass under a
+  // low plane a standing horse couldn't. Holding duck mid-air instead
+  // fast-falls, chrome-dino style, rather than doing nothing.
+  const DUCK_HEIGHT_FACTOR = 0.55;
+  const FASTFALL_GRAVITY_MULT = 2.4;
+
+  const COIN_R = 8;
+  const ORB_R = 15;
+  // Added to whatever vertical speed the horse already has on a
+  // successful parry -- a second, smaller hop stacked on the jump already
+  // in progress, not a fresh one.
+  const ORB_BOOST_VELOCITY = 760;
+
+  // -- Physics-derived fairness bound -------------------------------------
+  // There's no published Geometry Dash generation algorithm to copy (real
+  // GD levels are hand-built, not procedural), so gaps are instead gated
+  // by what THIS game's own jump can actually clear: airtime is exactly
+  // how long a jump spends above y=0 under this gravity/launch speed, so
+  // airtime * ground speed is the farthest a full, uninterrupted jump can
+  // carry the horse forward. Nothing is ever generated wider than that
+  // (with a safety margin) unless a jump orb is placed to make up the gap.
+  function jumpAirtime() { return 2 * (JUMP_VELOCITY / Math.abs(GRAVITY)); }
+  function maxJumpDistance(atSpeed) { return jumpAirtime() * atSpeed; }
+  const GAP_SAFETY = 0.78; // plain gaps may use at most this fraction of a true max jump
+  const ORB_GAP_SAFETY = 1.65; // orb-assisted gaps may exceed a single jump's reach
+
   let W = 0, H = 0, groundY = 0;
   let horseW = 96, horseH = 96 * HORSE_ASPECT;
   let dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -312,20 +358,38 @@
   resize();
 
   let state = 'idle'; // idle | playing | over
-  let horse = { y: 0, vy: 0, holding: false };
+  let horse = { y: 0, vy: 0, holding: false, ducking: false, falling: false };
   let hurdles = [];
+  let gaps = [];
+  let coins = [];
+  let planes = [];
+  let orbs = [];
   let dust = [];
   let bursts = []; // brief celebratory flashes on streak milestones
+  let particles = []; // orb-activation burst
   let shake = 0;
   let groundScroll = 0;
   let speed = START_SPEED;
   let spawnTimer = 0;
   let dustTimer = 0;
   let cleared = 0, earned = 0;
+  let deathReason = 'Wiped Out!';
   let best = parseInt(localStorage.getItem(BEST_KEY), 10) || 0;
   $('stat-best').textContent = best.toLocaleString();
 
   function hurdleHitbox(w) { return { inset: w * 0.12 }; }
+
+  // Single source of truth for the horse's current collision box --
+  // ducking only shrinks its height (and only while grounded), so every
+  // obstacle type checks against this instead of re-deriving it.
+  function horseBox() {
+    const h = (horse.ducking && horse.y <= 0.5 && !horse.falling) ? horseH * DUCK_HEIGHT_FACTOR : horseH;
+    const left = HORSE_X + horseW * 0.24;
+    const right = HORSE_X + horseW * 0.86;
+    const top = groundY - horse.y - h;
+    const bottom = groundY - horse.y;
+    return { left, right, top, bottom, h };
+  }
 
   function beginRun() {
     // Idempotent by design -- if this somehow fires twice for one
@@ -333,12 +397,13 @@
     // resetting a run that already started.
     if (state === 'playing') return;
     state = 'playing';
-    horse.y = 0; horse.vy = 0; horse.holding = false;
+    horse.y = 0; horse.vy = 0; horse.holding = false; horse.ducking = false; horse.falling = false;
     speed = START_SPEED;
     spawnTimer = 1.1;
     dustTimer = 0;
-    cleared = 0; earned = 0;
-    hurdles = []; dust = []; bursts = []; shake = 0;
+    cleared = 0; earned = 0; deathReason = 'Wiped Out!';
+    hurdles = []; gaps = []; coins = []; planes = []; orbs = [];
+    dust = []; bursts = []; particles = []; shake = 0;
     $('stat-cleared').textContent = '0';
     $('stat-earned').textContent = '0';
     startOverlay.hidden = true;
@@ -347,10 +412,30 @@
 
   function jump() {
     if (state !== 'playing') { beginRun(); return; }
-    if (horse.y <= 0.5 && horse.vy <= 0) {
-      horse.vy = JUMP_VELOCITY;
-      horse.holding = true;
+    if (horse.falling) return; // already committed to the hole -- no jumping out of it
+    if (horse.y > 0.5 || horse.vy > 0) {
+      // Airborne -- a second, distinct jump press only ever does one
+      // thing: parry a live orb it's currently touching. Deliberately a
+      // real double-click, not an auto-pickup on overlap -- tap to jump,
+      // then tap again near the orb.
+      const box = horseBox();
+      const cx = (box.left + box.right) / 2;
+      const cy = (box.top + box.bottom) / 2;
+      for (const o of orbs) {
+        if (o.used) continue;
+        if (Math.hypot(cx - o.x, cy - o.y) <= ORB_R + 18) {
+          o.used = true;
+          horse.vy = Math.max(horse.vy, 0) + ORB_BOOST_VELOCITY;
+          horse.holding = true;
+          spawnOrbBurst(o.x, o.y);
+          break;
+        }
+      }
+      return;
     }
+    if (horse.ducking) return; // grounded + ducking: duck and jump are exclusive
+    horse.vy = JUMP_VELOCITY;
+    horse.holding = true;
   }
 
   function releaseJump() {
@@ -358,13 +443,18 @@
     horse.holding = false;
   }
 
-  function endGame() {
+  function startDuck() { horse.ducking = true; }
+  function endDuck() { horse.ducking = false; }
+
+  function endGame(reason) {
     state = 'over';
     shake = 0.25;
+    deathReason = reason || 'Wiped Out!';
     if (cleared > best) {
       best = cleared;
       localStorage.setItem(BEST_KEY, String(best));
     }
+    $('gameover-title').textContent = deathReason;
     $('final-cleared').textContent = cleared.toLocaleString();
     $('final-earned').textContent = earned.toLocaleString();
     $('final-best').textContent = best.toLocaleString();
@@ -381,16 +471,111 @@
   }
 
   let nextHurdleId = 1;
-  function spawnHurdle() {
-    const type = pickHurdleType();
-    hurdles.push({ id: nextHurdleId++, x: W + 20, w: type.w, h: type.h, cleared: false });
-    // A brief run of speed occasionally spawns a close pair -- the real
-    // game's MAX_OBSTACLE_LENGTH grouping -- only once things are moving
-    // fast enough that a lone hurdle would otherwise feel too easy.
-    if (speed > 460 && Math.random() < 0.22) {
-      const type2 = pickHurdleType();
-      hurdles.push({ id: nextHurdleId++, x: W + 20 + type.w + 46 + Math.random() * 30, w: type2.w, h: type2.h, cleared: false });
+
+  // One coin per jump, never a cluster -- a single Struble icon floating
+  // over the obstacle that just called for a jump.
+  function spawnCoin(x, y) {
+    const roll = Math.random();
+    const value = roll < 0.15 ? 3 : (roll < 0.4 ? 2 : 1);
+    coins.push({ x, y, r: COIN_R, value, collected: false, bob: Math.random() * Math.PI * 2 });
+  }
+
+  // One plane type: big, low, and lethal unless ducked. (An earlier
+  // decorative high-altitude band was cut -- it had no collision at all
+  // and just cluttered the sky with obstacles that could never hurt you.)
+  function spawnPlane(x) {
+    const w = Math.min(220, W * 0.3);
+    const h = w * PLANE_ASPECT;
+    // Positioned so its bottom edge sits just above a *ducked* horse's
+    // head -- a duck clears it clean, standing height does not.
+    const duckH = horseH * DUCK_HEIGHT_FACTOR;
+    const margin = 6;
+    const bottom = groundY - duckH - margin;
+    const y = bottom - h / 2;
+    planes.push({ x, y, w, h, bob: Math.random() * Math.PI * 2 });
+  }
+
+  function spawnGap(x, w, withOrb) {
+    gaps.push({ x, w });
+    if (withOrb) {
+      orbs.push({ x: x + w / 2, y: groundY - Math.min(160, H * 0.42), used: false, phase: Math.random() * Math.PI * 2 });
     }
+  }
+
+  function spawnOrbBurst(x, y) {
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * (120 + Math.random() * 80),
+        vy: Math.sin(a) * (120 + Math.random() * 80),
+        age: 0, life: 0.5 + Math.random() * 0.2,
+      });
+    }
+  }
+
+  function tierForSpeed(atSpeed) {
+    if (atSpeed < 350) return 0;
+    if (atSpeed < 450) return 1;
+    if (atSpeed < 550) return 2;
+    return 3;
+  }
+
+  // Pattern/encounter spawner: replaces a single-hurdle random timer with
+  // a pool of hand-designed encounters gated by tier (== speed), each
+  // introducing a new obstacle type only once the run is fast enough that
+  // it's fair to ask of the player. Gaps within any pattern are clamped
+  // to maxJumpDistance()-derived bounds above, so nothing built here can
+  // ever be mathematically uncrossable.
+  function buildEncounter(originX, atSpeed) {
+    const tier = tierForSpeed(atSpeed);
+    const maxGap = maxJumpDistance(atSpeed) * GAP_SAFETY;
+    const maxOrbGap = maxJumpDistance(atSpeed) * ORB_GAP_SAFETY;
+
+    const patterns = [
+      { tier: 0, weight: 3, build: () => {
+        const t = pickHurdleType();
+        hurdles.push({ id: nextHurdleId++, x: originX, w: t.w, h: t.h, cleared: false });
+        if (Math.random() < 0.5) spawnCoin(originX + t.w / 2, groundY - horseH * 1.5);
+      }},
+      { tier: 1, weight: 2, build: () => {
+        const t1 = pickHurdleType();
+        const t2 = pickHurdleType();
+        hurdles.push({ id: nextHurdleId++, x: originX, w: t1.w, h: t1.h, cleared: false });
+        hurdles.push({ id: nextHurdleId++, x: originX + t1.w + 46 + Math.random() * 30, w: t2.w, h: t2.h, cleared: false });
+      }},
+      { tier: 2, weight: 2, build: () => {
+        const w = Math.max(36, Math.min(maxGap, 55 + Math.random() * 35));
+        spawnGap(originX, w, false);
+        spawnCoin(originX + w / 2, groundY - horseH * 1.3);
+      }},
+      { tier: 3, weight: 2, build: () => {
+        // A bit more than one clean jump can clear, capped well under a
+        // third of the visible stage so it never reads as an oversized
+        // chasm regardless of how fast the run has gotten.
+        const orbCap = Math.min(maxOrbGap, W * 0.3);
+        const w = Math.max(Math.min(maxGap + 24, orbCap), Math.min(orbCap, maxGap + 24 + Math.random() * 40));
+        spawnGap(originX, w, true);
+      }},
+      // The deadly low plane only enters rotation after 50 hurdle clears
+      // -- an explicit skill-gate rather than a speed-tier one, so it
+      // reliably shows up once a player has proven they can handle the
+      // basics, independent of how fast the run happens to be going.
+      { tier: 0, weight: 3, enabled: () => cleared >= 50, build: () => {
+        spawnPlane(originX);
+      }},
+      { tier: 0, weight: 1, enabled: () => cleared >= 50, build: () => {
+        spawnPlane(originX);
+        const t = pickHurdleType();
+        hurdles.push({ id: nextHurdleId++, x: originX + 220 + Math.random() * 40, w: t.w, h: t.h, cleared: false });
+      }},
+    ];
+
+    const pool = patterns.filter((p) => p.tier <= tier && (!p.enabled || p.enabled()));
+    const total = pool.reduce((s, p) => s + p.weight, 0);
+    let r = Math.random() * total;
+    for (const p of pool) { if ((r -= p.weight) <= 0) { p.build(); return; } }
+    pool[0].build();
   }
 
   function spawnDust(vx) {
@@ -410,10 +595,15 @@
     speed = Math.min(MAX_SPEED, speed + ACCEL * dt);
     groundScroll = (groundScroll + speed * dt) % (grassImg.naturalWidth ? grassImg.naturalWidth * (GROUND_H / (grassImg.naturalHeight || 130)) : 200);
 
-    // Horse physics
-    horse.vy += GRAVITY * dt;
+    // Horse physics -- ducking mid-air fast-falls instead of doing
+    // nothing, same as chrome dino's own duck-in-air behavior. The
+    // ground clamp itself is decided further down, once this frame's gap
+    // positions are known (see "Ground contact" below) -- stepping onto
+    // open air falls through instead of snapping back to y=0.
+    const grounded = horse.y <= 0.5 && !horse.falling;
+    const gravityMult = (horse.ducking && !grounded && !horse.falling) ? FASTFALL_GRAVITY_MULT : 1;
+    horse.vy += GRAVITY * gravityMult * dt;
     horse.y += horse.vy * dt;
-    if (horse.y <= 0) { horse.y = 0; horse.vy = 0; horse.holding = false; }
 
     // Dust while grounded and running
     dustTimer -= dt;
@@ -441,7 +631,7 @@
       const hurdleRight = h.x + h.w - hb.inset;
       const xOverlap = horseRight > hurdleLeft && horseLeft < hurdleRight;
       if (xOverlap && horse.y < h.h - 8) {
-        endGame();
+        endGame('Wiped Out!');
         return;
       }
       if (!h.cleared && h.x + h.w < HORSE_X) {
@@ -458,12 +648,98 @@
       if (h.x + h.w < -30) hurdles.splice(i, 1);
     }
 
+    // Gaps -- scroll first so "Ground contact" below reads this frame's
+    // real positions, not last frame's.
+    for (let i = gaps.length - 1; i >= 0; i--) {
+      const g = gaps[i];
+      g.x -= speed * dt;
+      if (g.x + g.w < -30) gaps.splice(i, 1);
+    }
+
+    // Ground contact -- the horse only actually falls into a gap once it
+    // physically crosses onto the open space over it, rather than dying
+    // the instant a hitbox merely touches the gap's edge. Once falling
+    // starts it's committed (no jumping out, see jump()) and gravity just
+    // keeps pulling it down past the ground line into the hole, ending
+    // the run once it's fallen far enough to be off-screen.
+    if (!horse.falling && horse.y <= 0.5) {
+      const centerX = HORSE_X + horseW * 0.5;
+      const overGap = gaps.some((g) => centerX > g.x && centerX < g.x + g.w);
+      if (overGap) {
+        horse.falling = true;
+      } else {
+        horse.y = 0; horse.vy = 0; horse.holding = false;
+      }
+    }
+    if (horse.falling && horse.y < -H * 0.55) {
+      endGame('Fell in a Gap!');
+      return;
+    }
+
+    // Planes -- big, low, lethal unless ducked under.
+    for (let i = planes.length - 1; i >= 0; i--) {
+      const p = planes[i];
+      p.x -= speed * dt;
+      p.bob += dt * 3;
+      const box = horseBox();
+      const planeLeft = p.x + p.w * 0.1;
+      const planeRight = p.x + p.w * 0.9;
+      const planeTop = p.y - p.h * 0.5;
+      const planeBottom = p.y + p.h * 0.5;
+      const xOverlap = box.right > planeLeft && box.left < planeRight;
+      const yOverlap = box.bottom > planeTop && box.top < planeBottom;
+      if (xOverlap && yOverlap) {
+        endGame('Clipped by a Plane!');
+        return;
+      }
+      if (p.x + p.w < -40) planes.splice(i, 1);
+    }
+
+    // Orbs -- pickup/boost is handled entirely in jump() (a real second
+    // press), this just scrolls and pulses them, and drops ones that
+    // scrolled off unused.
+    for (let i = orbs.length - 1; i >= 0; i--) {
+      const o = orbs[i];
+      o.x -= speed * dt;
+      o.phase += dt * 4;
+      if (o.x < -40) orbs.splice(i, 1);
+    }
+
+    // Coins -- sparse, variable-value, collectible in any horse state.
+    for (let i = coins.length - 1; i >= 0; i--) {
+      const c = coins[i];
+      c.x -= speed * dt;
+      c.bob += dt * 5;
+      if (!c.collected) {
+        const box = horseBox();
+        const dx = c.x - (box.left + box.right) / 2;
+        const dy = c.y - (box.top + box.bottom) / 2;
+        if (Math.hypot(dx, dy) < c.r + horseW * 0.28) {
+          c.collected = true;
+          earned += c.value;
+          try { Strubles.add(c.value); } catch {}
+          $('stat-earned').textContent = earned.toLocaleString();
+        }
+      }
+      if (c.x < -30) coins.splice(i, 1);
+    }
+
+    // Orb-burst particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const pt = particles[i];
+      pt.age += dt;
+      pt.x += (pt.vx - speed) * dt;
+      pt.y += pt.vy * dt;
+      pt.vx *= 0.94; pt.vy *= 0.94;
+      if (pt.age >= pt.life) particles.splice(i, 1);
+    }
+
     // Spawn
     spawnTimer -= dt;
     if (spawnTimer <= 0) {
-      spawnHurdle();
+      buildEncounter(W + 20, speed);
       const base = Math.max(0.6, 1.45 - speed / 750);
-      spawnTimer = base + Math.random() * 0.45;
+      spawnTimer = base + Math.random() * 0.5;
     }
 
     for (let i = bursts.length - 1; i >= 0; i--) {
@@ -491,6 +767,22 @@
       ctx.fillRect(0, groundY, W, h);
     }
     ctx.restore();
+
+    // Punch REAL gaps: clear the ground pixels entirely so the stage's
+    // own background shows through underneath, same as the empty sky
+    // above the ground strip -- reads as the grass actually being cut
+    // into two separated pieces, not a solid block painted over it.
+    for (const g of gaps) {
+      ctx.clearRect(g.x, groundY - 2, g.w, h + 2);
+      const edgeL = ctx.createLinearGradient(g.x, 0, g.x + 6, 0);
+      edgeL.addColorStop(0, 'rgba(0,0,0,.5)'); edgeL.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = edgeL;
+      ctx.fillRect(g.x, groundY, 6, h);
+      const edgeR = ctx.createLinearGradient(g.x + g.w - 6, 0, g.x + g.w, 0);
+      edgeR.addColorStop(0, 'rgba(0,0,0,0)'); edgeR.addColorStop(1, 'rgba(0,0,0,.5)');
+      ctx.fillStyle = edgeR;
+      ctx.fillRect(g.x + g.w - 6, groundY, 6, h);
+    }
   }
 
   function drawHurdle(h) {
@@ -516,25 +808,103 @@
   }
 
   function drawHorse() {
-    const w = horseW, h = horseH;
-    const x = HORSE_X;
+    const ducking = horse.ducking && horse.y <= 0.5 && !horse.falling;
+    const w = ducking ? horseW * 1.3 : horseW;
+    const h = ducking ? w * DUCK_ASPECT : horseH;
+    const x = ducking ? HORSE_X - (w - horseW) * 0.35 : HORSE_X;
     const y = groundY - h - horse.y;
     // Gallop bob only while grounded and actually running -- airborne
     // motion already reads from the jump arc itself.
-    const bob = (state === 'playing' && horse.y <= 0.5)
+    const bob = (state === 'playing' && horse.y <= 0.5 && !horse.falling)
       ? Math.sin(performance.now() / 90) * 3
       : 0;
     ctx.save();
+    if (horse.falling) {
+      // Tumble into the hole as it sinks -- the fall animation the ground
+      // clamp used to skip straight past with an instant death.
+      const cx = x + w / 2, cy = y + h / 2;
+      const fallT = Math.min(1, -horse.y / (H * 0.55));
+      ctx.translate(cx, cy);
+      ctx.rotate(fallT * Math.PI * 1.6);
+      ctx.translate(-cx, -cy);
+      ctx.globalAlpha = 1 - fallT * 0.3;
+    }
     ctx.shadowColor = 'rgba(0,0,0,.35)';
     ctx.shadowBlur = 6;
     ctx.shadowOffsetY = 4;
-    if (horseImg.complete && horseImg.naturalWidth) {
-      ctx.drawImage(horseImg, x, y + bob, w, h);
+    const img = ducking ? horseDuckImg : horseImg;
+    if (img.complete && img.naturalWidth) {
+      ctx.drawImage(img, x, y + bob, w, h);
     } else {
       ctx.fillStyle = '#5b3a24';
       ctx.fillRect(x, y + bob, w, h);
     }
     ctx.restore();
+  }
+
+  function drawCoin(c) {
+    if (c.collected) return;
+    const bobY = c.y + Math.sin(c.bob) * 3;
+    const scaleX = Math.abs(Math.cos(c.bob * 0.5)) * 0.6 + 0.4; // lazy spin, coin-flip style
+    const size = c.r * 2.6;
+    ctx.save();
+    ctx.translate(c.x, bobY);
+    ctx.scale(scaleX, 1);
+    ctx.shadowColor = 'rgba(255,215,0,.65)';
+    ctx.shadowBlur = 8;
+    if (strubleImg.complete && strubleImg.naturalWidth) {
+      ctx.drawImage(strubleImg, -size / 2, -size / 2, size, size);
+    } else {
+      ctx.beginPath();
+      ctx.arc(0, 0, c.r, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffd700';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawPlane(p) {
+    const bobY = p.y + Math.sin(p.bob) * 2;
+    ctx.save();
+    if (planeImg.complete && planeImg.naturalWidth) {
+      ctx.drawImage(planeImg, p.x, bobY - p.h / 2, p.w, p.h);
+    } else {
+      ctx.fillStyle = '#c9c9c9';
+      ctx.fillRect(p.x, bobY - p.h / 2, p.w, p.h);
+    }
+    ctx.restore();
+  }
+
+  function drawOrb(o) {
+    if (o.used) return;
+    const pulse = 0.7 + Math.sin(o.phase) * 0.3;
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, ORB_R * 2.2);
+    grad.addColorStop(0, `rgba(255,230,80,${(0.55 * pulse).toFixed(2)})`);
+    grad.addColorStop(1, 'rgba(255,230,80,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, ORB_R * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0, ORB_R * pulse, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff2a8';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#ffcf1f';
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawParticles() {
+    for (const pt of particles) {
+      const t = 1 - pt.age / pt.life;
+      ctx.fillStyle = `rgba(255,224,90,${t.toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 2.5 * t + 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   function drawDust() {
@@ -595,9 +965,13 @@
     }
     drawSpeedLines();
     drawDust();
+    for (const c of coins) drawCoin(c);
     for (const h of hurdles) drawHurdle(h);
+    for (const p of planes) drawPlane(p);
+    for (const o of orbs) drawOrb(o);
     drawHorse();
     drawGround();
+    drawParticles();
     drawBursts();
     ctx.restore();
   }
@@ -616,19 +990,27 @@
     requestAnimationFrame(frame);
   }
 
-  // ---------- Input: every path funnels into the same three functions ----------
+  // ---------- Input: every path funnels into the same handful of functions ----------
   window.addEventListener('keydown', (e) => {
     if (e.key === ' ' || e.key === 'ArrowUp' || e.code === 'Space') {
       e.preventDefault();
       if (!e.repeat) jump();
+    } else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+      e.preventDefault();
+      startDuck();
     }
   });
   window.addEventListener('keyup', (e) => {
     if (e.key === ' ' || e.key === 'ArrowUp' || e.code === 'Space') releaseJump();
+    else if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') endDuck();
   });
   stage.addEventListener('pointerdown', () => jump());
   stage.addEventListener('pointerup', () => releaseJump());
   stage.addEventListener('pointerleave', () => releaseJump());
+  const duckBtn = $('duck-btn');
+  duckBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); startDuck(); });
+  duckBtn.addEventListener('pointerup', endDuck);
+  duckBtn.addEventListener('pointerleave', endDuck);
   $('start-btn').addEventListener('click', () => tryPlayTheme());
   $('restart-btn').addEventListener('click', () => tryPlayTheme());
 
@@ -639,9 +1021,13 @@
   // for this page's own run state. Nothing here can mutate gameplay.
   window.HorseGame = {
     getState: () => ({
-      state, speed, cleared, earned, best,
-      horse: { y: horse.y, vy: horse.vy },
+      state, speed, cleared, earned, best, deathReason,
+      horse: { y: horse.y, vy: horse.vy, ducking: horse.ducking, falling: horse.falling },
       hurdles: hurdles.map((h) => ({ id: h.id, x: h.x, w: h.w, h: h.h, cleared: h.cleared })),
+      gaps: gaps.map((g) => ({ x: g.x, w: g.w })),
+      coins: coins.map((c) => ({ x: c.x, y: c.y, value: c.value, collected: c.collected })),
+      planes: planes.map((p) => ({ x: p.x, y: p.y })),
+      orbs: orbs.map((o) => ({ x: o.x, y: o.y, used: o.used })),
       horseX: HORSE_X, horseW,
     }),
   };
