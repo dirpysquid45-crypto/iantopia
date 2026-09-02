@@ -162,7 +162,7 @@
           <p>Space / ↑ / tap to jump — hold for a higher jump.<br>
           Walk off a gap's edge and you'll fall in — jump clear of it instead. Big gaps have a glowing orb: jump toward it, then tap jump again while touching it to boost across.<br>
           After 50 hurdles cleared, low planes start flying in — ↓ / S / the ⬇ button to duck under one, or it's game over.<br>
-          Only coins pay <b>Strubles</b> — clearing hurdles just builds your streak. Chase a big gap's orb boost far enough and there's a glowing rice bag waiting: grab it for temporary invincibility.</p>
+          Only coins pay <b>Strubles</b> — clearing hurdles just builds your streak. Some orb boosts lead to a rare glowing rice bag: grab it for a few seconds of invincibility.</p>
           <button class="btn" id="start-btn" type="button">▶ Start Running</button>
           <p id="sound-hint">🔇 Browsers block audio until you interact — sound starts the moment you press Start.</p>
         </div>
@@ -187,10 +187,10 @@
        contention. -->
   <audio id="theme-music" src="/audio/music/arvan-khoyor-jil.mp3" preload="metadata" loop></audio>
   <audio id="sfx-clear" src="/audio/sfx/minesweeper-flag.mp3" preload="none"></audio>
-  <!-- Rice-bag power-up sting: a trimmed ~32s excerpt of Clarity's chorus,
-       starting at its vocal entrance -- see build notes in the game script
-       for how the cut point was chosen. -->
-  <audio id="powerup-audio" src="/audio/sfx/rice-powerup-chorus.mp3" preload="none"></audio>
+  <!-- Rice-bag power-up sting: the first 3s of cursed.mp3, faded out at the
+       end. preload="auto" (unlike the other sfx) since it's tiny (~48KB)
+       and needs to be ready to fire instantly, not fetched on demand. -->
+  <audio id="powerup-audio" src="/audio/sfx/rice-powerup.mp3" preload="auto"></audio>
 
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -340,10 +340,13 @@
   // in progress, not a fresh one.
   const ORB_BOOST_VELOCITY = 760;
   const RICE_R = 16;
-  // Matches the trimmed powerup-audio clip's own length exactly (see the
+  // Matches the trimmed powerup-audio clip's own length (see the
   // <audio id="powerup-audio"> tag) so the invincibility window and the
-  // music both end together.
-  const POWERUP_DURATION = 32;
+  // sting both end together.
+  const POWERUP_DURATION = 3;
+  // Rice bags are a rare bonus, not a guaranteed reward for every orb
+  // gap -- most orb-gated gaps are just the orb, nothing more.
+  const RICE_BAG_CHANCE = 0.22;
 
   // -- Physics-derived fairness bound -------------------------------------
   // There's no published Geometry Dash generation algorithm to copy (real
@@ -467,8 +470,11 @@
     shake = 0.35;
     if (audioEnabled) {
       themeMusic.pause();
-      powerupAudio.currentTime = 0;
-      powerupAudio.play().catch(() => {});
+      // Setting currentTime before the browser has any data loaded can
+      // throw in some engines (readyState HAVE_NOTHING) -- guard it so a
+      // throw here can't ever abort the frame() loop that called us.
+      try { powerupAudio.currentTime = 0; } catch {}
+      powerupAudio.play().catch((err) => console.warn('[horse-game] powerup audio failed to play', err));
     }
   }
 
@@ -485,7 +491,7 @@
       const cy = (box.top + box.bottom) / 2;
       for (const o of orbs) {
         if (o.used) continue;
-        if (Math.hypot(cx - o.x, cy - o.y) <= ORB_R + 18) {
+        if (Math.hypot(cx - o.x, cy - o.y) <= ORB_R + 27) {
           o.used = true;
           horse.vy = Math.max(horse.vy, 0) + ORB_BOOST_VELOCITY;
           horse.holding = true;
@@ -547,9 +553,10 @@
   // decorative high-altitude band was cut -- it had no collision at all
   // and just cluttered the sky with obstacles that could never hurt you.)
   function spawnPlane(x) {
-    // Scaled off the horse itself (like every other obstacle here) rather
-    // than a small fixed cap, so it reads as a genuinely big threat.
-    const w = Math.max(horseW * 2.4, Math.min(360, W * 0.42));
+    // Scaled purely off the horse itself, not a screen-fraction cap --
+    // it needs to read as a clear obstacle sized against the horse, not
+    // a giant clip-art plane filling half the sky.
+    const w = horseW * 1.6;
     const h = w * PLANE_ASPECT;
     // Positioned so its bottom edge sits just above a *ducked* horse's
     // head -- a duck clears it clean, standing height does not.
@@ -568,14 +575,17 @@
       const orbX = x + w / 2;
       const orbY = groundY - Math.min(160, H * 0.42);
       orbs.push({ x: orbX, y: orbY, used: false, phase: Math.random() * Math.PI * 2 });
-      // The rice bag sits further along AND higher than the orb -- inside
-      // the extra reach a landed parry's boost provides, past where an
-      // unassisted jump's own apex could ever put the horse. Miss the
-      // orb and you're not just short on distance, you also never get
-      // the height needed to touch this.
-      const bagX = Math.min(orbX + w * 0.3 + 30, x + w - 30);
-      const bagY = orbY - Math.min(75, H * 0.22);
-      riceBags.push({ x: bagX, y: bagY, r: RICE_R, collected: false, phase: Math.random() * Math.PI * 2 });
+      // The rice bag is a rare bonus, not guaranteed on every orb gap.
+      // When it does spawn, it sits further along AND higher than the
+      // orb -- inside the extra reach a landed parry's boost provides,
+      // past where an unassisted jump's own apex could ever put the
+      // horse. Miss the orb and you're not just short on distance, you
+      // also never get the height needed to touch this.
+      if (Math.random() < RICE_BAG_CHANCE) {
+        const bagX = Math.min(orbX + w * 0.3 + 30, x + w - 30);
+        const bagY = orbY - Math.min(75, H * 0.22);
+        riceBags.push({ x: bagX, y: bagY, r: RICE_R, collected: false, phase: Math.random() * Math.PI * 2 });
+      }
     }
   }
 
@@ -776,7 +786,10 @@
     // the run once it's fallen far enough to be off-screen.
     if (!horse.falling && horse.y <= 0.5) {
       const centerX = HORSE_X + horseW * 0.5;
-      const overGap = gaps.some((g) => centerX > g.x && centerX < g.x + g.w);
+      // A few px of grace inset from each edge -- grazing the very lip of
+      // a gap shouldn't be an instant fall, only being solidly over it.
+      const GAP_FALL_GRACE = 10;
+      const overGap = gaps.some((g) => centerX > g.x + GAP_FALL_GRACE && centerX < g.x + g.w - GAP_FALL_GRACE);
       if (overGap && !horse.invincible) {
         horse.falling = true;
       } else {
@@ -871,18 +884,41 @@
       if (pt.age >= pt.life) particles.splice(i, 1);
     }
 
-    // Spawn
+    // Spawn -- a live backstop, not just a precomputed timer. The
+    // extent-based safeTimer below assumes a "normal" crossing, but a
+    // real player can take longer than that over a gap (a slow, careful
+    // jump, a missed-then-recovered parry, just hesitating) -- if the
+    // clock alone said "spawn now," a fresh hurdle could still land right
+    // as they touch down. Checking actual live obstacle positions can't
+    // drift out of sync with what really happened, so it's the thing
+    // that actually guarantees no ambush landing, not just the common case.
     spawnTimer -= dt;
     if (spawnTimer <= 0) {
-      const extent = buildEncounter(W + 20, speed);
-      const base = Math.max(0.6, 1.45 - speed / 750);
-      // A wide orb-gap can extend hundreds of px past its own origin --
-      // the next encounter must not spawn until THIS one's tail has
-      // actually scrolled clear, or the two interleave into an
-      // impossible ask (e.g. a fresh hurdle landing inside what was
-      // supposed to be a clean landing zone after a gap).
-      const safeTimer = (extent + 70) / speed;
-      spawnTimer = Math.max(base + Math.random() * 0.5, safeTimer);
+      const spawnX = W + 20;
+      const clearance = 130;
+      let furthest = -Infinity;
+      for (const h of hurdles) if (!h.knocked) furthest = Math.max(furthest, h.x + h.w);
+      for (const g of gaps) furthest = Math.max(furthest, g.x + g.w);
+      for (const p of planes) furthest = Math.max(furthest, p.x + p.w);
+      if (furthest > spawnX - clearance) {
+        spawnTimer = 0.15; // still occupied -- recheck shortly instead of forcing an overlap
+      } else {
+        const gapsBefore = gaps.length;
+        const extent = buildEncounter(spawnX, speed);
+        const addedGap = gaps.length > gapsBefore;
+        const base = Math.max(0.6, 1.45 - speed / 750);
+        // A wide orb-gap can extend hundreds of px past its own origin --
+        // the next encounter must not spawn until THIS one's tail has
+        // actually scrolled clear, or the two interleave into an
+        // impossible ask (e.g. a fresh hurdle landing inside what was
+        // supposed to be a clean landing zone after a gap).
+        const safeTimer = (extent + 160) / speed;
+        // A gap demands full attention for the jump (and parry, if any)
+        // itself -- give the player a beat to land and actually look up
+        // again before the next hazard, on top of normal spacing.
+        const recoveryBonus = addedGap ? 0.6 : 0;
+        spawnTimer = Math.max(base + Math.random() * 0.5, safeTimer) + recoveryBonus;
+      }
     }
 
     for (let i = bursts.length - 1; i >= 0; i--) {
