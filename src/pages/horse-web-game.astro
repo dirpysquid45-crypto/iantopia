@@ -162,7 +162,7 @@
           <p>Space / ↑ / tap to jump — hold for a higher jump.<br>
           Walk off a gap's edge and you'll fall in — jump clear of it instead. Big gaps have a glowing orb: jump toward it, then tap jump again while touching it to boost across.<br>
           After 50 hurdles cleared, low planes start flying in — ↓ / S / the ⬇ button to duck under one, or it's game over.<br>
-          Hurdles cleared and coins collected both pay <b>Strubles</b>.</p>
+          Only coins pay <b>Strubles</b> — clearing hurdles just builds your streak. Chase a big gap's orb boost far enough and there's a glowing rice bag waiting: grab it for temporary invincibility.</p>
           <button class="btn" id="start-btn" type="button">▶ Start Running</button>
           <p id="sound-hint">🔇 Browsers block audio until you interact — sound starts the moment you press Start.</p>
         </div>
@@ -187,6 +187,10 @@
        contention. -->
   <audio id="theme-music" src="/audio/music/arvan-khoyor-jil.mp3" preload="metadata" loop></audio>
   <audio id="sfx-clear" src="/audio/sfx/minesweeper-flag.mp3" preload="none"></audio>
+  <!-- Rice-bag power-up sting: a trimmed ~32s excerpt of Clarity's chorus,
+       starting at its vocal entrance -- see build notes in the game script
+       for how the cut point was chosen. -->
+  <audio id="powerup-audio" src="/audio/sfx/rice-powerup-chorus.mp3" preload="none"></audio>
 
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -209,11 +213,13 @@
   let audioEnabled = true;
   const themeMusic = $('theme-music');
   const sfxClear = $('sfx-clear');
+  const powerupAudio = $('powerup-audio');
   const VOLUME_KEY = 'music_volume_v1';
   const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
   const vol = isFinite(savedVolume) ? savedVolume : 0.3;
   themeMusic.volume = vol;
   sfxClear.volume = Math.min(1, vol + 0.3);
+  powerupAudio.volume = Math.min(1, vol + 0.5);
 
   const TRACKS = [
     { src: '/audio/music/arvan-khoyor-jil.mp3', label: 'Arvan Khoyor Jil' },
@@ -277,16 +283,24 @@
   const grassImg = new Image();
   grassImg.src = '/tycoon/grass-foreground.png';
   const GRASS_ASPECT = 130 / 1085;
-  // Plane obstacle reuses the tycoon page's existing silly-airplane.gif.
-  // drawImage() on a gif-backed Image only ever paints its first frame --
-  // deliberate: this keeps the file's "everything on screen is a draw
-  // call, not a DOM node" rule intact instead of syncing an animated <img>
-  // overlay to canvas state for one obstacle type.
+  // Plane obstacle: a tight PNG crop of the tycoon page's silly-airplane.gif
+  // (built offline via PIL). The source gif's actual opaque airplane pixels
+  // only fill ~13% of its 512x325 canvas -- drawing the raw file at any
+  // obstacle size left a huge invisible margin around a comparatively tiny
+  // visible plane, which is exactly why the old hitbox (sized off the full
+  // image bounds) never looked correlated to what was on screen. This
+  // pre-cropped asset's bounds ARE the visible plane, so sizing/hitbox math
+  // against plane.w/h now means what it looks like it means.
   const planeImg = new Image();
-  planeImg.src = '/tycoon/silly-airplane.gif';
-  const PLANE_ASPECT = 325 / 512;
+  planeImg.src = '/horse-game/plane.png';
+  const PLANE_ASPECT = 52 / 75;
   const strubleImg = new Image();
   strubleImg.src = '/strubles.png';
+  // The rice-bag power-up -- built offline via PIL, its own golden glow is
+  // drawn at runtime (same technique as the jump orb) rather than baked
+  // into the PNG, so it can pulse.
+  const riceBagImg = new Image();
+  riceBagImg.src = '/horse-game/rice-bag.png';
 
   // Physics constants researched from chromium's actual trex-runner
   // (GRAVITY 0.6, INITIAL_JUMP_VELOCITY ~12, SPEED 6->13 px/frame @60fps --
@@ -325,6 +339,11 @@
   // successful parry -- a second, smaller hop stacked on the jump already
   // in progress, not a fresh one.
   const ORB_BOOST_VELOCITY = 760;
+  const RICE_R = 16;
+  // Matches the trimmed powerup-audio clip's own length exactly (see the
+  // <audio id="powerup-audio"> tag) so the invincibility window and the
+  // music both end together.
+  const POWERUP_DURATION = 32;
 
   // -- Physics-derived fairness bound -------------------------------------
   // There's no published Geometry Dash generation algorithm to copy (real
@@ -337,7 +356,11 @@
   function jumpAirtime() { return 2 * (JUMP_VELOCITY / Math.abs(GRAVITY)); }
   function maxJumpDistance(atSpeed) { return jumpAirtime() * atSpeed; }
   const GAP_SAFETY = 0.78; // plain gaps may use at most this fraction of a true max jump
-  const ORB_GAP_SAFETY = 1.65; // orb-assisted gaps may exceed a single jump's reach
+  // The orb boost is itself a second, smaller "launch" (see jump()'s parry
+  // branch) -- treating it the same way as the main jump gives its own
+  // physics-derived airtime, so an orb gap's *ceiling* is grounded in the
+  // same real numbers as everything else instead of an arbitrary multiplier.
+  function orbBoostAirtime() { return 2 * (ORB_BOOST_VELOCITY / Math.abs(GRAVITY)); }
 
   let W = 0, H = 0, groundY = 0;
   let horseW = 96, horseH = 96 * HORSE_ASPECT;
@@ -358,12 +381,13 @@
   resize();
 
   let state = 'idle'; // idle | playing | over
-  let horse = { y: 0, vy: 0, holding: false, ducking: false, falling: false };
+  let horse = { y: 0, vy: 0, holding: false, ducking: false, falling: false, invincible: false };
   let hurdles = [];
   let gaps = [];
   let coins = [];
   let planes = [];
   let orbs = [];
+  let riceBags = [];
   let dust = [];
   let bursts = []; // brief celebratory flashes on streak milestones
   let particles = []; // orb-activation burst
@@ -372,6 +396,7 @@
   let speed = START_SPEED;
   let spawnTimer = 0;
   let dustTimer = 0;
+  let powerupTimer = 0;
   let cleared = 0, earned = 0;
   let deathReason = 'Wiped Out!';
   let best = parseInt(localStorage.getItem(BEST_KEY), 10) || 0;
@@ -397,17 +422,54 @@
     // resetting a run that already started.
     if (state === 'playing') return;
     state = 'playing';
-    horse.y = 0; horse.vy = 0; horse.holding = false; horse.ducking = false; horse.falling = false;
+    horse.y = 0; horse.vy = 0; horse.holding = false; horse.ducking = false; horse.falling = false; horse.invincible = false;
     speed = START_SPEED;
     spawnTimer = 1.1;
     dustTimer = 0;
+    powerupTimer = 0;
     cleared = 0; earned = 0; deathReason = 'Wiped Out!';
-    hurdles = []; gaps = []; coins = []; planes = []; orbs = [];
+    hurdles = []; gaps = []; coins = []; planes = []; orbs = []; riceBags = [];
     dust = []; bursts = []; particles = []; shake = 0;
+    powerupAudio.pause();
+    powerupAudio.currentTime = 0;
     $('stat-cleared').textContent = '0';
     $('stat-earned').textContent = '0';
     startOverlay.hidden = true;
     gameoverOverlay.hidden = true;
+  }
+
+  // Invincibility ends either when its timer runs out or the run ends
+  // outright -- both paths funnel through here so the chorus clip never
+  // keeps playing over a game-over screen or a fresh run.
+  function endPowerup() {
+    horse.invincible = false;
+    powerupTimer = 0;
+    powerupAudio.pause();
+    if (state === 'playing' && audioEnabled) tryPlayTheme();
+  }
+
+  function knockAwayHurdles() {
+    for (const h of hurdles) {
+      if (h.knocked) continue;
+      h.knocked = true;
+      h.knockVx = 200 + Math.random() * 140;
+      h.knockVy = -260 - Math.random() * 180;
+      h.knockY = 0;
+      h.knockSpin = (Math.random() < 0.5 ? -1 : 1) * (3 + Math.random() * 3);
+      h.knockRot = 0;
+    }
+  }
+
+  function triggerPowerup() {
+    horse.invincible = true;
+    powerupTimer = POWERUP_DURATION;
+    knockAwayHurdles();
+    shake = 0.35;
+    if (audioEnabled) {
+      themeMusic.pause();
+      powerupAudio.currentTime = 0;
+      powerupAudio.play().catch(() => {});
+    }
   }
 
   function jump() {
@@ -449,6 +511,7 @@
   function endGame(reason) {
     state = 'over';
     shake = 0.25;
+    if (horse.invincible) { horse.invincible = false; powerupTimer = 0; powerupAudio.pause(); }
     deathReason = reason || 'Wiped Out!';
     if (cleared > best) {
       best = cleared;
@@ -484,7 +547,9 @@
   // decorative high-altitude band was cut -- it had no collision at all
   // and just cluttered the sky with obstacles that could never hurt you.)
   function spawnPlane(x) {
-    const w = Math.min(220, W * 0.3);
+    // Scaled off the horse itself (like every other obstacle here) rather
+    // than a small fixed cap, so it reads as a genuinely big threat.
+    const w = Math.max(horseW * 2.4, Math.min(360, W * 0.42));
     const h = w * PLANE_ASPECT;
     // Positioned so its bottom edge sits just above a *ducked* horse's
     // head -- a duck clears it clean, standing height does not.
@@ -492,13 +557,25 @@
     const margin = 6;
     const bottom = groundY - duckH - margin;
     const y = bottom - h / 2;
-    planes.push({ x, y, w, h, bob: Math.random() * Math.PI * 2 });
+    const p = { x, y, w, h, bob: Math.random() * Math.PI * 2 };
+    planes.push(p);
+    return p;
   }
 
   function spawnGap(x, w, withOrb) {
     gaps.push({ x, w });
     if (withOrb) {
-      orbs.push({ x: x + w / 2, y: groundY - Math.min(160, H * 0.42), used: false, phase: Math.random() * Math.PI * 2 });
+      const orbX = x + w / 2;
+      const orbY = groundY - Math.min(160, H * 0.42);
+      orbs.push({ x: orbX, y: orbY, used: false, phase: Math.random() * Math.PI * 2 });
+      // The rice bag sits further along AND higher than the orb -- inside
+      // the extra reach a landed parry's boost provides, past where an
+      // unassisted jump's own apex could ever put the horse. Miss the
+      // orb and you're not just short on distance, you also never get
+      // the height needed to touch this.
+      const bagX = Math.min(orbX + w * 0.3 + 30, x + w - 30);
+      const bagY = orbY - Math.min(75, H * 0.22);
+      riceBags.push({ x: bagX, y: bagY, r: RICE_R, collected: false, phase: Math.random() * Math.PI * 2 });
     }
   }
 
@@ -526,56 +603,81 @@
   // introducing a new obstacle type only once the run is fast enough that
   // it's fair to ask of the player. Gaps within any pattern are clamped
   // to maxJumpDistance()-derived bounds above, so nothing built here can
-  // ever be mathematically uncrossable.
+  // ever be mathematically uncrossable. Every build() returns how far
+  // past originX it placed its rightmost obstacle -- buildEncounter hands
+  // that back so the caller can hold off the NEXT encounter until this
+  // one's tail has actually scrolled clear, instead of a fixed timer that
+  // doesn't know how wide what it just built was (which is how a fresh
+  // hurdle or gap could end up landing right on top of an orb-gap's own
+  // landing zone).
   function buildEncounter(originX, atSpeed) {
     const tier = tierForSpeed(atSpeed);
     const maxGap = maxJumpDistance(atSpeed) * GAP_SAFETY;
-    const maxOrbGap = maxJumpDistance(atSpeed) * ORB_GAP_SAFETY;
+    // The true (no-safety-margin) ceiling of a normal jump -- an orb gap
+    // has to start wider than THIS, not just wider than maxGap, or a
+    // plain jump alone can already clear it and the orb never actually
+    // becomes necessary.
+    const trueMaxJump = maxJumpDistance(atSpeed);
+    const orbCeiling = (jumpAirtime() + orbBoostAirtime()) * atSpeed;
 
     const patterns = [
       { tier: 0, weight: 3, build: () => {
         const t = pickHurdleType();
         hurdles.push({ id: nextHurdleId++, x: originX, w: t.w, h: t.h, cleared: false });
         if (Math.random() < 0.5) spawnCoin(originX + t.w / 2, groundY - horseH * 1.5);
+        return t.w;
       }},
       { tier: 1, weight: 2, build: () => {
         const t1 = pickHurdleType();
         const t2 = pickHurdleType();
+        const gap2 = 46 + Math.random() * 30;
         hurdles.push({ id: nextHurdleId++, x: originX, w: t1.w, h: t1.h, cleared: false });
-        hurdles.push({ id: nextHurdleId++, x: originX + t1.w + 46 + Math.random() * 30, w: t2.w, h: t2.h, cleared: false });
+        hurdles.push({ id: nextHurdleId++, x: originX + t1.w + gap2, w: t2.w, h: t2.h, cleared: false });
+        return t1.w + gap2 + t2.w;
       }},
       { tier: 2, weight: 2, build: () => {
         const w = Math.max(36, Math.min(maxGap, 55 + Math.random() * 35));
         spawnGap(originX, w, false);
         spawnCoin(originX + w / 2, groundY - horseH * 1.3);
+        return w;
       }},
       { tier: 3, weight: 2, build: () => {
-        // A bit more than one clean jump can clear, capped well under a
-        // third of the visible stage so it never reads as an oversized
-        // chasm regardless of how fast the run has gotten.
-        const orbCap = Math.min(maxOrbGap, W * 0.3);
-        const w = Math.max(Math.min(maxGap + 24, orbCap), Math.min(orbCap, maxGap + 24 + Math.random() * 40));
+        // Floor: past the point an unassisted jump could ever reach, with
+        // a margin so it's never an ambiguous near-miss -- the orb has to
+        // actually be required, not just helpful. Ceiling: as far as a
+        // jump PLUS a landed parry can carry the horse, with its own
+        // margin so a well-timed parry reliably clears it.
+        const lo = trueMaxJump * 1.15;
+        const hi = Math.max(lo + 30, orbCeiling * 0.88);
+        const w = lo + Math.random() * (hi - lo);
         spawnGap(originX, w, true);
+        return w;
       }},
       // The deadly low plane only enters rotation after 50 hurdle clears
       // -- an explicit skill-gate rather than a speed-tier one, so it
       // reliably shows up once a player has proven they can handle the
       // basics, independent of how fast the run happens to be going.
       { tier: 0, weight: 3, enabled: () => cleared >= 50, build: () => {
-        spawnPlane(originX);
+        const plane = spawnPlane(originX);
+        return plane.w;
       }},
       { tier: 0, weight: 1, enabled: () => cleared >= 50, build: () => {
-        spawnPlane(originX);
+        // The hurdle must clear the plane's own full footprint plus room
+        // to stand back up and react, or the two obstacles overlap and
+        // ask for duck and jump at the same x -- an impossible input.
+        const plane = spawnPlane(originX);
         const t = pickHurdleType();
-        hurdles.push({ id: nextHurdleId++, x: originX + 220 + Math.random() * 40, w: t.w, h: t.h, cleared: false });
+        const hurdleX = plane.w + 150 + Math.random() * 40;
+        hurdles.push({ id: nextHurdleId++, x: originX + hurdleX, w: t.w, h: t.h, cleared: false });
+        return hurdleX + t.w;
       }},
     ];
 
     const pool = patterns.filter((p) => p.tier <= tier && (!p.enabled || p.enabled()));
     const total = pool.reduce((s, p) => s + p.weight, 0);
     let r = Math.random() * total;
-    for (const p of pool) { if ((r -= p.weight) <= 0) { p.build(); return; } }
-    pool[0].build();
+    for (const p of pool) { if ((r -= p.weight) <= 0) return p.build(); }
+    return pool[0].build();
   }
 
   function spawnDust(vx) {
@@ -620,26 +722,36 @@
       if (d.age >= d.life) dust.splice(i, 1);
     }
 
-    // Hurdles
+    // Hurdles -- Strubles now come only from things actually collected
+    // in-game (coins, the rice bag's own effect), not from clearing a
+    // hurdle; clearing one still counts toward the stats/streak/plane-gate.
     const horseLeft = HORSE_X + horseW * 0.24;
     const horseRight = HORSE_X + horseW * 0.86;
     for (let i = hurdles.length - 1; i >= 0; i--) {
       const h = hurdles[i];
+      if (h.knocked) {
+        // Invincibility just hit -- this one's flying off screen instead
+        // of scrolling normally, and can't be collided with either way.
+        h.x += h.knockVx * dt;
+        h.knockY += h.knockVy * dt;
+        h.knockVy += GRAVITY * 0.45 * dt;
+        h.knockRot += h.knockSpin * dt;
+        if (h.x > W + 80 || h.knockY > H + 80) hurdles.splice(i, 1);
+        continue;
+      }
       h.x -= speed * dt;
       const hb = hurdleHitbox(h.w);
       const hurdleLeft = h.x + hb.inset;
       const hurdleRight = h.x + h.w - hb.inset;
       const xOverlap = horseRight > hurdleLeft && horseLeft < hurdleRight;
-      if (xOverlap && horse.y < h.h - 8) {
+      if (xOverlap && horse.y < h.h - 8 && !horse.invincible) {
         endGame('Wiped Out!');
         return;
       }
       if (!h.cleared && h.x + h.w < HORSE_X) {
         h.cleared = true;
-        cleared++; earned++;
-        try { Strubles.add(1); } catch {}
+        cleared++;
         $('stat-cleared').textContent = cleared.toLocaleString();
-        $('stat-earned').textContent = earned.toLocaleString();
         playClearSfx();
         if (cleared % 10 === 0) {
           bursts.push({ x: HORSE_X + horseW * 0.5, y: groundY - horseH * 0.6, age: 0, life: 0.9, text: `${cleared} STREAK!` });
@@ -665,7 +777,7 @@
     if (!horse.falling && horse.y <= 0.5) {
       const centerX = HORSE_X + horseW * 0.5;
       const overGap = gaps.some((g) => centerX > g.x && centerX < g.x + g.w);
-      if (overGap) {
+      if (overGap && !horse.invincible) {
         horse.falling = true;
       } else {
         horse.y = 0; horse.vy = 0; horse.holding = false;
@@ -682,13 +794,13 @@
       p.x -= speed * dt;
       p.bob += dt * 3;
       const box = horseBox();
-      const planeLeft = p.x + p.w * 0.1;
-      const planeRight = p.x + p.w * 0.9;
-      const planeTop = p.y - p.h * 0.5;
-      const planeBottom = p.y + p.h * 0.5;
+      const planeLeft = p.x + p.w * 0.04;
+      const planeRight = p.x + p.w * 0.96;
+      const planeTop = p.y - p.h * 0.46;
+      const planeBottom = p.y + p.h * 0.46;
       const xOverlap = box.right > planeLeft && box.left < planeRight;
       const yOverlap = box.bottom > planeTop && box.top < planeBottom;
-      if (xOverlap && yOverlap) {
+      if (xOverlap && yOverlap && !horse.invincible) {
         endGame('Clipped by a Plane!');
         return;
       }
@@ -724,6 +836,31 @@
       if (c.x < -30) coins.splice(i, 1);
     }
 
+    // Rice bag -- only physically reachable inside an orb-boosted arc (see
+    // spawnGap), but pickup itself is a simple touch, like a coin.
+    for (let i = riceBags.length - 1; i >= 0; i--) {
+      const b = riceBags[i];
+      b.x -= speed * dt;
+      b.phase += dt * 3;
+      if (!b.collected) {
+        const box = horseBox();
+        const dx = b.x - (box.left + box.right) / 2;
+        const dy = b.y - (box.top + box.bottom) / 2;
+        if (Math.hypot(dx, dy) < b.r + horseW * 0.3) {
+          b.collected = true;
+          triggerPowerup();
+        }
+      }
+      if (b.x < -40) riceBags.splice(i, 1);
+    }
+
+    // Invincibility window -- ends on its own timer, or immediately at
+    // endGame()/beginRun() (see those functions) if the run stops early.
+    if (horse.invincible) {
+      powerupTimer -= dt;
+      if (powerupTimer <= 0) endPowerup();
+    }
+
     // Orb-burst particles
     for (let i = particles.length - 1; i >= 0; i--) {
       const pt = particles[i];
@@ -737,9 +874,15 @@
     // Spawn
     spawnTimer -= dt;
     if (spawnTimer <= 0) {
-      buildEncounter(W + 20, speed);
+      const extent = buildEncounter(W + 20, speed);
       const base = Math.max(0.6, 1.45 - speed / 750);
-      spawnTimer = base + Math.random() * 0.5;
+      // A wide orb-gap can extend hundreds of px past its own origin --
+      // the next encounter must not spawn until THIS one's tail has
+      // actually scrolled clear, or the two interleave into an
+      // impossible ask (e.g. a fresh hurdle landing inside what was
+      // supposed to be a clean landing zone after a gap).
+      const safeTimer = (extent + 70) / speed;
+      spawnTimer = Math.max(base + Math.random() * 0.5, safeTimer);
     }
 
     for (let i = bursts.length - 1; i >= 0; i--) {
@@ -786,6 +929,16 @@
   }
 
   function drawHurdle(h) {
+    ctx.save();
+    if (h.knocked) {
+      // Invincibility just punted this one off screen -- shift it up by
+      // how far it's flown, then spin it around its own center.
+      ctx.translate(0, -h.knockY);
+      const cx = h.x + h.w / 2, cy = groundY - h.h / 2;
+      ctx.translate(cx, cy);
+      ctx.rotate(h.knockRot);
+      ctx.translate(-cx, -cy);
+    }
     const baseY = groundY;
     const topY = baseY - h.h;
     ctx.fillStyle = '#6b4423';
@@ -805,6 +958,7 @@
       ctx.strokeStyle = 'rgba(0,0,0,.35)';
       ctx.strokeRect(h.x - 2, ry, h.w + 4, 6);
     }
+    ctx.restore();
   }
 
   function drawHorse() {
@@ -828,6 +982,20 @@
       ctx.rotate(fallT * Math.PI * 1.6);
       ctx.translate(-cx, -cy);
       ctx.globalAlpha = 1 - fallT * 0.3;
+    }
+    if (horse.invincible) {
+      const hue = (performance.now() / 6) % 360;
+      const cx = x + w / 2, cy = y + h / 2;
+      const haloR = Math.max(w, h) * 0.85;
+      const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, haloR);
+      halo.addColorStop(0, `hsla(${hue},100%,65%,0.5)`);
+      halo.addColorStop(0.55, `hsla(${(hue + 120) % 360},100%,60%,0.28)`);
+      halo.addColorStop(1, 'hsla(0,0%,100%,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath();
+      ctx.arc(cx, cy, haloR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.filter = `hue-rotate(${hue}deg) saturate(2) brightness(1.15)`;
     }
     ctx.shadowColor = 'rgba(0,0,0,.35)';
     ctx.shadowBlur = 6;
@@ -894,6 +1062,29 @@
     ctx.lineWidth = 3;
     ctx.strokeStyle = '#ffcf1f';
     ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawRiceBag(b) {
+    if (b.collected) return;
+    const bobY = b.y + Math.sin(b.phase) * 3;
+    const pulse = 0.75 + Math.sin(b.phase * 1.4) * 0.25;
+    ctx.save();
+    ctx.translate(b.x, bobY);
+    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, b.r * 2.3);
+    grad.addColorStop(0, `rgba(255,208,80,${(0.5 * pulse).toFixed(2)})`);
+    grad.addColorStop(1, 'rgba(255,208,80,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(0, 0, b.r * 2.3, 0, Math.PI * 2);
+    ctx.fill();
+    const size = b.r * 2.3;
+    if (riceBagImg.complete && riceBagImg.naturalWidth) {
+      ctx.drawImage(riceBagImg, -size / 2, -size / 2, size, size);
+    } else {
+      ctx.fillStyle = '#c9a15c';
+      ctx.fillRect(-size / 2, -size / 2, size, size);
+    }
     ctx.restore();
   }
 
@@ -969,6 +1160,7 @@
     for (const h of hurdles) drawHurdle(h);
     for (const p of planes) drawPlane(p);
     for (const o of orbs) drawOrb(o);
+    for (const b of riceBags) drawRiceBag(b);
     drawHorse();
     drawGround();
     drawParticles();
@@ -1021,13 +1213,14 @@
   // for this page's own run state. Nothing here can mutate gameplay.
   window.HorseGame = {
     getState: () => ({
-      state, speed, cleared, earned, best, deathReason,
-      horse: { y: horse.y, vy: horse.vy, ducking: horse.ducking, falling: horse.falling },
-      hurdles: hurdles.map((h) => ({ id: h.id, x: h.x, w: h.w, h: h.h, cleared: h.cleared })),
+      state, speed, cleared, earned, best, deathReason, powerupTimer,
+      horse: { y: horse.y, vy: horse.vy, ducking: horse.ducking, falling: horse.falling, invincible: horse.invincible },
+      hurdles: hurdles.map((h) => ({ id: h.id, x: h.x, w: h.w, h: h.h, cleared: h.cleared, knocked: !!h.knocked })),
       gaps: gaps.map((g) => ({ x: g.x, w: g.w })),
       coins: coins.map((c) => ({ x: c.x, y: c.y, value: c.value, collected: c.collected })),
       planes: planes.map((p) => ({ x: p.x, y: p.y })),
       orbs: orbs.map((o) => ({ x: o.x, y: o.y, used: o.used })),
+      riceBags: riceBags.map((b) => ({ x: b.x, y: b.y, collected: b.collected })),
       horseX: HORSE_X, horseW,
     }),
   };
