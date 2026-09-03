@@ -356,11 +356,14 @@
   const PLANE_ASPECT = 52 / 75;
   const strubleImg = new Image();
   strubleImg.src = '/strubles.png';
-  // The rice-bag power-up -- built offline via PIL, its own golden glow is
+  // The rice-bag power-up -- the same asset the "Bag of Rice" mil-spec
+  // item already uses elsewhere on the site (public/assets/items/), just
+  // cropped to its content bounds for this file. Its golden glow is
   // drawn at runtime (same technique as the jump orb) rather than baked
   // into the PNG, so it can pulse.
   const riceBagImg = new Image();
   riceBagImg.src = '/horse-game/rice-bag.png';
+  const RICE_BAG_ASPECT = 960 / 863;
   // 8-frame explosion burst, sampled from the same sheet the minesweeper
   // mine-hit explosion uses, laid out as one horizontal strip.
   const explosionImg = new Image();
@@ -1223,7 +1226,8 @@
     ctx.fill();
     const size = b.r * 2.3;
     if (riceBagImg.complete && riceBagImg.naturalWidth) {
-      ctx.drawImage(riceBagImg, -size / 2, -size / 2, size, size);
+      const h = size * RICE_BAG_ASPECT;
+      ctx.drawImage(riceBagImg, -size / 2, -h / 2, size, h);
     } else {
       ctx.fillStyle = '#c9a15c';
       ctx.fillRect(-size / 2, -size / 2, size, size);
