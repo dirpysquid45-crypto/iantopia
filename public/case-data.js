@@ -63,6 +63,8 @@ window.CASE_ITEMS = {
   mus_atari:   { label: 'Ecco2k – Play Em Like Atari',    tier: 'classified', emoji: '🕹️',                                  type: 'music_unlock', key: 'atari' },
   mus_death:   { label: 'Panchiko – DEATHMETAL',          tier: 'classified', emoji: '📻',                                  type: 'music_unlock', key: 'deathmetal' },
   bg_money:    { label: 'Background: Raining Money',      tier: 'classified', img: '/video/raining-money.gif',             type: 'background_unlock', key: 'raining_money' },
+  mus_arvan:   { label: 'Arvan Khoyor Jil',               tier: 'classified', emoji: '🐎',                                  type: 'music_unlock', key: 'arvan_khoyor_jil' },
+  mus_chinggis: { label: 'Chinggis Khaan',                tier: 'classified', emoji: '🏹',                                  type: 'music_unlock', key: 'chinggis_khaan' },
   // Archived: kept so existing owners' history/labels still resolve, but
   // excluded from ALL_IDS below so it can no longer be rolled.
   haiku_email: { label: 'Email from the Void',            tier: 'classified', emoji: '✉️',                                  type: 'action', effect: 'email_void', archived: true },
@@ -80,6 +82,8 @@ window.CASE_ITEMS = {
   bg_hellokitty: { label: 'Background: Hello Kitty',      tier: 'covert',     emoji: '🎀',                                  type: 'background_unlock', key: 'hello_kitty' },
   bg_girllikeme: { label: 'Background: PinkPantheress – Girl Like Me', tier: 'covert', emoji: '🐆',                        type: 'background_unlock', key: 'girl_like_me' },
   bg_minecraft: { label: 'Background: Minecraft',        tier: 'covert',     emoji: '🟩',                                  type: 'background_unlock', key: 'minecraft' },
+  bg_mongolia: { label: 'Background: Mongolia',          tier: 'covert',     emoji: '🐴',                                  type: 'background_unlock', key: 'mongolia' },
+  cur_horse:   { label: 'Cursor: Horse',                  tier: 'covert',     img: '/cursors/horse-point.png',             type: 'cursor_unlock', key: 'horse' },
   // Archived: kept so existing owners' history/labels still resolve, but
   // excluded from ALL_IDS below so it can no longer be rolled.
   finish_ian:  { label: 'Email Ian to Finish Iantopia',   tier: 'covert',     emoji: '📧',                                  type: 'action', effect: 'email_finish', archived: true },

@@ -833,6 +833,72 @@
       image-rendering: pixelated;
     }
 
+    /* ---------- Mongolia theme ---------- */
+    /* Fur texture on every button, but `cover` + centered instead of the
+       Minecraft treatment's 100% 100% stretch: buttons here have wildly
+       different aspect ratios (long nav links vs. square icon buttons),
+       and a real photographic fur texture warps badly when squashed to
+       fit each one exactly. `cover` crops instead of distorting, so every
+       button shows a clean, undistorted patch of the same texture. */
+    body.theme-mongolia a.big,
+    body.theme-mongolia button.big,
+    body.theme-mongolia #inv-btn,
+    body.theme-mongolia #bg-btn,
+    body.theme-mongolia #cursor-btn,
+    body.theme-mongolia #account-btn,
+    body.theme-mongolia #now-playing,
+    body.theme-mongolia #ending-link {
+      background-color: #6b4a2e;
+      background-image: url('/assets/decorations/fur-texture.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-style: solid;
+      border-width: 3px;
+      border-color: #2c1c10;
+      color: #ffffff;
+      text-shadow: 0 0 6px rgba(224,52,44,.9), 0 0 14px rgba(224,52,44,.55), 2px 2px 0 rgba(0,0,0,.6);
+      box-shadow: 0 0 16px rgba(224,52,44,.35);
+    }
+    body.theme-mongolia a.big:hover,
+    body.theme-mongolia button.big:hover,
+    body.theme-mongolia #inv-btn:hover,
+    body.theme-mongolia #bg-btn:hover,
+    body.theme-mongolia #cursor-btn:hover,
+    body.theme-mongolia #account-btn:hover,
+    body.theme-mongolia #now-playing:hover,
+    body.theme-mongolia #ending-link:hover {
+      filter: brightness(1.2);
+      box-shadow: 0 0 28px rgba(224,52,44,.65);
+    }
+    body.theme-mongolia .flip-card {
+      filter: drop-shadow(0 0 24px rgba(224,52,44,.65)) drop-shadow(0 0 48px rgba(170,28,20,.4));
+    }
+    body.theme-mongolia h1 {
+      color: #ffffff;
+      text-shadow:
+        0 0 8px rgba(224,52,44,.95),
+        0 0 20px rgba(224,52,44,.7),
+        0 0 42px rgba(224,52,44,.4),
+        2px 2px 0 rgba(0,0,0,.55);
+    }
+    /* Same cover/crop treatment as the buttons, just with the grass swatch
+       instead of fur, and a red-glow border/text to match the theme
+       instead of Minecraft's diamond teal. */
+    body.theme-mongolia #topia-timer {
+      background-color: #3d5a2c;
+      background-image: url('/assets/decorations/mongolia-grass-texture.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-style: solid;
+      border-width: 3px;
+      border-color: #e0342c;
+      color: #ffffff;
+      text-shadow: 0 0 6px rgba(224,52,44,.9), 2px 2px 0 rgba(0,0,0,.6);
+      box-shadow: 0 0 18px rgba(224,52,44,.5);
+    }
+
     /* ---------- Daily struble reel ---------- */
     #daily-reel-overlay {
       display:none; position:fixed; inset:0; z-index:60;
@@ -1430,10 +1496,10 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script is:inline src="/cloud-sync.js?v=7"></script>
-  <script is:inline src="/music-library.js?v=9"></script>
+  <script is:inline src="/music-library.js?v=10"></script>
   <script is:inline src="/music-position.js?v=1"></script>
-  <script is:inline src="/background-library.js?v=11"></script>
-  <script is:inline src="/cursor-library.js?v=2"></script>
+  <script is:inline src="/background-library.js?v=12"></script>
+  <script is:inline src="/cursor-library.js?v=4"></script>
 
   <!-- Timer Script -->
   <script is:inline>

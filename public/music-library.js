@@ -23,6 +23,8 @@ window.MUSIC_LIBRARY = {
   forever_young:       { label: 'Alphaville – Forever Young',       src: '/audio/music/forever-young.mp3' },
   mario_desert:        { label: 'Desert (Mario, Bitcrushed)',       src: '/audio/music/minesweeper-desert.mp3' },
   hotel:               { label: 'Hotel Lounge',                    src: '/audio/music/hotel.mp3' },
+  arvan_khoyor_jil:    { label: 'Arvan Khoyor Jil',                 src: '/audio/music/arvan-khoyor-jil.mp3' },
+  chinggis_khaan:      { label: 'Chinggis Khaan',                   src: '/audio/music/chinggis-khaan.mp3' },
 
   // Combo tracks: paired with a matching background in index.astro's
   // applyBackground() rather than won separately — selecting the background

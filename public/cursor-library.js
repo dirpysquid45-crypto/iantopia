@@ -21,10 +21,12 @@ window.CURSOR_LIBRARY = {
   struble_coin: {
     label: 'Struble Coin',
     point: '/strubles.png',
+    interact: '/cursors/struble-coin-shiny.png',
   },
   joker: {
     label: 'The Joker',
     point: '/assets/casino/cards/card_joker_red.png',
+    interact: '/assets/casino/cards/card_spades_A.png',
   },
   hamood_habibi: {
     label: 'Hamood Habibi',
@@ -35,5 +37,10 @@ window.CURSOR_LIBRARY = {
       '/audio/sfx/hamood-2.mp3',
       '/audio/sfx/hamood-3.mp3',
     ],
+  },
+  horse: {
+    label: 'Horse',
+    point: '/cursors/horse-point.png',
+    interact: '/cursors/horse-interact.png',
   },
 };
