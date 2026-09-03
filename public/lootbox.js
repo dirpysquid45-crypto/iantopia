@@ -349,17 +349,27 @@
   // unlocks) -- deliberately excludes buildings, badges, draggable items,
   // Strubles-grant items, and the narrative unlock_page item. Buildings stay
   // a pure-chance Tycoon case pull, and the Alternate Ending stays something
-  // you find, not something you buy. Priced off DUPLICATE_REFUND, the same
-  // per-tier value the game already treats as a floor (what a fully-cleaned-
-  // out case pays out), so a direct buy is never cheaper than that -- just a
-  // deliberately modest markup on top of it, since the point of the shop is
-  // "skip the RNG for the one specific thing I want," not to outcompete
-  // opening a case on expected value.
+  // you find, not something you buy.
+  //
+  // Priced off its own table now, NOT DUPLICATE_REFUND -- that constant's
+  // job is the case-duplicate-refund floor, a different economic lever, and
+  // reusing it here (at a 2x markup on top) pushed even the cheapest shop
+  // item to 400 Strubles against a 100-Struble starting balance. New
+  // players couldn't afford anything in the shop without grinding first,
+  // which defeats the shop's whole point ("skip the RNG for the one thing
+  // I want"). These are deliberately reachable within a session or two of
+  // normal play + daily claims, while still scaling with tier.
   const SHOP_TYPES = ['music_unlock', 'background_unlock', 'cursor_unlock'];
-  const SHOP_MARKUP = 2;
+  const SHOP_PRICE = {
+    mil_spec: 120,
+    restricted: 350,
+    classified: 900,
+    covert: 2200,
+    exceedingly_rare: 6000,
+  };
 
   function shopPrice(item) {
-    return (DUPLICATE_REFUND[item.tier] || 0) * SHOP_MARKUP;
+    return SHOP_PRICE[item.tier] || 0;
   }
 
   function getShopListings() {
