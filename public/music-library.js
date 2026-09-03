@@ -25,6 +25,7 @@ window.MUSIC_LIBRARY = {
   hotel:               { label: 'Hotel Lounge',                    src: '/audio/music/hotel.mp3' },
   arvan_khoyor_jil:    { label: 'Arvan Khoyor Jil',                 src: '/audio/music/arvan-khoyor-jil.mp3' },
   chinggis_khaan:      { label: 'Chinggis Khaan',                   src: '/audio/music/chinggis-khaan.mp3' },
+  altain_magtaal:      { label: 'Altain Magtaal',                   src: '/audio/music/altain-magtaal.mp3' },
 
   // Combo tracks: paired with a matching background in index.astro's
   // applyBackground() rather than won separately — selecting the background

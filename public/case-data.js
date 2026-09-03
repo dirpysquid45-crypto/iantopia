@@ -65,6 +65,7 @@ window.CASE_ITEMS = {
   bg_money:    { label: 'Background: Raining Money',      tier: 'classified', img: '/video/raining-money.gif',             type: 'background_unlock', key: 'raining_money' },
   mus_arvan:   { label: 'Arvan Khoyor Jil',               tier: 'classified', emoji: '🐎',                                  type: 'music_unlock', key: 'arvan_khoyor_jil' },
   mus_chinggis: { label: 'Chinggis Khaan',                tier: 'classified', emoji: '🏹',                                  type: 'music_unlock', key: 'chinggis_khaan' },
+  mus_altain:  { label: 'Altain Magtaal',                 tier: 'classified', emoji: '🏔️',                                  type: 'music_unlock', key: 'altain_magtaal' },
   // Archived: kept so existing owners' history/labels still resolve, but
   // excluded from ALL_IDS below so it can no longer be rolled.
   haiku_email: { label: 'Email from the Void',            tier: 'classified', emoji: '✉️',                                  type: 'action', effect: 'email_void', archived: true },

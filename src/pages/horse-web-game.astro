@@ -174,9 +174,10 @@
         <div class="stage-box">
           <h2>🐴 Horse Game</h2>
           <p>Space / ↑ / tap to jump — hold for a higher jump.<br>
-          Walk off a gap's edge and you'll fall in — jump clear of it instead. Big gaps have a glowing orb: jump toward it, then tap jump again while touching it to boost across.<br>
+          Walk off a gap's edge and you'll fall in — jump clear of it instead. Big gaps have a glowing orb: jump toward it, then tap jump again while touching it to boost across. The widest gaps need two orbs chained back-to-back.<br>
           After 50 hurdles cleared, low planes start flying in — ↓ / S / the ⬇ button to duck under one, or it's game over.<br>
-          Only coins pay <b>Strubles</b> — clearing hurdles just builds your streak. Some orb boosts lead to a rare glowing rice bag: grab it for a few seconds of invincibility.</p>
+          Only coins pay <b>Strubles</b> — clearing hurdles just builds your streak. Some orb boosts lead to a rare glowing rice bag: grab it for a few seconds of invincibility.<br>
+          Past 100 hurdles, the whole run flips — new stone ground, everything mirrored.</p>
           <button class="btn" id="start-btn" type="button">▶ Start Running</button>
           <p id="sound-hint">🔇 Browsers block audio until you interact — sound starts the moment you press Start.</p>
         </div>
@@ -248,12 +249,13 @@
   powerupAudio.volume = Math.min(0.55, vol + 0.15);
   explosionAudio.volume = Math.min(0.4, vol + 0.1);
 
-  // Default mode auto-alternates between these two, advancing on each
-  // track's natural end (not a fixed loop) so it reads as one long
-  // rotation rather than either song repeating on its own.
+  // Default mode auto-alternates through these, advancing on each track's
+  // natural end (not a fixed loop) so it reads as one long rotation
+  // rather than any single song repeating on its own.
   const DUET_TRACKS = [
     { src: '/audio/music/arvan-khoyor-jil.mp3', label: 'Arvan Khoyor Jil' },
     { src: '/audio/music/chinggis-khaan.mp3', label: 'Chinggis Khaan' },
+    { src: '/audio/music/altain-magtaal.mp3', label: 'Altain Magtaal' },
   ];
   // The track button swaps over to this instead of cycling a flat list --
   // it's mostly silence and bird chirps, a deliberate change of pace from
@@ -343,6 +345,12 @@
   const grassImg = new Image();
   grassImg.src = '/tycoon/grass-foreground.png';
   const GRASS_ASPECT = 130 / 1085;
+  // Second-act ground -- swaps in past HURDLE_FLIP_THRESHOLD (see
+  // drawGround()), alongside the whole-world mirror flip (see render()).
+  const stoneImg = new Image();
+  stoneImg.src = '/horse-game/stone-floor.png';
+  const STONE_ASPECT = 605 / 1280;
+  const HURDLE_FLIP_THRESHOLD = 100;
   // Plane obstacle: a tight PNG crop of the tycoon page's silly-airplane.gif
   // (built offline via PIL). The source gif's actual opaque airplane pixels
   // only fill ~13% of its 512x325 canvas -- drawing the raw file at any
@@ -693,6 +701,27 @@
     }
   }
 
+  // A gap wide enough that even a single orb's boost can't cover it needs
+  // TWO, chained one after another -- jump normally into the first, then
+  // (while still airborne on that boost) fly into the second for a
+  // further one. jump()'s parry check already just scans every live,
+  // unused orb within reach, so this needs no new catch logic at all --
+  // placing two orbs correctly is the whole mechanic. Orb 1 sits where a
+  // normal jump can reach it (same math as the single-orb case); Orb 2
+  // sits further along AND higher, within Orb 1's own single-boost reach,
+  // the same "extra reach lives past a caught orb" logic the rice bag
+  // already uses one level up.
+  function spawnDoubleGap(x, w, atSpeed) {
+    gaps.push({ x, w });
+    const orb1X = x + Math.min(maxJumpDistance(atSpeed) * 0.8, w * 0.3);
+    const orb1Y = groundY - Math.min(160, H * 0.42);
+    orbs.push({ x: orb1X, y: orb1Y, used: false, phase: Math.random() * Math.PI * 2 });
+    const singleBoostReach = orbBoostAirtime() * atSpeed;
+    const orb2X = Math.min(orb1X + singleBoostReach * 0.75, x + w - 40);
+    const orb2Y = orb1Y - Math.min(70, H * 0.2);
+    orbs.push({ x: orb2X, y: orb2Y, used: false, phase: Math.random() * Math.PI * 2 });
+  }
+
   function spawnOrbBurst(x, y) {
     for (let i = 0; i < 14; i++) {
       const a = (i / 14) * Math.PI * 2;
@@ -733,6 +762,9 @@
     // becomes necessary.
     const trueMaxJump = maxJumpDistance(atSpeed);
     const orbCeiling = (jumpAirtime() + orbBoostAirtime()) * atSpeed;
+    // Same idea one boost further -- the farthest a jump plus TWO landed
+    // parries could ever carry the horse, the ceiling for a double-orb gap.
+    const doubleOrbCeiling = (jumpAirtime() + 2 * orbBoostAirtime()) * atSpeed;
 
     const patterns = [
       { tier: 0, weight: 3, build: () => {
@@ -763,6 +795,22 @@
         // margin so a well-timed parry reliably clears it.
         const lo = trueMaxJump * 1.15;
         const hi = Math.max(lo + 30, orbCeiling * 0.88);
+        // Once the run is fast enough that a single-orb gap could already
+        // be built near its own ceiling, occasionally go past it instead
+        // -- an extra-long gap needing two chained orbs, not one.
+        if (atSpeed > 560 && Math.random() < 0.35) {
+          const lo2 = hi + 20;
+          // Capped relative to the stage itself, not just the physics
+          // ceiling -- at top speed the raw ceiling comes out wider than
+          // the viewport, which would put the second orb permanently
+          // off-screen. Physics still wins if it ever demands more than
+          // the cap (narrow viewport, max speed) -- see the single-orb
+          // gap's own precedent above.
+          const hi2 = Math.max(lo2 + 40, Math.min(doubleOrbCeiling * 0.85, W * 0.85));
+          const w2 = lo2 + Math.random() * (hi2 - lo2);
+          spawnDoubleGap(originX, w2, atSpeed);
+          return w2;
+        }
         const w = lo + Math.random() * (hi - lo);
         spawnGap(originX, w, true);
         return w;
@@ -1039,19 +1087,22 @@
 
   function drawGround() {
     const h = GROUND_H;
+    const useStone = cleared >= HURDLE_FLIP_THRESHOLD;
+    const groundImg = useStone ? stoneImg : grassImg;
+    const groundAspect = useStone ? STONE_ASPECT : GRASS_ASPECT;
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, groundY, W, h);
     ctx.clip();
-    if (grassImg.complete && grassImg.naturalWidth) {
-      const tileW = h / GRASS_ASPECT;
+    if (groundImg.complete && groundImg.naturalWidth) {
+      const tileW = h / groundAspect;
       let x = -groundScroll;
       while (x < W) {
-        ctx.drawImage(grassImg, x, groundY, tileW, h);
+        ctx.drawImage(groundImg, x, groundY, tileW, h);
         x += tileW;
       }
     } else {
-      ctx.fillStyle = '#2f6d2f';
+      ctx.fillStyle = useStone ? '#6b6b66' : '#2f6d2f';
       ctx.fillRect(0, groundY, W, h);
     }
     ctx.restore();
@@ -1279,7 +1330,7 @@
     ctx.restore();
   }
 
-  function drawBursts() {
+  function drawBursts(mirrored) {
     for (const b of bursts) {
       const t = b.age / b.life;
       ctx.save();
@@ -1289,7 +1340,12 @@
       ctx.textAlign = 'center';
       ctx.shadowColor = '#000';
       ctx.shadowBlur = 3;
-      ctx.fillText(b.text, b.x, b.y - t * 24);
+      // Text draws un-mirrored even past the flip threshold -- glyphs
+      // rendered through a horizontal ctx.scale(-1,1) come out mirror-
+      // written and unreadable, so only the position (not the glyphs
+      // themselves) reflects the flip.
+      const bx = mirrored ? W - b.x : b.x;
+      ctx.fillText(b.text, bx, b.y - t * 24);
       ctx.restore();
     }
   }
@@ -1315,6 +1371,17 @@
       const s = shake * 10;
       ctx.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
     }
+    // Second act: past HURDLE_FLIP_THRESHOLD, the whole world mirrors --
+    // one transform around every world-space draw call is enough to flip
+    // literally everything (ground scroll, horse, every obstacle type) at
+    // once, since none of them draw at a fixed screen position. Physics
+    // and collision are untouched -- they still run in the same original
+    // coordinate space; this only changes how that space gets painted.
+    // Scoped to its own save/restore so it doesn't also mirror the
+    // (screen-space) burst text drawn after it -- see drawBursts().
+    const mirrored = cleared >= HURDLE_FLIP_THRESHOLD;
+    ctx.save();
+    if (mirrored) { ctx.translate(W, 0); ctx.scale(-1, 1); }
     drawSpeedLines();
     drawDust();
     for (const c of coins) drawCoin(c);
@@ -1325,8 +1392,9 @@
     drawHorse();
     drawGround();
     drawParticles();
-    drawBursts();
     drawExplosion();
+    ctx.restore();
+    drawBursts(mirrored);
     ctx.restore();
   }
 
@@ -1400,6 +1468,7 @@
       orbs: orbs.map((o) => ({ x: o.x, y: o.y, used: o.used })),
       riceBags: riceBags.map((b) => ({ x: b.x, y: b.y, collected: b.collected })),
       explosion: explosion ? { cx: explosion.cx, cy: explosion.cy, age: explosion.age, life: explosion.life } : null,
+      flipped: cleared >= HURDLE_FLIP_THRESHOLD,
       horseX: HORSE_X, horseW,
     }),
   };
