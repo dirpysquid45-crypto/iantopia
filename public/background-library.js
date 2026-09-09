@@ -45,6 +45,10 @@ window.BACKGROUND_LIBRARY = {
   girl_like_me:     { label: 'PinkPantheress – Girl Like Me', type: 'video', src: '/video/girl-like-me.mp4', theme: 'theme-girl-like-me', comboTrack: 'girl_like_me' },
   minecraft:        { label: 'Minecraft',          type: 'video', src: '/video/minecraft-panorama.mp4', theme: 'theme-minecraft', comboTrack: 'minecraft_ost' },
   mongolia:         { label: 'Mongolia',           type: 'video', src: '/video/mongolia.mp4', theme: 'theme-mongolia' },
+  // Unlike every other comboTrack, Orb of Dreamers is ALSO separately
+  // unlockable/selectable (see case-data.js's mus_orb) -- owning just the
+  // background still gets you the auto-switch on pick, same as always.
+  dreamer:          { label: 'Dreamer',             type: 'video', src: '/video/dreamer-storm.mp4', theme: 'theme-dreamer', comboTrack: 'orb_of_dreamers' },
 
   // Inventory-page-only backgrounds. `restricted: true` means every picker
   // (pickers.js, and home's and lootbox's own separate copies) skips this

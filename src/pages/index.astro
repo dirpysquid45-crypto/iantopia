@@ -899,6 +899,60 @@
       box-shadow: 0 0 18px rgba(224,52,44,.5);
     }
 
+    /* ---------- Dreamer theme ---------- */
+    /* Flat black everywhere, carried entirely by a strong white glow --
+       no texture image this time (Storm's own footage already supplies
+       all the visual noise), so the chrome reads as calm/graphic against
+       it instead of competing with it. */
+    body.theme-dreamer a.big,
+    body.theme-dreamer button.big,
+    body.theme-dreamer #inv-btn,
+    body.theme-dreamer #bg-btn,
+    body.theme-dreamer #cursor-btn,
+    body.theme-dreamer #account-btn,
+    body.theme-dreamer #now-playing,
+    body.theme-dreamer #ending-link {
+      background-color: #000000;
+      background-image: none;
+      border-style: solid;
+      border-width: 2px;
+      border-color: #ffffff;
+      color: #ffffff;
+      text-shadow: 0 0 6px rgba(255,255,255,.95), 0 0 14px rgba(255,255,255,.6);
+      box-shadow: 0 0 14px rgba(255,255,255,.55), 0 0 30px rgba(255,255,255,.3);
+    }
+    body.theme-dreamer a.big:hover,
+    body.theme-dreamer button.big:hover,
+    body.theme-dreamer #inv-btn:hover,
+    body.theme-dreamer #bg-btn:hover,
+    body.theme-dreamer #cursor-btn:hover,
+    body.theme-dreamer #account-btn:hover,
+    body.theme-dreamer #now-playing:hover,
+    body.theme-dreamer #ending-link:hover {
+      box-shadow: 0 0 22px rgba(255,255,255,.85), 0 0 46px rgba(255,255,255,.5);
+    }
+    body.theme-dreamer .flip-card {
+      filter: drop-shadow(0 0 22px rgba(255,255,255,.75)) drop-shadow(0 0 46px rgba(255,255,255,.4));
+    }
+    body.theme-dreamer h1 {
+      color: #ffffff;
+      text-shadow:
+        0 0 8px rgba(255,255,255,1),
+        0 0 20px rgba(255,255,255,.8),
+        0 0 42px rgba(255,255,255,.5),
+        2px 2px 0 rgba(0,0,0,.6);
+    }
+    body.theme-dreamer #topia-timer {
+      background-color: #000000;
+      background-image: none;
+      border-style: solid;
+      border-width: 3px;
+      border-color: #ffffff;
+      color: #ffffff;
+      text-shadow: 0 0 6px rgba(255,255,255,.95), 0 0 14px rgba(255,255,255,.6);
+      box-shadow: 0 0 20px rgba(255,255,255,.6), 0 0 40px rgba(255,255,255,.3);
+    }
+
     /* ---------- Daily struble reel ---------- */
     #daily-reel-overlay {
       display:none; position:fixed; inset:0; z-index:60;
@@ -1496,9 +1550,9 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script is:inline src="/cloud-sync.js?v=7"></script>
-  <script is:inline src="/music-library.js?v=11"></script>
+  <script is:inline src="/music-library.js?v=12"></script>
   <script is:inline src="/music-position.js?v=1"></script>
-  <script is:inline src="/background-library.js?v=12"></script>
+  <script is:inline src="/background-library.js?v=13"></script>
   <script is:inline src="/cursor-library.js?v=4"></script>
 
   <!-- Timer Script -->

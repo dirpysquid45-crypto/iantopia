@@ -66,6 +66,7 @@ window.CASE_ITEMS = {
   mus_arvan:   { label: 'Arvan Khoyor Jil',               tier: 'classified', emoji: '🐎',                                  type: 'music_unlock', key: 'arvan_khoyor_jil' },
   mus_chinggis: { label: 'Chinggis Khaan',                tier: 'classified', emoji: '🏹',                                  type: 'music_unlock', key: 'chinggis_khaan' },
   mus_altain:  { label: 'Altain Magtaal',                 tier: 'classified', emoji: '🏔️',                                  type: 'music_unlock', key: 'altain_magtaal' },
+  mus_orb:     { label: 'The Orb of Dreamers',            tier: 'classified', emoji: '🔮',                                  type: 'music_unlock', key: 'orb_of_dreamers' },
   // Archived: kept so existing owners' history/labels still resolve, but
   // excluded from ALL_IDS below so it can no longer be rolled.
   haiku_email: { label: 'Email from the Void',            tier: 'classified', emoji: '✉️',                                  type: 'action', effect: 'email_void', archived: true },
@@ -84,6 +85,7 @@ window.CASE_ITEMS = {
   bg_girllikeme: { label: 'Background: PinkPantheress – Girl Like Me', tier: 'covert', emoji: '🐆',                        type: 'background_unlock', key: 'girl_like_me' },
   bg_minecraft: { label: 'Background: Minecraft',        tier: 'covert',     emoji: '🟩',                                  type: 'background_unlock', key: 'minecraft' },
   bg_mongolia: { label: 'Background: Mongolia',          tier: 'covert',     emoji: '🐴',                                  type: 'background_unlock', key: 'mongolia' },
+  bg_dreamer:  { label: 'Background: Dreamer',           tier: 'covert',     emoji: '🌩️',                                  type: 'background_unlock', key: 'dreamer' },
   cur_horse:   { label: 'Cursor: Horse',                  tier: 'covert',     img: '/cursors/horse-point.png',             type: 'cursor_unlock', key: 'horse' },
   // Archived: kept so existing owners' history/labels still resolve, but
   // excluded from ALL_IDS below so it can no longer be rolled.
