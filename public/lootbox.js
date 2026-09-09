@@ -51,6 +51,27 @@
     exceedingly_rare: 25000,
   };
 
+  // Once isFullyComplete() is true, EVERY roll in EVERY tier becomes a
+  // currency payout, not a rare edge case: the type:'strubles' items
+  // (s_2500, s_10000, one_true) are permanently exempt from the
+  // ownership filter, so a fully-cleaned-out tier collapses to just that
+  // one item instead of being genuinely empty; the two tiers with no
+  // currency item at all (restricted, covert) hit DUPLICATE_REFUND
+  // instead. At the normal amounts, the expected payout per case open
+  // this way comfortably clears every case's own cost (a Starter case
+  // nets roughly +2,650 Strubles in expectation once complete, Vault
+  // roughly +2,200) -- a straightforward money-printer, not the safety
+  // net either mechanism was actually designed to be. Both paths route
+  // through this much smaller table once that state is reached; nothing
+  // changes for a player who's still actually collecting.
+  const POST_COMPLETION_PAYOUT = {
+    mil_spec: 15,
+    restricted: 40,
+    classified: 100,
+    covert: 250,
+    exceedingly_rare: 1000,
+  };
+
   const INV_BUCKETS = ['items', 'powerups', 'sfx', 'themes', 'badges', 'tracks', 'backgrounds', 'cursors', 'buildings'];
 
   // Buildings are the one type that isn't a simple own-it-once collectible —
@@ -189,6 +210,21 @@
     return Array.isArray(inv[bucket]) && inv[bucket].includes(key);
   }
 
+  // True once every real collectible (everything except the always-
+  // available strubles/action entries, which isOwned() never counts) is
+  // owned. At that point every tier's roll pool has collapsed to nothing
+  // but a currency payout -- see the comment on POST_COMPLETION_PAYOUT
+  // below for why that state needs its own, much smaller numbers.
+  function isFullyComplete() {
+    const I = window.CASE_ITEMS || {};
+    return Object.keys(I).every((id) => {
+      const item = I[id];
+      if (item.archived) return true;
+      if (item.type === 'strubles' || item.type === 'action') return true;
+      return isOwned(id, item);
+    });
+  }
+
   function itemsInTier(def, tier) {
     const I = window.CASE_ITEMS || {};
     return def.items.filter((id) => {
@@ -271,7 +307,14 @@
       }
 
       case 'strubles': {
-        Strubles.add(item.amount || 0);
+        // Full completion means this specific item is the ONLY thing
+        // left in its tier's pool (see isFullyComplete()) -- a guaranteed
+        // hit every time that tier rolls, not the occasional jackpot it
+        // reads as mid-collection. Route it through the same reduced
+        // table the duplicate-refund fallback below uses instead of the
+        // item's own (much bigger) face amount.
+        const amount = isFullyComplete() ? (POST_COMPLETION_PAYOUT[item.tier] || 0) : (item.amount || 0);
+        Strubles.add(amount);
         result.unlocked = true;
         break;
       }
@@ -339,7 +382,8 @@
     }
 
     if (result.duplicate) {
-      result.refund = DUPLICATE_REFUND[item.tier] || 0;
+      const refundTable = isFullyComplete() ? POST_COMPLETION_PAYOUT : DUPLICATE_REFUND;
+      result.refund = refundTable[item.tier] || 0;
       if (result.refund) Strubles.add(result.refund);
     }
     return result;

@@ -56,7 +56,12 @@ window.TYCOON_BUILDINGS = {
     tier: 'exceedingly_rare',
     img: '/tycoon/taipei-101.png',
     description: 'The crown jewel of the skyline. Owning one is basically bragging rights with a paycheck attached.',
-    production: 20,
+    // Was 20/min -- at up to 5 copies (MAX_PER_TYPE) that's 100/min run
+    // continuously, ~144,000/day, by far the single biggest passive-
+    // income source in the game despite being flagged `prestige`. Cut to
+    // below even Pagoda's 5/min so owning one is genuinely a bragging-
+    // rights building, not the best investment available dressed up as one.
+    production: 5,
     buildMinutes: 1440,
     cost: 15000,
     prestige: true,
