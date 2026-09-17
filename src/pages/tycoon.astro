@@ -189,6 +189,17 @@
     font-family:inherit; transition:background .2s, color .2s;
   }
   #guide-btn:hover { background:var(--gold); color:#000; }
+  #bank-btn {
+    color:var(--gold); background:#000; border:3px solid var(--gold);
+    padding:10px 14px; font-size:11px; font-weight:700; cursor:none;
+    font-family:inherit; transition:background .2s, color .2s;
+  }
+  #bank-btn:hover { background:var(--gold); color:#000; }
+  .bank-cap-row { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:10px; }
+  .bank-cap-row:last-child { border-bottom:none; }
+  .bank-cap-row span:last-child { color:var(--muted); }
+  .bank-buy-row { margin-top:16px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .bank-buy-row p { margin:0; font-size:10px; color:var(--ink); line-height:1.7; }
 
   /* ---------- The skyline: a single row of 5 ---------- */
   /* flex:1 + min-height:0 gives this whatever vertical space is actually
@@ -410,6 +421,7 @@
     <div id="cta-row">
       <a id="lootbox-cta" href="/lootbox">🏗️ Get an Iantopia Lootbox Basic</a>
       <button id="guide-btn" type="button">📖 Building Guide</button>
+      <button id="bank-btn" type="button">🏦 Bank</button>
     </div>
 
     <div id="tycoon-grid"></div>
@@ -454,6 +466,22 @@
     </div>
   </div>
 
+  <!-- Bank: current wallet cap (Bank level + Taipei bonus, itemized) and the next level's cost -->
+  <div class="overlay" id="bank-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Bank</h2>
+        <button class="btn" id="bank-close" type="button">Close</button>
+      </div>
+      <p style="font-size:10px; color:var(--muted); line-height:1.7; margin:0 0 14px;">Strubles earned past your wallet cap don't accrue — spend down below the cap, or raise it here.</p>
+      <div id="bank-cap-breakdown"></div>
+      <div class="bank-buy-row">
+        <p id="bank-next-info"></p>
+        <button class="btn" id="bank-buy" type="button">Upgrade</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Music Playlist Modal -->
   <div class="overlay" id="playlist-overlay">
     <div class="modal">
@@ -487,14 +515,15 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <!-- Headless here (no account UI on this page) — see blackjack.astro for
      why every page needs this now, not just home. -->
-<script is:inline src="/cloud-sync.js?v=7"></script>
+<script is:inline src="/cloud-sync.js?v=8"></script>
 <script is:inline src="/music-library.js?v=12"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
 <script is:inline src="/case-data.js?v=18"></script>
-<script is:inline src="/tycoon-buildings.js?v=6"></script>
+<script is:inline src="/tycoon-buildings.js?v=7"></script>
 <script is:inline src="/cursor.js?v=3"></script>
-<script is:inline src="/strubles.js?v=2"></script>
+<script is:inline src="/tycoon-bank.js?v=1"></script>
+<script is:inline src="/strubles.js?v=3"></script>
 <script is:inline src="/pickers.js?v=11"></script>
 <script is:inline>
 (() => {
@@ -507,7 +536,6 @@
   const DEFS = window.TYCOON_BUILDINGS || {};
   const MAX_PER_TYPE = window.TYCOON_MAX_PER_TYPE || 5;
   const MAX_CONCURRENT = window.TYCOON_MAX_CONCURRENT_BUILDS || 3;
-  const OFFLINE_CAP_MS = window.TYCOON_OFFLINE_CAP_MS || 8 * 60 * 60 * 1000;
   const RARITY = window.CASE_RARITIES || {};
 
   function loadJSON(k, fb) { try { const v = localStorage.getItem(k); return v != null ? JSON.parse(v) : fb; } catch { return fb; } }
@@ -547,27 +575,31 @@
     return grid.filter((s) => s && s.status === 'building').length;
   }
 
-  // Reconciles construction completion + production accrual since the last
-  // check-in, capped at OFFLINE_CAP_MS so a long absence doesn't retroactively
-  // finish/produce forever — the excess time beyond the cap is simply lost,
-  // not banked for later ("construction pauses" per the spec).
+  // Reconciles construction completion + production accrual since the
+  // last check-in. Used to also cap this against an 8h "offline" window
+  // (OFFLINE_CAP_MS) so a long absence didn't retroactively finish/produce
+  // forever -- replaced by the wallet cap (tycoon-bank.js + strubles.js's
+  // add()), which bounds the BALANCE directly and uniformly regardless of
+  // online/offline state, so a duration-based cap here is redundant. This
+  // also fixes a side effect the old cap had: construction completion
+  // itself was being gated by the same capped clock as production, even
+  // though only production payout was ever meant to be bounded -- a
+  // building now always finishes exactly when its own timer says it will.
   function tick(grid) {
     const now = Date.now();
-    const lastSeen = Number(localStorage.getItem(LAST_SEEN_KEY)) || now;
-    const cappedNow = Math.min(now, lastSeen + OFFLINE_CAP_MS);
     let earned = 0;
     let changed = false;
     grid.forEach((slot) => {
       if (!slot) return;
       const def = DEFS[slot.key];
       if (!def) return;
-      if (slot.status === 'building' && cappedNow >= slot.completesAt) {
+      if (slot.status === 'building' && now >= slot.completesAt) {
         slot.status = 'complete';
         slot.lastProductionAt = slot.completesAt;
         changed = true;
       }
       if (slot.status === 'complete') {
-        const elapsedMin = Math.max(0, cappedNow - slot.lastProductionAt) / 60000;
+        const elapsedMin = Math.max(0, now - slot.lastProductionAt) / 60000;
         const gain = Math.floor(elapsedMin * def.production);
         if (gain > 0) {
           earned += gain;
@@ -847,6 +879,55 @@
     el.addEventListener('click', (e) => {
       if (e.target.id === 'guide-overlay' || e.target.id === 'guide-close') {
         guideOverlay.classList.remove('open');
+      }
+    });
+  });
+
+  // --- Bank: raise the wallet cap. Re-rendered fresh each open so a
+  // level bought (or a Taipei placed/removed) elsewhere stays current. ---
+  const bankOverlay = $('bank-overlay');
+  const bankBreakdown = $('bank-cap-breakdown');
+  const bankNextInfo = $('bank-next-info');
+  const bankBuyBtn = $('bank-buy');
+
+  function renderBank() {
+    const TB = window.TycoonBank;
+    const level = TB.currentLevel();
+    const bankCap = TB.capForLevel(level);
+    const taipei = TB.taipeiBonus();
+    const total = bankCap + taipei;
+    const nextCost = TB.costForLevel(level + 1);
+    const nextGain = TB.capGainForLevel(level + 1);
+
+    bankBreakdown.innerHTML = `
+      <div class="bank-cap-row"><span>Bank (level ${level})</span><span>${bankCap.toLocaleString()} Strubles</span></div>
+      <div class="bank-cap-row"><span>Taipei 101 bonus</span><span>+${taipei.toLocaleString()} Strubles</span></div>
+      <div class="bank-cap-row"><span><b>Total cap</b></span><span><b>${total.toLocaleString()} Strubles</b></span></div>
+    `;
+    bankNextInfo.textContent = `Next: Level ${level + 1} — costs ${nextCost.toLocaleString()}, raises the cap by ${nextGain.toLocaleString()}.`;
+  }
+
+  $('bank-btn').addEventListener('click', () => {
+    renderBank();
+    bankOverlay.classList.add('open');
+  });
+  bankBuyBtn.addEventListener('click', () => {
+    const TB = window.TycoonBank;
+    const level = TB.currentLevel();
+    const cost = TB.costForLevel(level + 1);
+    if (!Strubles.spend(cost)) {
+      alert(`Not enough Strubles for the next level (need ${cost.toLocaleString()}).`);
+      return;
+    }
+    localStorage.setItem(TB.BANK_LEVEL_KEY, String(level + 1));
+    try { window.dispatchEvent(new Event('tycoon:changed')); } catch {} // Strubles.spend() above already fired strubles:change for the balance itself
+    renderBank();
+    syncBalance();
+  });
+  document.querySelectorAll('#bank-overlay, #bank-close').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      if (e.target.id === 'bank-overlay' || e.target.id === 'bank-close') {
+        bankOverlay.classList.remove('open');
       }
     });
   });

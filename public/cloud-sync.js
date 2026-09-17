@@ -52,6 +52,7 @@
     'lootbox_active_track_v1',
     'tycoon_grid_v1',
     'tycoon_last_seen_v1',
+    'tycoon_bank_level_v1',
   ];
 
   // pickers.js (blackjack/alternate-ending/minesweeper/inventory) derives its

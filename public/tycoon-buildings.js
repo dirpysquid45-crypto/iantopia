@@ -74,7 +74,9 @@ window.TYCOON_BUILDING_ORDER = ['shabby_apartment', 'generic_building', 'pagoda'
 
 window.TYCOON_MAX_PER_TYPE = 5;
 window.TYCOON_MAX_CONCURRENT_BUILDS = 3;
-window.TYCOON_OFFLINE_CAP_MS = 8 * 60 * 60 * 1000;
+// The old 8h offline production cap (TYCOON_OFFLINE_CAP_MS) was retired in
+// favor of the wallet cap (tycoon-bank.js + strubles.js's add()), which
+// bounds the balance itself uniformly instead of only while a player is away.
 
 // Pedestrians that wander past the skyline — see tycoon.astro's spawner.
 // More of the city built (buildings placed) means more people around,

@@ -1,0 +1,13 @@
+{
+  "name": "iantopia-admin-scripts",
+  "private": true,
+  "version": "1.0.0",
+  "description": "One-off / occasional scripts run with elevated (service-account) Firestore access -- never part of the deployed Astro site, isolated exactly like news-pipeline/ isolates its own Python deps.",
+  "type": "commonjs",
+  "scripts": {
+    "currency-reform": "node currency-reform.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.0.0"
+  }
+}

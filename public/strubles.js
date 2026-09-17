@@ -39,7 +39,21 @@
     version: "2.0.0",
     get()  { return _load(); },
     set(v) { return _save(v); },
-    add(n) { return _save(_load() + Number(n || 0)); },
+    // Wallet cap (see tycoon-bank.js): freezes at the cap rather than
+    // ever slashing an existing balance. A clamp inside _save() itself
+    // would mean the very next add() after any balance-reducing event
+    // upstream (e.g. the currency reform) forcibly cuts an
+    // already-legitimate balance down to whatever the cap happens to be
+    // -- this only ever stops NEW earnings from pushing past the cap,
+    // never reduces what's already there. Falls back to no cap at all if
+    // tycoon-bank.js isn't loaded on a given page.
+    add(n) {
+      const cur = _load();
+      const cap = (window.TycoonBank && window.TycoonBank.currentCap()) || Infinity;
+      if (cur >= cap) return cur;
+      const amount = Math.max(0, Number(n) || 0);
+      return _save(Math.min(cur + amount, cap));
+    },
     spend(n) {
       const need = Math.max(0, Math.floor(Number(n || 0)));
       const bal = _load();
