@@ -41,6 +41,18 @@
     cursor:none;
     position:relative;
     overflow-x:hidden; overflow-y:auto;
+    /* The core jump mechanic is "press and hold" (hold for a higher
+       jump) -- on mobile, with nothing telling the browser otherwise,
+       that's indistinguishable from a long-press-to-select gesture, so
+       holding down on the game itself (or its instructional text) was
+       highlighting content blue instead of registering as game input.
+       Only #duck-btn had this before; a page this text-free needs it
+       everywhere, not per-element. -webkit-touch-callout additionally
+       suppresses iOS's "save image" callout on the stage's background
+       photo and the Struble badge icon. */
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
   }
 
   #sky-bg {
@@ -140,6 +152,24 @@
   }
   #duck-btn:hover { background:var(--gold); color:#000; }
   #duck-btn:active { transform:scale(0.97); }
+
+  /* This page had no mobile breakpoint at all before -- every other game
+     page on the site (minesweeper/blackjack/tycoon) has its own
+     @media(max-width:768px) block, but this one just kept its desktop
+     font sizes verbatim on a phone. Most of those sizes (7-9px) were
+     already small on a big monitor viewed at arm's length; on a phone
+     screen with no compensating bump, they read as genuinely too small
+     to read comfortably, not just "a bit tight." Bumping the worst
+     offenders up here, not shrinking anything further. */
+  @media (max-width:768px) {
+    h1 { font-size:clamp(13px,4vw,18px); }
+    header a, header button { font-size:12px; padding:8px 10px; }
+    #stats-bar { font-size:11px; gap:12px; padding:9px 12px; }
+    .stage-box h2 { font-size:16px; }
+    .stage-box p { font-size:11px; line-height:1.85; }
+    #sound-hint { font-size:9.5px; }
+    #hint { font-size:10px; }
+  }
 </style>
 </head>
 <body>
