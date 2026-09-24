@@ -14,6 +14,7 @@ window.TYCOON_BUILDINGS = {
     production: 1,       // Strubles/min once complete
     buildMinutes: 15,
     cost: 50,             // Strubles spent at placement (the "permit")
+    upkeepPct: 0.04,     // 0.04 * 50 = 2 Strubles/day
   },
   generic_building: {
     label: 'Generic Building',
@@ -27,6 +28,7 @@ window.TYCOON_BUILDINGS = {
     production: 2,
     buildMinutes: 30,
     cost: 100,
+    upkeepPct: 0.05,     // 0.05 * 100 = 5 Strubles/day
   },
   pagoda: {
     label: 'Pagoda',
@@ -36,6 +38,7 @@ window.TYCOON_BUILDINGS = {
     production: 5,
     buildMinutes: 60,
     cost: 1000,
+    upkeepPct: 0.05,     // 0.05 * 1000 = 50 Strubles/day
     luckBuff: true, // see lootbox.js's oddsFor() — owning these nudges odds off Common
   },
   generic_skyscraper: {
@@ -50,6 +53,7 @@ window.TYCOON_BUILDINGS = {
     production: 8,
     buildMinutes: 300,
     cost: 500,
+    upkeepPct: 0.06,     // 0.06 * 500 = 30 Strubles/day
   },
   taipei_101: {
     label: 'Taipei 101',
@@ -64,6 +68,7 @@ window.TYCOON_BUILDINGS = {
     production: 5,
     buildMinutes: 1440,
     cost: 15000,
+    upkeepPct: 0.08,     // 0.08 * 15000 = 1200 Strubles/day (heaviest tax)
     prestige: true,
     skyscraper: true,
   },

@@ -294,6 +294,9 @@
   .tycoon-slot.building .tycoon-building-img {
     filter: brightness(0.5) saturate(0.6) drop-shadow(0 6px 10px rgba(0,0,0,.5));
   }
+  .tycoon-slot.neglected .tycoon-building-img {
+    filter: brightness(0.35) saturate(0.4) drop-shadow(0 6px 10px rgba(0,0,0,.5));
+  }
   .tycoon-slot .label-tag {
     /* Above the building, not below — bottom used to sit right where the
        taller/overlapping grass now covers it, making every label
@@ -416,6 +419,7 @@
       <span>Production: <b id="stat-production">0</b>/min</span>
       <span>Placed: <b id="stat-placed">0</b>/5</span>
       <span>Under construction: <b id="stat-building">0/3</b></span>
+      <span>Upkeep: <b id="stat-upkeep">0</b>/day</span>
     </div>
 
     <div id="cta-row">
@@ -520,7 +524,7 @@
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
 <script is:inline src="/case-data.js?v=18"></script>
-<script is:inline src="/tycoon-buildings.js?v=7"></script>
+<script is:inline src="/tycoon-buildings.js?v=8"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/tycoon-bank.js?v=1"></script>
 <script is:inline src="/strubles.js?v=3"></script>
@@ -596,20 +600,49 @@
       if (slot.status === 'building' && now >= slot.completesAt) {
         slot.status = 'complete';
         slot.lastProductionAt = slot.completesAt;
+        slot.lastTaxAt = slot.completesAt;
+        slot.taxDebt = slot.taxDebt || 0;
         changed = true;
       }
       if (slot.status === 'complete') {
+        // Initialize tax checkpoint on first encounter (migration for pre-existing saves)
+        if (slot.lastTaxAt == null) {
+          slot.lastTaxAt = now;
+          slot.taxDebt = 0;
+          changed = true;
+        }
+        // Accrual: if debt is outstanding, production is halved
+        const neglected = slot.taxDebt > 0;
         const elapsedMin = Math.max(0, now - slot.lastProductionAt) / 60000;
-        const gain = Math.floor(elapsedMin * def.production);
+        const effectiveProduction = def.production * (neglected ? 0.5 : 1);
+        const gain = Math.floor(elapsedMin * effectiveProduction);
         if (gain > 0) {
           earned += gain;
-          slot.lastProductionAt += (gain / def.production) * 60000;
+          slot.lastProductionAt += (gain / effectiveProduction) * 60000;
+          changed = true;
+        }
+        // Tax accrual
+        const dailyUpkeep = def.cost * (def.upkeepPct || 0);
+        const elapsedMinTax = Math.max(0, now - slot.lastTaxAt) / 60000;
+        const taxOwed = Math.floor(elapsedMinTax * (dailyUpkeep / 1440));
+        if (taxOwed > 0) {
+          slot.taxDebt = (slot.taxDebt || 0) + taxOwed;
+          slot.lastTaxAt += (taxOwed / (dailyUpkeep / 1440)) * 60000;
           changed = true;
         }
       }
     });
     localStorage.setItem(LAST_SEEN_KEY, String(now));
     if (earned > 0) { try { Strubles.add(earned); } catch {} }
+    // Auto-pay accumulated tax debt from balance
+    grid.forEach((slot) => {
+      if (slot && slot.status === 'complete' && slot.taxDebt > 0) {
+        if (Strubles.spend(slot.taxDebt)) {
+          slot.taxDebt = 0;
+          changed = true;
+        }
+      }
+    });
     return changed;
   }
 
@@ -631,6 +664,7 @@
     gridEl.innerHTML = '';
     const now = Date.now();
     let totalProduction = 0;
+    let totalUpkeep = 0;
 
     grid.forEach((slot, i) => {
       const cell = document.createElement('div');
@@ -695,8 +729,24 @@
 
         tag.textContent = def.label;
       } else {
-        totalProduction += def.production;
-        tag.textContent = `${def.label} · +${def.production}/min`;
+        // Complete building: show actual (possibly halved) production
+        const dailyUpkeep = def.cost * (def.upkeepPct || 0);
+        totalUpkeep += dailyUpkeep;
+        const neglected = slot.taxDebt > 0;
+        const displayProduction = def.production * (neglected ? 0.5 : 1);
+        totalProduction += displayProduction;
+        tag.textContent = `${def.label} · +${displayProduction}/min`;
+
+        // Render neglected badge if debt outstanding
+        if (neglected) {
+          cell.classList.add('neglected');
+          img.style.filter = 'brightness(0.35) saturate(0.4) drop-shadow(0 6px 10px rgba(0,0,0,.5))';
+          const debtBadge = document.createElement('div');
+          debtBadge.className = 'construction-pct';
+          debtBadge.style.color = '#ff6b6b';
+          debtBadge.textContent = `⚠ Owes ${Math.floor(slot.taxDebt)} — half production`;
+          visual.appendChild(debtBadge);
+        }
       }
       visual.appendChild(tag);
       cell.appendChild(visual);
@@ -704,9 +754,14 @@
       gridEl.appendChild(cell);
     });
 
-    $('stat-production').textContent = totalProduction;
+    $('stat-production').textContent = Math.floor(totalProduction);
     $('stat-placed').textContent = grid.filter(Boolean).length;
     $('stat-building').textContent = buildingCount(grid) + '/' + MAX_CONCURRENT;
+    // Add upkeep stat to stats bar
+    const upkeepSpan = $('stat-upkeep');
+    if (upkeepSpan) {
+      upkeepSpan.textContent = Math.floor(totalUpkeep);
+    }
     syncBalance();
   }
 
@@ -814,16 +869,26 @@
     manageSlot = slotIndex;
     const def = DEFS[slot.key];
     const rarity = RARITY[def.tier] || {};
+    const dailyUpkeep = def.cost * (def.upkeepPct || 0);
     $('manage-title').textContent = def.label;
-    const statusLine = slot.status === 'building'
+    let statusLine = slot.status === 'building'
       ? 'Currently under construction — removing forfeits progress, no refund.'
       : `Producing +${def.production}/min.`;
+    let upkeepLine = '';
+    if (slot.status === 'complete') {
+      if (slot.taxDebt > 0) {
+        upkeepLine = `<small style="color:#ff6b6b;">⚠ Neglected — owes ${Math.floor(slot.taxDebt)} Strubles (half production until paid). Upkeep ${Math.floor(dailyUpkeep)}/day.</small>`;
+      } else {
+        upkeepLine = `<small>Upkeep ${Math.floor(dailyUpkeep)}/day, auto-paid from balance.</small>`;
+      }
+    }
     $('manage-info').innerHTML = `
       <div class="guide-row">
         <img src="${def.img}" alt="${def.label}">
         <div class="row-info">
           ${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''}</small>
           <small>${statusLine}</small>
+          ${upkeepLine}
           ${def.description ? `<small class="row-desc">${def.description}</small>` : ''}
         </div>
       </div>`;
@@ -861,6 +926,7 @@
     ORDER.forEach((key) => {
       const def = DEFS[key];
       const rarity = RARITY[def.tier] || {};
+      const dailyUpkeep = def.cost * (def.upkeepPct || 0);
       const row = document.createElement('div');
       row.className = 'guide-row';
       const img = document.createElement('img');
@@ -868,7 +934,7 @@
       img.alt = def.label;
       const info = document.createElement('div');
       info.className = 'row-info';
-      info.innerHTML = `${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE}</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done</small>${def.description ? `<small class="row-desc">${def.description}</small>` : ''}`;
+      info.innerHTML = `${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE}</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done · Upkeep ${Math.floor(dailyUpkeep)}/day</small>${def.description ? `<small class="row-desc">${def.description}</small>` : ''}`;
       row.appendChild(img);
       row.appendChild(info);
       guideList.appendChild(row);
