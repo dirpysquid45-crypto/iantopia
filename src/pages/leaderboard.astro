@@ -1,0 +1,171 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Iantopia Tycoon Leaderboard</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0a0c12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script is:inline src="/pwa.js?v=1" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style is:global>
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body {
+    height:100dvh;
+    display:flex; flex-direction:column;
+    color:var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+    cursor:none;
+    position:relative;
+    overflow-x:hidden; overflow-y:auto;
+    background:#0f1115;
+  }
+
+  main {
+    position:relative; z-index:2; max-width:1200px; width:100%; margin:0 auto;
+    padding:20px 24px;
+    flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column;
+  }
+
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; border-bottom:4px solid #000; padding-bottom:10px; gap:10px; }
+  header a { color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; font-weight:700; background:#000; transition:background 0.2s; font-size:10px; cursor:none; }
+  header a:hover { background:var(--gold); color:#000; }
+
+  h1 {
+    margin:0; font-size:clamp(13px,2.6vw,20px); letter-spacing:1px; color:var(--gold); font-weight:400;
+    text-shadow: 2px 2px 0 #000; text-align:center; width:100%;
+  }
+
+  #leaderboard-list {
+    flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column;
+    gap:0;
+    border:2px solid var(--gold);
+    background:rgba(0,0,0,.4);
+    overflow-y:auto;
+  }
+
+  .leaderboard-loading {
+    display:flex; align-items:center; justify-content:center; padding:40px 20px;
+    color:var(--muted); font-size:12px;
+  }
+
+  .leaderboard-empty {
+    display:flex; align-items:center; justify-content:center; padding:40px 20px;
+    color:var(--muted); font-size:11px; text-align:center;
+  }
+
+  .leaderboard-error {
+    display:flex; align-items:center; justify-content:center; padding:40px 20px;
+    color:#ff6b6b; font-size:11px; text-align:center;
+  }
+
+  .leaderboard-row {
+    display:grid; grid-template-columns:40px 1fr 120px; gap:10px; align-items:center;
+    padding:12px 16px; border-bottom:1px solid rgba(255,215,0,0.2); font-size:11px;
+    transition:background 0.2s;
+  }
+  .leaderboard-row:hover { background:rgba(255,215,0,.08); }
+  .leaderboard-row.current-user { background:rgba(255,215,0,.15); border-left:4px solid var(--gold); padding-left:12px; }
+
+  .leaderboard-rank { color:var(--gold); font-weight:700; text-align:center; }
+  .leaderboard-name { color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .leaderboard-score { color:var(--muted); text-align:right; }
+
+  @media (max-width:768px) {
+    main { padding-left:12px; padding-right:12px; }
+    .leaderboard-row { grid-template-columns:30px 1fr 100px; font-size:9px; padding:10px 12px; }
+    header a { font-size:9px; padding:6px 10px; }
+  }
+</style>
+</head>
+<body>
+  <main>
+    <header>
+      <a href="/tycoon" title="Back to Tycoon">← Tycoon</a>
+      <h1>TYCOON LEADERBOARD</h1>
+      <div style="width:80px;"></div>
+    </header>
+
+    <div id="leaderboard-list">
+      <div class="leaderboard-loading">Loading leaderboard...</div>
+    </div>
+  </main>
+
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/cloud-sync.js?v=9"></script>
+
+<script is:inline>
+(() => {
+  const listEl = document.getElementById('leaderboard-list');
+  const currentUserId = window.CloudSync?.currentUser?.uid;
+
+  function renderLoading() {
+    listEl.innerHTML = '<div class="leaderboard-loading">Loading leaderboard...</div>';
+  }
+
+  function renderEmpty() {
+    listEl.innerHTML = '<div class="leaderboard-empty">No tycoons ranked yet — be the first!</div>';
+  }
+
+  function renderError(message) {
+    listEl.innerHTML = `<div class="leaderboard-error">${message}</div>`;
+  }
+
+  function renderList(docs) {
+    if (docs.length === 0) {
+      renderEmpty();
+      return;
+    }
+    listEl.innerHTML = docs.map((doc, idx) => {
+      const data = doc.data();
+      const rank = idx + 1;
+      const isCurrentUser = doc.id === currentUserId;
+      return `
+        <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}">
+          <div class="leaderboard-rank">#${rank}</div>
+          <div class="leaderboard-name">${data.displayName || 'Anonymous Tycoon'}</div>
+          <div class="leaderboard-score">${Number(data.netProduction || 0).toFixed(1)}/min</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  renderLoading();
+  firebase.firestore().collection('leaderboard')
+    .orderBy('netProduction', 'desc').limit(50).get()
+    .then((snap) => {
+      const docs = snap.docs;
+      if (docs.length === 0) {
+        renderEmpty();
+      } else {
+        renderList(docs);
+      }
+    })
+    .catch((err) => {
+      console.error('[leaderboard] query failed:', err);
+      if (err.code === 'permission-denied') {
+        renderError('Leaderboard not yet available — check back soon!');
+      } else {
+        renderError('Failed to load leaderboard. Please try again later.');
+      }
+    });
+})();
+</script>
+</body>
+</html>

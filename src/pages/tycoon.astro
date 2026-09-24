@@ -183,6 +183,12 @@
     padding:10px 18px; font-size:11px; font-weight:700;
   }
   #lootbox-cta:hover { background:#ffe766; }
+  #leaderboard-cta {
+    display:block; text-align:center; width:fit-content;
+    color:#000; background:var(--gold); text-decoration:none; border:3px solid #000;
+    padding:10px 18px; font-size:11px; font-weight:700;
+  }
+  #leaderboard-cta:hover { background:#ffe766; }
   #guide-btn {
     color:var(--gold); background:#000; border:3px solid var(--gold);
     padding:10px 14px; font-size:11px; font-weight:700; cursor:none;
@@ -433,6 +439,7 @@
       <button id="guide-btn" type="button">📖 Building Guide</button>
       <button id="bank-btn" type="button">🏦 Bank</button>
       <button id="expand-btn" type="button">➕ Expand Grid</button>
+      <a id="leaderboard-cta" href="/leaderboard">🏆 Leaderboard</a>
     </div>
 
     <div id="tycoon-grid"></div>
@@ -798,6 +805,9 @@
       upkeepSpan.textContent = Math.floor(totalUpkeep);
     }
     syncBalance();
+    // Push leaderboard score (net production after upkeep)
+    const netProduction = totalProduction - (totalUpkeep / 1440);
+    maybePushLeaderboardScore(netProduction);
   }
 
   function scheduleReconcile() {
@@ -1182,6 +1192,25 @@
     }, 45000 + Math.random() * 45000); // one every 45-90s
   }
   if (!reduceMotion) scheduleNextAirplane();
+
+  // --- Leaderboard score push ---
+  let lastPushedNetProduction = null;
+  let leaderboardPushInFlight = false;
+  function maybePushLeaderboardScore(netProduction) {
+    if (!window.CloudSync || !CloudSync.isSignedIn()) return;
+    if (netProduction === lastPushedNetProduction || leaderboardPushInFlight) return;
+    const user = CloudSync.currentUser;
+    if (!user) return;
+    leaderboardPushInFlight = true;
+    firebase.firestore().collection('leaderboard').doc(user.uid).set({
+      displayName: user.displayName || 'Anonymous Tycoon',
+      netProduction: Math.round(netProduction * 1000) / 1000,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
+      .then(() => { lastPushedNetProduction = netProduction; })
+      .catch((err) => console.error('[leaderboard] push failed:', err))
+      .finally(() => { leaderboardPushInFlight = false; });
+  }
 
   if (window.initPickers) setTimeout(window.initPickers, 100);
 })();

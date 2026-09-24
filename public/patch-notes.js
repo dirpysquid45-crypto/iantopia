@@ -8,6 +8,14 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: ‘2026-09-24’,
+    title: ‘Leaderboard’,
+    changes: [
+      ‘A new Leaderboard page ranks players by net Strubles production per minute -- production minus upkeep, not raw balance.’,
+      ‘Raw hoarding or over-building without paying upkeep won’t climb the board -- only a well-managed economy will.’,
+    ],
+  },
+  {
     date: ‘2026-09-23’,
     title: ‘Grid Expansion’,
     changes: [
