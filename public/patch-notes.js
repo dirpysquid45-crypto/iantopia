@@ -9,6 +9,14 @@
 window.PATCH_NOTES = [
   {
     date: ‘2026-09-23’,
+    title: ‘Grid Expansion’,
+    changes: [
+      ‘The skyline is no longer capped at 5 buildings -- a new Expand button on the Tycoon page purchases additional slots.’,
+      ‘Each slot costs roughly triple the last, starting at 200,000 Strubles for the 6th -- a long-term sink for players who have outgrown the base economy.’,
+    ],
+  },
+  {
+    date: ‘2026-09-23’,
     title: ‘Building Upkeep’,
     changes: [
       ‘Every completed building now owes a daily upkeep cost (a percentage of its own permit price), auto-paid from your balance.’,

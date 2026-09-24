@@ -195,6 +195,12 @@
     font-family:inherit; transition:background .2s, color .2s;
   }
   #bank-btn:hover { background:var(--gold); color:#000; }
+  #expand-btn {
+    color:var(--gold); background:#000; border:3px solid var(--gold);
+    padding:10px 14px; font-size:11px; font-weight:700; cursor:none;
+    font-family:inherit; transition:background .2s, color .2s;
+  }
+  #expand-btn:hover { background:var(--gold); color:#000; }
   .bank-cap-row { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:10px; }
   .bank-cap-row:last-child { border-bottom:none; }
   .bank-cap-row span:last-child { color:var(--muted); }
@@ -417,7 +423,7 @@
 
     <div id="stats-bar">
       <span>Production: <b id="stat-production">0</b>/min</span>
-      <span>Placed: <b id="stat-placed">0</b>/5</span>
+      <span>Placed: <b id="stat-placed">0/5</b></span>
       <span>Under construction: <b id="stat-building">0/3</b></span>
       <span>Upkeep: <b id="stat-upkeep">0</b>/day</span>
     </div>
@@ -426,6 +432,7 @@
       <a id="lootbox-cta" href="/lootbox">🏗️ Get an Iantopia Lootbox Basic</a>
       <button id="guide-btn" type="button">📖 Building Guide</button>
       <button id="bank-btn" type="button">🏦 Bank</button>
+      <button id="expand-btn" type="button">➕ Expand Grid</button>
     </div>
 
     <div id="tycoon-grid"></div>
@@ -486,6 +493,22 @@
     </div>
   </div>
 
+  <!-- Expand Grid: purchase additional skyline slots -->
+  <div class="overlay" id="expand-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Expand Grid</h2>
+        <button class="btn" id="expand-close" type="button">Close</button>
+      </div>
+      <p style="font-size:10px; color:var(--muted); line-height:1.7; margin:0 0 14px;">Each new slot costs roughly triple the last — a long-term sink for late-game progression.</p>
+      <div id="expand-info-breakdown"></div>
+      <div class="bank-buy-row">
+        <p id="expand-next-info"></p>
+        <button class="btn" id="expand-buy" type="button">Purchase</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Music Playlist Modal -->
   <div class="overlay" id="playlist-overlay">
     <div class="modal">
@@ -519,7 +542,7 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <!-- Headless here (no account UI on this page) — see blackjack.astro for
      why every page needs this now, not just home. -->
-<script is:inline src="/cloud-sync.js?v=8"></script>
+<script is:inline src="/cloud-sync.js?v=9"></script>
 <script is:inline src="/music-library.js?v=12"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
@@ -532,22 +555,33 @@
 <script is:inline>
 (() => {
   const $ = (id) => document.getElementById(id);
-  const GRID_SIZE = 5;
+  const BASE_GRID_SIZE = 5;
   const GRID_KEY = 'tycoon_grid_v1';
   const LAST_SEEN_KEY = 'tycoon_last_seen_v1';
   const INV_KEY = 'strubles_inventory_v1';
+  const SLOTS_KEY = 'tycoon_slots_owned_v1';
   const ORDER = window.TYCOON_BUILDING_ORDER || [];
   const DEFS = window.TYCOON_BUILDINGS || {};
   const MAX_PER_TYPE = window.TYCOON_MAX_PER_TYPE || 5;
   const MAX_CONCURRENT = window.TYCOON_MAX_CONCURRENT_BUILDS || 3;
   const RARITY = window.CASE_RARITIES || {};
+  const EXPAND_BASE_COST = 200000;
+  const EXPAND_GROWTH = 3;
+
+  function slotsOwned() { return Math.max(0, Number(localStorage.getItem(SLOTS_KEY)) || 0); }
+  let GRID_SIZE = BASE_GRID_SIZE + slotsOwned();
+  function expandCostForSlot(n) { return n <= 0 ? 0 : EXPAND_BASE_COST * Math.pow(EXPAND_GROWTH, n - 1); }
 
   function loadJSON(k, fb) { try { const v = localStorage.getItem(k); return v != null ? JSON.parse(v) : fb; } catch { return fb; } }
   function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
   function loadGrid() {
     const raw = loadJSON(GRID_KEY, null);
-    if (Array.isArray(raw) && raw.length === GRID_SIZE) return raw;
+    if (Array.isArray(raw)) {
+      if (raw.length === GRID_SIZE) return raw;
+      if (raw.length < GRID_SIZE) return raw.concat(new Array(GRID_SIZE - raw.length).fill(null));
+      return raw.slice(0, GRID_SIZE);
+    }
     return new Array(GRID_SIZE).fill(null);
   }
   function saveGrid(grid) {
@@ -661,6 +695,7 @@
 
   function render() {
     const gridEl = $('tycoon-grid');
+    gridEl.style.gridTemplateColumns = `repeat(${GRID_SIZE}, 1fr)`;
     gridEl.innerHTML = '';
     const now = Date.now();
     let totalProduction = 0;
@@ -755,7 +790,7 @@
     });
 
     $('stat-production').textContent = Math.floor(totalProduction);
-    $('stat-placed').textContent = grid.filter(Boolean).length;
+    $('stat-placed').textContent = grid.filter(Boolean).length + '/' + GRID_SIZE;
     $('stat-building').textContent = buildingCount(grid) + '/' + MAX_CONCURRENT;
     // Add upkeep stat to stats bar
     const upkeepSpan = $('stat-upkeep');
@@ -994,6 +1029,56 @@
     el.addEventListener('click', (e) => {
       if (e.target.id === 'bank-overlay' || e.target.id === 'bank-close') {
         bankOverlay.classList.remove('open');
+      }
+    });
+  });
+
+  // --- Grid expansion: purchase additional slots ---
+  const expandOverlay = $('expand-overlay');
+  const expandInfoBreakdown = $('expand-info-breakdown');
+  const expandNextInfo = $('expand-next-info');
+  const expandBuyBtn = $('expand-buy');
+
+  function renderExpand() {
+    const owned = slotsOwned();
+    const currentSize = BASE_GRID_SIZE + owned;
+    const nextSlotNum = owned + 1;
+    const nextCost = expandCostForSlot(nextSlotNum);
+    const nextSize = BASE_GRID_SIZE + nextSlotNum;
+
+    expandInfoBreakdown.innerHTML = `
+      <div class="bank-cap-row"><span>Current grid size</span><span>${currentSize} slots</span></div>
+      <div class="bank-cap-row"><span>Slots purchased</span><span>${owned}</span></div>
+    `;
+    expandNextInfo.textContent = `Next: Slot ${nextSize} — costs ${nextCost.toLocaleString()} Strubles.`;
+  }
+
+  $('expand-btn').addEventListener('click', () => {
+    renderExpand();
+    expandOverlay.classList.add('open');
+  });
+  expandBuyBtn.addEventListener('click', () => {
+    const owned = slotsOwned();
+    const nextSlotNum = owned + 1;
+    const cost = expandCostForSlot(nextSlotNum);
+    if (!Strubles.spend(cost)) {
+      alert(`Not enough Strubles for the next slot (need ${cost.toLocaleString()}).`);
+      return;
+    }
+    const newOwned = owned + 1;
+    localStorage.setItem(SLOTS_KEY, String(newOwned));
+    GRID_SIZE = BASE_GRID_SIZE + newOwned;
+    grid.push(null);
+    saveGrid(grid);
+    try { window.dispatchEvent(new Event('tycoon:changed')); } catch {}
+    renderExpand();
+    render();
+    syncBalance();
+  });
+  document.querySelectorAll('#expand-overlay, #expand-close').forEach((el) => {
+    el.addEventListener('click', (e) => {
+      if (e.target.id === 'expand-overlay' || e.target.id === 'expand-close') {
+        expandOverlay.classList.remove('open');
       }
     });
   });
