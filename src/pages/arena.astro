@@ -35,7 +35,7 @@
 </head>
 <body>
   <audio id="arena-music" loop autoplay>
-    <source src="/audio/music/aaa-powerline.mp3" type="audio/mpeg">
+    <source src="/Yadakk%20Theme%20-%20The%20Battle%20of%20Polytopia.mp3" type="audio/mpeg">
   </audio>
   <a href="/" class="back-link">← Home</a>
   <main>
@@ -48,5 +48,12 @@
       </div>
     </div>
   </main>
+
+<script is:inline>
+  const music = document.getElementById('arena-music');
+  if (music) {
+    music.volume = 0.6;
+  }
+</script>
 </body>
 </html>
