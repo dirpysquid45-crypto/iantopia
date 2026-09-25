@@ -19,7 +19,7 @@
   :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; }
-  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:none; background:#0f1115 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23880000" width="100" height="100"/><circle cx="50" cy="50" r="40" fill="%23aa0000" opacity="0.3"/></svg>'); background-attachment: fixed; }
+  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:none; background:#0f1115 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23880000" width="100" height="100"/><circle cx="50" cy="50" r="40" fill="%23aa0000" opacity="0.3"/></svg>'); background-attachment: fixed; position:relative; }
   main { flex:1; display:flex; flex-direction:column; padding:20px; max-width:1200px; margin:0 auto; width:100%; }
   .top-bar { display:flex; justify-content:space-between; margin-bottom:20px; }
   .balance { font-size:11px; color:var(--gold); background:rgba(0,0,0,.5); padding:8px 12px; border:2px solid var(--gold); }
@@ -77,6 +77,8 @@
     </div>
   </main>
 
+<script is:inline src="/cursor-library.js?v=4"></script>
+<script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -85,8 +87,8 @@
 <script is:inline src="/arena-music.js"></script>
 <script is:inline>
 (() => {
-  // Initialize music - Koronba for competitive arena tension
-  window.arenaMusic = new ArenaMusic('/koronba%20-%20Ryegen.mp3');
+  // Initialize music - Yaddak battle theme with red table
+  window.arenaMusic = new ArenaMusic('/Yadakk%20Theme%20-%20The%20Battle%20of%20Polytopia.mp3');
 
   const WS_URL = window.location.protocol === 'https:' ? 'wss://arena.iantopia.com/blackjack' : 'ws://localhost:4001';
   let ws = null;
