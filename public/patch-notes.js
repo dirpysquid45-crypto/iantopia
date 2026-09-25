@@ -9,6 +9,16 @@
 window.PATCH_NOTES = [
   {
     date: ‘2026-09-25’,
+    title: ‘Arena Mode: Battleship 1v1 & Multiplayer Polish’,
+    changes: [
+      ‘Battleship 1v1 joins the Arena: Place your fleet on the Taiwan Strait, then hunt enemy ships across a grid. Win by sinking all opponent vessels.’,
+      ‘Arena Mode now ships with thematic music (Yaddak for the hub, Balatro for Blackjack, Koronba for Battleship), floating music controls, and sprite-rendered naval combat.’,
+      ‘All Arena payouts respect your wallet cap and burn a 5% rake from the economy.’,
+      ‘Mobile-responsive design brings full Arena functionality to phones and tablets.’,
+    ],
+  },
+  {
+    date: ‘2026-09-25’,
     title: ‘Arena Mode: Blackjack 1v1’,
     changes: [
       ‘A new ⚔️ Arena mode opens multiplayer real-time gaming. Start with Blackjack 1v1: enter a public lobby, auto-match with an equal bet, and play head-to-head.’,

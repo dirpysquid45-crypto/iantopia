@@ -36,8 +36,8 @@
   .ship-item:hover { background:rgba(255,215,0,.2); }
 
   .grid-container { flex:1; display:flex; flex-direction:column; background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; }
-  .grid-controls { display:flex; gap:10px; margin-bottom:10px; }
-  .grid-btn { background:var(--gold); color:#000; border:none; padding:6px 12px; font-size:9px; font-weight:700; cursor:pointer; border-radius:4px; }
+  .grid-controls { display:flex; gap:10px; margin-bottom:10px; flex-wrap:nowrap; }
+  .grid-btn { background:var(--gold); color:#000; border:none; padding:6px 12px; font-size:9px; font-weight:700; cursor:pointer; border-radius:4px; flex:1; min-width:70px; }
   .grid-btn:hover { background:#ffe766; }
 
   .grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; }
