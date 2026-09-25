@@ -20,28 +20,37 @@ REGIONS = {
     'Europe': [
         'ukraine', 'russia', 'nato', 'eu', 'european', 'germany', 'france', 'poland',
         'uk', 'britain', 'balkans', 'moldova', 'belarus', 'scandinavia', 'nordic',
-        'turkey', 'mediterranean'
+        'turkey', 'mediterranean', 'brussels', 'moscow', 'ukraine war', 'russia ukraine',
+        'nato expansion', 'swedish', 'finnish', 'latvian', 'estonian', 'hungarian'
     ],
     'Asia-Pacific': [
         'china', 'taiwan', 'india', 'japan', 'korea', 'asean', 'philippines',
         'vietnam', 'indonesia', 'south korea', 'north korea', 'asia-pacific',
-        'indo-pacific', 'pacific', 'beijing', 'beijing', 'australian', 'australia',
-        'new zealand', 'singapore', 'thailand', 'myanmar'
+        'indo-pacific', 'pacific', 'beijing', 'australian', 'australia',
+        'new zealand', 'singapore', 'thailand', 'myanmar', 'bangladesh', 'pakistan',
+        'hong kong', 'south china sea', 'strait of taiwan', 'korean peninsula',
+        'indo-pacific', 'quad', 'aukus', 'sri lanka'
     ],
     'Middle East & North Africa': [
         'israel', 'palestine', 'iran', 'saudi', 'uae', 'gulf', 'egypt', 'iraq',
         'syria', 'lebanon', 'jordan', 'yemen', 'houthi', 'hezbollah', 'hamas',
-        'mena', 'middle east', 'maghreb', 'tunisia', 'morocco', 'algeria'
+        'mena', 'middle east', 'maghreb', 'tunisia', 'morocco', 'algeria',
+        'gaza', 'west bank', 'tehran', 'riyadh', 'beirut', 'damascus', 'oman',
+        'qatar', 'kuwait', 'bahrain', 'libyan', 'libyan', 'turkish'
     ],
     'Americas': [
-        'united states', 'mexico', 'canada', 'venezuela', 'brazil', 'colombia',
-        'cuba', 'biden', 'latin america', 'central america', 'caribbean',
-        'washington', 'congress', 'senate', 'nato', 'oea'
+        'united states', 'usa', 'america', 'mexico', 'canada', 'venezuela', 'brazil',
+        'colombia', 'cuba', 'biden', 'latin america', 'central america', 'caribbean',
+        'washington', 'congress', 'senate', 'canadian', 'mexican', 'brazilian',
+        'panama', 'costa rica', 'argentina', 'chile', 'peru', 'ecuador',
+        'white house', 'state department', 'us congress'
     ],
     'Africa': [
-        'africa', 'nigeria', 'kenya', 'south africa', 'sudan', 'ethiopia',
-        'somalia', 'mali', 'sahel', 'congo', 'zimbabwe', 'egypt', 'morocco',
-        'uganda', 'tanzania', 'rwanda', 'senegal'
+        'africa', 'nigerian', 'nigeria', 'kenya', 'south africa', 'sudan', 'ethiopia',
+        'somalia', 'mali', 'sahel', 'congo', 'zimbabwe', 'egypt', 'moroccan', 'morocco',
+        'uganda', 'tanzania', 'rwanda', 'senegal', 'cameroon', 'burkina', 'niger',
+        'liberia', 'sierra leone', 'ghana', 'ivory coast', 'botswana', 'zambia',
+        'african union', 'sahara'
     ]
 }
 
@@ -58,8 +67,15 @@ FEEDS = {
     'Politico': ['https://www.politico.eu/feed/', 'https://www.politico.com/rss/politics.xml'],
     'Reuters': [
         'https://feeds.reuters.com/reuters/worldNews',
-        'https://feeds.reuters.com/reuters/businessNews',
-        'https://www.reuters.com/world'
+        'https://feeds.reuters.com/reuters/businessNews'
+    ],
+    'BBC News': [
+        'http://feeds.bbc.co.uk/news/world/rss.xml',
+        'http://feeds.bbc.co.uk/news/rss.xml'
+    ],
+    'AP News': [
+        'https://apnews.com/hub/world-news',
+        'https://apnews.com/hub/asia-pacific'
     ]
 }
 
@@ -165,12 +181,68 @@ def pull_feeds():
     return stories_by_region
 
 
+DEMO_STORIES = {
+    'Asia-Pacific': [
+        {
+            'source': 'Reuters',
+            'title': 'Taiwan reports Chinese military exercises near strait',
+            'summary': 'Beijing signals military pressure as geopolitical tensions escalate in waters off Taipei.',
+            'link': 'https://reuters.com',
+            'status': 'breaking'
+        },
+        {
+            'source': 'Politico',
+            'title': 'India and Japan deepen defense partnership amid China concerns',
+            'summary': 'Quad alliance members coordinate military strategy to counter Beijing influence in Indo-Pacific.',
+            'link': 'https://politico.eu',
+            'status': 'developing'
+        }
+    ],
+    'Americas': [
+        {
+            'source': 'Reuters',
+            'title': 'U.S.-Mexico border negotiations intensify over migration',
+            'summary': 'Washington and Mexico City discuss new agreements on asylum processing and deportation.',
+            'link': 'https://reuters.com',
+            'status': 'breaking'
+        },
+        {
+            'source': 'Politico',
+            'title': 'Venezuelan opposition gains diplomatic recognition',
+            'summary': 'Western nations formalize support for alternative government amid humanitarian crisis.',
+            'link': 'https://politico.eu',
+            'status': 'scheduled'
+        }
+    ],
+    'Africa': [
+        {
+            'source': 'BBC News',
+            'title': 'Sub-Saharan conflict creates refugee surge',
+            'summary': 'Regional instability drives humanitarian crisis as peacekeeping efforts struggle.',
+            'link': 'https://bbc.co.uk',
+            'status': 'developing'
+        },
+        {
+            'source': 'Reuters',
+            'title': 'African Union convenes emergency session on stability',
+            'summary': 'Member states coordinate response to overlapping security threats across continent.',
+            'link': 'https://reuters.com',
+            'status': 'scheduled'
+        }
+    ]
+}
+
+
 def build_output(stories_by_region):
     """Build the final JSON structure."""
     regions = []
 
     for region_name in REGIONS.keys():
         stories = stories_by_region.get(region_name, [])
+
+        # Add demo stories if region has no live coverage
+        if not stories and region_name in DEMO_STORIES:
+            stories = DEMO_STORIES[region_name]
 
         # Limit to 3-5 stories per region, prioritize breaking > developing > scheduled
         stories.sort(key=lambda s: (

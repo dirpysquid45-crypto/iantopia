@@ -8,6 +8,15 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: ‘2026-09-25’,
+    title: ‘Arena Mode: Blackjack 1v1’,
+    changes: [
+      ‘A new ⚔️ Arena mode opens multiplayer real-time gaming. Start with Blackjack 1v1: enter a public lobby, auto-match with an equal bet, and play head-to-head.’,
+      ‘All bets and payouts are server-authoritative and respect your wallet cap -- no sneaking past the balance limits you built up through the Tycoon.’,
+      ‘A 5% rake is burned from the economy on each game (no banker house -- just disappeared coins).’,
+    ],
+  },
+  {
     date: ‘2026-09-24’,
     title: ‘Leaderboard’,
     changes: [
