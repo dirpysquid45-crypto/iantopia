@@ -34,10 +34,11 @@
 </style>
 </head>
 <body>
-  <audio id="arena-music" loop autoplay>
-    <source src="/Yadakk%20Theme%20-%20The%20Battle%20of%20Polytopia.mp3" type="audio/mpeg">
-  </audio>
   <a href="/" class="back-link">← Home</a>
+  <script is:inline src="/arena-music.js"></script>
+  <script is:inline>
+    window.arenaMusic = new ArenaMusic('/audio/music/Balatro-Main-Theme.mp3');
+  </script>
   <main>
     <h1>⚔️ ARENA MODE</h1>
     <div class="arena-list">

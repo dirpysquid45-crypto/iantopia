@@ -77,8 +77,12 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script is:inline src="/cloud-sync.js?v=9"></script>
 <script is:inline src="/strubles.js?v=3"></script>
+<script is:inline src="/arena-music.js"></script>
 <script is:inline>
 (() => {
+  // Initialize music
+  window.arenaMusic = new ArenaMusic('/audio/music/aaa-powerline.mp3');
+
   const WS_URL = window.location.protocol === 'https:' ? 'wss://arena.iantopia.com/blackjack' : 'ws://localhost:4001';
   let ws = null;
   let yourIndex = null;
