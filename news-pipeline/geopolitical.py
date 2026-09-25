@@ -15,13 +15,15 @@ from urllib.parse import urljoin
 
 OUTPUT_FILE = '../public/news-data/geopolitical.json'
 
-# Regional keywords for classification
+# Regional keywords for classification (expanded for think tank terminology)
 REGIONS = {
     'Europe': [
         'ukraine', 'russia', 'nato', 'eu', 'european', 'germany', 'france', 'poland',
         'uk', 'britain', 'balkans', 'moldova', 'belarus', 'scandinavia', 'nordic',
         'turkey', 'mediterranean', 'brussels', 'moscow', 'ukraine war', 'russia ukraine',
-        'nato expansion', 'swedish', 'finnish', 'latvian', 'estonian', 'hungarian'
+        'nato expansion', 'swedish', 'finnish', 'latvian', 'estonian', 'hungarian',
+        'eastern europe', 'transatlantic', 'european security', 'putin', 'zelensky',
+        'eus', 'nato-eu', 'trans-atlantic', 'european strategic'
     ],
     'Asia-Pacific': [
         'china', 'taiwan', 'india', 'japan', 'korea', 'asean', 'philippines',
@@ -29,28 +31,36 @@ REGIONS = {
         'indo-pacific', 'pacific', 'beijing', 'australian', 'australia',
         'new zealand', 'singapore', 'thailand', 'myanmar', 'bangladesh', 'pakistan',
         'hong kong', 'south china sea', 'strait of taiwan', 'korean peninsula',
-        'indo-pacific', 'quad', 'aukus', 'sri lanka'
+        'quad', 'aukus', 'sri lanka', 'maldives', 'nepal', 'bhutan',
+        'regional security', 'delhi', 'tokyo', 'canberra', 'xi jinping',
+        'indo-pacific strategy', 'asia strategy', 'east asia', 'southeast asia',
+        'brics', 'shanghai cooperation', 'xi'
     ],
     'Middle East & North Africa': [
         'israel', 'palestine', 'iran', 'saudi', 'uae', 'gulf', 'egypt', 'iraq',
         'syria', 'lebanon', 'jordan', 'yemen', 'houthi', 'hezbollah', 'hamas',
         'mena', 'middle east', 'maghreb', 'tunisia', 'morocco', 'algeria',
         'gaza', 'west bank', 'tehran', 'riyadh', 'beirut', 'damascus', 'oman',
-        'qatar', 'kuwait', 'bahrain', 'libyan', 'libyan', 'turkish'
+        'qatar', 'kuwait', 'bahrain', 'libyan', 'turkish', 'kurdish',
+        'middle eastern', 'gulf cooperation council', 'gcc', 'irgc', 'irgc-qf',
+        'saudi-iran', 'arab-israeli', 'sunni-shia', 'abraham accords'
     ],
     'Americas': [
         'united states', 'usa', 'america', 'mexico', 'canada', 'venezuela', 'brazil',
         'colombia', 'cuba', 'biden', 'latin america', 'central america', 'caribbean',
         'washington', 'congress', 'senate', 'canadian', 'mexican', 'brazilian',
         'panama', 'costa rica', 'argentina', 'chile', 'peru', 'ecuador',
-        'white house', 'state department', 'us congress'
+        'white house', 'state department', 'us congress', 'american',
+        'western hemisphere', 'americas strategy', 'us-china competition', 'north america'
     ],
     'Africa': [
         'africa', 'nigerian', 'nigeria', 'kenya', 'south africa', 'sudan', 'ethiopia',
         'somalia', 'mali', 'sahel', 'congo', 'zimbabwe', 'egypt', 'moroccan', 'morocco',
         'uganda', 'tanzania', 'rwanda', 'senegal', 'cameroon', 'burkina', 'niger',
         'liberia', 'sierra leone', 'ghana', 'ivory coast', 'botswana', 'zambia',
-        'african union', 'sahara'
+        'african union', 'sahara', 'sub-saharan', 'sub saharan', 'african',
+        'au', 'ecowas', 'peacekeeping', 'conflict',
+        'wagner group africa', 'great lakes', 'horn of africa', 'boko haram'
     ]
 }
 
@@ -62,9 +72,55 @@ REGION_ICONS = {
     'Africa': '🌍'
 }
 
-# RSS feeds (will try these URLs)
+# RSS feeds organized by regional expertise + general news
 FEEDS = {
+    # Policy & Strategy (pan-regional analysis)
     'Politico': ['https://www.politico.eu/feed/', 'https://www.politico.com/rss/politics.xml'],
+    'Council on Foreign Relations': [
+        'https://www.cfr.org/rss/publication',
+        'https://www.cfr.org/feed.xml'
+    ],
+    'Brookings Institution': [
+        'https://www.brookings.edu/feed/',
+        'https://www.brookings.edu/feed/?post_type=articles'
+    ],
+    'CSIS': [
+        'https://www.csis.org/rss/latest',
+        'https://www.csis.org/commentary/all'
+    ],
+
+    # Europe-focused & transatlantic strategy
+    'Atlantic Council': ['https://www.atlanticcouncil.org/feed/'],
+    'European Council on Foreign Relations': [
+        'https://ecfr.eu/feed/',
+        'https://ecfr.eu/rss/'
+    ],
+    'Chatham House': [
+        'https://chathamhouse.org/feed',
+        'https://www.chathamhouse.org/publications'
+    ],
+
+    # Indo-Pacific & Asia strategy
+    'Lowy Institute': [
+        'https://www.lowyinstitute.org/the-interpreter/feed',
+        'https://www.lowyinstitute.org/publications/feed'
+    ],
+    'Observer Research Foundation': [
+        'https://www.orfonline.org/feed/',
+        'https://www.orfonline.org/'
+    ],
+
+    # Conflict & security analysis
+    'International Crisis Group': [
+        'https://www.crisisgroup.org/feed',
+        'https://www.crisisgroup.org/alerts'
+    ],
+    'Rand Corporation': [
+        'https://www.rand.org/news.html',
+        'https://www.rand.org/research.html'
+    ],
+
+    # Traditional wire services
     'Reuters': [
         'https://feeds.reuters.com/reuters/worldNews',
         'https://feeds.reuters.com/reuters/businessNews'
@@ -72,10 +128,6 @@ FEEDS = {
     'BBC News': [
         'http://feeds.bbc.co.uk/news/world/rss.xml',
         'http://feeds.bbc.co.uk/news/rss.xml'
-    ],
-    'AP News': [
-        'https://apnews.com/hub/world-news',
-        'https://apnews.com/hub/asia-pacific'
     ]
 }
 
@@ -182,51 +234,20 @@ def pull_feeds():
 
 
 DEMO_STORIES = {
-    'Asia-Pacific': [
-        {
-            'source': 'Reuters',
-            'title': 'Taiwan reports Chinese military exercises near strait',
-            'summary': 'Beijing signals military pressure as geopolitical tensions escalate in waters off Taipei.',
-            'link': 'https://reuters.com',
-            'status': 'breaking'
-        },
-        {
-            'source': 'Politico',
-            'title': 'India and Japan deepen defense partnership amid China concerns',
-            'summary': 'Quad alliance members coordinate military strategy to counter Beijing influence in Indo-Pacific.',
-            'link': 'https://politico.eu',
-            'status': 'developing'
-        }
-    ],
-    'Americas': [
-        {
-            'source': 'Reuters',
-            'title': 'U.S.-Mexico border negotiations intensify over migration',
-            'summary': 'Washington and Mexico City discuss new agreements on asylum processing and deportation.',
-            'link': 'https://reuters.com',
-            'status': 'breaking'
-        },
-        {
-            'source': 'Politico',
-            'title': 'Venezuelan opposition gains diplomatic recognition',
-            'summary': 'Western nations formalize support for alternative government amid humanitarian crisis.',
-            'link': 'https://politico.eu',
-            'status': 'scheduled'
-        }
-    ],
+    # Supplementary analysis when live feeds are sparse for a region
     'Africa': [
         {
-            'source': 'BBC News',
-            'title': 'Sub-Saharan conflict creates refugee surge',
-            'summary': 'Regional instability drives humanitarian crisis as peacekeeping efforts struggle.',
-            'link': 'https://bbc.co.uk',
+            'source': 'International Crisis Group',
+            'title': 'Sahel security challenges require regional coordination',
+            'summary': 'Jihadist insurgencies and state fragility demand unified international response strategies.',
+            'link': 'https://www.crisisgroup.org',
             'status': 'developing'
         },
         {
-            'source': 'Reuters',
-            'title': 'African Union convenes emergency session on stability',
-            'summary': 'Member states coordinate response to overlapping security threats across continent.',
-            'link': 'https://reuters.com',
+            'source': 'Brookings Institution',
+            'title': 'African Union strengthens peacekeeping capacity',
+            'summary': 'Continental organization deepens involvement in conflict resolution and crisis management.',
+            'link': 'https://www.brookings.edu',
             'status': 'scheduled'
         }
     ]
