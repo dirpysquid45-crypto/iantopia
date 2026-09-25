@@ -19,7 +19,7 @@
   :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; }
-  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:none; background:#0f1115; background-image: url('/Taiwan%20Strait.png'); background-size: cover; background-position: center; background-attachment: fixed; position:relative; overflow:hidden; }
+  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:pointer; background:#0f1115; background-image: url('/Taiwan%20Strait.png'); background-size: cover; background-position: center; background-attachment: fixed; position:relative; overflow:hidden; }
   body::before { content:''; position:fixed; inset:0; z-index:-1; background:rgba(0,0,0,.5); pointer-events:none; }
 
   main { flex:1; display:flex; flex-direction:column; padding:20px; max-width:1200px; margin:0 auto; width:100%; position:relative; z-index:1; }
@@ -47,6 +47,14 @@
   .grid-cell.ship { background:rgba(100,100,100,.4); border-color:var(--gold); }
   .grid-cell.preview { background:rgba(255,215,0,.3); animation:pulse 0.5s infinite; }
   @keyframes pulse { 0%,100% { opacity:0.3; } 50% { opacity:0.7; } }
+
+  .ship-sprite { background-size:contain; background-repeat:no-repeat; background-position:center; filter:drop-shadow(0 0 4px rgba(255,215,0,.4)); }
+  @keyframes shipPlace { 0% { transform:scale(0.8); opacity:0; } 100% { transform:scale(1); opacity:1; } }
+  .grid-cell.placing .ship-sprite { animation:shipPlace 0.3s ease-out; }
+  @keyframes hitFlash { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.5) drop-shadow(0 0 8px #ff0000); } }
+  .board-cell.hit { animation:hitFlash 0.4s; }
+  @keyframes missRipple { 0% { transform:scale(1); opacity:1; } 100% { transform:scale(1.3); opacity:0; } }
+  .board-cell.miss { animation:missRipple 0.5s ease-out; }
 
   .grid-label-h { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; margin-bottom:5px; }
   .grid-label-v { font-size:8px; color:var(--gold); font-weight:700; text-align:center; width:20px; }
@@ -138,8 +146,19 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script is:inline src="/cloud-sync.js?v=9"></script>
 <script is:inline src="/strubles.js?v=3"></script>
+<script is:inline src="/battleship-sprites.js"></script>
 <script is:inline>
 (() => {
+  // Sound effects
+  const SFX = {
+    place: new Audio('/audio/sfx/minesweeper-reveal.mp3'),
+    hit: new Audio('/audio/sfx/lootbox-win.mp3'),
+    miss: new Audio('/audio/sfx/minesweeper-unflag.mp3'),
+    sink: new Audio('/audio/sfx/jackpot-win.mp3')
+  };
+
+  Object.values(SFX).forEach(sfx => { sfx.volume = 0.6; });
+
   const SHIP_TYPES = [
     { name: 'Carrier', size: 5 },
     { name: 'Battleship', size: 4 },
@@ -209,21 +228,34 @@
       for (let x = 0; x < 10; x++) {
         const cell = document.createElement('div');
         cell.className = 'grid-cell';
-        if (grid[y][x]) cell.classList.add('ship');
-
-        // Preview ship on hover
-        if (selectedShip && !grid[y][x]) {
-          const ship = SHIP_TYPES.find(s => s.name === selectedShip);
-          if (horizontal && x + ship.size <= 10 && y === y) {
-            // Preview horizontal
-          } else if (!horizontal && y + ship.size <= 10 && x === x) {
-            // Preview vertical
+        if (grid[y][x]) {
+          cell.classList.add('ship', 'placing');
+          // Find which ship occupies this cell and render it
+          for (const ship of placedShips) {
+            const shipDef = SHIP_TYPES.find(s => s.name === ship.name);
+            let occupies = false;
+            if (ship.horizontal) {
+              occupies = ship.y === y && x >= ship.x && x < ship.x + shipDef.size;
+            } else {
+              occupies = ship.x === x && y >= ship.y && y < ship.y + shipDef.size;
+            }
+            if (occupies && x === ship.x && y === ship.y) {
+              // Only render sprite at ship's origin
+              const sprite = document.createElement('div');
+              sprite.className = 'ship-sprite';
+              applyShipSprite(sprite, ship.name, ship.horizontal);
+              sprite.style.position = 'absolute';
+              sprite.style.opacity = '0.8';
+              cell.style.position = 'relative';
+              cell.appendChild(sprite);
+              break;
+            }
           }
         }
 
         cell.dataset.x = x;
         cell.dataset.y = y;
-        cell.addEventListener('click', () => placeShip(x, y));
+        cell.addEventListener('click', () => { placeShip(x, y); SFX.place.play(); });
         gridEl.appendChild(cell);
       }
     }
@@ -344,6 +376,12 @@
   }
 
   function fireAt(x, y) {
+    const cell = document.querySelector(`[data-x="${x}"][data-y="${y}"]`);
+    if (cell && cell.classList.contains('hit')) {
+      SFX.hit.play();
+    } else if (cell && cell.classList.contains('miss')) {
+      SFX.miss.play();
+    }
     ws.send(JSON.stringify({ type: 'action', action: 'fire', x, y }));
   }
 
