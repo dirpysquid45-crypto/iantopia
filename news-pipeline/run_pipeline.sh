@@ -16,6 +16,7 @@ run_stage ingest.py
 run_stage cluster.py
 run_stage digest.py
 run_stage stock_analysis.py
+run_stage geopolitical.py
 
 # Every stage above writes to public/news-data/ -- but nginx serves the
 # already-built dist/ folder (a read-only bind mount), which Astro only
