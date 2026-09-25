@@ -155,6 +155,35 @@
   .lean-center { color:var(--paper-muted); }
   .lean-right { color:#aa2222; }
 
+  .geopolitical-section { margin-bottom:32px; }
+  .region-group { margin-bottom:28px; border:1px solid var(--paper-rule); padding:16px; background:rgba(245,245,245,.4); }
+  .region-header {
+    font-size:14px; text-transform:uppercase; letter-spacing:2px; font-weight:700; margin:0 0 14px;
+    display:flex; align-items:center; gap:8px; padding-bottom:8px; border-bottom:2px solid var(--paper-accent);
+  }
+  .region-icon { font-size:20px; }
+  .geo-story { padding:12px 0; border-top:1px solid rgba(0,0,0,.1); }
+  .geo-story:first-child { border-top:none; padding-top:0; }
+  .geo-story .source-row { display:flex; justify-content:space-between; align-items:center; font-size:11px; gap:8px; flex-wrap:wrap; }
+  .geo-story .title { font-size:15px; font-weight:700; margin:4px 0 6px; line-height:1.4; }
+  .geo-story .summary { font-size:13px; color:#333; margin:4px 0 8px; line-height:1.5; }
+  .status-badge {
+    display:inline-block; padding:2px 8px; border:1px solid currentColor; font-size:9px; text-transform:uppercase; letter-spacing:.5px; font-weight:700;
+  }
+  .status-breaking { color:#aa2222; }
+  .status-developing { color:#2255aa; }
+  .status-scheduled { color:var(--paper-muted); }
+
+  body[data-wing="matrix"] .region-group { border-color: var(--matrix-dim); background: rgba(0,12,5,.94); }
+  body[data-wing="matrix"] .region-header { color: var(--matrix-green); border-color: var(--matrix-green); }
+  body[data-wing="matrix"] .geo-story { border-color: var(--matrix-dim); }
+  body[data-wing="matrix"] .geo-story .title { color: var(--matrix-green); }
+  body[data-wing="matrix"] .geo-story .summary { color:#7fcf9a; }
+  body[data-wing="matrix"] .geo-story .source-row { color:#4ecb7a; }
+  body[data-wing="matrix"] .status-breaking { color:#ff5c5c; }
+  body[data-wing="matrix"] .status-developing { color:#4aa3ff; }
+  body[data-wing="matrix"] .status-scheduled { color:#4ecb7a; }
+
   /* ---------- Matrix wing ---------- */
   body[data-wing="matrix"] {
     background: var(--matrix-bg); color: var(--matrix-green);
@@ -312,6 +341,10 @@
     <div class="section-head">Research &amp; Context</div>
     <p class="placeholder-note" id="research-note">Loading Pew Research context…</p>
     <div class="headline-grid" id="research-grid"></div>
+
+    <div class="section-head">Geopolitical Briefing</div>
+    <p class="placeholder-note" id="geo-note">Loading geopolitical coverage…</p>
+    <div class="geopolitical-section" id="geopolitical-grid"></div>
   </main>
 
 <script is:inline src="/cursor-library.js?v=4"></script>
@@ -514,6 +547,40 @@
   function stopRain() {
     if (rainInterval) { clearInterval(rainInterval); rainInterval = null; }
   }
+
+  // ---------- Geopolitical briefing (by region) ----------
+  const geoGrid = $('geopolitical-grid');
+  const geoNote = $('geo-note');
+  fetch('/news-data/geopolitical.json')
+    .then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then((data) => {
+      const regions = data.regions || [];
+      if (!regions.length) throw new Error('no regions');
+      geoGrid.innerHTML = regions.map((region) => {
+        const stories = region.stories.map((story) => {
+          const statusClass = `status-${story.status}`;
+          return `<div class="geo-story">
+            <div class="title">${esc(story.title)}</div>
+            <div class="summary">${esc(story.summary)}</div>
+            <div class="source-row">
+              <a href="${safeHref(story.link)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none; font-weight:700;">${esc(story.source)}</a>
+              <span class="status-badge ${statusClass}">${esc(story.status)}</span>
+            </div>
+          </div>`;
+        }).join('');
+        return `<div class="region-group">
+          <div class="region-header">
+            <span class="region-icon">${esc(region.icon)}</span>
+            <span>${esc(region.name)}</span>
+          </div>
+          ${stories}
+        </div>`;
+      }).join('');
+      geoNote.textContent = 'Coverage organized by geopolitical region — sources: Institute for the Study of War, Politico, Reuters.';
+    })
+    .catch(() => {
+      geoNote.textContent = 'Geopolitical briefing data is not available right now.';
+    });
 
   // Runs only after startRain/stopRain exist above -- setWing('paper')'s
   // else-branch calls stopRain(), which threw a temporal-dead-zone error
