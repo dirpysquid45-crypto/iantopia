@@ -19,13 +19,18 @@
   :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; }
-  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:none; background:#0f1115; }
+  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:none; background:#0f1115 url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect fill="%23880000" width="100" height="100"/><circle cx="50" cy="50" r="40" fill="%23aa0000" opacity="0.3"/></svg>'); background-attachment: fixed; }
   main { flex:1; display:flex; flex-direction:column; padding:20px; max-width:1200px; margin:0 auto; width:100%; }
   .top-bar { display:flex; justify-content:space-between; margin-bottom:20px; }
   .balance { font-size:11px; color:var(--gold); background:rgba(0,0,0,.5); padding:8px 12px; border:2px solid var(--gold); }
-  .game-area { flex:1; display:flex; gap:20px; }
-  .player-section { flex:1; background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; }
-  .player-name { font-size:10px; color:var(--gold); margin-bottom:10px; }
+  .game-area { flex:1; display:flex; gap:20px; flex-direction:row; }
+  .player-section { flex:1; background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:clamp(10px, 2vw, 20px); }
+  .player-name { font-size:clamp(8px, 2vw, 12px); color:var(--gold); margin-bottom:10px; }
+  @media (max-width:768px) {
+    .game-area { flex-direction:column; gap:10px; }
+    .top-bar { flex-direction:column; gap:10px; align-items:flex-start; }
+    main { padding:10px; }
+  }
   .hand { font-size:9px; color:var(--muted); line-height:1.6; }
   .actions { display:flex; gap:10px; margin-top:15px; }
   .actions button { color:#000; background:var(--gold); border:2px solid #000; padding:6px 12px; font-size:9px; font-weight:700; cursor:pointer; }
@@ -80,8 +85,8 @@
 <script is:inline src="/arena-music.js"></script>
 <script is:inline>
 (() => {
-  // Initialize music
-  window.arenaMusic = new ArenaMusic('/audio/music/aaa-powerline.mp3');
+  // Initialize music - Koronba for competitive arena tension
+  window.arenaMusic = new ArenaMusic('/koronba%20-%20Ryegen.mp3');
 
   const WS_URL = window.location.protocol === 'https:' ? 'wss://arena.iantopia.com/blackjack' : 'ws://localhost:4001';
   let ws = null;

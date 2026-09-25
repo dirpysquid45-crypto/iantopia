@@ -33,6 +33,15 @@ class ArenaMusic {
           gap: 10px;
           font-family: 'Press Start 2P', monospace;
         }
+        @media (max-width:768px) {
+          #arena-music-control {
+            bottom: 10px;
+            right: 10px;
+            padding: 8px;
+            gap: 6px;
+            flex-direction: column;
+          }
+        }
         #arena-music-control button {
           background: #ffd700;
           color: #000;

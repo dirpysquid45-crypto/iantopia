@@ -1,40 +1,125 @@
-// music-library.js
-// Every track the Now Playing playlist can select.
-//
-// The key MUST match the `key` of the corresponding music_unlock item in
-// case-data.js. The playlist looks tracks up by key and silently skips any it
-// can't resolve, so a missing entry here means the track is granted and listed
-// in the Inventory but can never actually be played.
-//
-// To add a track: drop the mp3 in public/audio/music/, add one line here, and
-// add a matching music_unlock item to case-data.js.
-window.MUSIC_LIBRARY = {
-  default: { label: 'Home Theme', src: '/audio/music/home-theme.mp3' },
+/**
+ * Iantopia Music Library & Playlist Manager
+ * Shared across all game pages. Supports shuffle, repeat, and track selection.
+ */
 
-  // --- Unlockable ---
-  taipei_instrumental: { label: 'Yung Lean – Taipei Instrumental',  src: '/audio/music/taipei-instrumental.mp3' },
-  circus:              { label: 'Circus',                           src: '/audio/music/Circus.mp3' },
-  balatro:             { label: 'Balatro Main Theme',               src: '/audio/music/Balatro-Main-Theme.mp3' },
-  cursed:              { label: 'Cursed Audio File',                src: '/audio/music/cursed.mp3' },
-  buildings:           { label: 'Yung Lean × Thaiboy × Bladee – Buildings', src: '/audio/music/buildings-instrumental.mp3' },
-  aaa_powerline:       { label: 'Ecco2k – AAA Powerline',           src: '/audio/music/aaa-powerline.mp3' },
-  atari:               { label: 'Ecco2k – Play Em Like Atari',      src: '/audio/music/play-em-like-atari.mp3' },
-  deathmetal:          { label: 'Panchiko – DEATHMETAL',            src: '/audio/music/deathmetal.mp3' },
-  forever_young:       { label: 'Alphaville – Forever Young',       src: '/audio/music/forever-young.mp3' },
-  mario_desert:        { label: 'Desert (Mario, Bitcrushed)',       src: '/audio/music/minesweeper-desert.mp3' },
-  hotel:               { label: 'Hotel Lounge',                    src: '/audio/music/hotel.mp3' },
-  arvan_khoyor_jil:    { label: 'Arvan Khoyor Jil',                 src: '/audio/music/arvan-khoyor-jil.mp3' },
-  chinggis_khaan:      { label: 'Chinggis Khaan',                   src: '/audio/music/chinggis-khaan.mp3' },
-  altain_magtaal:      { label: 'Altain Magtaal',                   src: '/audio/music/altain-magtaal.mp3' },
-  orb_of_dreamers:     { label: 'The Orb of Dreamers',               src: '/audio/music/orb-of-dreamers.mp3' },
+const MUSIC_LIBRARY = [
+  // Arena Competitive
+  { name: 'Koronba - Ryegen', path: '/koronba%20-%20Ryegen.mp3', category: 'arena', mood: 'intense' },
+  { name: 'AAA Powerline', path: '/audio/music/aaa-powerline.mp3', category: 'arena', mood: 'energy' },
+  { name: 'Deathmetal', path: '/audio/music/deathmetal.mp3', category: 'arena', mood: 'aggressive' },
 
-  // Combo tracks: paired with a matching background in index.astro's
-  // applyBackground() rather than won separately — selecting the background
-  // is enough to also switch Now Playing to this, no independent unlock.
-  bladee_waster:       { label: 'Bladee – Waster',                  src: '/audio/music/bladee-waster.mp3' },
-  evian_yxguden:        { label: 'Evian Christ – Yxguden (feat. Bladee)', src: '/audio/music/evian-christ-yxguden.mp3' },
-  clarity:             { label: 'Zedd – Clarity ft. Foxes',          src: '/audio/music/clarity.mp3' },
-  hello_kitty:         { label: 'Hello Kitty',                       src: '/audio/music/hello-kitty.mp3' },
-  girl_like_me:        { label: 'PinkPantheress – Girl Like Me',     src: '/audio/music/girl-like-me.mp3' },
-  minecraft_ost:       { label: 'Minecraft OST (C418)',              src: '/audio/music/minecraft-ost.mp3' },
-};
+  // Exploration & Chill
+  { name: 'Balatro Main Theme', path: '/audio/music/Balatro-Main-Theme.mp3', category: 'lobby', mood: 'strategic' },
+  { name: 'Forever Young', path: '/audio/music/forever-young.mp3', category: 'chill', mood: 'relaxed' },
+  { name: 'Clarity', path: '/audio/music/clarity.mp3', category: 'chill', mood: 'meditative' },
+  { name: 'Hotel', path: '/audio/music/hotel.mp3', category: 'chill', mood: 'ambient' },
+
+  // Tycoon & Management
+  { name: 'Buildings Instrumental', path: '/audio/music/buildings-instrumental.mp3', category: 'tycoon', mood: 'productive' },
+  { name: 'Taipei Instrumental', path: '/audio/music/taipei-instrumental.mp3', category: 'tycoon', mood: 'zen' },
+
+  // Epic & Adventure
+  { name: 'Chinggis Khaan', path: '/audio/music/chinggis-khaan.mp3', category: 'epic', mood: 'heroic' },
+  { name: 'Arvan Khoyor Jil', path: '/audio/music/arvan-khoyor-jil.mp3', category: 'epic', mood: 'majestic' },
+
+  // Experimental
+  { name: 'Bladee Waster', path: '/audio/music/bladee-waster.mp3', category: 'experimental', mood: 'ethereal' },
+  { name: 'Evian Christ Yxguden', path: '/audio/music/evian-christ-yxguden.mp3', category: 'experimental', mood: 'cosmic' },
+  { name: 'Girl Like Me', path: '/audio/music/girl-like-me.mp3', category: 'experimental', mood: 'upbeat' },
+
+  // Special
+  { name: 'Minecraft OST', path: '/audio/music/minecraft-ost.mp3', category: 'nostalgia', mood: 'calm' },
+  { name: 'Lootbox Theme', path: '/audio/music/lootbox-theme.mp3', category: 'games', mood: 'exciting' },
+  { name: 'Home Theme', path: '/audio/music/home-theme.mp3', category: 'lobby', mood: 'welcoming' },
+  { name: 'Cursed', path: '/audio/music/cursed.mp3', category: 'experimental', mood: 'dark' }
+];
+
+class PlaylistManager {
+  constructor() {
+    this.library = MUSIC_LIBRARY;
+    this.currentIndex = 0;
+    this.isShuffling = false;
+    this.playlist = [...this.library];
+    this.audio = null;
+  }
+
+  init(audioElement = null) {
+    if (audioElement) {
+      this.audio = audioElement;
+    } else {
+      this.audio = new Audio();
+      this.audio.loop = false;
+      this.audio.volume = 0.6;
+    }
+    this.setupEventListeners();
+  }
+
+  setupEventListeners() {
+    if (this.audio) {
+      this.audio.addEventListener('ended', () => this.nextTrack());
+    }
+  }
+
+  shuffle() {
+    this.isShuffling = !this.isShuffling;
+    if (this.isShuffling) {
+      this.playlist = this.library.sort(() => Math.random() - 0.5);
+      this.currentIndex = 0;
+    } else {
+      this.playlist = [...this.library];
+      this.currentIndex = 0;
+    }
+    return this.isShuffling;
+  }
+
+  play(trackIndex = this.currentIndex) {
+    if (trackIndex < 0 || trackIndex >= this.playlist.length) return;
+    const track = this.playlist[trackIndex];
+    if (!this.audio) return;
+
+    this.audio.src = track.path;
+    this.audio.play().catch(() => {});
+    this.currentIndex = trackIndex;
+    return track;
+  }
+
+  nextTrack() {
+    if (this.currentIndex + 1 < this.playlist.length) {
+      this.currentIndex++;
+    } else {
+      this.currentIndex = 0;
+    }
+    this.play(this.currentIndex);
+  }
+
+  prevTrack() {
+    if (this.currentIndex - 1 >= 0) {
+      this.currentIndex--;
+    } else {
+      this.currentIndex = this.playlist.length - 1;
+    }
+    this.play(this.currentIndex);
+  }
+
+  getCurrentTrack() {
+    return this.playlist[this.currentIndex] || null;
+  }
+
+  getTracksByCategory(category) {
+    return this.library.filter(t => t.category === category);
+  }
+
+  getTracksByMood(mood) {
+    return this.library.filter(t => t.mood === mood);
+  }
+
+  setVolume(vol) {
+    if (this.audio) {
+      this.audio.volume = Math.max(0, Math.min(1, vol));
+    }
+  }
+}
+
+window.PlaylistManager = PlaylistManager;
+window.MUSIC_LIBRARY = MUSIC_LIBRARY;

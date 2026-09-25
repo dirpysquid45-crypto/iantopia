@@ -64,7 +64,17 @@
 
   /* BATTLE PHASE */
   .phase-battle { display:grid; grid-template-columns:1fr 1fr; gap:20px; flex:1; }
-  .battle-board { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; display:flex; flex-direction:column; }
+  .battle-board { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:clamp(10px, 2vw, 20px); display:flex; flex-direction:column; }
+  @media (max-width:1024px) {
+    .phase-battle { grid-template-columns:1fr; gap:15px; }
+  }
+  @media (max-width:768px) {
+    .phase-setup { flex-direction:column; gap:15px; }
+    .ship-palette { width:100%; height:auto; max-height:150px; }
+    .grid-container { flex:1; min-height:300px; }
+    main { padding:10px; }
+    .grid-cell, .board-cell { font-size:6px; }
+  }
   .board-title { font-size:12px; color:var(--gold); margin-bottom:10px; font-weight:700; }
   .board-grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; }
   .board-cell { aspect-ratio:1; background:rgba(0,100,150,.2); border:1px solid rgba(255,215,0,.3); cursor:pointer; display:flex; align-items:center; justify-content:center; }
@@ -150,8 +160,8 @@
 <script is:inline src="/arena-music.js"></script>
 <script is:inline>
 (() => {
-  // Initialize music for Battleship
-  window.arenaMusic = new ArenaMusic('/audio/music/deathmetal.mp3');
+  // Initialize music for Battleship - Koronba for tactical intensity
+  window.arenaMusic = new ArenaMusic('/koronba%20-%20Ryegen.mp3');
 
   // Sound effects
   const SFX = {
