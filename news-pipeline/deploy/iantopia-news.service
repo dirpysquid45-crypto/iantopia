@@ -1,5 +1,5 @@
 [Unit]
-Description=Iantopia news pipeline (ingest, cluster, digest, stocks)
+Description=Iantopia news pipeline (ingest, cluster, digest, stocks, geopolitical)
 After=network-online.target
 Wants=network-online.target
 
