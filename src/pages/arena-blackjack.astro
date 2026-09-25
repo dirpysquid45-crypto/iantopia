@@ -1,0 +1,163 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Arena: Blackjack 1v1</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0a0c12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style is:global>
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:none; background:#0f1115; }
+  main { flex:1; display:flex; flex-direction:column; padding:20px; max-width:1200px; margin:0 auto; width:100%; }
+  .top-bar { display:flex; justify-content:space-between; margin-bottom:20px; }
+  .balance { font-size:11px; color:var(--gold); background:rgba(0,0,0,.5); padding:8px 12px; border:2px solid var(--gold); }
+  .game-area { flex:1; display:flex; gap:20px; }
+  .player-section { flex:1; background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; }
+  .player-name { font-size:10px; color:var(--gold); margin-bottom:10px; }
+  .hand { font-size:9px; color:var(--muted); line-height:1.6; }
+  .actions { display:flex; gap:10px; margin-top:15px; }
+  .actions button { color:#000; background:var(--gold); border:2px solid #000; padding:6px 12px; font-size:9px; font-weight:700; cursor:pointer; }
+  .actions button:hover { background:#ffe766; }
+  .bet-section { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; }
+  .bet-input { background:#000; border:2px solid var(--gold); color:var(--gold); padding:8px; font-family:inherit; font-size:11px; width:100%; margin-bottom:10px; }
+  .bet-btn { color:#000; background:var(--gold); border:2px solid #000; padding:8px 12px; font-size:10px; font-weight:700; width:100%; cursor:pointer; }
+  .status { font-size:9px; color:var(--muted); margin:10px 0; }
+  .back-link { position:fixed; top:20px; left:20px; color:var(--gold); text-decoration:none; border:2px solid #000; padding:6px 10px; background:#000; font-size:9px; font-weight:700; }
+</style>
+</head>
+<body>
+  <a href="/arena" class="back-link">← Arena</a>
+  <main>
+    <div class="top-bar">
+      <div class="balance">Balance: <span id="balance">0</span> Strubles</div>
+    </div>
+
+    <div id="bet-section" class="bet-section">
+      <div class="status">Enter your bet and find a match</div>
+      <input type="number" id="bet-input" class="bet-input" min="100" step="100" placeholder="Bet amount" />
+      <button id="find-match" class="bet-btn">Find Match</button>
+      <div class="status" id="status-message"></div>
+    </div>
+
+    <div id="game-section" class="game-area" style="display:none;">
+      <div class="player-section">
+        <div class="player-name">You</div>
+        <div class="hand" id="your-hand"></div>
+        <div class="actions">
+          <button id="hit">Hit</button>
+          <button id="stand">Stand</button>
+        </div>
+      </div>
+      <div class="player-section">
+        <div class="player-name">Opponent</div>
+        <div class="hand" id="opponent-hand"></div>
+      </div>
+    </div>
+
+    <div id="result-section" style="display:none; text-align:center;">
+      <div style="font-size:14px; color:var(--gold); margin:20px 0;" id="result-message"></div>
+      <button id="back-to-lobby" class="bet-btn" style="max-width:300px; margin:0 auto;">Back to Lobby</button>
+    </div>
+  </main>
+
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/cloud-sync.js?v=9"></script>
+<script is:inline src="/strubles.js?v=3"></script>
+<script is:inline>
+(() => {
+  const WS_URL = window.location.protocol === 'https:' ? 'wss://arena.iantopia.com/blackjack' : 'ws://localhost:4001';
+  let ws = null;
+  let yourIndex = null;
+
+  function updateBalance() {
+    document.getElementById('balance').textContent = Strubles.get().toLocaleString();
+  }
+
+  function showStatus(msg) {
+    document.getElementById('status-message').textContent = msg;
+  }
+
+  document.getElementById('find-match').addEventListener('click', async () => {
+    if (!window.CloudSync || !CloudSync.isSignedIn()) {
+      showStatus('Must be signed in');
+      return;
+    }
+    const bet = parseInt(document.getElementById('bet-input').value || 0);
+    if (!bet || bet < 100) {
+      showStatus('Bet must be at least 100');
+      return;
+    }
+    const balance = Strubles.get();
+    if (balance < bet) {
+      showStatus('Insufficient balance');
+      return;
+    }
+    connectAndJoin(bet);
+  });
+
+  async function connectAndJoin(bet) {
+    const user = CloudSync.currentUser;
+    const token = await user.getIdToken();
+    ws = new WebSocket(WS_URL);
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'auth', token }));
+    };
+    ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
+    ws.onerror = (err) => showStatus('Connection error');
+    ws.onclose = () => showStatus('Disconnected');
+  }
+
+  function handleMessage(msg) {
+    if (msg.type === 'auth_ok') {
+      showStatus('Authenticated, joining queue...');
+      ws.send(JSON.stringify({ type: 'join_queue', bet: parseInt(document.getElementById('bet-input').value) }));
+    } else if (msg.type === 'status' && msg.status === 'queued') {
+      showStatus('Waiting for opponent...');
+    } else if (msg.type === 'game_start') {
+      document.getElementById('bet-section').style.display = 'none';
+      document.getElementById('game-section').style.display = 'flex';
+      renderHands(msg.hands);
+    } else if (msg.type === 'game_update') {
+      renderHands(msg.hands);
+    } else if (msg.type === 'game_result') {
+      const result = msg.results[yourIndex];
+      document.getElementById('game-section').style.display = 'none';
+      document.getElementById('result-section').style.display = 'block';
+      const resultText = result.result === 'win' ? `🎉 You won ${result.payout} Strubles!` : result.result === 'push' ? `Tie! Got your bet back.` : `You lost.`;
+      document.getElementById('result-message').textContent = resultText;
+      updateBalance();
+    } else if (msg.type === 'balance_update') {
+      Strubles.set(msg.balance);
+      updateBalance();
+    }
+  }
+
+  function renderHands(hands) {
+    document.getElementById('your-hand').textContent = hands[0].map(c => c.v + c.s).join(' ');
+    document.getElementById('opponent-hand').textContent = hands[1].map(c => c.v + c.s).join(' ');
+  }
+
+  document.getElementById('hit').addEventListener('click', () => ws?.send(JSON.stringify({ type: 'action', action: 'hit' })));
+  document.getElementById('stand').addEventListener('click', () => ws?.send(JSON.stringify({ type: 'action', action: 'stand' })));
+  document.getElementById('back-to-lobby').addEventListener('click', () => location.href = '/arena');
+
+  updateBalance();
+  window.addEventListener('strubles:change', updateBalance);
+})();
+</script>
+</body>
+</html>

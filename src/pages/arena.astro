@@ -1,0 +1,48 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Iantopia Arena</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0a0c12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style is:global>
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace; cursor:none; background:#0f1115; }
+  main { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; max-width:1200px; width:100%; margin:0 auto; padding:20px; }
+  h1 { font-size:clamp(20px,4vw,32px); letter-spacing:1px; color:var(--gold); text-shadow: 2px 2px 0 #000; margin-bottom:40px; }
+  .arena-list { display:flex; flex-direction:column; gap:20px; }
+  .game-card { background:rgba(0,0,0,.5); border:3px solid var(--gold); padding:20px; text-align:center; }
+  .game-card h2 { margin:0 0 10px; color:var(--gold); font-size:14px; }
+  .game-card p { margin:0 0 15px; color:var(--muted); font-size:10px; line-height:1.6; }
+  .game-card a { display:inline-block; color:#000; background:var(--gold); text-decoration:none; padding:10px 20px; font-weight:700; font-size:11px; border:3px solid #000; transition:background 0.2s; }
+  .game-card a:hover { background:#ffe766; }
+  .back-link { position:fixed; top:20px; left:20px; color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; background:#000; font-size:10px; font-weight:700; }
+  .back-link:hover { background:var(--gold); color:#000; }
+</style>
+</head>
+<body>
+  <a href="/" class="back-link">← Home</a>
+  <main>
+    <h1>⚔️ ARENA MODE</h1>
+    <div class="arena-list">
+      <div class="game-card">
+        <h2>♠️ Blackjack 1v1</h2>
+        <p>Head-to-head Blackjack. Beat your opponent to win the pot.</p>
+        <a href="/arena-blackjack">Play Now</a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
