@@ -1,4 +1,5 @@
 const BlackjackGame = require('./blackjack');
+const { BattleshipGame } = require('./battleship');
 const BalanceManager = require('./balance');
 
 class Manager {
@@ -39,36 +40,34 @@ class Manager {
     if (!conn) return;
 
     if (msg.type === 'join_queue') {
-      await this.joinQueue(userId, sessionId, msg.bet, conn.ws);
+      await this.joinQueue(userId, sessionId, msg.bet, msg.gameType || 'blackjack', conn.ws);
     } else if (msg.type === 'action') {
       await this.handleGameAction(sessionId, msg.action);
+    } else if (msg.type === 'place_ships') {
+      await this.handleShipPlacement(sessionId, msg.ships);
     }
   }
 
-  async joinQueue(userId, sessionId, bet, ws) {
+  async joinQueue(userId, sessionId, bet, gameType, ws) {
     const balance = await this.balance.getBalance(userId);
     if (balance < bet) {
       ws.send(JSON.stringify({ type: 'error', message: 'Insufficient balance' }));
       return;
     }
-    this.queue.push({ userId, sessionId, bet, ws });
+    this.queue.push({ userId, sessionId, bet, gameType, ws });
     ws.send(JSON.stringify({ type: 'status', status: 'queued' }));
     this.tryMatchmake();
   }
 
   tryMatchmake() {
     while (this.queue.length >= 2) {
-      const a = this.queue.shift();
-      const b = this.queue.shift();
-      if (a.bet === b.bet) {
-        this.startGame(a, b);
+      const a = this.queue[0];
+      const b = this.queue[1];
+      if (a.bet === b.bet && a.gameType === b.gameType) {
+        const playerA = this.queue.shift();
+        const playerB = this.queue.shift();
+        this.startGame(playerA, playerB);
       } else {
-        // Re-queue the one with lower bet
-        if (a.bet < b.bet) {
-          this.queue.unshift(b);
-        } else {
-          this.queue.unshift(a);
-        }
         break;
       }
     }
@@ -76,9 +75,45 @@ class Manager {
 
   async startGame(playerA, playerB) {
     const tableId = Math.random().toString(36).substring(7);
-    const game = new BlackjackGame(tableId, playerA, playerB, this.balance, this.db);
+    let game;
+
+    if (playerA.gameType === 'battleship') {
+      game = new BattleshipGame(playerA.userId, playerB.userId, playerA.bet, this.balance);
+      game.tableId = tableId;
+    } else {
+      game = new BlackjackGame(tableId, playerA, playerB, this.balance, this.db);
+    }
+
     this.tables.set(tableId, game);
-    await game.start();
+
+    if (playerA.gameType === 'blackjack') {
+      await game.start();
+    } else {
+      // Battleship: notify both players to start setup phase
+      playerA.ws.send(JSON.stringify({ type: 'game_start', gameType: 'battleship', tableId, yourIndex: 0 }));
+      playerB.ws.send(JSON.stringify({ type: 'game_start', gameType: 'battleship', tableId, yourIndex: 1 }));
+    }
+  }
+
+  async handleShipPlacement(sessionId, ships) {
+    for (const [tableId, game] of this.tables) {
+      if (game instanceof BattleshipGame) {
+        const playerIndex = game.player1Id === this.connections.get(sessionId).userId ? 0 : 1;
+        const result = game.placeShips(playerIndex, ships);
+        if (result.valid && game.state === 'battle') {
+          // Both players ready, start battle
+          const player1Session = Array.from(this.userSessions.get(game.player1Id) || [])[0];
+          const player2Session = Array.from(this.userSessions.get(game.player2Id) || [])[0];
+          const conn1 = this.connections.get(player1Session);
+          const conn2 = this.connections.get(player2Session);
+          if (conn1) conn1.ws.send(JSON.stringify({ type: 'battle_start', currentTurn: 0 }));
+          if (conn2) conn2.ws.send(JSON.stringify({ type: 'battle_start', currentTurn: 0 }));
+        }
+        const conn = this.connections.get(sessionId);
+        if (conn) conn.ws.send(JSON.stringify({ type: 'placement_result', valid: result.valid, error: result.error }));
+        break;
+      }
+    }
   }
 
   async handleGameAction(sessionId, action) {

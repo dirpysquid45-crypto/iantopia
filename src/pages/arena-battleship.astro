@@ -1,0 +1,363 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Arena: Battleship</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0a0c12">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style is:global>
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:none; background:#0f1115; background-image: url('/Taiwan%20Strait.png'); background-size: cover; background-position: center; background-attachment: fixed; position:relative; overflow:hidden; }
+  body::before { content:''; position:fixed; inset:0; z-index:-1; background:rgba(0,0,0,.5); pointer-events:none; }
+
+  main { flex:1; display:flex; flex-direction:column; padding:20px; max-width:1200px; margin:0 auto; width:100%; position:relative; z-index:1; }
+  .top-bar { display:flex; justify-content:space-between; margin-bottom:20px; align-items:center; }
+  .balance { font-size:11px; color:var(--gold); background:rgba(0,0,0,.5); padding:8px 12px; border:2px solid var(--gold); }
+  .title { font-size:18px; color:var(--gold); font-weight:700; text-shadow:0 0 10px rgba(255,215,0,.5); }
+
+  .back-link { position:fixed; top:20px; left:20px; color:var(--gold); text-decoration:none; border:2px solid #000; padding:6px 10px; background:#000; font-size:9px; font-weight:700; z-index:2; }
+
+  /* SETUP PHASE */
+  .phase-setup { display:flex; gap:20px; flex:1; }
+  .ship-palette { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; width:150px; overflow-y:auto; }
+  .ship-item { background:rgba(255,215,0,.1); border:1px solid var(--gold); padding:8px; margin-bottom:8px; font-size:9px; color:var(--gold); cursor:pointer; border-radius:4px; }
+  .ship-item:hover { background:rgba(255,215,0,.2); }
+
+  .grid-container { flex:1; display:flex; flex-direction:column; background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; }
+  .grid-controls { display:flex; gap:10px; margin-bottom:10px; }
+  .grid-btn { background:var(--gold); color:#000; border:none; padding:6px 12px; font-size:9px; font-weight:700; cursor:pointer; border-radius:4px; }
+  .grid-btn:hover { background:#ffe766; }
+
+  .grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; }
+  .grid-cell { aspect-ratio:1; background:rgba(0,100,150,.3); border:1px solid rgba(255,215,0,.3); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:8px; position:relative; }
+  .grid-cell:hover { background:rgba(0,150,200,.4); }
+  .grid-cell.water { background:rgba(0,100,150,.2); }
+  .grid-cell.ship { background:rgba(100,100,100,.4); border-color:var(--gold); }
+  .grid-cell.preview { background:rgba(255,215,0,.3); animation:pulse 0.5s infinite; }
+  @keyframes pulse { 0%,100% { opacity:0.3; } 50% { opacity:0.7; } }
+
+  .grid-label-h { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; margin-bottom:5px; }
+  .grid-label-v { font-size:8px; color:var(--gold); font-weight:700; text-align:center; width:20px; }
+  .label-cell { text-align:center; font-size:8px; color:var(--gold); font-weight:700; }
+
+  .setup-status { font-size:10px; color:var(--muted); margin-top:10px; }
+
+  /* BATTLE PHASE */
+  .phase-battle { display:grid; grid-template-columns:1fr 1fr; gap:20px; flex:1; }
+  .battle-board { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; display:flex; flex-direction:column; }
+  .board-title { font-size:12px; color:var(--gold); margin-bottom:10px; font-weight:700; }
+  .board-grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; }
+  .board-cell { aspect-ratio:1; background:rgba(0,100,150,.2); border:1px solid rgba(255,215,0,.3); cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .board-cell:hover { background:rgba(0,150,200,.4); }
+  .board-cell.hit { background:#ff3333; border-color:#ff0000; }
+  .board-cell.miss { background:#3366ff; border-color:#0000ff; }
+  .board-cell.ship { background:rgba(100,100,100,.4); border-color:var(--gold); }
+  .board-cell.sunk { background:#aa0000; }
+
+  .turn-indicator { font-size:10px; color:var(--muted); margin-top:10px; }
+  .turn-indicator.active { color:#00ff00; font-weight:700; }
+
+  /* RESULT PHASE */
+  .phase-result { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
+  .result-banner { background:rgba(0,0,0,.6); border:3px solid var(--gold); padding:30px; text-align:center; }
+  .result-text { font-size:16px; color:var(--gold); margin:0; }
+  .result-payout { font-size:14px; color:#00ff00; margin-top:10px; }
+  .result-button { background:var(--gold); color:#000; border:none; padding:10px 20px; font-size:11px; font-weight:700; cursor:pointer; margin-top:20px; border-radius:4px; }
+  .result-button:hover { background:#ffe766; }
+</style>
+</head>
+<body>
+  <a href="/arena" class="back-link">← Arena</a>
+  <main>
+    <div class="top-bar">
+      <div class="title">⚓ Battleship 1v1</div>
+      <div class="balance">Balance: <span id="balance">0</span> Strubles</div>
+    </div>
+
+    <!-- SETUP PHASE -->
+    <div id="phase-setup" class="phase-setup" style="display:none;">
+      <div class="ship-palette">
+        <div style="font-size:10px; color:var(--gold); margin-bottom:10px;">Ships</div>
+        <div id="ship-list"></div>
+      </div>
+      <div class="grid-container">
+        <div class="grid-controls">
+          <button class="grid-btn" id="rotate-btn">Rotate (R)</button>
+          <button class="grid-btn" id="clear-btn">Clear All</button>
+          <button class="grid-btn" id="ready-btn">Ready!</button>
+        </div>
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+          <div class="grid-label-v" style="width:auto;"></div>
+          <div class="grid-label-h" id="grid-header"></div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <div id="grid-labels" style="display:flex; flex-direction:column; gap:2px;"></div>
+          <div class="grid" id="grid-placement"></div>
+        </div>
+        <div class="setup-status" id="setup-status">Place all ships to continue...</div>
+      </div>
+    </div>
+
+    <!-- BATTLE PHASE -->
+    <div id="phase-battle" class="phase-battle" style="display:none;">
+      <div class="battle-board">
+        <div class="board-title">Your Fleet</div>
+        <div class="board-grid" id="grid-your"></div>
+      </div>
+      <div class="battle-board">
+        <div class="board-title">Enemy Radar</div>
+        <div class="board-grid" id="grid-enemy"></div>
+        <div class="turn-indicator" id="turn-indicator">Waiting for opponent...</div>
+      </div>
+    </div>
+
+    <!-- RESULT PHASE -->
+    <div id="phase-result" class="phase-result" style="display:none;">
+      <div class="result-banner">
+        <p class="result-text" id="result-text">Victory!</p>
+        <p class="result-payout" id="result-payout">+5000 Strubles</p>
+        <button class="result-button" id="back-lobby-btn">Back to Lobby</button>
+      </div>
+    </div>
+  </main>
+
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/cloud-sync.js?v=9"></script>
+<script is:inline src="/strubles.js?v=3"></script>
+<script is:inline>
+(() => {
+  const SHIP_TYPES = [
+    { name: 'Carrier', size: 5 },
+    { name: 'Battleship', size: 4 },
+    { name: 'Cruiser', size: 3 },
+    { name: 'Submarine', size: 3 },
+    { name: 'Destroyer', size: 2 }
+  ];
+
+  const WS_URL = window.location.protocol === 'https:' ? 'wss://arena.iantopia.com/battleship' : 'ws://localhost:4001';
+  let ws = null;
+  let phase = 'bet'; // bet, setup, battle, result
+  let grid = Array(10).fill(null).map(() => Array(10).fill(0));
+  let placedShips = [];
+  let selectedShip = null;
+  let horizontal = true;
+  let yourIndex = null;
+  let opponentGrid = Array(10).fill(null).map(() => Array(10).fill(0));
+
+  function updateBalance() {
+    document.getElementById('balance').textContent = Strubles.get().toLocaleString();
+  }
+
+  function showPhase(p) {
+    document.getElementById('phase-setup').style.display = p === 'setup' ? 'flex' : 'none';
+    document.getElementById('phase-battle').style.display = p === 'battle' ? 'grid' : 'none';
+    document.getElementById('phase-result').style.display = p === 'result' ? 'flex' : 'none';
+    phase = p;
+  }
+
+  function initSetupPhase() {
+    showPhase('setup');
+    grid = Array(10).fill(null).map(() => Array(10).fill(0));
+    placedShips = [];
+    renderGridSetup();
+    renderShipPalette();
+  }
+
+  function renderShipPalette() {
+    const palette = document.getElementById('ship-list');
+    palette.innerHTML = SHIP_TYPES.map(ship =>
+      `<div class="ship-item" data-ship="${ship.name}" style="opacity:${placedShips.find(s => s.name === ship.name) ? 0.5 : 1}">${ship.name} (${ship.size})</div>`
+    ).join('');
+    document.querySelectorAll('.ship-item').forEach(el => {
+      el.addEventListener('click', () => selectShip(el.dataset.ship));
+    });
+  }
+
+  function selectShip(name) {
+    if (placedShips.find(s => s.name === name)) return;
+    selectedShip = name;
+    renderGridSetup();
+  }
+
+  function renderGridSetup() {
+    // Header
+    const header = document.getElementById('grid-header');
+    header.innerHTML = 'ABCDEFGHIJ'.split('').map(c => `<div class="label-cell">${c}</div>`).join('');
+
+    // Grid labels
+    const labels = document.getElementById('grid-labels');
+    labels.innerHTML = '1234567890'.split('').map((n, i) => `<div class="grid-label-v">${i+1}</div>`).join('');
+
+    // Grid cells
+    const gridEl = document.getElementById('grid-placement');
+    gridEl.innerHTML = '';
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 10; x++) {
+        const cell = document.createElement('div');
+        cell.className = 'grid-cell';
+        if (grid[y][x]) cell.classList.add('ship');
+
+        // Preview ship on hover
+        if (selectedShip && !grid[y][x]) {
+          const ship = SHIP_TYPES.find(s => s.name === selectedShip);
+          if (horizontal && x + ship.size <= 10 && y === y) {
+            // Preview horizontal
+          } else if (!horizontal && y + ship.size <= 10 && x === x) {
+            // Preview vertical
+          }
+        }
+
+        cell.dataset.x = x;
+        cell.dataset.y = y;
+        cell.addEventListener('click', () => placeShip(x, y));
+        gridEl.appendChild(cell);
+      }
+    }
+  }
+
+  function placeShip(x, y) {
+    if (!selectedShip) return;
+    const ship = SHIP_TYPES.find(s => s.name === selectedShip);
+    const cells = [];
+
+    if (horizontal) {
+      if (x + ship.size > 10) return;
+      for (let i = 0; i < ship.size; i++) {
+        if (grid[y][x + i]) return;
+        cells.push([x + i, y]);
+      }
+    } else {
+      if (y + ship.size > 10) return;
+      for (let i = 0; i < ship.size; i++) {
+        if (grid[y + i][x]) return;
+        cells.push([x, y + i]);
+      }
+    }
+
+    for (const [nx, ny] of cells) {
+      grid[ny][nx] = 1;
+    }
+    placedShips.push({ name: selectedShip, x, y, horizontal });
+    selectedShip = null;
+    renderGridSetup();
+    renderShipPalette();
+
+    if (placedShips.length === 5) {
+      document.getElementById('setup-status').textContent = 'All ships placed! Click Ready to proceed.';
+    }
+  }
+
+  function readyForBattle() {
+    if (placedShips.length !== 5) return;
+    const ships = placedShips.map(s => ({
+      name: s.name,
+      x: s.x,
+      y: s.y,
+      horizontal: s.horizontal
+    }));
+    ws.send(JSON.stringify({ type: 'place_ships', ships }));
+  }
+
+  document.getElementById('rotate-btn').addEventListener('click', () => {
+    horizontal = !horizontal;
+    renderGridSetup();
+  });
+
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    grid = Array(10).fill(null).map(() => Array(10).fill(0));
+    placedShips = [];
+    selectedShip = null;
+    renderGridSetup();
+    renderShipPalette();
+    document.getElementById('setup-status').textContent = 'Place all ships to continue...';
+  });
+
+  document.getElementById('ready-btn').addEventListener('click', readyForBattle);
+  document.getElementById('back-lobby-btn').addEventListener('click', () => location.href = '/arena');
+
+  function connectAndJoin(bet) {
+    const user = CloudSync.currentUser;
+    user.getIdToken().then(token => {
+      ws = new WebSocket(WS_URL);
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ type: 'auth', token }));
+      };
+      ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
+      ws.onerror = () => console.error('WS error');
+      ws.onclose = () => location.href = '/arena';
+    });
+  }
+
+  function handleMessage(msg) {
+    if (msg.type === 'auth_ok') {
+      ws.send(JSON.stringify({ type: 'join_queue', bet: parseInt(document.getElementById('bet-input')?.value || 0), gameType: 'battleship' }));
+    } else if (msg.type === 'status' && msg.status === 'queued') {
+      showPhase('setup');
+      initSetupPhase();
+    } else if (msg.type === 'game_start') {
+      yourIndex = msg.yourIndex;
+      showPhase('battle');
+    } else if (msg.type === 'placement_result') {
+      if (!msg.valid) alert('Placement error: ' + msg.error);
+    } else if (msg.type === 'battle_start') {
+      updateBattleDisplay();
+    }
+  }
+
+  function updateBattleDisplay() {
+    const yourGrid = document.getElementById('grid-your');
+    const enemyGrid = document.getElementById('grid-enemy');
+
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 10; x++) {
+        const cell = document.createElement('div');
+        cell.className = 'board-cell';
+        cell.dataset.x = x;
+        cell.dataset.y = y;
+        cell.addEventListener('click', () => fireAt(x, y));
+        enemyGrid.appendChild(cell);
+      }
+    }
+
+    for (let y = 0; y < 10; y++) {
+      for (let x = 0; x < 10; x++) {
+        const cell = document.createElement('div');
+        cell.className = 'board-cell';
+        if (grid[y][x]) cell.classList.add('ship');
+        yourGrid.appendChild(cell);
+      }
+    }
+  }
+
+  function fireAt(x, y) {
+    ws.send(JSON.stringify({ type: 'action', action: 'fire', x, y }));
+  }
+
+  // Start with bet input (simplified for now)
+  const bet = prompt('Enter bet amount (min 100):');
+  if (!bet || parseInt(bet) < 100) {
+    location.href = '/arena';
+  } else {
+    connectAndJoin(parseInt(bet));
+  }
+
+  updateBalance();
+  window.addEventListener('strubles:change', updateBalance);
+})();
+</script>
+</body>
+</html>
