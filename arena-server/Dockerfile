@@ -8,8 +8,9 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install dependencies. npm install (not ci) — no package-lock.json is
+# committed for this package, and ci hard-requires one.
+RUN npm install --omit=dev
 
 # Copy application code
 COPY . .
