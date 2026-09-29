@@ -5,7 +5,7 @@
 
 const MUSIC_LIBRARY = [
   // Arena Competitive
-  { name: 'Koronba - Ryegen', path: '/koronba%20-%20Ryegen.mp3', category: 'arena', mood: 'intense' },
+  { name: 'Koronba - Ryegen', path: '/audio/music/koronba-ryegen.mp3', category: 'arena', mood: 'intense' },
   { name: 'AAA Powerline', path: '/audio/music/aaa-powerline.mp3', category: 'arena', mood: 'energy' },
   { name: 'Deathmetal', path: '/audio/music/deathmetal.mp3', category: 'arena', mood: 'aggressive' },
 
