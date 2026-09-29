@@ -317,6 +317,30 @@
       box-shadow: 0 0 10px #29b6f6, 0 0 24px #29b6f6, 0 0 48px rgba(41, 182, 246, 0.6), inset 0 0 14px rgba(41, 182, 246, 0.2);
     }
 
+    /* Temporary economy freeze -- see tycoon.astro's TYCOON_DISABLED.
+       Fully non-interactive (pointer-events:none, no href on the element
+       itself), not just dimmed, so there's no click or keyboard path to
+       the page from here regardless of animation/hover overrides. */
+    a.big.neon-tycoon.disabled {
+      filter: grayscale(1);
+      opacity: 0.4;
+      pointer-events: none;
+      animation: none !important;
+      box-shadow: none;
+      text-shadow: none;
+      border-color: #555;
+      color: #888;
+      position: relative;
+    }
+    a.big.neon-tycoon.disabled::after {
+      content: 'OUT OF ORDER';
+      display: block;
+      font-size: 10px;
+      letter-spacing: 1px;
+      margin-top: 4px;
+      color: #ff6b6b;
+    }
+
     a.big.neon-arena {
       background: #1a0800;
       border: 2px solid #ff6b1a;
@@ -1491,7 +1515,7 @@
   <div class="button-grid">
     <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
     <a class="big neon-mines" href="/minesweeper">💣 Minesweeper</a>
-    <a class="big neon-tycoon" href="/tycoon">🏙️ Iantopia Tycoon</a>
+    <a class="big neon-tycoon disabled" role="link" aria-disabled="true" title="Temporarily out of order">🏙️ Iantopia Tycoon</a>
     <a class="big neon-horse" href="/horse-web-game">🐴 Horse Game</a>
     <a class="big neon-arena" href="/arena">⚔️ Arena</a>
     <a class="big neon-shop" href="/lootbox">🍺 Shop</a>

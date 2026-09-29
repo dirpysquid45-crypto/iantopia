@@ -70,7 +70,20 @@ class Manager {
       if (a.bet === b.bet && a.gameType === b.gameType) {
         const playerA = this.queue.shift();
         const playerB = this.queue.shift();
-        this.startGame(playerA, playerB);
+        // startGame() is async and this call is intentionally not
+        // awaited (tryMatchmake isn't async) -- so it MUST be
+        // .catch()'d here. Previously it wasn't: an error from
+        // balanceManager.deductBet() (e.g. a stale queue-time balance
+        // check followed by a real insufficient-balance failure at
+        // match time) became an unhandled promise rejection, which
+        // crashes the entire Node process by default -- disconnecting
+        // every player on the server, not just the two in this match.
+        this.startGame(playerA, playerB).catch((e) => {
+          console.error('[startGame] Failed to start match:', e.message);
+          const errMsg = JSON.stringify({ type: 'error', message: 'Failed to start match: ' + e.message });
+          try { playerA.ws.send(errMsg); } catch {}
+          try { playerB.ws.send(errMsg); } catch {}
+        });
       } else {
         break;
       }
@@ -88,7 +101,16 @@ class Manager {
     }
 
     this.tables.set(tableId, game);
-    await game.start();
+    try {
+      await game.start();
+    } catch (e) {
+      // Table was already registered above -- if start() fails partway
+      // (e.g. player A's bet deducted but player B's balance check
+      // fails), remove it so it doesn't linger as a broken, unplayable
+      // entry that a later disconnect could still match against.
+      this.tables.delete(tableId);
+      throw e;
+    }
   }
 
   async handleShipPlacement(sessionId, ships) {

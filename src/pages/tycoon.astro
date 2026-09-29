@@ -427,6 +427,10 @@
       </div>
     </header>
 
+    <div id="out-of-order-banner" style="background:rgba(180,30,30,0.9); border:2px solid #ff4444; color:#fff; padding:12px 16px; margin-bottom:14px; text-align:center; font-weight:700; letter-spacing:0.5px;">
+      🚧 Tycoon is temporarily out of order — construction, production, and upkeep are all frozen. Nothing here is earning or costing Strubles right now.
+    </div>
+
     <div id="stats-bar">
       <span>Production: <b id="stat-production">0</b>/min</span>
       <span>Placed: <b id="stat-placed">0/5</b></span>
@@ -562,6 +566,10 @@
 <script is:inline>
 (() => {
   const $ = (id) => document.getElementById(id);
+  // Temporary economy freeze: no construction progress, no production
+  // accrual, no tax accrual. The grid still renders (read-only) so
+  // existing layouts aren't lost, but nothing here can earn Strubles.
+  const TYCOON_DISABLED = true;
   const BASE_GRID_SIZE = 5;
   const GRID_KEY = 'tycoon_grid_v1';
   const LAST_SEEN_KEY = 'tycoon_last_seen_v1';
@@ -631,6 +639,7 @@
   // though only production payout was ever meant to be bounded -- a
   // building now always finishes exactly when its own timer says it will.
   function tick(grid) {
+    if (TYCOON_DISABLED) return false;
     const now = Date.now();
     let earned = 0;
     let changed = false;
