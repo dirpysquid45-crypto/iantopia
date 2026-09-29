@@ -111,6 +111,22 @@
   .volume-mute-btn{ all:unset; cursor:none; font-size:16px; padding:4px 8px; border:1px solid var(--gold); background:#000; }
   #now-playing { position:fixed; bottom:20px; right:20px; z-index:20; color:var(--gold); background:#000; border:3px solid var(--gold); padding:10px 14px; font-size:14px; cursor:none; transition:background 0.2s; }
   #now-playing:hover { background:var(--gold); color:#000; }
+
+  /* BET PHASE (lobby browsing) */
+  .phase-bet { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:20px; max-width:400px; margin:0 auto; }
+  .bet-input { background:#000; border:2px solid var(--gold); color:var(--gold); padding:8px; font-family:inherit; font-size:11px; width:100%; margin-bottom:10px; box-sizing:border-box; }
+  .bet-btn { color:#000; background:var(--gold); border:2px solid #000; padding:8px 12px; font-size:10px; font-weight:700; width:100%; cursor:pointer; }
+  .bet-btn:hover { background:#ffe766; }
+  .bet-status { font-size:9px; color:var(--muted); margin:10px 0; }
+  #lobby-list { margin-top:15px; }
+  #lobby-list-heading { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
+  .lobby-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border:2px solid rgba(255,215,0,.3); margin-bottom:6px; background:rgba(255,215,0,.05); }
+  .lobby-row .lobby-bet { font-size:11px; color:var(--gold); }
+  .lobby-row.own { border-color:rgba(255,215,0,.6); background:rgba(255,215,0,.1); }
+  .lobby-row.own .lobby-bet::after { content:' (yours — waiting)'; color:var(--muted); font-size:9px; }
+  .lobby-row button { color:#000; background:var(--gold); border:2px solid #000; padding:6px 10px; font-size:9px; font-weight:700; cursor:pointer; }
+  .lobby-row button:hover { background:#ffe766; }
+  #lobby-empty { font-size:9px; color:var(--muted); padding:8px 0; }
 </style>
 </head>
 <body>
@@ -119,6 +135,20 @@
     <div class="top-bar">
       <div class="title">⚓ Battleship 1v1</div>
       <div class="balance">Balance: <span id="balance">0</span> Strubles</div>
+    </div>
+
+    <!-- BET PHASE (lobby browsing) -->
+    <div id="phase-bet" class="phase-bet">
+      <div class="bet-status">Enter a bet to open a lobby, or match one below</div>
+      <input type="number" id="bet-input" class="bet-input" min="100" step="100" placeholder="Bet amount" />
+      <button id="find-match" class="bet-btn">Open Lobby</button>
+      <div class="bet-status" id="status-message"></div>
+
+      <div id="lobby-list">
+        <div id="lobby-list-heading">Open Lobbies</div>
+        <div id="lobby-rows"></div>
+        <div id="lobby-empty">No open lobbies yet — be the first to place a bet.</div>
+      </div>
     </div>
 
     <!-- SETUP PHASE -->
@@ -264,16 +294,53 @@
   let horizontal = true;
   let yourIndex = null;
   let opponentGrid = Array(10).fill(null).map(() => Array(10).fill(0));
+  let myQueueId = null;
 
   function updateBalance() {
     document.getElementById('balance').textContent = Strubles.get().toLocaleString();
   }
 
   function showPhase(p) {
+    document.getElementById('phase-bet').style.display = p === 'bet' ? 'block' : 'none';
     document.getElementById('phase-setup').style.display = p === 'setup' ? 'flex' : 'none';
     document.getElementById('phase-battle').style.display = p === 'battle' ? 'grid' : 'none';
     document.getElementById('phase-result').style.display = p === 'result' ? 'flex' : 'none';
     phase = p;
+  }
+
+  function showStatus(msg) {
+    document.getElementById('status-message').textContent = msg;
+  }
+
+  function renderLobbies(lobbies) {
+    const container = document.getElementById('lobby-rows');
+    const empty = document.getElementById('lobby-empty');
+    const relevant = lobbies.filter(l => l.gameType === 'battleship');
+    container.innerHTML = '';
+    if (relevant.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+    relevant.forEach((lobby) => {
+      const isOwn = lobby.queueId === myQueueId;
+      const row = document.createElement('div');
+      row.className = 'lobby-row' + (isOwn ? ' own' : '');
+      const betSpan = document.createElement('span');
+      betSpan.className = 'lobby-bet';
+      betSpan.textContent = `${lobby.bet.toLocaleString()} Strubles`;
+      row.appendChild(betSpan);
+      if (!isOwn) {
+        const btn = document.createElement('button');
+        btn.textContent = 'Match Bet';
+        btn.addEventListener('click', () => {
+          if (!ws || ws.readyState !== WebSocket.OPEN) return;
+          ws.send(JSON.stringify({ type: 'match_bet', queueId: lobby.queueId }));
+        });
+        row.appendChild(btn);
+      }
+      container.appendChild(row);
+    });
   }
 
   function initSetupPhase() {
@@ -409,8 +476,14 @@
   document.getElementById('ready-btn').addEventListener('click', readyForBattle);
   document.getElementById('back-lobby-btn').addEventListener('click', () => location.href = '/arena');
 
-  function connectAndJoin(bet) {
+  // Connect and authenticate as soon as we know the user's signed in --
+  // not on bet placement -- so the lobby list (which streams in over
+  // this same connection) is visible before they've entered a bet at
+  // all, letting them browse and match an existing lobby immediately.
+  function connectAuth() {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
     const user = CloudSync.currentUser;
+    if (!user) return;
     user.getIdToken().then(token => {
       ws = new WebSocket(WS_URL);
       ws.onopen = () => {
@@ -418,20 +491,56 @@
       };
       ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
       ws.onerror = () => console.error('WS error');
-      ws.onclose = () => location.href = '/arena';
+      ws.onclose = () => {
+        showStatus('Disconnected -- reconnecting...');
+        ws = null;
+        myQueueId = null;
+        setTimeout(connectAuth, 2000);
+      };
     });
   }
+  window.addEventListener('cloudsync:authchanged', (e) => {
+    if (e.detail.user) connectAuth();
+  });
+  if (window.CloudSync && CloudSync.isSignedIn()) connectAuth();
+
+  document.getElementById('find-match').addEventListener('click', () => {
+    if (!window.CloudSync || !CloudSync.isSignedIn()) {
+      showStatus('Must be signed in');
+      return;
+    }
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      showStatus('Still connecting, try again in a moment...');
+      connectAuth();
+      return;
+    }
+    const bet = parseInt(document.getElementById('bet-input').value || 0);
+    if (!bet || bet < 100) {
+      showStatus('Bet must be at least 100');
+      return;
+    }
+    if (Strubles.get() < bet) {
+      showStatus('Insufficient balance');
+      return;
+    }
+    ws.send(JSON.stringify({ type: 'join_queue', bet, gameType: 'battleship' }));
+  });
 
   function handleMessage(msg) {
     if (msg.type === 'auth_ok') {
-      ws.send(JSON.stringify({ type: 'join_queue', bet: currentBet, gameType: 'battleship' }));
+      showStatus('Connected. Enter a bet to open a lobby, or match one below.');
+    } else if (msg.type === 'lobby_update') {
+      renderLobbies(msg.lobbies);
     } else if (msg.type === 'status' && msg.status === 'queued') {
-      // Waiting for an opponent -- ships aren't placed yet (no table
-      // exists server-side until matched), so nothing to show here.
+      myQueueId = msg.queueId;
+      showStatus('Waiting for opponent... (or someone can match your bet)');
     } else if (msg.type === 'game_start') {
       // Matched: this is when setup (ship placement) actually begins.
       yourIndex = msg.yourIndex;
+      myQueueId = null;
       initSetupPhase();
+    } else if (msg.type === 'error') {
+      showStatus(msg.message);
     } else if (msg.type === 'placement_result') {
       if (!msg.valid) alert('Placement error: ' + msg.error);
     } else if (msg.type === 'battle_start') {
@@ -521,16 +630,7 @@
     ws.send(JSON.stringify({ type: 'action', action: 'fire', x, y }));
   }
 
-  // Start with bet input (simplified for now)
-  let currentBet = 0;
-  const bet = prompt('Enter bet amount (min 100):');
-  if (!bet || parseInt(bet) < 100) {
-    location.href = '/arena';
-  } else {
-    currentBet = parseInt(bet);
-    connectAndJoin(currentBet);
-  }
-
+  showPhase('bet');
   updateBalance();
   window.addEventListener('strubles:change', updateBalance);
 })();
