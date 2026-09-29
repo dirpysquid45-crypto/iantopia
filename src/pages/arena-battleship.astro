@@ -633,6 +633,8 @@
   showPhase('bet');
   updateBalance();
   window.addEventListener('strubles:change', updateBalance);
+
+  if (window.initPickers) { setTimeout(window.initPickers, 100); }
 })();
 </script>
 </body>

@@ -145,6 +145,8 @@
         if (audioEnabled) tryPlayTheme();
         else themeMusic.pause();
       });
+
+      if (window.initPickers) { setTimeout(window.initPickers, 100); }
     })();
   </script>
 </body>
