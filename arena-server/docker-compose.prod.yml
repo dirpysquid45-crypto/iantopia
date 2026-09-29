@@ -25,7 +25,12 @@ services:
           cpus: '0.5'
           memory: 256M
     healthcheck:
-      test: ["CMD", "node", "-e", "require('ws').connect('ws://localhost:4001')"]
+      # This compose-level healthcheck overrides the Dockerfile's own
+      # HEALTHCHECK instruction. require('ws') has no .connect() static
+      # method (that's not the ws package's API) -- every check has been
+      # throwing and marking the container "unhealthy" regardless of
+      # whether it's actually serving connections correctly.
+      test: ["CMD", "node", "-e", "const WS = require('ws'); const ws = new WS('ws://localhost:4001'); ws.on('open', () => { ws.close(); process.exit(0); }); ws.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 5000);"]
       interval: 30s
       timeout: 10s
       retries: 3

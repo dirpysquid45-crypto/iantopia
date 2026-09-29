@@ -23,9 +23,11 @@ console.log(`[Arena Server] Listening on 0.0.0.0:${PORT}`);
 
 wss.on('connection', async (ws, req) => {
   const clientIp = req.socket.remoteAddress || '127.0.0.1';
+  console.log(`[connection] New connection from ${clientIp}`);
 
   // Rate limit by IP
   if (rateLimit.isLimited(clientIp)) {
+    console.log(`[connection] Rejected ${clientIp}: too many connections`);
     ws.close(1008, 'Too many connections from this IP');
     return;
   }
@@ -40,11 +42,13 @@ wss.on('connection', async (ws, req) => {
       // Auth phase
       if (!userId) {
         if (msg.type !== 'auth') {
+          console.log(`[auth] Closing ${clientIp}: first message was '${msg.type}', not 'auth'`);
           ws.close(1008, 'Must authenticate first');
           return;
         }
         const token = msg.token;
         if (!token) {
+          console.log(`[auth] Closing ${clientIp}: no token provided`);
           ws.close(1008, 'No token provided');
           return;
         }
@@ -52,6 +56,7 @@ wss.on('connection', async (ws, req) => {
           const decodedToken = await auth.verifyIdToken(token);
           userId = decodedToken.uid;
           sessionId = Math.random().toString(36).substring(7);
+          console.log(`[auth] OK: userId=${userId} sessionId=${sessionId}`);
           ws.send(JSON.stringify({ type: 'auth_ok', sessionId }));
           manager.registerConnection(userId, sessionId, ws);
         } catch (e) {
@@ -63,9 +68,12 @@ wss.on('connection', async (ws, req) => {
 
       // Rate limit by connection (messages/sec)
       if (!rateLimit.allowMessage(sessionId)) {
+        console.log(`[rate-limit] ${userId} (${sessionId}) hit the message rate limit`);
         ws.send(JSON.stringify({ type: 'error', message: 'Rate limited' }));
         return;
       }
+
+      console.log(`[message] ${userId} (${sessionId}): ${msg.type}${msg.type === 'join_queue' ? ` bet=${msg.bet} gameType=${msg.gameType}` : ''}${msg.type === 'action' ? ` action=${msg.action}` : ''}`);
 
       // Route messages to manager
       await manager.handleMessage(userId, sessionId, msg);
@@ -75,7 +83,8 @@ wss.on('connection', async (ws, req) => {
     }
   });
 
-  ws.on('close', () => {
+  ws.on('close', (code, reason) => {
+    console.log(`[close] userId=${userId} sessionId=${sessionId} code=${code} reason=${reason || '(none)'}`);
     try {
       if (userId && sessionId) {
         manager.deregisterConnection(userId, sessionId);
@@ -89,7 +98,7 @@ wss.on('connection', async (ws, req) => {
   });
 
   ws.on('error', (err) => {
-    console.error('[WebSocket] Error:', err.message);
+    console.error(`[WebSocket] Error for userId=${userId} sessionId=${sessionId}:`, err.message);
   });
 });
 

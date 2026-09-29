@@ -23,7 +23,11 @@ USER nodejs
 
 EXPOSE 4001
 
+# Node 20 has no global WebSocket -- must use the ws package explicitly,
+# not the browser-style `new WebSocket(...)` this previously (and always,
+# since the image was first built) used, which threw ReferenceError on
+# every single check and left the container permanently "unhealthy".
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "const ws = new WebSocket('ws://localhost:4001'); ws.onopen = () => { ws.close(); process.exit(0); }; setTimeout(() => process.exit(1), 5000);"
+  CMD node -e "const WS = require('ws'); const ws = new WS('ws://localhost:4001'); ws.on('open', () => { ws.close(); process.exit(0); }); ws.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 5000);"
 
 CMD ["node", "server.js"]
