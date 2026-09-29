@@ -183,7 +183,7 @@
     { name: 'Destroyer', size: 2 }
   ];
 
-  const WS_URL = window.location.protocol === 'https:' ? 'wss://iantopia.com/api/arena/battleship' : 'ws://localhost:4001';
+  const WS_URL = window.location.protocol === 'https:' ? 'wss://iantopia.com/arena-ws/battleship' : 'ws://localhost:4001';
   let ws = null;
   let phase = 'bet'; // bet, setup, battle, result
   let grid = Array(10).fill(null).map(() => Array(10).fill(0));

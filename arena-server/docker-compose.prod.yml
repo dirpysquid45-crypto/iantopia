@@ -7,10 +7,12 @@ services:
     restart: unless-stopped
     networks:
       - iantopia-network
+      - yt-network
     ports:
       - "127.0.0.1:4001:4001"
     volumes:
       - ./service-account-key.json:/app/service-account-key.json:ro
+      - ../public:/public:ro
     environment:
       - NODE_ENV=production
       - PORT=4001
@@ -32,3 +34,6 @@ services:
 networks:
   iantopia-network:
     driver: bridge
+  yt-network:
+    external: true
+    name: youtube-transcript-app_yt-network
