@@ -37,4 +37,11 @@ window.MUSIC_LIBRARY = {
   hello_kitty:         { label: 'Hello Kitty',                       src: '/audio/music/hello-kitty.mp3' },
   girl_like_me:        { label: 'PinkPantheress – Girl Like Me',     src: '/audio/music/girl-like-me.mp3' },
   minecraft_ost:       { label: 'Minecraft OST (C418)',              src: '/audio/music/minecraft-ost.mp3' },
+
+  // --- Arena-only free defaults ---
+  // koronba has no shop entry (Arena Battleship's page-only free
+  // default, via PAGE_FREE_TRACK_KEY); yadakk mirrors it as Arena's hub
+  // theme but is ALSO a real case-unlockable track (see case-data.js).
+  koronba:             { label: 'Koronba - Ryegen',                  src: '/audio/music/koronba-ryegen.mp3' },
+  yadakk:              { label: 'Yaddak Theme - Battle of Polytopia', src: '/audio/music/yadakk-theme.mp3' },
 };

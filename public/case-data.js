@@ -74,6 +74,7 @@ window.CASE_ITEMS = {
   // ---------- Covert (red) ----------
   mus_taipei:  { label: 'Yung Lean – Taipei Instrumental', tier: 'covert',    emoji: '🌆',                                  type: 'music_unlock', key: 'taipei_instrumental' },
   mus_cursed:  { label: 'Cursed Audio File',              tier: 'covert',     emoji: '💀',                                  type: 'music_unlock', key: 'cursed' },
+  mus_yadakk:  { label: 'Yaddak Theme - Battle of Polytopia', tier: 'covert', emoji: '⚔️',                                  type: 'music_unlock', key: 'yadakk' },
   bg_vegas:    { label: 'Background: Las Vegas Skyline',  tier: 'covert',     img: '/video/vegas-skyline.gif',             type: 'background_unlock', key: 'vegas_skyline' },
   bg_oldppl:   { label: 'Background: Old People Slot',    tier: 'covert',     img: '/video/old-ppl-slot.gif',              type: 'background_unlock', key: 'old_ppl_slot' },
   mus_build:   { label: 'Yung Lean × Thaiboy × Bladee – Buildings', tier: 'covert', emoji: '🏙️',                            type: 'music_unlock', key: 'buildings' },

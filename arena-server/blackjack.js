@@ -23,12 +23,11 @@ class BlackjackGame {
     this.hands[0] = [this.deck.pop(), this.deck.pop()];
     this.hands[1] = [this.deck.pop(), this.deck.pop()];
 
-    // Send initial state
-    this.broadcast({
-      type: 'game_start',
-      hands: this.hands,
-      yourIndex: null // Client doesn't need this on initial, but structure it anyway
-    });
+    // Send initial state. Each player needs their OWN index -- broadcast()
+    // would send the identical message to both, leaving neither client
+    // able to tell which side of `results[]` is theirs once the game ends.
+    this.sendTo(0, { type: 'game_start', hands: this.hands, yourIndex: 0 });
+    this.sendTo(1, { type: 'game_start', hands: this.hands, yourIndex: 1 });
   }
 
   async handleAction(sessionId, action) {
@@ -97,6 +96,10 @@ class BlackjackGame {
     }, 3000);
   }
 
+  isFinished() {
+    return this.done[0] && this.done[1];
+  }
+
   forfeit(sessionId) {
     const playerIndex = this.players.findIndex(p => p.sessionId === sessionId);
     if (playerIndex === -1) return;
@@ -106,6 +109,10 @@ class BlackjackGame {
     const payout = (bet * 2) - raked;
     this.balanceManager.creditPayout(this.players[otherIndex].userId, payout);
     this.broadcast({ type: 'opponent_disconnected', winner: otherIndex });
+  }
+
+  sendTo(playerIndex, msg) {
+    this.players[playerIndex].ws.send(JSON.stringify(msg));
   }
 
   broadcast(msg) {

@@ -76,8 +76,15 @@ wss.on('connection', async (ws, req) => {
   });
 
   ws.on('close', () => {
-    if (userId && sessionId) {
-      manager.deregisterConnection(userId, sessionId);
+    try {
+      if (userId && sessionId) {
+        manager.deregisterConnection(userId, sessionId);
+      }
+    } catch (e) {
+      // A bug in any one game's disconnect/forfeit path must never take
+      // down the whole process -- that would drop every other concurrent
+      // match, not just this connection's.
+      console.error('[close] Error during deregisterConnection:', e.message);
     }
   });
 

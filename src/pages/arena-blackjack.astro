@@ -70,6 +70,23 @@
     64%  { color:#fff; }
     72%, 100% { color:#ffeb3b; }
   }
+
+  /* Now Playing modal -- same structure/classes as every other page's
+     picker so Arena feels like one system with the rest of the site. */
+  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:100; display:none; align-items:center; justify-content:center; padding:20px; }
+  .overlay.open{ display:flex; }
+  .modal{ width:min(360px,90vw); max-height:70vh; overflow-y:auto; background:#0a0a0a; border:3px solid var(--gold); padding:20px; box-shadow:0 0 20px rgba(255,215,0,.4); }
+  .modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; }
+  .modal-head h2{ margin:0; font-size:12px; color:var(--gold); font-weight:400; }
+  .btn{ color:var(--gold); text-decoration:none; border:3px solid var(--gold); padding:8px 12px; background:#000; font-size:9px; transition:background .2s, color .2s; cursor:none; font-family:inherit; letter-spacing:1px; text-transform:uppercase; }
+  .btn:hover{ background:var(--gold); color:#000; }
+  .picker-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:11px; }
+  .picker-row:last-child { border-bottom:none; }
+  .volume-row{ display:flex; align-items:center; gap:10px; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid rgba(255,215,0,0.3); }
+  .volume-row input[type="range"]{ flex:1; accent-color:var(--gold); cursor:none; touch-action:none; padding:14px 0; }
+  .volume-mute-btn{ all:unset; cursor:none; font-size:16px; padding:4px 8px; border:1px solid var(--gold); background:#000; }
+  #now-playing { position:fixed; bottom:20px; right:20px; z-index:20; color:var(--gold); background:#000; border:3px solid var(--gold); padding:10px 14px; font-size:14px; cursor:none; transition:background 0.2s; }
+  #now-playing:hover { background:var(--gold); color:#000; }
 </style>
 </head>
 <body>
@@ -116,6 +133,25 @@
     </div>
   </main>
 
+  <button id="now-playing" title="Music options">🎵</button>
+
+  <!-- Music Playlist Modal -->
+  <div class="overlay" id="playlist-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Now Playing</h2>
+        <button class="btn" id="playlist-close" type="button">Close</button>
+      </div>
+      <div class="volume-row">
+        <button class="volume-mute-btn" id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
+        <input type="range" id="volume-slider" min="0" max="100" value="50" aria-label="Music volume" />
+      </div>
+      <div id="playlist-list"></div>
+    </div>
+  </div>
+
+  <audio id="theme-music" src="/audio/music/Balatro-Main-Theme.mp3" preload="auto" loop></audio>
+
 <script is:inline src="/cursor-library.js?v=4"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -124,11 +160,47 @@
 <script is:inline src="/cloud-sync.js?v=9"></script>
 <script is:inline src="/tycoon-bank.js?v=1"></script>
 <script is:inline src="/strubles.js?v=3"></script>
-<script is:inline src="/arena-music.js"></script>
+<script is:inline src="/music-library.js?v=13"></script>
+<script is:inline src="/music-position.js?v=1"></script>
+<script is:inline>
+  // Balatro plays for free on Arena Blackjack, matching solo /blackjack.
+  window.PAGE_FREE_TRACK_KEY = 'balatro';
+</script>
+<script is:inline src="/pickers.js?v=11"></script>
 <script is:inline>
 (() => {
-  // Initialize music - Balatro strategic theme with red table
-  window.arenaMusic = new ArenaMusic('/audio/music/Balatro-Main-Theme.mp3');
+  const themeMusic = document.getElementById('theme-music');
+  const VOLUME_KEY = 'music_volume_v1';
+  const volumeSlider = document.getElementById('volume-slider');
+  const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
+  themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.5;
+  volumeSlider.value = Math.round(themeMusic.volume * 100);
+  volumeSlider.addEventListener('input', () => {
+    themeMusic.volume = volumeSlider.value / 100;
+    localStorage.setItem(VOLUME_KEY, themeMusic.volume);
+  });
+
+  let audioEnabled = true;
+  function tryPlayTheme() {
+    if (!audioEnabled) return;
+    themeMusic.play().catch(() => {});
+  }
+  tryPlayTheme();
+  const unlockTheme = () => {
+    tryPlayTheme();
+    window.removeEventListener('pointerdown', unlockTheme);
+    window.removeEventListener('keydown', unlockTheme);
+  };
+  window.addEventListener('pointerdown', unlockTheme);
+  window.addEventListener('keydown', unlockTheme);
+
+  const muteBtn = document.getElementById('mute-btn');
+  muteBtn.addEventListener('click', () => {
+    audioEnabled = !audioEnabled;
+    muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
+    if (audioEnabled) tryPlayTheme();
+    else themeMusic.pause();
+  });
 
   const WS_URL = window.location.protocol === 'https:' ? 'wss://iantopia.com/arena-ws/blackjack' : 'ws://localhost:4001';
   let ws = null;
@@ -192,6 +264,7 @@
     } else if (msg.type === 'status' && msg.status === 'queued') {
       showStatus('Waiting for opponent...');
     } else if (msg.type === 'game_start') {
+      yourIndex = msg.yourIndex;
       document.getElementById('bet-section').style.display = 'none';
       document.getElementById('game-section').style.display = 'flex';
       renderHands(msg.hands);
@@ -212,8 +285,9 @@
   }
 
   function renderHands(hands) {
-    document.getElementById('your-hand').textContent = hands[0].map(c => c.v + c.s).join(' ');
-    document.getElementById('opponent-hand').textContent = hands[1].map(c => c.v + c.s).join(' ');
+    const oppIndex = 1 - yourIndex;
+    document.getElementById('your-hand').textContent = hands[yourIndex].map(c => c.v + c.s).join(' ');
+    document.getElementById('opponent-hand').textContent = hands[oppIndex].map(c => c.v + c.s).join(' ');
   }
 
   document.getElementById('hit').addEventListener('click', () => ws?.send(JSON.stringify({ type: 'action', action: 'hit' })));
