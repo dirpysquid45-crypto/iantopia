@@ -95,6 +95,7 @@ wss.on('connection', async (ws, req) => {
       // match, not just this connection's.
       console.error('[close] Error during deregisterConnection:', e.message);
     }
+    rateLimit.removeConnection(clientIp);
   });
 
   ws.on('error', (err) => {

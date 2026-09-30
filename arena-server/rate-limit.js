@@ -31,6 +31,15 @@ class RateLimit {
     this.connectionMessageCount.set(sessionId, state);
     return true;
   }
+
+  removeConnection(ip) {
+    const count = this.ipConnections.get(ip) || 0;
+    if (count > 1) {
+      this.ipConnections.set(ip, count - 1);
+    } else {
+      this.ipConnections.delete(ip);
+    }
+  }
 }
 
 module.exports = RateLimit;
