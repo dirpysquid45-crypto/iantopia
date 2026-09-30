@@ -53,14 +53,24 @@ REGIONS = {
         'white house', 'state department', 'us congress', 'american',
         'western hemisphere', 'americas strategy', 'us-china competition', 'north america'
     ],
-    'Africa': [
-        'africa', 'nigerian', 'nigeria', 'kenya', 'south africa', 'sudan', 'ethiopia',
-        'somalia', 'mali', 'sahel', 'congo', 'zimbabwe', 'egypt', 'moroccan', 'morocco',
-        'uganda', 'tanzania', 'rwanda', 'senegal', 'cameroon', 'burkina', 'niger',
-        'liberia', 'sierra leone', 'ghana', 'ivory coast', 'botswana', 'zambia',
-        'african union', 'sahara', 'sub-saharan', 'sub saharan', 'african',
-        'au', 'ecowas', 'peacekeeping', 'conflict',
-        'wagner group africa', 'great lakes', 'horn of africa', 'boko haram'
+    'Horn of Africa': [
+        'ethiopia', 'somalia', 'kenya', 'sudan', 'south sudan', 'eritrea',
+        'horn of africa', 'east africa', 'abyssinia', 'djibouti', 'addis',
+        'mogadishu', 'nairobi', 'khartoum', 'security', 'conflict', 'currency',
+        'monetary', 'inflation', 'famine', 'drought', 'humanitarian'
+    ],
+    'West Africa': [
+        'nigerian', 'nigeria', 'senegal', 'ghana', 'ivory coast', 'mali',
+        'burkina faso', 'burkina', 'niger', 'cameroon', 'liberia', 'sierra leone',
+        'guinea', 'benin', 'togo', 'west africa', 'sahel', 'ecowas',
+        'lagos', 'dakar', 'abuja', 'accra', 'security', 'terrorism', 'economy'
+    ],
+    'Central & Southern Africa': [
+        'congo', 'zimbabwe', 'botswana', 'zambia', 'south africa', 'mozambique',
+        'malawi', 'lesotho', 'namibia', 'angola', 'rwandan', 'rwanda', 'uganda',
+        'tanzania', 'central africa', 'southern africa', 'drc',
+        'johannesburg', 'cape town', 'kinshasa', 'harare', 'lusaka',
+        'security', 'military', 'humanitarian', 'drought', 'food', 'inflation'
     ]
 }
 
@@ -69,7 +79,9 @@ REGION_ICONS = {
     'Asia-Pacific': '🌏',
     'Middle East & North Africa': '🌍',
     'Americas': '🌎',
-    'Africa': '🌍'
+    'Horn of Africa': '🌍',
+    'West Africa': '🌍',
+    'Central & Southern Africa': '🌍'
 }
 
 # RSS feeds organized by regional expertise + general news
@@ -235,20 +247,52 @@ def pull_feeds():
 
 DEMO_STORIES = {
     # Supplementary analysis when live feeds are sparse for a region
-    'Africa': [
+    'Horn of Africa': [
         {
             'source': 'International Crisis Group',
-            'title': 'Sahel security challenges require regional coordination',
-            'summary': 'Jihadist insurgencies and state fragility demand unified international response strategies.',
+            'title': 'Horn of Africa security and economic integration',
+            'summary': 'Regional stability initiatives amid transnational threats and currency pressures affecting Ethiopia, Somalia, and Kenya.',
             'link': 'https://www.crisisgroup.org',
             'status': 'developing'
         },
         {
+            'source': 'Institute for the Study of War',
+            'title': 'Counterinsurgency operations in East Africa',
+            'summary': 'Government campaigns targeting extremist groups and cross-border militant networks.',
+            'link': 'https://www.understandingwar.org',
+            'status': 'developing'
+        }
+    ],
+    'West Africa': [
+        {
             'source': 'Brookings Institution',
-            'title': 'African Union strengthens peacekeeping capacity',
-            'summary': 'Continental organization deepens involvement in conflict resolution and crisis management.',
+            'title': 'West African economic integration and political stability',
+            'summary': 'ECOWAS efforts to strengthen regional trade, address security challenges, and coordinate development policy.',
             'link': 'https://www.brookings.edu',
-            'status': 'scheduled'
+            'status': 'developing'
+        },
+        {
+            'source': 'International Crisis Group',
+            'title': 'Sahel security and regional cooperation frameworks',
+            'summary': 'Transnational terrorism response and state capacity building in Nigeria, Mali, Burkina Faso, and neighboring nations.',
+            'link': 'https://www.crisisgroup.org',
+            'status': 'developing'
+        }
+    ],
+    'Central & Southern Africa': [
+        {
+            'source': 'Institute for the Study of War',
+            'title': 'Central Africa conflict dynamics and humanitarian impact',
+            'summary': 'Ongoing security operations and regional implications in DRC, Uganda, and surrounding territories.',
+            'link': 'https://www.understandingwar.org',
+            'status': 'developing'
+        },
+        {
+            'source': 'Brookings Institution',
+            'title': 'Southern Africa climate, food security, and development challenges',
+            'summary': 'Regional economic pressures from drought, inflation, and geopolitical positioning of major African powers.',
+            'link': 'https://www.brookings.edu',
+            'status': 'developing'
         }
     ]
 }
