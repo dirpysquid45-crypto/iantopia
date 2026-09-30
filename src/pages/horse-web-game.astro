@@ -217,6 +217,7 @@
         <div class="stage-box">
           <h2 id="gameover-title">Wiped Out!</h2>
           <p>Hurdles cleared: <b id="final-cleared">0</b><br>Strubles earned: <b id="final-earned">0</b><br>Best: <b id="final-best">0</b></p>
+          <p id="cap-warning" style="color:#ff6b6b; font-size:8px; display:none; margin:8px 0 0;">⚠️ Wallet cap reached! Upgrade your Bank on /tycoon to continue earning.</p>
           <button class="btn" id="restart-btn" type="button">↻ Try Again</button>
         </div>
       </div>
@@ -641,6 +642,17 @@
     $('final-earned').textContent = earned.toLocaleString();
     $('final-best').textContent = best.toLocaleString();
     $('stat-best').textContent = best.toLocaleString();
+
+    // Show wallet cap warning if applicable
+    const finalBal = Strubles.get();
+    const cap = (window.TycoonBank && window.TycoonBank.currentCap()) || Infinity;
+    const capWarning = $('cap-warning');
+    if (earned > 0 && finalBal >= cap) {
+      capWarning.style.display = 'block';
+    } else {
+      capWarning.style.display = 'none';
+    }
+
     gameoverOverlay.hidden = false;
   }
 
@@ -1025,7 +1037,17 @@
         if (Math.hypot(dx, dy) < c.r + horseW * 0.28) {
           c.collected = true;
           earned += c.value;
-          try { Strubles.add(c.value); } catch {}
+          const beforeBal = Strubles.get();
+          const cap = (window.TycoonBank && window.TycoonBank.currentCap()) || Infinity;
+          try {
+            Strubles.add(c.value);
+            const afterBal = Strubles.get();
+            if (afterBal === beforeBal && beforeBal >= cap) {
+              console.warn(`[Horse] Coin +${c.value} blocked by wallet cap (${beforeBal}/${cap}). Upgrade your Bank to continue earning.`);
+            }
+          } catch (e) {
+            console.error('[Horse] Strubles.add failed:', e.message);
+          }
           $('stat-earned').textContent = earned.toLocaleString();
         }
       }
