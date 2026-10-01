@@ -8,6 +8,19 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: "2026-10-01",
+    title: "Horse Game Phase 2 & Arena Expansion",
+    changes: [
+      "Horse Game now features a dramatic 100-hurdle milestone: obstacles shift from wooden fences to rocks, the background swaps from plains to mountains, and a 2.5-second spawn cooldown prevents instant death on the flip.",
+      "New Arena card: ⚔️ Cavalry Battle joins Blackjack and Battleship, rendered with an animated cavalry battle GIF and golden-fiery styling.",
+      "Obstacle tracking consolidated -- planes dodged and gaps jumped now count toward the main 'Obstacles cleared' stat alongside hurdles, unifying all obstacle types.",
+      "Mobile layout fixes: Strubles badge repositioned on phones to prevent overlap with game canvas (now at 120px instead of 15px).",
+      "Collectibles system refactored: Rock, Horse, and Happy Horse items moved from in-game pickups to shop/lootcrate rewards (mil-spec, restricted, classified tiers respectively).",
+      "Repository reorganized: all game assets moved to /public directory with subdirectories for backgrounds, images, and naval-battle-assets. Asset paths standardized (lowercase with hyphens).",
+      "News digest cleaner: removed 'Generated locally on Qasim' attribution from morning digest byline -- now shows only timestamp.",
+    ],
+  },
+  {
     date: "2026-09-25",
     title: "Arena Mode: Battleship 1v1 & Multiplayer Polish",
     changes: [
