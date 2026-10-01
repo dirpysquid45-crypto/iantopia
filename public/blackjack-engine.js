@@ -24,6 +24,9 @@
     d.push({ s: '✨', v: '🎯', isGoalCard: true });
     d.push({ s: '✨', v: '🎯', isGoalCard: true });
 
+    // Add exactly 1 Ace Wildcard (trump version of Ace, rare)
+    d.push({ s: '♠', v: 'A', isWildcard: true });
+
     // Fisher-Yates shuffle
     for (let i = d.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -41,6 +44,14 @@
 
   function hasGoalCard(hand) {
     return hand.some(c => c.isGoalCard);
+  }
+
+  function hasAceWildcard(hand) {
+    return hand.some(c => c.v === 'A' && c.isWildcard);
+  }
+
+  function isTrumpCard(card) {
+    return card.isGoalCard || (card.v === 'A' && card.isWildcard);
   }
 
   function handValue(hand) {
@@ -75,6 +86,8 @@
     handValue,
     isBust,
     hasGoalCard,
+    hasAceWildcard,
+    isTrumpCard,
     getBustLimit
   };
 });

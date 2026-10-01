@@ -129,6 +129,9 @@
   .lobby-row button { color:#000; background:var(--gold); border:2px solid #000; padding:6px 10px; font-size:9px; font-weight:700; cursor:pointer; }
   .lobby-row button:hover { background:#ffe766; }
   #lobby-empty { font-size:9px; color:var(--muted); padding:8px 0; }
+
+  /* Trump card glow effect */
+  .trump-card { filter: drop-shadow(0 0 8px rgba(255,215,0,.8)) drop-shadow(0 0 4px rgba(255,215,0,.5)); border-color:#ffd700 !important; box-shadow:0 0 12px rgba(255,215,0,.4), inset 0 0 8px rgba(255,215,0,.15) !important; }
 </style>
 </head>
 <body>
@@ -304,9 +307,13 @@
   // full re-render on every server update doesn't replay the whole hand.
   function renderHand(hand, el, prevCount) {
     el.innerHTML = '';
+    const Engine = window.BlackjackEngine;
     hand.forEach((c, i) => {
       const slot = document.createElement('div');
       slot.className = 'card-slot' + ((c.s === '♥' || c.s === '♦') ? ' red' : '');
+      if (Engine && Engine.isTrumpCard(c)) {
+        slot.classList.add('trump-card');
+      }
       const img = document.createElement('img');
       img.className = 'card-img';
       img.src = cardImgSrc(c);
