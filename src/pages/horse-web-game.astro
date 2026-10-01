@@ -402,6 +402,7 @@
   batImg.onerror = () => console.error('[Bat] Failed to load');
   batImg.src = '/horse-game/bat.png';
   const BAT_ASPECT = 3347 / 1233; // bat.png native dimensions
+  const PLANE_ASPECT = BAT_ASPECT; // planes are now bats; use same aspect ratio
   // Rock obstacle: use original dimensions without stretching (1920x1280)
   const ROCK_ASPECT = 1920 / 1280;
   const strubleImg = new Image();
