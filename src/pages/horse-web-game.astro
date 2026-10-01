@@ -190,11 +190,9 @@
     </header>
 
     <div id="stats-bar">
-      <span>Hurdles cleared: <b id="stat-cleared">0</b></span>
+      <span>Obstacles cleared: <b id="stat-cleared">0</b></span>
       <span>Best: <b id="stat-best">0</b></span>
       <span>Strubles this run: <b id="stat-earned">0</b></span>
-      <span>Planes dodged: <b id="stat-planes">0</b></span>
-      <span>Gaps jumped: <b id="stat-gaps">0</b></span>
     </div>
 
     <div id="game-stage">
@@ -517,7 +515,7 @@
   let dustTimer = 0;
   let powerupTimer = 0;
   let flipCooldown = 0; // cooldown after hitting 100 hurdles
-  let cleared = 0, earned = 0, planesDodged = 0, gapsJumped = 0;
+  let cleared = 0, earned = 0;
   let deathReason = 'Wiped Out!';
   let best = parseInt(localStorage.getItem(BEST_KEY), 10) || 0;
   $('stat-best').textContent = best.toLocaleString();
@@ -548,7 +546,7 @@
     dustTimer = 0;
     powerupTimer = 0;
     flipCooldown = 0;
-    cleared = 0; earned = 0; planesDodged = 0; gapsJumped = 0;
+    cleared = 0; earned = 0;
     deathReason = 'Wiped Out!';
     hurdles = []; gaps = []; coins = []; planes = []; orbs = []; riceBags = [];
     dust = []; bursts = []; particles = []; shake = 0; explosion = null;
@@ -557,8 +555,6 @@
     explosionAudio.pause();
     $('stat-cleared').textContent = '0';
     $('stat-earned').textContent = '0';
-    $('stat-planes').textContent = '0';
-    $('stat-gaps').textContent = '0';
     startOverlay.hidden = true;
     gameoverOverlay.hidden = true;
   }
@@ -986,11 +982,11 @@
     for (let i = gaps.length - 1; i >= 0; i--) {
       const g = gaps[i];
       g.x -= speed * dt;
-      // Track gap cleared when horse successfully jumps over it
+      // Track gap cleared as an obstacle when horse successfully jumps over it
       if (!g.cleared && g.x + g.w < HORSE_X) {
         g.cleared = true;
-        gapsJumped++;
-        $('stat-gaps').textContent = gapsJumped.toLocaleString();
+        cleared++;
+        $('stat-cleared').textContent = cleared.toLocaleString();
       }
       if (g.x + g.w < -30) gaps.splice(i, 1);
     }
@@ -1034,11 +1030,11 @@
         triggerPlaneExplosion(box, p);
         return;
       }
-      // Track plane successfully dodged when it scrolls past
+      // Track plane successfully dodged as an obstacle when it scrolls past
       if (!p.dodged && p.x + p.w < HORSE_X) {
         p.dodged = true;
-        planesDodged++;
-        $('stat-planes').textContent = planesDodged.toLocaleString();
+        cleared++;
+        $('stat-cleared').textContent = cleared.toLocaleString();
       }
       if (p.x + p.w < -40) planes.splice(i, 1);
     }
@@ -1551,7 +1547,7 @@
   // for this page's own run state. Nothing here can mutate gameplay.
   window.HorseGame = {
     getState: () => ({
-      state, speed, cleared, earned, best, deathReason, powerupTimer, planesDodged, gapsJumped,
+      state, speed, cleared, earned, best, deathReason, powerupTimer,
       horse: { y: horse.y, vy: horse.vy, ducking: horse.ducking, falling: horse.falling, invincible: horse.invincible },
       hurdles: hurdles.map((h) => ({ id: h.id, x: h.x, w: h.w, h: h.h, cleared: h.cleared, knocked: !!h.knocked })),
       gaps: gaps.map((g) => ({ x: g.x, w: g.w })),
