@@ -100,6 +100,11 @@ window.CASE_ITEMS = {
   cur_struble: { label: 'Cursor: Struble Coin',           tier: 'exceedingly_rare', img: '/strubles.png',                  type: 'cursor_unlock', key: 'struble_coin' },
   cur_hamood:  { label: 'Cursor: Hamood Habibi',          tier: 'exceedingly_rare', img: '/cursors/hamood-point.png',      type: 'cursor_unlock', key: 'hamood_habibi' },
 
+  // ---------- Horse Game Collectibles ----------
+  horse_rock:  { label: 'Rock Collectible',               tier: 'mil_spec',         img: '/Rock.png',                        type: 'item', draggable: true },
+  horse_steed: { label: 'Horse Collectible',              tier: 'restricted',       img: '/horse-game/horse.png',           type: 'item', draggable: true },
+  horse_happy: { label: 'Happy Horse (Jumping)',          tier: 'classified',       img: '/horse-game/horse-jump.png',      type: 'item', draggable: true },
+
   // ---------- Iantopia Tycoon buildings ----------
   // Unlike every other type above, these are NOT simple one-time
   // collectibles — a player can own up to TYCOON_MAX_PER_TYPE (10) of the

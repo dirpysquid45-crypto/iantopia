@@ -18,40 +18,44 @@ OUTPUT_FILE = '../public/news-data/geopolitical.json'
 # Regional keywords for classification (expanded for think tank terminology)
 REGIONS = {
     'Europe': [
-        'ukraine', 'russia', 'nato', 'eu', 'european', 'germany', 'france', 'poland',
+        'ukraine', 'nato', 'eu', 'european', 'germany', 'france', 'poland',
         'uk', 'britain', 'balkans', 'moldova', 'belarus', 'scandinavia', 'nordic',
-        'turkey', 'mediterranean', 'brussels', 'moscow', 'ukraine war', 'russia ukraine',
+        'turkey', 'mediterranean', 'brussels', 'ukraine war',
         'nato expansion', 'swedish', 'finnish', 'latvian', 'estonian', 'hungarian',
-        'eastern europe', 'transatlantic', 'european security', 'putin', 'zelensky',
+        'eastern europe', 'transatlantic', 'european security', 'zelensky',
         'eus', 'nato-eu', 'trans-atlantic', 'european strategic'
     ],
-    'Asia-Pacific': [
-        'china', 'taiwan', 'india', 'japan', 'korea', 'asean', 'philippines',
-        'vietnam', 'indonesia', 'south korea', 'north korea', 'asia-pacific',
-        'indo-pacific', 'pacific', 'beijing', 'australian', 'australia',
-        'new zealand', 'singapore', 'thailand', 'myanmar', 'bangladesh', 'pakistan',
-        'hong kong', 'south china sea', 'strait of taiwan', 'korean peninsula',
-        'quad', 'aukus', 'sri lanka', 'maldives', 'nepal', 'bhutan',
-        'regional security', 'delhi', 'tokyo', 'canberra', 'xi jinping',
-        'indo-pacific strategy', 'asia strategy', 'east asia', 'southeast asia',
-        'brics', 'shanghai cooperation', 'xi'
+    'Russia & Central Asia': [
+        'russia', 'putin', 'moscow', 'siberia', 'kazakhstan', 'uzbekistan',
+        'tajikistan', 'kyrgyzstan', 'turkmenistan', 'central asia',
+        'russian military', 'kremlin', 'cis', 'eurasian', 'brics',
+        'shanghai cooperation', 'collective security treaty', 'astana', 'almaty',
+        'energy security', 'gas', 'pipeline', 'gazprom', 'rosneft',
+        'sanctions', 'defense ministry', 'russian economy'
+    ],
+    'East Asia & China': [
+        'china', 'taiwan', 'japan', 'korea', 'beijing', 'xi jinping', 'xi',
+        'chinese', 'hong kong', 'south korea', 'north korea', 'korean peninsula',
+        'strait of taiwan', 'south china sea', 'senkaku', 'seoul', 'tokyo',
+        'brics', 'communist party', 'people\'s liberation army', 'pla',
+        'trade war', 'semiconductor', 'huawei', 'tiktok', 'east asia strategy'
+    ],
+    'South & Southeast Asia': [
+        'india', 'asean', 'vietnam', 'philippines', 'thailand', 'indonesia',
+        'bangladesh', 'pakistan', 'myanmar', 'singapore', 'malaysia',
+        'delhi', 'bangkok', 'jakarta', 'manila', 'hanoi', 'colombo',
+        'sri lanka', 'nepal', 'bhutan', 'maldives', 'laos', 'cambodia',
+        'indo-pacific', 'quad', 'aukus', 'south asia',
+        'subcontinent', 'monsoon asia', 'development', 'trade'
     ],
     'Middle East & North Africa': [
         'israel', 'palestine', 'iran', 'saudi', 'uae', 'gulf', 'egypt', 'iraq',
         'syria', 'lebanon', 'jordan', 'yemen', 'houthi', 'hezbollah', 'hamas',
         'mena', 'middle east', 'maghreb', 'tunisia', 'morocco', 'algeria',
         'gaza', 'west bank', 'tehran', 'riyadh', 'beirut', 'damascus', 'oman',
-        'qatar', 'kuwait', 'bahrain', 'libyan', 'turkish', 'kurdish',
-        'middle eastern', 'gulf cooperation council', 'gcc', 'irgc', 'irgc-qf',
+        'qatar', 'kuwait', 'bahrain', 'libyan', 'kurdish',
+        'middle eastern', 'gulf cooperation council', 'gcc', 'irgc',
         'saudi-iran', 'arab-israeli', 'sunni-shia', 'abraham accords'
-    ],
-    'Americas': [
-        'united states', 'usa', 'america', 'mexico', 'canada', 'venezuela', 'brazil',
-        'colombia', 'cuba', 'biden', 'latin america', 'central america', 'caribbean',
-        'washington', 'congress', 'senate', 'canadian', 'mexican', 'brazilian',
-        'panama', 'costa rica', 'argentina', 'chile', 'peru', 'ecuador',
-        'white house', 'state department', 'us congress', 'american',
-        'western hemisphere', 'americas strategy', 'us-china competition', 'north america'
     ],
     'Horn of Africa': [
         'ethiopia', 'somalia', 'kenya', 'sudan', 'south sudan', 'eritrea',
@@ -71,17 +75,58 @@ REGIONS = {
         'tanzania', 'central africa', 'southern africa', 'drc',
         'johannesburg', 'cape town', 'kinshasa', 'harare', 'lusaka',
         'security', 'military', 'humanitarian', 'drought', 'food', 'inflation'
+    ],
+    'USA': [
+        'united states', 'usa', 'america', 'trump', 'biden', 'washington',
+        'congress', 'senate', 'american', 'white house', 'state department',
+        'us congress', 'pentagon', 'federal', 'national security', 'homeland',
+        'fbi', 'cia', 'defense department', 'military', 'congress',
+        'capitol hill', 'new york', 'los angeles', 'chicago', 'washington dc',
+        'election', 'policy', 'economy', 'inflation', 'jobs', 'industry',
+        'tech', 'finance', 'wall street', 'federal reserve', 'treasury'
+    ],
+    'North America': [
+        'canada', 'mexico', 'canadian', 'mexican', 'north america',
+        'nafta', 'usmca', 'trilateral', 'trade', 'border', 'migration',
+        'toronto', 'mexico city', 'ottawa', 'quebec', 'brittish columbia',
+        'monterrey', 'guadalajara', 'energy', 'oil', 'natural gas',
+        'electricity', 'defense', 'security', 'arctic', 'caribbean'
+    ],
+    'Central America': [
+        'guatemala', 'honduras', 'el salvador', 'costa rica', 'panama', 'belize',
+        'nicaragua', 'central america', 'central american', 'isthmus',
+        'mexico', 'mexico-central america', 'drug trafficking', 'security',
+        'migration', 'development', 'maya', 'caribbean'
+    ],
+    'South America': [
+        'brazil', 'argentina', 'chile', 'peru', 'colombia', 'venezuela',
+        'ecuador', 'bolivia', 'paraguay', 'uruguay', 'guyana', 'suriname',
+        'amazonia', 'amazon', 'andean', 'southern cone',
+        'buenos aires', 'santiago', 'lima', 'caracas', 'brasília',
+        'brics', 'unasur', 'latin america', 'south american', 'trade'
+    ],
+    'Caribbean': [
+        'cuba', 'haiti', 'dominican republic', 'puerto rico', 'jamaica',
+        'bahamas', 'barbados', 'trinidad', 'tobago', 'grenada', 'st lucia',
+        'caribbean', 'west indies', 'antilles', 'havana', 'caribbean sea',
+        'hurricane', 'tourism', 'island', 'maritime', 'development'
     ]
 }
 
 REGION_ICONS = {
     'Europe': '🇪🇺',
-    'Asia-Pacific': '🌏',
+    'Russia & Central Asia': '🇷🇺',
+    'East Asia & China': '🇨🇳',
+    'South & Southeast Asia': '🌏',
     'Middle East & North Africa': '🌍',
-    'Americas': '🌎',
     'Horn of Africa': '🌍',
     'West Africa': '🌍',
-    'Central & Southern Africa': '🌍'
+    'Central & Southern Africa': '🌍',
+    'USA': '🇺🇸',
+    'North America': '🇨🇦',
+    'Central America': '🌎',
+    'South America': '🇧🇷',
+    'Caribbean': '🏝️'
 }
 
 # RSS feeds organized by regional expertise + general news
@@ -246,20 +291,55 @@ def pull_feeds():
 
 
 DEMO_STORIES = {
-    # Supplementary analysis when live feeds are sparse for a region
+    'USA': [
+        {
+            'source': 'Politico',
+            'title': 'US foreign policy shifts amid domestic political transitions',
+            'summary': 'American strategic priorities reshape alliances, trade relationships, and global military posture.',
+            'link': 'https://www.politico.com',
+            'status': 'breaking'
+        },
+        {
+            'source': 'CSIS',
+            'title': 'American technological competition and supply chain security',
+            'summary': 'US prioritizes semiconductor manufacturing, AI development, and critical technology independence.',
+            'link': 'https://www.csis.org',
+            'status': 'developing'
+        }
+    ],
+    'Russia & Central Asia': [
+        {
+            'source': 'CSIS',
+            'title': 'Russia energy geopolitics and Central Asian strategic partnerships',
+            'summary': 'Regional power dynamics shaped by energy resources, infrastructure projects, and competing great-power influence.',
+            'link': 'https://www.csis.org',
+            'status': 'developing'
+        }
+    ],
+    'East Asia & China': [
+        {
+            'source': 'Lowy Institute',
+            'title': 'Taiwan strait dynamics and regional military posture',
+            'summary': 'Cross-strait tensions and allied security responses amid changing regional balance.',
+            'link': 'https://www.lowyinstitute.org',
+            'status': 'developing'
+        }
+    ],
+    'South & Southeast Asia': [
+        {
+            'source': 'Observer Research Foundation',
+            'title': 'ASEAN and Indo-Pacific strategic partnerships',
+            'summary': 'Regional nation-building and multilateral frameworks amid great power competition.',
+            'link': 'https://www.orfonline.org',
+            'status': 'developing'
+        }
+    ],
     'Horn of Africa': [
         {
             'source': 'International Crisis Group',
             'title': 'Horn of Africa security and economic integration',
-            'summary': 'Regional stability initiatives amid transnational threats and currency pressures affecting Ethiopia, Somalia, and Kenya.',
+            'summary': 'Regional stability initiatives amid transnational threats and currency pressures.',
             'link': 'https://www.crisisgroup.org',
-            'status': 'developing'
-        },
-        {
-            'source': 'Institute for the Study of War',
-            'title': 'Counterinsurgency operations in East Africa',
-            'summary': 'Government campaigns targeting extremist groups and cross-border militant networks.',
-            'link': 'https://www.understandingwar.org',
             'status': 'developing'
         }
     ],
@@ -267,15 +347,8 @@ DEMO_STORIES = {
         {
             'source': 'Brookings Institution',
             'title': 'West African economic integration and political stability',
-            'summary': 'ECOWAS efforts to strengthen regional trade, address security challenges, and coordinate development policy.',
+            'summary': 'ECOWAS efforts to strengthen regional trade and address security challenges.',
             'link': 'https://www.brookings.edu',
-            'status': 'developing'
-        },
-        {
-            'source': 'International Crisis Group',
-            'title': 'Sahel security and regional cooperation frameworks',
-            'summary': 'Transnational terrorism response and state capacity building in Nigeria, Mali, Burkina Faso, and neighboring nations.',
-            'link': 'https://www.crisisgroup.org',
             'status': 'developing'
         }
     ],
@@ -286,12 +359,41 @@ DEMO_STORIES = {
             'summary': 'Ongoing security operations and regional implications in DRC, Uganda, and surrounding territories.',
             'link': 'https://www.understandingwar.org',
             'status': 'developing'
-        },
+        }
+    ],
+    'North America': [
         {
-            'source': 'Brookings Institution',
-            'title': 'Southern Africa climate, food security, and development challenges',
-            'summary': 'Regional economic pressures from drought, inflation, and geopolitical positioning of major African powers.',
-            'link': 'https://www.brookings.edu',
+            'source': 'Council on Foreign Relations',
+            'title': 'North American security and trade cooperation',
+            'summary': 'USMCA implementation and trilateral defense coordination among US, Canada, and Mexico.',
+            'link': 'https://www.cfr.org',
+            'status': 'developing'
+        }
+    ],
+    'Central America': [
+        {
+            'source': 'International Crisis Group',
+            'title': 'Central American migration and security challenges',
+            'summary': 'Regional responses to transnational crime, gang violence, and humanitarian pressures.',
+            'link': 'https://www.crisisgroup.org',
+            'status': 'developing'
+        }
+    ],
+    'South America': [
+        {
+            'source': 'CSIS',
+            'title': 'South American governance and economic integration',
+            'summary': 'Regional development initiatives and BRICS positioning amid global economic realignment.',
+            'link': 'https://www.csis.org',
+            'status': 'developing'
+        }
+    ],
+    'Caribbean': [
+        {
+            'source': 'Rand Corporation',
+            'title': 'Caribbean resilience and development priorities',
+            'summary': 'Island economies address climate impacts, energy security, and tourism-dependent growth models.',
+            'link': 'https://www.rand.org',
             'status': 'developing'
         }
     ]

@@ -195,7 +195,6 @@
       <span>Strubles this run: <b id="stat-earned">0</b></span>
       <span>Planes dodged: <b id="stat-planes">0</b></span>
       <span>Gaps jumped: <b id="stat-gaps">0</b></span>
-      <span>Rocks: <b id="stat-rocks">0</b> | Horses: <b id="stat-horses">0</b> | Happy: <b id="stat-happy-horses">0</b></span>
     </div>
 
     <div id="game-stage">
@@ -389,15 +388,6 @@
   // Rock obstacle skin
   const rockImg = new Image();
   rockImg.src = '/Rock.png';
-  // Rock collectible
-  const rockCollectibleImg = new Image();
-  rockCollectibleImg.src = '/Rock.png';
-  // Horse collectible
-  const horseCollectibleImg = new Image();
-  horseCollectibleImg.src = '/horse-game/horse.png';
-  // Happy horse collectible (jumping sprite)
-  const happyHorseImg = new Image();
-  happyHorseImg.src = '/horse-game/horse-jump.png';
   const HURDLE_FLIP_THRESHOLD = 100;
   const FLIP_COOLDOWN = 2.5; // seconds of no spawning after hitting 100
   // Plane obstacle: a tight PNG crop of the tycoon page's silly-airplane.gif
@@ -520,9 +510,6 @@
   let dust = [];
   let bursts = []; // brief celebratory flashes on streak milestones
   let particles = []; // orb-activation burst
-  let rocks = []; // rock collectibles
-  let horses = []; // horse collectibles
-  let happyHorses = []; // happy horse collectibles
   let shake = 0;
   let groundScroll = 0;
   let speed = START_SPEED;
@@ -530,7 +517,7 @@
   let dustTimer = 0;
   let powerupTimer = 0;
   let flipCooldown = 0; // cooldown after hitting 100 hurdles
-  let cleared = 0, earned = 0, planesDodged = 0, gapsJumped = 0, rocksCollected = 0, horsesCollected = 0, happyHorsesCollected = 0;
+  let cleared = 0, earned = 0, planesDodged = 0, gapsJumped = 0;
   let deathReason = 'Wiped Out!';
   let best = parseInt(localStorage.getItem(BEST_KEY), 10) || 0;
   $('stat-best').textContent = best.toLocaleString();
@@ -561,9 +548,9 @@
     dustTimer = 0;
     powerupTimer = 0;
     flipCooldown = 0;
-    cleared = 0; earned = 0; planesDodged = 0; gapsJumped = 0; rocksCollected = 0; horsesCollected = 0; happyHorsesCollected = 0;
+    cleared = 0; earned = 0; planesDodged = 0; gapsJumped = 0;
     deathReason = 'Wiped Out!';
-    hurdles = []; gaps = []; coins = []; planes = []; orbs = []; riceBags = []; rocks = []; horses = []; happyHorses = [];
+    hurdles = []; gaps = []; coins = []; planes = []; orbs = []; riceBags = [];
     dust = []; bursts = []; particles = []; shake = 0; explosion = null;
     powerupAudio.pause();
     powerupAudio.currentTime = 0;
@@ -572,9 +559,6 @@
     $('stat-earned').textContent = '0';
     $('stat-planes').textContent = '0';
     $('stat-gaps').textContent = '0';
-    $('stat-rocks').textContent = '0';
-    $('stat-horses').textContent = '0';
-    $('stat-happy-horses').textContent = '0';
     startOverlay.hidden = true;
     gameoverOverlay.hidden = true;
   }
@@ -732,18 +716,6 @@
     coins.push({ x, y, r: COIN_R, value, collected: false, bob: Math.random() * Math.PI * 2 });
   }
 
-  function spawnRockCollectible(x, y) {
-    rocks.push({ x, y, r: 12, collected: false, bob: Math.random() * Math.PI * 2 });
-  }
-
-  function spawnHorseCollectible(x, y) {
-    horses.push({ x, y, r: 14, collected: false, bob: Math.random() * Math.PI * 2 });
-  }
-
-  function spawnHappyHorseCollectible(x, y) {
-    happyHorses.push({ x, y, r: 14, collected: false, bob: Math.random() * Math.PI * 2 });
-  }
-
   // One plane type: big, low, and lethal unless ducked. (An earlier
   // decorative high-altitude band was cut -- it had no collision at all
   // and just cluttered the sky with obstacles that could never hurt you.)
@@ -853,16 +825,7 @@
       { tier: 0, weight: 3, build: () => {
         const t = pickHurdleType();
         hurdles.push({ id: nextHurdleId++, x: originX, w: t.w, h: t.h, cleared: false });
-        const roll = Math.random();
-        if (roll < 0.5) {
-          spawnCoin(originX + t.w / 2, groundY - horseH * 1.5);
-        } else if (roll < 0.6) {
-          spawnRockCollectible(originX + t.w / 2, groundY - horseH * 1.5);
-        } else if (roll < 0.7) {
-          spawnHorseCollectible(originX + t.w / 2, groundY - horseH * 1.5);
-        } else if (roll < 0.8) {
-          spawnHappyHorseCollectible(originX + t.w / 2, groundY - horseH * 1.5);
-        }
+        if (Math.random() < 0.5) spawnCoin(originX + t.w / 2, groundY - horseH * 1.5);
         return t.w;
       }},
       { tier: 1, weight: 2, build: () => {
@@ -1135,60 +1098,6 @@
         }
       }
       if (b.x < -40) riceBags.splice(i, 1);
-    }
-
-    // Rock collectibles
-    for (let i = rocks.length - 1; i >= 0; i--) {
-      const r = rocks[i];
-      r.x -= speed * dt;
-      r.bob += dt * 5;
-      if (!r.collected) {
-        const box = horseBox();
-        const dx = r.x - (box.left + box.right) / 2;
-        const dy = r.y - (box.top + box.bottom) / 2;
-        if (Math.hypot(dx, dy) < r.r + horseW * 0.28) {
-          r.collected = true;
-          rocksCollected++;
-          $('stat-rocks').textContent = rocksCollected.toLocaleString();
-        }
-      }
-      if (r.x < -30) rocks.splice(i, 1);
-    }
-
-    // Horse collectibles
-    for (let i = horses.length - 1; i >= 0; i--) {
-      const h = horses[i];
-      h.x -= speed * dt;
-      h.bob += dt * 4;
-      if (!h.collected) {
-        const box = horseBox();
-        const dx = h.x - (box.left + box.right) / 2;
-        const dy = h.y - (box.top + box.bottom) / 2;
-        if (Math.hypot(dx, dy) < h.r + horseW * 0.3) {
-          h.collected = true;
-          horsesCollected++;
-          $('stat-horses').textContent = horsesCollected.toLocaleString();
-        }
-      }
-      if (h.x < -30) horses.splice(i, 1);
-    }
-
-    // Happy horse collectibles
-    for (let i = happyHorses.length - 1; i >= 0; i--) {
-      const h = happyHorses[i];
-      h.x -= speed * dt;
-      h.bob += dt * 4;
-      if (!h.collected) {
-        const box = horseBox();
-        const dx = h.x - (box.left + box.right) / 2;
-        const dy = h.y - (box.top + box.bottom) / 2;
-        if (Math.hypot(dx, dy) < h.r + horseW * 0.3) {
-          h.collected = true;
-          happyHorsesCollected++;
-          $('stat-happy-horses').textContent = happyHorsesCollected.toLocaleString();
-        }
-      }
-      if (h.x < -30) happyHorses.splice(i, 1);
     }
 
     // Invincibility window -- ends on its own timer, or immediately at
@@ -1469,63 +1378,6 @@
     ctx.restore();
   }
 
-  function drawRock(r) {
-    if (r.collected) return;
-    const bobY = r.y + Math.sin(r.bob) * 3;
-    const size = r.r * 5;
-    ctx.save();
-    ctx.translate(r.x, bobY);
-    ctx.shadowColor = 'rgba(139,69,19,.6)';
-    ctx.shadowBlur = 6;
-    if (rockCollectibleImg.complete && rockCollectibleImg.naturalWidth) {
-      ctx.drawImage(rockCollectibleImg, -size / 2, -size / 2, size, size);
-    } else {
-      ctx.fillStyle = '#8b4513';
-      ctx.beginPath();
-      ctx.arc(0, 0, r.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  function drawHorseCollectible(h) {
-    if (h.collected) return;
-    const bobY = h.y + Math.sin(h.bob) * 3;
-    const size = h.r * 6;
-    ctx.save();
-    ctx.translate(h.x, bobY);
-    ctx.shadowColor = 'rgba(139,69,19,.4)';
-    ctx.shadowBlur = 8;
-    if (horseCollectibleImg.complete && horseCollectibleImg.naturalWidth) {
-      ctx.drawImage(horseCollectibleImg, -size / 2, -size / 2 * HORSE_ASPECT, size, size * HORSE_ASPECT);
-    } else {
-      ctx.fillStyle = '#8b6f47';
-      ctx.beginPath();
-      ctx.arc(0, 0, h.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  function drawHappyHorse(h) {
-    if (h.collected) return;
-    const bobY = h.y + Math.sin(h.bob) * 3;
-    const size = h.r * 6;
-    ctx.save();
-    ctx.translate(h.x, bobY);
-    ctx.shadowColor = 'rgba(255,215,0,.5)';
-    ctx.shadowBlur = 10;
-    if (happyHorseImg.complete && happyHorseImg.naturalWidth) {
-      ctx.drawImage(happyHorseImg, -size / 2, -size / 2 * JUMP_ASPECT, size, size * JUMP_ASPECT);
-    } else {
-      ctx.fillStyle = '#ffd700';
-      ctx.beginPath();
-      ctx.arc(0, 0, h.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
   function drawParticles() {
     for (const pt of particles) {
       const t = 1 - pt.age / pt.life;
@@ -1625,9 +1477,6 @@
     drawSpeedLines();
     drawDust();
     for (const c of coins) drawCoin(c);
-    for (const r of rocks) drawRock(r);
-    for (const h of horses) drawHorseCollectible(h);
-    for (const h of happyHorses) drawHappyHorse(h);
     for (const h of hurdles) drawHurdle(h);
     for (const p of planes) drawPlane(p);
     for (const o of orbs) drawOrb(o);
@@ -1702,7 +1551,7 @@
   // for this page's own run state. Nothing here can mutate gameplay.
   window.HorseGame = {
     getState: () => ({
-      state, speed, cleared, earned, best, deathReason, powerupTimer, planesDodged, gapsJumped, rocksCollected, horsesCollected, happyHorsesCollected,
+      state, speed, cleared, earned, best, deathReason, powerupTimer, planesDodged, gapsJumped,
       horse: { y: horse.y, vy: horse.vy, ducking: horse.ducking, falling: horse.falling, invincible: horse.invincible },
       hurdles: hurdles.map((h) => ({ id: h.id, x: h.x, w: h.w, h: h.h, cleared: h.cleared, knocked: !!h.knocked })),
       gaps: gaps.map((g) => ({ x: g.x, w: g.w })),
@@ -1710,9 +1559,6 @@
       planes: planes.map((p) => ({ x: p.x, y: p.y })),
       orbs: orbs.map((o) => ({ x: o.x, y: o.y, used: o.used })),
       riceBags: riceBags.map((b) => ({ x: b.x, y: b.y, collected: b.collected })),
-      rocks: rocks.map((r) => ({ x: r.x, y: r.y, collected: r.collected })),
-      horses: horses.map((h) => ({ x: h.x, y: h.y, collected: h.collected })),
-      happyHorses: happyHorses.map((h) => ({ x: h.x, y: h.y, collected: h.collected })),
       explosion: explosion ? { cx: explosion.cx, cy: explosion.cy, age: explosion.age, life: explosion.life } : null,
       flipped: cleared >= HURDLE_FLIP_THRESHOLD,
       horseX: HORSE_X, horseW,
