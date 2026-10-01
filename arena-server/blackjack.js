@@ -23,11 +23,24 @@ class BlackjackGame {
     this.hands[0] = [this.deck.pop(), this.deck.pop()];
     this.hands[1] = [this.deck.pop(), this.deck.pop()];
 
-    // Send initial state. Each player needs their OWN index -- broadcast()
-    // would send the identical message to both, leaving neither client
-    // able to tell which side of `results[]` is theirs once the game ends.
-    this.sendTo(0, { type: 'game_start', hands: this.hands, yourIndex: 0 });
-    this.sendTo(1, { type: 'game_start', hands: this.hands, yourIndex: 1 });
+    // Send initial state to each player separately
+    // Player 0 sees: their full hand + opponent's visible cards (first 2) + bust limits
+    this.sendTo(0, {
+      type: 'game_start',
+      yourHand: this.hands[0],
+      opponentVisibleCards: this.hands[1].slice(0, 2),
+      yourBustLimit: Engine.getBustLimit(this.hands[0]),
+      opponentBustLimit: Engine.getBustLimit(this.hands[1]),
+      yourIndex: 0
+    });
+    this.sendTo(1, {
+      type: 'game_start',
+      yourHand: this.hands[1],
+      opponentVisibleCards: this.hands[0].slice(0, 2),
+      yourBustLimit: Engine.getBustLimit(this.hands[1]),
+      opponentBustLimit: Engine.getBustLimit(this.hands[0]),
+      yourIndex: 1
+    });
   }
 
   async handleAction(sessionId, action) {
@@ -43,7 +56,20 @@ class BlackjackGame {
       this.done[playerIndex] = true;
     }
 
-    this.broadcast({ type: 'game_update', hands: this.hands, done: this.done });
+    // Send each player only their own full hand + opponent's visible cards (first 2 only)
+    // This prevents the second player from seeing the first player's current total
+    this.sendTo(0, {
+      type: 'game_update',
+      yourHand: this.hands[0],
+      opponentVisibleCards: this.hands[1].slice(0, 2),
+      done: this.done
+    });
+    this.sendTo(1, {
+      type: 'game_update',
+      yourHand: this.hands[1],
+      opponentVisibleCards: this.hands[0].slice(0, 2),
+      done: this.done
+    });
 
     if (this.done[0] && this.done[1]) {
       await this.resolve();

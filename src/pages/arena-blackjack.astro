@@ -432,9 +432,9 @@
       document.getElementById('your-row').classList.add('active-hand');
       document.getElementById('hit').disabled = false;
       document.getElementById('stand').disabled = false;
-      renderHands(msg.hands);
+      renderGameState(msg.yourHand, msg.opponentVisibleCards, msg.yourBustLimit, msg.opponentBustLimit, [false, false]);
     } else if (msg.type === 'game_update') {
-      renderHands(msg.hands);
+      renderGameState(msg.yourHand, msg.opponentVisibleCards, null, null, msg.done);
       const youDone = !!(msg.done && msg.done[yourIndex]);
       document.getElementById('hit').disabled = youDone;
       document.getElementById('stand').disabled = youDone;
@@ -458,19 +458,26 @@
     }
   }
 
-  function renderHands(hands) {
-    const oppIndex = 1 - yourIndex;
-    const yourHand = hands[yourIndex];
-    const oppHand = hands[oppIndex];
-
+  function renderGameState(yourHand, opponentVisibleCards, yourBustLimit, opponentBustLimit, doneFlags) {
+    // Render your full hand
     renderHand(yourHand, document.getElementById('your-hand'), prevHandLengths[0]);
-    renderHand(oppHand, document.getElementById('opponent-hand'), prevHandLengths[1]);
-    prevHandLengths = [yourHand.length, oppHand.length];
+    // Render only opponent's visible cards (first 2)
+    renderHand(opponentVisibleCards, document.getElementById('opponent-hand'), 0);
+    prevHandLengths[0] = yourHand.length;
 
-    const yourVal = window.BlackjackEngine ? BlackjackEngine.handValue(yourHand) : '';
-    const oppVal = window.BlackjackEngine ? BlackjackEngine.handValue(oppHand) : '';
-    document.getElementById('your-score').textContent = `Total: ${yourVal}`;
-    document.getElementById('opponent-score').textContent = `Total: ${oppVal}`;
+    // Show goal card status if present
+    const Engine = window.BlackjackEngine;
+    const yourVal = Engine ? Engine.handValue(yourHand) : '';
+    const oppVal = Engine ? Engine.handValue(opponentVisibleCards) : '';
+    const yourGoalText = Engine && Engine.hasGoalCard(yourHand) ? ' 🎯' : '';
+    const oppGoalText = opponentVisibleCards && opponentVisibleCards.some(c => c.isGoalCard) ? ' 🎯' : '';
+
+    // Show bust limits (21 or 31 if goal card present)
+    const yourLimit = yourBustLimit || (Engine ? Engine.getBustLimit(yourHand) : 21);
+    const oppLimit = opponentBustLimit || 21; // Don't know opponent's limit until game ends
+
+    document.getElementById('your-score').textContent = `Total: ${yourVal}${yourGoalText} (bust at ${yourLimit}+)`;
+    document.getElementById('opponent-score').textContent = `Total: ${oppVal}${oppGoalText}`;
   }
 
   document.getElementById('hit').addEventListener('click', () => ws?.send(JSON.stringify({ type: 'action', action: 'hit' })));

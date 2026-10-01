@@ -9,6 +9,9 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   const SUITS = ['♠', '♥', '♦', '♣'];
   const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const SPECIAL_CARDS = {
+    GOAL_CARD: { v: '🎯', name: 'Goal Card', raises_limit_to: 31 } // Raises bust limit to 31
+  };
 
   function makeDeck() {
     const d = [];
@@ -17,6 +20,10 @@
         d.push({ s, v });
       }
     }
+    // Add exactly 2 Goal Cards (fair distribution: one per player max)
+    d.push({ s: '✨', v: '🎯', isGoalCard: true });
+    d.push({ s: '✨', v: '🎯', isGoalCard: true });
+
     // Fisher-Yates shuffle
     for (let i = d.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -26,9 +33,14 @@
   }
 
   function cardValue(c) {
+    if (c.isGoalCard) return 0; // Goal card doesn't add value
     if (c.v === 'A') return 11;
     if (['K', 'Q', 'J'].includes(c.v)) return 10;
     return parseInt(c.v, 10);
+  }
+
+  function hasGoalCard(hand) {
+    return hand.some(c => c.isGoalCard);
   }
 
   function handValue(hand) {
@@ -45,15 +57,24 @@
   }
 
   function isBust(hand) {
-    return handValue(hand) > 21;
+    // Goal card raises bust limit to 31
+    const limit = hasGoalCard(hand) ? 31 : 21;
+    return handValue(hand) > limit;
+  }
+
+  function getBustLimit(hand) {
+    return hasGoalCard(hand) ? 31 : 21;
   }
 
   return {
     SUITS,
     VALUES,
+    SPECIAL_CARDS,
     makeDeck,
     cardValue,
     handValue,
-    isBust
+    isBust,
+    hasGoalCard,
+    getBustLimit
   };
 });
