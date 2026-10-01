@@ -391,6 +391,8 @@
   mountainBgImg.src = '/backgrounds/mountain-background.gif';
   // Rock obstacle skin
   const rockImg = new Image();
+  rockImg.onload = () => console.log('[Rock] Image loaded successfully');
+  rockImg.onerror = () => console.error('[Rock] Failed to load rock.png');
   rockImg.src = '/images/rock.png';
   const HURDLE_FLIP_THRESHOLD = 100;
   const FLIP_COOLDOWN = 2.5; // seconds of no spawning after hitting 100
@@ -1229,9 +1231,18 @@
     // After 100 hurdles, use rock skin for second act. Before that, use fence.
     const useRockSkin = cleared >= HURDLE_FLIP_THRESHOLD;
 
-    if (useRockSkin && rockImg.complete && rockImg.naturalWidth) {
-      ctx.drawImage(rockImg, h.x, topY, h.w, h.h);
-    } else if (!useRockSkin) {
+    if (useRockSkin) {
+      if (rockImg.complete && rockImg.naturalWidth) {
+        ctx.drawImage(rockImg, h.x, topY, h.w, h.h);
+      } else {
+        // Fallback: brown stone color if image not loaded
+        ctx.fillStyle = '#8b7355';
+        ctx.fillRect(h.x, topY, h.w, h.h);
+        ctx.strokeStyle = '#5a4a38';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(h.x, topY, h.w, h.h);
+      }
+    } else {
       ctx.fillStyle = '#6b4423';
       ctx.strokeStyle = '#3e2812';
       ctx.lineWidth = 1;
@@ -1249,10 +1260,6 @@
         ctx.strokeStyle = 'rgba(0,0,0,.35)';
         ctx.strokeRect(h.x - 2, ry, h.w + 4, 6);
       }
-    } else if (useRockSkin) {
-      // Fallback if rock image hasn't loaded yet in second act
-      ctx.fillStyle = '#6b6b66';
-      ctx.fillRect(h.x, topY, h.w, h.h);
     }
     ctx.restore();
   }
