@@ -759,13 +759,13 @@
     const margin = 6;
     const bottom = groundY - duckH - margin;
     const y = bottom - h / 2;
-    const p = { x, y, w, h, bob: Math.random() * Math.PI * 2 };
+    const p = { x, y, w, h, bob: Math.random() * Math.PI * 2, dodged: false };
     planes.push(p);
     return p;
   }
 
   function spawnGap(x, w, withOrb) {
-    gaps.push({ x, w });
+    gaps.push({ x, w, cleared: false });
     if (withOrb) {
       const orbX = x + w / 2;
       const orbY = groundY - Math.min(160, H * 0.42);
@@ -795,7 +795,7 @@
   // the same "extra reach lives past a caught orb" logic the rice bag
   // already uses one level up.
   function spawnDoubleGap(x, w, atSpeed) {
-    gaps.push({ x, w });
+    gaps.push({ x, w, cleared: false });
     const orb1X = x + Math.min(maxJumpDistance(atSpeed) * 0.8, w * 0.3);
     const orb1Y = groundY - Math.min(160, H * 0.42);
     orbs.push({ x: orb1X, y: orb1Y, used: false, phase: Math.random() * Math.PI * 2 });
