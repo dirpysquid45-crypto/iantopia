@@ -131,7 +131,6 @@
   #lobby-empty { font-size:9px; color:var(--muted); padding:8px 0; }
 
   /* Trump card glow effect */
-  .trump-card { filter: drop-shadow(0 0 8px rgba(255,215,0,.8)) drop-shadow(0 0 4px rgba(255,215,0,.5)); border-color:#ffd700 !important; box-shadow:0 0 12px rgba(255,215,0,.4), inset 0 0 8px rgba(255,215,0,.15) !important; }
 </style>
 </head>
 <body>
@@ -314,11 +313,13 @@
       if (Engine && Engine.isTrumpCard(c)) {
         slot.classList.add('trump-card');
       }
+
       const img = document.createElement('img');
       img.className = 'card-img';
       img.src = cardImgSrc(c);
       img.alt = `${c.v} of ${suitName(c.s)}`;
       slot.appendChild(img);
+
       el.appendChild(slot);
       if (i >= prevCount) {
         slot.classList.add('deal-in');
