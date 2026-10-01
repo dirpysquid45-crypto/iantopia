@@ -388,10 +388,10 @@
   const STONE_ASPECT = 605 / 1280;
   // Mountain background for second act
   const mountainBgImg = new Image();
-  mountainBgImg.src = '/Mountain Backround.gif';
+  mountainBgImg.src = '/backgrounds/mountain-background.gif';
   // Rock obstacle skin
   const rockImg = new Image();
-  rockImg.src = '/Rock.png';
+  rockImg.src = '/images/rock.png';
   const HURDLE_FLIP_THRESHOLD = 100;
   const FLIP_COOLDOWN = 2.5; // seconds of no spawning after hitting 100
   // Plane obstacle: a tight PNG crop of the tycoon page's silly-airplane.gif
@@ -1483,7 +1483,7 @@
     // Swap background to mountain after 100 hurdles
     const skyBg = document.getElementById('sky-bg');
     if (skyBg) {
-      skyBg.style.backgroundImage = mirrored ? "url('/Mountain Backround.gif')" : "url('/horse-game/plain.gif')";
+      skyBg.style.backgroundImage = mirrored ? "url('/backgrounds/mountain-background.gif')" : "url('/horse-game/plain.gif')";
     }
     ctx.save();
     if (mirrored) { ctx.translate(W, 0); ctx.scale(-1, 1); }
