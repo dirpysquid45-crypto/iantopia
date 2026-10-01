@@ -62,6 +62,14 @@ class Manager {
       await this.handleGameAction(sessionId, msg.action, { x: msg.x, y: msg.y });
     } else if (msg.type === 'place_ships') {
       await this.handleShipPlacement(sessionId, msg.ships);
+    } else if (msg.type === 'rematch_accept') {
+      // Player accepted rematch; find their game and handle it
+      for (const game of this.tables.values()) {
+        if (game.players.some(p => p.sessionId === sessionId)) {
+          await game.handleRematchResponse(sessionId);
+          break;
+        }
+      }
     }
   }
 

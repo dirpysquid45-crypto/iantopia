@@ -180,7 +180,14 @@
 
     <div id="result-section" style="display:none; text-align:center;">
       <div style="font-size:14px; color:var(--gold); margin:20px 0;" id="result-message"></div>
-      <button id="back-to-lobby" class="bet-btn" style="max-width:300px; margin:0 auto;">Back to Lobby</button>
+      <div id="rematch-prompt" style="margin:20px 0;">
+        <p style="color:var(--muted); font-size:12px; margin:10px 0;">Play another round?</p>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+          <button id="rematch-accept" class="bet-btn" style="flex:1; min-width:120px;">Rematch</button>
+          <button id="rematch-decline" class="bet-btn" style="flex:1; min-width:120px;">Back to Lobby</button>
+        </div>
+        <p id="rematch-status" style="color:var(--muted); font-size:10px; margin:10px 0; display:none;"></p>
+      </div>
     </div>
   </main>
 
@@ -450,6 +457,37 @@
         playRandomSound('chips-stack', 6);
       }
       updateBalance();
+      // Show rematch prompt
+      document.getElementById('rematch-accept').disabled = false;
+      document.getElementById('rematch-decline').disabled = false;
+      document.getElementById('rematch-status').style.display = 'none';
+    } else if (msg.type === 'show_rematch_prompt') {
+      // Server initiated rematch prompt (game finished)
+      document.getElementById('rematch-accept').disabled = false;
+      document.getElementById('rematch-decline').disabled = false;
+      document.getElementById('rematch-status').style.display = 'none';
+    } else if (msg.type === 'rematch_opponent_accepted') {
+      document.getElementById('rematch-status').textContent = 'Opponent accepted! Starting rematch...';
+      document.getElementById('rematch-status').style.display = 'block';
+      document.getElementById('rematch-accept').disabled = true;
+      document.getElementById('rematch-decline').disabled = true;
+    } else if (msg.type === 'rematch_failed') {
+      document.getElementById('rematch-status').textContent = msg.message;
+      document.getElementById('rematch-status').style.display = 'block';
+      document.getElementById('rematch-accept').disabled = true;
+      document.getElementById('rematch-decline').disabled = true;
+    } else if (msg.type === 'game_start' && msg.isRematch) {
+      // New game started from rematch
+      yourIndex = msg.yourIndex;
+      myQueueId = null;
+      prevHandLengths = [0, 0];
+      document.getElementById('result-section').style.display = 'none';
+      document.getElementById('game-section').style.display = 'block';
+      document.getElementById('your-row').classList.add('active-hand');
+      document.getElementById('hit').disabled = false;
+      document.getElementById('stand').disabled = false;
+      renderGameState(msg.yourHand, msg.opponentVisibleCards, msg.yourBustLimit, msg.opponentBustLimit, [false, false]);
+      showStatus('Rematch started!');
     } else if (msg.type === 'balance_update') {
       Strubles.set(msg.balance);
       updateBalance();
@@ -482,7 +520,18 @@
 
   document.getElementById('hit').addEventListener('click', () => ws?.send(JSON.stringify({ type: 'action', action: 'hit' })));
   document.getElementById('stand').addEventListener('click', () => ws?.send(JSON.stringify({ type: 'action', action: 'stand' })));
-  document.getElementById('back-to-lobby').addEventListener('click', () => location.href = '/arena');
+
+  document.getElementById('rematch-accept').addEventListener('click', () => {
+    document.getElementById('rematch-accept').disabled = true;
+    document.getElementById('rematch-decline').disabled = true;
+    document.getElementById('rematch-status').textContent = 'Waiting for opponent...';
+    document.getElementById('rematch-status').style.display = 'block';
+    ws?.send(JSON.stringify({ type: 'rematch_accept' }));
+  });
+
+  document.getElementById('rematch-decline').addEventListener('click', () => {
+    location.href = '/arena';
+  });
 
   updateBalance();
   window.addEventListener('strubles:change', updateBalance);
