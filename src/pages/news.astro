@@ -387,7 +387,7 @@
         return;
       }
       digestText.textContent = data.text;
-      digestByline.textContent = `— Generated locally on Qasim (${data.model}), ${new Date(data.generated_at).toLocaleString()}.`;
+      digestByline.textContent = `${new Date(data.generated_at).toLocaleString()}`;
     })
     .catch(() => {
       digestText.textContent = 'The digest is not available right now.';
