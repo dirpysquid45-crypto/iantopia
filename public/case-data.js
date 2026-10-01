@@ -101,8 +101,9 @@ window.CASE_ITEMS = {
   cur_hamood:  { label: 'Cursor: Hamood Habibi',          tier: 'exceedingly_rare', img: '/cursors/hamood-point.png',      type: 'cursor_unlock', key: 'hamood_habibi' },
 
   // ---------- Horse Game Collectibles ----------
-  horse_rock:  { label: 'Rock Collectible',               tier: 'mil_spec',         img: '/Rock.png',                        type: 'item', draggable: true },
+  horse_rock:  { label: 'Rock Collectible',               tier: 'mil_spec',         img: '/images/rock.png',                type: 'item', draggable: true },
   horse_steed: { label: 'Horse Collectible',              tier: 'restricted',       img: '/horse-game/horse.png',           type: 'item', draggable: true },
+  horse_bat:   { label: 'Bat Collectible',                tier: 'restricted',       img: '/horse-game/bat.png',             type: 'item', draggable: true },
   horse_happy: { label: 'Happy Horse (Jumping)',          tier: 'classified',       img: '/horse-game/horse-jump.png',      type: 'item', draggable: true },
 
   // ---------- Iantopia Tycoon buildings ----------

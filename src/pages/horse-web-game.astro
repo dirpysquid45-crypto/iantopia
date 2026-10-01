@@ -396,17 +396,14 @@
   rockImg.src = '/images/rock.png';
   const HURDLE_FLIP_THRESHOLD = 100;
   const FLIP_COOLDOWN = 2.5; // seconds of no spawning after hitting 100
-  // Plane obstacle: a tight PNG crop of the tycoon page's silly-airplane.gif
-  // (built offline via PIL). The source gif's actual opaque airplane pixels
-  // only fill ~13% of its 512x325 canvas -- drawing the raw file at any
-  // obstacle size left a huge invisible margin around a comparatively tiny
-  // visible plane, which is exactly why the old hitbox (sized off the full
-  // image bounds) never looked correlated to what was on screen. This
-  // pre-cropped asset's bounds ARE the visible plane, so sizing/hitbox math
-  // against plane.w/h now means what it looks like it means.
-  const planeImg = new Image();
-  planeImg.src = '/horse-game/plane.png';
-  const PLANE_ASPECT = 52 / 75;
+  // Bat obstacle: replaces plane from here forward. Bat dimensions are wider and more menacing.
+  const batImg = new Image();
+  batImg.onload = () => console.log('[Bat] Image loaded');
+  batImg.onerror = () => console.error('[Bat] Failed to load');
+  batImg.src = '/horse-game/bat.png';
+  const BAT_ASPECT = 3347 / 1233; // bat.png native dimensions
+  // Rock obstacle: use original dimensions without stretching (1920x1280)
+  const ROCK_ASPECT = 1920 / 1280;
   const strubleImg = new Image();
   strubleImg.src = '/strubles.png';
   // The rice-bag power-up -- the same asset the "Bag of Rice" mil-spec
@@ -674,27 +671,26 @@
 
   const EXPLOSION_DURATION = 0.5;
 
-  // Plane hits get their own beat instead of an instant cut to the
+  // Bat hits get their own beat instead of an instant cut to the
   // game-over screen: the run freezes (state leaves 'playing', see
   // jump()'s guard and frame() below) while a small burst animation plays
   // over the impact point, THEN endGame() fires once it's done.
-  function triggerPlaneExplosion(box, p) {
+  function triggerBatExplosion(box, b) {
     state = 'exploding';
     shake = 0.3;
-    // Union of the horse's own box and the plane's front (nose) half --
-    // planes face left now, so the nose is the left edge of their box.
-    const planeFrontRight = p.x + p.w * 0.5;
-    const left = Math.min(box.left, p.x);
-    const right = Math.max(box.right, planeFrontRight);
-    const top = Math.min(box.top, p.y - p.h * 0.5);
-    const bottom = Math.max(box.bottom, p.y + p.h * 0.5);
+    // Union of the horse's own box and the bat's front half
+    const batFrontRight = b.x + b.w * 0.5;
+    const left = Math.min(box.left, b.x);
+    const right = Math.max(box.right, batFrontRight);
+    const top = Math.min(box.top, b.y - b.h * 0.5);
+    const bottom = Math.max(box.bottom, b.y + b.h * 0.5);
     explosion = {
       cx: (left + right) / 2,
       cy: (top + bottom) / 2,
       w: (right - left) * 1.35,
       age: 0,
       life: EXPLOSION_DURATION,
-      deathReason: 'You clipped into engine fuel!',
+      deathReason: 'you smashed into a bat',
     };
     if (audioEnabled) {
       try { explosionAudio.currentTime = 0; } catch {}
@@ -1022,29 +1018,29 @@
       return;
     }
 
-    // Planes -- big, low, lethal unless ducked under.
+    // Bats -- big, low, lethal unless ducked under.
     for (let i = planes.length - 1; i >= 0; i--) {
-      const p = planes[i];
-      p.x -= speed * dt;
-      p.bob += dt * 3;
+      const b = planes[i];
+      b.x -= speed * dt;
+      b.bob += dt * 3;
       const box = horseBox();
-      const planeLeft = p.x + p.w * 0.04;
-      const planeRight = p.x + p.w * 0.96;
-      const planeTop = p.y - p.h * 0.46;
-      const planeBottom = p.y + p.h * 0.46;
-      const xOverlap = box.right > planeLeft && box.left < planeRight;
-      const yOverlap = box.bottom > planeTop && box.top < planeBottom;
+      const batLeft = b.x + b.w * 0.04;
+      const batRight = b.x + b.w * 0.96;
+      const batTop = b.y - b.h * 0.46;
+      const batBottom = b.y + b.h * 0.46;
+      const xOverlap = box.right > batLeft && box.left < batRight;
+      const yOverlap = box.bottom > batTop && box.top < batBottom;
       if (xOverlap && yOverlap && !horse.invincible) {
-        triggerPlaneExplosion(box, p);
+        triggerBatExplosion(box, b);
         return;
       }
-      // Track plane successfully dodged as an obstacle when it scrolls past
-      if (!p.dodged && p.x + p.w < HORSE_X) {
-        p.dodged = true;
+      // Track bat successfully dodged as an obstacle when it scrolls past
+      if (!b.dodged && b.x + b.w < HORSE_X) {
+        b.dodged = true;
         cleared++;
         $('stat-cleared').textContent = cleared.toLocaleString();
       }
-      if (p.x + p.w < -40) planes.splice(i, 1);
+      if (b.x + b.w < -40) planes.splice(i, 1);
     }
 
     // Orbs -- pickup/boost is handled entirely in jump() (a real second
@@ -1233,7 +1229,13 @@
 
     if (useRockSkin) {
       if (rockImg.complete && rockImg.naturalWidth) {
-        ctx.drawImage(rockImg, h.x, topY, h.w, h.h);
+        // Rock: render at original aspect ratio (1920x1280), scaled up for challenge
+        // Use original dimensions without stretching, centered on hurdle position
+        const rockDisplayH = Math.max(h.h * 1.8, 120);
+        const rockDisplayW = rockDisplayH * ROCK_ASPECT;
+        const rockX = h.x + h.w / 2 - rockDisplayW / 2;
+        const rockY = groundY - rockDisplayH;
+        ctx.drawImage(rockImg, rockX, rockY, rockDisplayW, rockDisplayH);
       } else {
         // Fallback: brown stone color if image not loaded
         ctx.fillStyle = '#8b7355';
@@ -1335,14 +1337,14 @@
     ctx.restore();
   }
 
-  function drawPlane(p) {
-    const bobY = p.y + Math.sin(p.bob) * 2;
+  function drawBat(b) {
+    const bobY = b.y + Math.sin(b.bob) * 2;
     ctx.save();
-    if (planeImg.complete && planeImg.naturalWidth) {
-      ctx.drawImage(planeImg, p.x, bobY - p.h / 2, p.w, p.h);
+    if (batImg.complete && batImg.naturalWidth) {
+      ctx.drawImage(batImg, b.x, bobY - b.h / 2, b.w, b.h);
     } else {
-      ctx.fillStyle = '#c9c9c9';
-      ctx.fillRect(p.x, bobY - p.h / 2, p.w, p.h);
+      ctx.fillStyle = '#8b4513';
+      ctx.fillRect(b.x, bobY - b.h / 2, b.w, b.h);
     }
     ctx.restore();
   }
@@ -1494,13 +1496,21 @@
     }
     ctx.save();
     if (mirrored) { ctx.translate(W, 0); ctx.scale(-1, 1); }
+
+    // Draw mountain background inside canvas first (behind everything) after 100 hurdles
+    if (mirrored && mountainBgImg.complete && mountainBgImg.naturalWidth) {
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(mountainBgImg, 0, 0, W, H * 0.7);
+      ctx.globalAlpha = 1;
+    }
+
     drawSpeedLines();
     drawDust();
     for (const c of coins) drawCoin(c);
     for (const h of hurdles) drawHurdle(h);
-    for (const p of planes) drawPlane(p);
+    for (const b of planes) drawBat(b);
     for (const o of orbs) drawOrb(o);
-    for (const b of riceBags) drawRiceBag(b);
+    for (const rb of riceBags) drawRiceBag(rb);
     drawHorse();
     drawGround();
     drawParticles();
