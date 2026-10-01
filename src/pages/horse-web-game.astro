@@ -66,6 +66,12 @@
   }
   #strubles-badge img{ width:28px; height:28px; }
 
+  @media (max-width:768px) {
+    #strubles-badge {
+      top:calc(120px + env(safe-area-inset-top));
+    }
+  }
+
   main {
     position:relative; z-index:2; max-width:900px; width:100%; margin:0 auto;
     padding:16px 24px 24px; padding-top:calc(80px + env(safe-area-inset-top));
@@ -1220,10 +1226,12 @@
     const baseY = groundY;
     const topY = baseY - h.h;
 
-    // Draw using rock.png if available, otherwise fallback to fence
-    if (rockImg.complete && rockImg.naturalWidth) {
+    // After 100 hurdles, use rock skin for second act. Before that, use fence.
+    const useRockSkin = cleared >= HURDLE_FLIP_THRESHOLD;
+
+    if (useRockSkin && rockImg.complete && rockImg.naturalWidth) {
       ctx.drawImage(rockImg, h.x, topY, h.w, h.h);
-    } else {
+    } else if (!useRockSkin) {
       ctx.fillStyle = '#6b4423';
       ctx.strokeStyle = '#3e2812';
       ctx.lineWidth = 1;
@@ -1241,6 +1249,10 @@
         ctx.strokeStyle = 'rgba(0,0,0,.35)';
         ctx.strokeRect(h.x - 2, ry, h.w + 4, 6);
       }
+    } else if (useRockSkin) {
+      // Fallback if rock image hasn't loaded yet in second act
+      ctx.fillStyle = '#6b6b66';
+      ctx.fillRect(h.x, topY, h.w, h.h);
     }
     ctx.restore();
   }
@@ -1468,6 +1480,11 @@
     // Scoped to its own save/restore so it doesn't also mirror the
     // (screen-space) burst text drawn after it -- see drawBursts().
     const mirrored = cleared >= HURDLE_FLIP_THRESHOLD;
+    // Swap background to mountain after 100 hurdles
+    const skyBg = document.getElementById('sky-bg');
+    if (skyBg) {
+      skyBg.style.backgroundImage = mirrored ? "url('/Mountain Backround.gif')" : "url('/horse-game/plain.gif')";
+    }
     ctx.save();
     if (mirrored) { ctx.translate(W, 0); ctx.scale(-1, 1); }
     drawSpeedLines();
