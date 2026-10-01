@@ -128,85 +128,93 @@ class BlackjackGame {
   }
 
   async handleRematchResponse(sessionIdOrType) {
-    const isTimeout = sessionIdOrType === 'timeout';
-    const playerIndex = isTimeout ? -1 : this.players.findIndex(p => p.sessionId === sessionIdOrType);
+    try {
+      const isTimeout = sessionIdOrType === 'timeout';
+      const playerIndex = isTimeout ? -1 : this.players.findIndex(p => p.sessionId === sessionIdOrType);
 
-    if (!isTimeout && (playerIndex === -1 || this.rematchAccepted[playerIndex])) return;
+      if (!isTimeout && (playerIndex === -1 || this.rematchAccepted[playerIndex])) return;
 
-    if (!isTimeout) {
-      this.rematchAccepted[playerIndex] = true;
+      if (!isTimeout) {
+        this.rematchAccepted[playerIndex] = true;
 
-      // Notify opponent that this player accepted
-      const oppIndex = 1 - playerIndex;
-      this.players[oppIndex].ws.send(JSON.stringify({
-        type: 'rematch_opponent_accepted'
-      }));
-    }
+        // Notify opponent that this player accepted
+        const oppIndex = 1 - playerIndex;
+        try { this.players[oppIndex].ws.send(JSON.stringify({ type: 'rematch_opponent_accepted' })); } catch {}
+      }
 
-    // Check if both players accepted
-    if (this.rematchAccepted[0] && this.rematchAccepted[1]) {
-      clearTimeout(this.rematchTimeout);
-      // Both accepted: start new game
-      await this.startRematch();
-      return;
-    }
+      // Check if both players accepted
+      if (this.rematchAccepted[0] && this.rematchAccepted[1]) {
+        clearTimeout(this.rematchTimeout);
+        // Both accepted: start new game
+        await this.startRematch();
+        return;
+      }
 
-    // If timeout and not both accepted, send both to queue
-    if (isTimeout && !this.rematchAccepted[0] && !this.rematchAccepted[1]) {
-      clearTimeout(this.rematchTimeout);
-      this.players[0].ws.send(JSON.stringify({ type: 'ready_for_queue' }));
-      this.players[1].ws.send(JSON.stringify({ type: 'ready_for_queue' }));
+      // If timeout and not both accepted, send both to queue
+      if (isTimeout && !this.rematchAccepted[0] && !this.rematchAccepted[1]) {
+        clearTimeout(this.rematchTimeout);
+        try { this.players[0].ws.send(JSON.stringify({ type: 'ready_for_queue' })); } catch {}
+        try { this.players[1].ws.send(JSON.stringify({ type: 'ready_for_queue' })); } catch {}
+      }
+    } catch (e) {
+      console.error('[rematch] Error in handleRematchResponse:', e.message);
     }
   }
 
   async startRematch() {
-    // Reset game state
-    this.hands = [[], []];
-    this.done = [false, false];
-    this.rematchAccepted = [false, false];
-
-    // Deduct bets again
-    const bet = this.players[0].bet;
     try {
-      await this.balanceManager.deductBet(this.players[0].userId, bet);
-      await this.balanceManager.deductBet(this.players[1].userId, bet);
-    } catch (e) {
-      // Insufficient balance for rematch
-      this.broadcast({
-        type: 'rematch_failed',
-        message: 'Insufficient Strubles to rematch'
+      // Reset game state
+      this.hands = [[], []];
+      this.done = [false, false];
+      this.rematchAccepted = [false, false];
+
+      // Deduct bets again
+      const bet = this.players[0].bet;
+      try {
+        await this.balanceManager.deductBet(this.players[0].userId, bet);
+        await this.balanceManager.deductBet(this.players[1].userId, bet);
+      } catch (e) {
+        // Insufficient balance for rematch
+        this.broadcast({
+          type: 'rematch_failed',
+          message: 'Insufficient Strubles to rematch'
+        });
+        setTimeout(() => {
+          try { this.players[0].ws.send(JSON.stringify({ type: 'ready_for_queue' })); } catch {}
+          try { this.players[1].ws.send(JSON.stringify({ type: 'ready_for_queue' })); } catch {}
+        }, 3000);
+        return;
+      }
+
+      // Deal new cards
+      this.deck = Engine.makeDeck();
+      this.hands[0] = [this.deck.pop(), this.deck.pop()];
+      this.hands[1] = [this.deck.pop(), this.deck.pop()];
+
+      // Send game start
+      this.sendTo(0, {
+        type: 'game_start',
+        yourHand: this.hands[0],
+        opponentVisibleCards: this.hands[1].slice(0, 2),
+        yourBustLimit: Engine.getBustLimit(this.hands[0]),
+        opponentBustLimit: Engine.getBustLimit(this.hands[1]),
+        yourIndex: 0,
+        isRematch: true
       });
-      setTimeout(() => {
-        this.players[0].ws.send(JSON.stringify({ type: 'ready_for_queue' }));
-        this.players[1].ws.send(JSON.stringify({ type: 'ready_for_queue' }));
-      }, 3000);
-      return;
+      this.sendTo(1, {
+        type: 'game_start',
+        yourHand: this.hands[1],
+        opponentVisibleCards: this.hands[0].slice(0, 2),
+        yourBustLimit: Engine.getBustLimit(this.hands[1]),
+        opponentBustLimit: Engine.getBustLimit(this.hands[0]),
+        yourIndex: 1,
+        isRematch: true
+      });
+    } catch (e) {
+      console.error('[rematch] Error in startRematch:', e.message);
+      try { this.players[0].ws.send(JSON.stringify({ type: 'error', message: 'Rematch failed' })); } catch {}
+      try { this.players[1].ws.send(JSON.stringify({ type: 'error', message: 'Rematch failed' })); } catch {}
     }
-
-    // Deal new cards
-    this.deck = Engine.makeDeck();
-    this.hands[0] = [this.deck.pop(), this.deck.pop()];
-    this.hands[1] = [this.deck.pop(), this.deck.pop()];
-
-    // Send game start
-    this.sendTo(0, {
-      type: 'game_start',
-      yourHand: this.hands[0],
-      opponentVisibleCards: this.hands[1].slice(0, 2),
-      yourBustLimit: Engine.getBustLimit(this.hands[0]),
-      opponentBustLimit: Engine.getBustLimit(this.hands[1]),
-      yourIndex: 0,
-      isRematch: true
-    });
-    this.sendTo(1, {
-      type: 'game_start',
-      yourHand: this.hands[1],
-      opponentVisibleCards: this.hands[0].slice(0, 2),
-      yourBustLimit: Engine.getBustLimit(this.hands[1]),
-      opponentBustLimit: Engine.getBustLimit(this.hands[0]),
-      yourIndex: 1,
-      isRematch: true
-    });
   }
 
   isFinished() {
