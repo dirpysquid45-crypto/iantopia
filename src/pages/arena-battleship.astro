@@ -30,14 +30,15 @@
   .back-link { position:fixed; top:20px; left:20px; color:var(--gold); text-decoration:none; border:2px solid #000; padding:6px 10px; background:#000; font-size:9px; font-weight:700; z-index:2; }
 
   /* SETUP PHASE */
-  .phase-setup { display:flex; gap:20px; flex:1; }
-  .ship-palette { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; width:150px; overflow-y:auto; }
+  .phase-setup { display:flex; gap:20px; flex:1; overflow:hidden; }
+  .ship-palette { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; width:180px; overflow-y:auto; flex-shrink:0; }
   .ship-item { background:rgba(255,215,0,.1); border:1px solid var(--gold); padding:8px; margin-bottom:8px; font-size:9px; color:var(--gold); cursor:pointer; border-radius:4px; }
   .ship-item:hover { background:rgba(255,215,0,.2); }
 
-  .grid-container { flex:1; display:flex; flex-direction:column; background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; }
-  .grid-controls { display:flex; gap:10px; margin-bottom:10px; flex-wrap:nowrap; }
-  .grid-btn { background:var(--gold); color:#000; border:none; padding:6px 12px; font-size:9px; font-weight:700; cursor:pointer; border-radius:4px; flex:1; min-width:70px; }
+  .grid-container { flex:1; display:flex; flex-direction:column; background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; min-width:0; overflow:hidden; }
+  .grid-controls { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+  .grid-btn { background:var(--gold); color:#000; border:none; padding:8px 10px; font-size:8px; font-weight:700; cursor:pointer; border-radius:4px; flex:1; min-width:60px; }
+  .grid { gap:1px; }
   .grid-btn:hover { background:#ffe766; }
 
   .grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; }
@@ -45,8 +46,10 @@
   .grid-cell:hover { background:rgba(0,150,200,.4); }
   .grid-cell.water { background:rgba(0,100,150,.2); }
   .grid-cell.ship { background:rgba(100,100,100,.4); border-color:var(--gold); }
-  .grid-cell.preview { background:rgba(255,215,0,.3); animation:pulse 0.5s infinite; }
+  .grid-cell.preview { background:rgba(255,215,0,.3); animation:pulse 0.5s infinite; border-color:var(--gold); }
+  .grid-cell.preview-invalid { background:rgba(255,50,50,.4); animation:pulse 0.5s infinite; border-color:#ff3333; }
   @keyframes pulse { 0%,100% { opacity:0.3; } 50% { opacity:0.7; } }
+  .grid-cell.preview-origin { border:2px solid var(--gold); }
 
   .ship-sprite { background-size:contain; background-repeat:no-repeat; background-position:center; filter:drop-shadow(0 0 4px rgba(255,215,0,.4)); }
   @keyframes shipPlace { 0% { transform:scale(0.8); opacity:0; } 100% { transform:scale(1); opacity:1; } }
@@ -62,18 +65,37 @@
 
   .setup-status { font-size:10px; color:var(--muted); margin-top:10px; }
 
+  .edit-controls { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; justify-content:center; }
+  .edit-btn { background:rgba(255,215,0,.8); color:#000; border:none; padding:8px 12px; font-size:9px; font-weight:700; cursor:pointer; border-radius:3px; min-width:50px; }
+  .edit-btn:hover { background:var(--gold); transform:scale(1.05); }
+  .edit-btn.confirm { background:#00aa00; color:#fff; }
+  .edit-btn.confirm:hover { background:#00cc00; }
+  .edit-btn.cancel { background:#aa0000; color:#fff; }
+  .edit-btn.cancel:hover { background:#cc0000; }
+
+  .grid-cell.editing { background:rgba(100,200,255,.5); border-color:#00aaff; box-shadow:0 0 8px rgba(0,170,255,.6); }
+
   /* BATTLE PHASE */
   .phase-battle { display:grid; grid-template-columns:1fr 1fr; gap:20px; flex:1; }
   .battle-board { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:clamp(10px, 2vw, 20px); display:flex; flex-direction:column; }
   @media (max-width:1024px) {
     .phase-battle { grid-template-columns:1fr; gap:15px; }
   }
+  @media (max-width:1200px) {
+    .ship-palette { width:140px; padding:12px; }
+    .grid-btn { font-size:7px; padding:6px 8px; }
+  }
+
   @media (max-width:768px) {
-    .phase-setup { flex-direction:column; gap:15px; }
-    .ship-palette { width:100%; height:auto; max-height:150px; }
-    .grid-container { flex:1; min-height:300px; }
-    main { padding:10px; }
-    .grid-cell, .board-cell { font-size:6px; }
+    .phase-setup { flex-direction:column; gap:12px; }
+    .ship-palette { width:100%; height:auto; max-height:120px; overflow-x:auto; overflow-y:hidden; display:flex; gap:8px; padding:10px; flex-wrap:wrap; }
+    .ship-item { min-width:80px; margin-bottom:0; }
+    .grid-container { flex:1; min-height:350px; padding:12px; }
+    main { padding:8px; }
+    .grid-cell, .board-cell { font-size:7px; }
+    .grid-btn, .edit-btn { font-size:8px; padding:6px 8px; }
+    .edit-controls { gap:6px; }
+    .grid { gap:1px; }
   }
   .board-title { font-size:12px; color:var(--gold); margin-bottom:10px; font-weight:700; }
   .board-grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; }
@@ -172,6 +194,15 @@
           <div class="grid" id="grid-placement"></div>
         </div>
         <div class="setup-status" id="setup-status">Place all ships to continue...</div>
+        <div class="edit-controls" id="edit-controls" style="display:none;">
+          <button class="edit-btn" id="edit-rotate-btn">Rotate (R)</button>
+          <button class="edit-btn" id="edit-up-btn">↑ Up</button>
+          <button class="edit-btn" id="edit-down-btn">↓ Down</button>
+          <button class="edit-btn" id="edit-left-btn">← Left</button>
+          <button class="edit-btn" id="edit-right-btn">→ Right</button>
+          <button class="edit-btn confirm" id="edit-confirm-btn">✓ Confirm</button>
+          <button class="edit-btn cancel" id="edit-cancel-btn">✕ Cancel</button>
+        </div>
       </div>
     </div>
 
@@ -364,7 +395,179 @@
   function selectShip(name) {
     if (placedShips.find(s => s.name === name)) return;
     selectedShip = name;
+    previewX = null;
+    previewY = null;
+    exitEditMode(); // Ensure no edit state when selecting new ship
     renderGridSetup();
+  }
+
+  let previewX = null;
+  let previewY = null;
+  let editingShip = null; // { name, x, y, horizontal }
+  let editX = null;
+  let editY = null;
+
+  // Validation helpers
+  function validateGridState() {
+    // Ensure all placedShips have cells marked in grid
+    for (const ship of placedShips) {
+      const shipDef = SHIP_TYPES.find(s => s.name === ship.name);
+      if (ship.horizontal) {
+        for (let i = 0; i < shipDef.size; i++) {
+          if (!grid[ship.y][ship.x + i]) {
+            console.warn(`Grid inconsistency: ship ${ship.name} at (${ship.x},${ship.y}) missing grid marker at (${ship.x + i},${ship.y})`);
+            return false;
+          }
+        }
+      } else {
+        for (let i = 0; i < shipDef.size; i++) {
+          if (!grid[ship.y + i][ship.x]) {
+            console.warn(`Grid inconsistency: ship ${ship.name} at (${ship.x},${ship.y}) missing grid marker at (${ship.x},${ship.y + i})`);
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  function validateEditState() {
+    if (!editingShip) {
+      if (editX !== null || editY !== null) {
+        console.warn('Edit state inconsistency: editing coords without ship');
+        editX = null;
+        editY = null;
+      }
+      return true;
+    }
+    if (editX === null || editY === null) {
+      console.warn('Edit state inconsistency: ship without coords');
+      return false;
+    }
+    if (editX < 0 || editY < 0 || editX > 9 || editY > 9) {
+      console.warn(`Edit state out of bounds: (${editX},${editY})`);
+      return false;
+    }
+    return true;
+  }
+
+  function canPlaceShip(x, y, shipName, isHorizontal) {
+    const ship = SHIP_TYPES.find(s => s.name === shipName);
+    if (!ship) return false;
+    if (x < 0 || y < 0) return false;
+
+    if (isHorizontal) {
+      if (x + ship.size > 10) return false;
+      for (let i = 0; i < ship.size; i++) {
+        if (grid[y][x + i]) return false;
+      }
+    } else {
+      if (y + ship.size > 10) return false;
+      for (let i = 0; i < ship.size; i++) {
+        if (grid[y + i][x]) return false;
+      }
+    }
+    return true;
+  }
+
+  function enterEditMode(shipName) {
+    const ship = placedShips.find(s => s.name === shipName);
+    if (!ship) {
+      console.warn(`enterEditMode: ship ${shipName} not found in placedShips`);
+      return;
+    }
+    editingShip = { ...ship };
+    editX = ship.x;
+    editY = ship.y;
+    console.log(`[EDIT] Entered edit mode for ${shipName} at (${editX},${editY}) ${ship.horizontal ? 'H' : 'V'}`);
+    validateEditState();
+    renderGridSetup();
+  }
+
+  function exitEditMode() {
+    editingShip = null;
+    editX = null;
+    editY = null;
+    renderGridSetup();
+  }
+
+  function rotateEditingShip() {
+    if (!editingShip) return;
+    editingShip.horizontal = !editingShip.horizontal;
+    renderGridSetup();
+  }
+
+  function moveEditingShip(dx, dy) {
+    if (!editingShip) return;
+    const shipDef = SHIP_TYPES.find(s => s.name === editingShip.name);
+    const maxX = editingShip.horizontal ? 10 - shipDef.size : 10;
+    const maxY = editingShip.horizontal ? 10 : 10 - shipDef.size;
+    editX = Math.max(0, Math.min(maxX - 1, editX + dx));
+    editY = Math.max(0, Math.min(maxY - 1, editY + dy));
+    renderGridSetup();
+  }
+
+  function confirmEdit() {
+    if (!editingShip || editX === null || editY === null) {
+      console.warn('confirmEdit: invalid state', { editingShip, editX, editY });
+      return;
+    }
+
+    const shipDef = SHIP_TYPES.find(s => s.name === editingShip.name);
+    if (!shipDef) {
+      console.warn(`confirmEdit: ship def not found for ${editingShip.name}`);
+      return;
+    }
+
+    console.log(`[EDIT] Confirming ${editingShip.name}: (${editingShip.x},${editingShip.y}) → (${editX},${editY}) ${editingShip.horizontal ? 'H' : 'V'}`);
+
+    // Verify new placement is valid BEFORE clearing old ship
+    if (!canPlaceShip(editX, editY, editingShip.name, editingShip.horizontal)) {
+      console.warn(`[EDIT] Placement invalid - rejected`);
+      return; // Invalid placement, don't change anything
+    }
+
+    // Clear old ship from grid
+    const oldShip = placedShips.find(s => s.name === editingShip.name);
+    if (oldShip) {
+      if (oldShip.horizontal) {
+        for (let i = 0; i < shipDef.size; i++) {
+          grid[oldShip.y][oldShip.x + i] = 0;
+        }
+      } else {
+        for (let i = 0; i < shipDef.size; i++) {
+          grid[oldShip.y + i][oldShip.x] = 0;
+        }
+      }
+    }
+
+    // Place ship at new position
+    if (editingShip.horizontal) {
+      for (let i = 0; i < shipDef.size; i++) {
+        grid[editY][editX + i] = 1;
+      }
+    } else {
+      for (let i = 0; i < shipDef.size; i++) {
+        grid[editY + i][editX] = 1;
+      }
+    }
+
+    // Update ship data
+    const shipIndex = placedShips.findIndex(s => s.name === editingShip.name);
+    if (shipIndex >= 0) {
+      placedShips[shipIndex] = {
+        name: editingShip.name,
+        x: editX,
+        y: editY,
+        horizontal: editingShip.horizontal
+      };
+      console.log(`[EDIT] Ship ${editingShip.name} confirmed at (${editX},${editY})`);
+    } else {
+      console.warn(`[EDIT] Ship ${editingShip.name} not found in placedShips to update`);
+    }
+
+    validateGridState();
+    exitEditMode();
   }
 
   function renderGridSetup() {
@@ -383,8 +586,42 @@
       for (let x = 0; x < 10; x++) {
         const cell = document.createElement('div');
         cell.className = 'grid-cell';
-        if (grid[y][x]) {
+
+        // Show preview if ship is selected and cursor is hovering
+        if (selectedShip && previewX !== null && previewY !== null) {
+          const isInPreview = () => {
+            const ship = SHIP_TYPES.find(s => s.name === selectedShip);
+            if (horizontal) {
+              return y === previewY && x >= previewX && x < previewX + ship.size;
+            } else {
+              return x === previewX && y >= previewY && y < previewY + ship.size;
+            }
+          };
+
+          if (isInPreview()) {
+            const canPlace = canPlaceShip(previewX, previewY, selectedShip, horizontal);
+            cell.classList.add(canPlace ? 'preview' : 'preview-invalid');
+            if (x === previewX && y === previewY) {
+              cell.classList.add('preview-origin');
+            }
+          }
+        }
+
+        // Check if this is part of the editing ship (use editX/editY, not editingShip.x/y)
+        let isEditingCell = false;
+        if (editingShip && editX !== null && editY !== null) {
+          const shipDef = SHIP_TYPES.find(s => s.name === editingShip.name);
+          if (editingShip.horizontal) {
+            isEditingCell = editY === y && x >= editX && x < editX + shipDef.size;
+          } else {
+            isEditingCell = editX === x && y >= editY && y < editY + shipDef.size;
+          }
+        }
+
+        if (grid[y][x] || isEditingCell) {
           cell.classList.add('ship', 'placing');
+          if (isEditingCell) cell.classList.add('editing');
+
           // Find which ship occupies this cell and render it
           for (const ship of placedShips) {
             const shipDef = SHIP_TYPES.find(s => s.name === ship.name);
@@ -400,9 +637,14 @@
               sprite.className = 'ship-sprite';
               applyShipSprite(sprite, ship.name, ship.horizontal);
               sprite.style.position = 'absolute';
-              sprite.style.opacity = '0.8';
+              sprite.style.opacity = isEditingCell ? '1' : '0.8';
               cell.style.position = 'relative';
               cell.appendChild(sprite);
+              // Make placed ships clickable to enter edit mode (unless already editing)
+              if (!editingShip) {
+                cell.style.cursor = 'pointer';
+                cell.addEventListener('click', (e) => { e.stopPropagation(); enterEditMode(ship.name); });
+              }
               break;
             }
           }
@@ -410,6 +652,20 @@
 
         cell.dataset.x = x;
         cell.dataset.y = y;
+        cell.addEventListener('mousemove', () => {
+          if (selectedShip) {
+            previewX = x;
+            previewY = y;
+            renderGridSetup();
+          }
+        });
+        cell.addEventListener('mouseleave', () => {
+          if (selectedShip) {
+            previewX = null;
+            previewY = null;
+            renderGridSetup();
+          }
+        });
         cell.addEventListener('click', () => { placeShip(x, y); SFX.place.play(); });
         gridEl.appendChild(cell);
       }
@@ -422,15 +678,27 @@
     const cells = [];
 
     if (horizontal) {
-      if (x + ship.size > 10) return;
+      if (x + ship.size > 10) {
+        console.warn(`placeShip: ${selectedShip} would exceed grid width at x=${x}`);
+        return;
+      }
       for (let i = 0; i < ship.size; i++) {
-        if (grid[y][x + i]) return;
+        if (grid[y][x + i]) {
+          console.warn(`placeShip: ${selectedShip} collision at (${x + i},${y})`);
+          return;
+        }
         cells.push([x + i, y]);
       }
     } else {
-      if (y + ship.size > 10) return;
+      if (y + ship.size > 10) {
+        console.warn(`placeShip: ${selectedShip} would exceed grid height at y=${y}`);
+        return;
+      }
       for (let i = 0; i < ship.size; i++) {
-        if (grid[y + i][x]) return;
+        if (grid[y + i][x]) {
+          console.warn(`placeShip: ${selectedShip} collision at (${x},${y + i})`);
+          return;
+        }
         cells.push([x, y + i]);
       }
     }
@@ -439,12 +707,15 @@
       grid[ny][nx] = 1;
     }
     placedShips.push({ name: selectedShip, x, y, horizontal });
+    console.log(`[PLACE] ${selectedShip} placed at (${x},${y}) ${horizontal ? 'H' : 'V'}`);
     selectedShip = null;
+    validateGridState();
     renderGridSetup();
     renderShipPalette();
 
     if (placedShips.length === 5) {
       document.getElementById('setup-status').textContent = 'All ships placed! Click Ready to proceed.';
+      console.log('[SETUP] All 5 ships placed successfully');
     }
   }
 
@@ -475,6 +746,70 @@
 
   document.getElementById('ready-btn').addEventListener('click', readyForBattle);
   document.getElementById('back-lobby-btn').addEventListener('click', () => location.href = '/arena');
+
+  // Edit mode controls
+  document.getElementById('edit-rotate-btn').addEventListener('click', rotateEditingShip);
+  document.getElementById('edit-up-btn').addEventListener('click', () => moveEditingShip(0, -1));
+  document.getElementById('edit-down-btn').addEventListener('click', () => moveEditingShip(0, 1));
+  document.getElementById('edit-left-btn').addEventListener('click', () => moveEditingShip(-1, 0));
+  document.getElementById('edit-right-btn').addEventListener('click', () => moveEditingShip(1, 0));
+  document.getElementById('edit-confirm-btn').addEventListener('click', confirmEdit);
+  document.getElementById('edit-cancel-btn').addEventListener('click', exitEditMode);
+
+  // Update edit controls visibility when entering/exiting edit mode
+  function updateEditControlsVisibility() {
+    document.getElementById('edit-controls').style.display = editingShip ? 'flex' : 'none';
+  }
+
+  // Hook into enterEditMode and exitEditMode
+  const origEnterEditMode = enterEditMode;
+  enterEditMode = function(shipName) {
+    origEnterEditMode(shipName);
+    updateEditControlsVisibility();
+  };
+
+  const origExitEditMode = exitEditMode;
+  exitEditMode = function() {
+    origExitEditMode();
+    updateEditControlsVisibility();
+  };
+
+  // Keyboard controls for edit mode
+  document.addEventListener('keydown', (e) => {
+    if (!editingShip) return;
+    if (e.key.toLowerCase() === 'r') {
+      e.preventDefault();
+      rotateEditingShip();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      moveEditingShip(0, -1);
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      moveEditingShip(0, 1);
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      moveEditingShip(-1, 0);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      moveEditingShip(1, 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      confirmEdit();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      exitEditMode();
+    }
+  });
+
+  // Rotate on main setup phase (not editing) with R key
+  document.addEventListener('keydown', (e) => {
+    if (editingShip || selectedShip === null) return;
+    if (e.key.toLowerCase() === 'r') {
+      e.preventDefault();
+      horizontal = !horizontal;
+      renderGridSetup();
+    }
+  });
 
   // Connect and authenticate as soon as we know the user's signed in --
   // not on bet placement -- so the lobby list (which streams in over
