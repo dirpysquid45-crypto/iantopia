@@ -499,6 +499,21 @@
     } else if (msg.type === 'balance_update') {
       Strubles.set(msg.balance);
       updateBalance();
+    } else if (msg.type === 'rematch_declined') {
+      document.getElementById('rematch-status').textContent = 'Opponent declined the rematch.';
+      document.getElementById('rematch-status').style.display = 'block';
+      document.getElementById('rematch-accept').disabled = true;
+      document.getElementById('rematch-decline').disabled = true;
+    } else if (msg.type === 'ready_for_queue') {
+      // Table fully closed server-side (rematch declined or timed out
+      // with no response) -- previously nothing handled this message at
+      // all, so the UI stayed frozen on the result/rematch screen even
+      // after the server had already torn the table down.
+      document.getElementById('result-section').style.display = 'none';
+      document.getElementById('game-section').style.display = 'none';
+      document.getElementById('bet-section').style.display = 'block';
+      myQueueId = null;
+      showStatus('Enter a bet to open a lobby, or match one below.');
     } else if (msg.type === 'error') {
       showStatus(msg.message);
     }
@@ -538,6 +553,7 @@
   });
 
   document.getElementById('rematch-decline').addEventListener('click', () => {
+    ws?.send(JSON.stringify({ type: 'rematch_decline' }));
     location.href = '/arena';
   });
 

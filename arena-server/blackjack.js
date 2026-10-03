@@ -12,6 +12,14 @@ class BlackjackGame {
     this.rake = 0.05; // 5% rake
     this.rematchAccepted = [false, false];
     this.rematchTimeout = null;
+    // Only true once this table will NEVER see another message (timeout-
+    // to-queue or an explicit decline) -- NOT once a hand resolves. The
+    // previous isFinished() (done[0] && done[1]) was true the instant a
+    // hand ended, which made manager.js delete this table from
+    // `this.tables` right as the rematch prompt went out, so a later
+    // 'rematch_accept' could never find it again (manager.js's handler
+    // loops `this.tables.values()` and silently finds nothing).
+    this.tableClosed = false;
   }
 
   async start() {
@@ -153,12 +161,31 @@ class BlackjackGame {
       // If timeout and not both accepted, send both to queue
       if (isTimeout && !this.rematchAccepted[0] && !this.rematchAccepted[1]) {
         clearTimeout(this.rematchTimeout);
+        this.tableClosed = true;
         try { this.players[0].ws.send(JSON.stringify({ type: 'ready_for_queue' })); } catch {}
         try { this.players[1].ws.send(JSON.stringify({ type: 'ready_for_queue' })); } catch {}
+        this.closeTable?.();
       }
     } catch (e) {
       console.error('[rematch] Error in handleRematchResponse:', e.message);
     }
+  }
+
+  // Explicit decline (as opposed to the 30s auto-decline above) -- the
+  // client's "Back to Lobby" button previously just navigated away with
+  // no message at all, so the opponent had no way to find out except by
+  // waiting out the full 30s timeout. This tells them immediately.
+  declineRematch(sessionId) {
+    clearTimeout(this.rematchTimeout);
+    this.tableClosed = true;
+    const playerIndex = this.players.findIndex(p => p.sessionId === sessionId);
+    const oppIndex = playerIndex === -1 ? -1 : 1 - playerIndex;
+    if (oppIndex !== -1) {
+      try { this.players[oppIndex].ws.send(JSON.stringify({ type: 'rematch_declined' })); } catch {}
+    }
+    try { this.players[0].ws.send(JSON.stringify({ type: 'ready_for_queue' })); } catch {}
+    try { this.players[1].ws.send(JSON.stringify({ type: 'ready_for_queue' })); } catch {}
+    this.closeTable?.();
   }
 
   async startRematch() {
@@ -218,10 +245,19 @@ class BlackjackGame {
   }
 
   isFinished() {
-    return this.done[0] && this.done[1];
+    return this.tableClosed;
   }
 
   forfeit(sessionId) {
+    // A disconnect once the current hand has already resolved (its
+    // payout already issued by resolve()) means we're in the
+    // rematch-prompt window, not mid-hand -- paying out AGAIN here would
+    // be a second, unearned payout on the same already-settled bet.
+    // Treat it exactly like the player clicking "decline".
+    if (this.done[0] && this.done[1]) {
+      this.declineRematch(sessionId);
+      return;
+    }
     const playerIndex = this.players.findIndex(p => p.sessionId === sessionId);
     if (playerIndex === -1) return;
     const otherIndex = 1 - playerIndex;

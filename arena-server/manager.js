@@ -70,6 +70,13 @@ class Manager {
           break;
         }
       }
+    } else if (msg.type === 'rematch_decline') {
+      for (const game of this.tables.values()) {
+        if (game.players.some(p => p.sessionId === sessionId)) {
+          game.declineRematch?.(sessionId);
+          break;
+        }
+      }
     }
   }
 
@@ -176,6 +183,10 @@ class Manager {
     }
 
     this.tables.set(tableId, game);
+    // Lets a game close its own table from inside an internal timer (the
+    // blackjack rematch auto-decline) where there's no incoming message
+    // for handleGameAction's own isFinished() check to piggyback on.
+    game.closeTable = () => this.tables.delete(tableId);
     try {
       await game.start();
     } catch (e) {

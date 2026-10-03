@@ -19,7 +19,11 @@
   :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
   * { box-sizing:border-box; cursor:none !important; }
   html, body { margin:0; height:100%; }
-  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:none; background:#0f1115; background-image: url('/backgrounds/taiwan-strait.png'); background-size: cover; background-position: center; background-attachment: fixed; position:relative; overflow:hidden; }
+  /* overflow:hidden here used to mean "can't scroll on mobile" too --
+     once .phase-battle drops to one column under 1024px (see below),
+     both boards stack vertically and need real page scroll to reach the
+     second one, which a hard overflow:hidden on body made impossible. */
+  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:none; background:#0f1115; background-image: url('/backgrounds/taiwan-strait.png'); background-size: cover; background-position: center; background-attachment: fixed; position:relative; overflow-x:hidden; overflow-y:auto; }
   body::before { content:''; position:fixed; inset:0; z-index:-1; background:rgba(0,0,0,.5); pointer-events:none; }
 
   main { flex:1; display:flex; flex-direction:column; padding:20px; max-width:1200px; margin:0 auto; width:100%; position:relative; z-index:1; }
@@ -30,16 +34,35 @@
   .back-link { position:fixed; top:20px; left:20px; color:var(--gold); text-decoration:none; border:2px solid #000; padding:6px 10px; background:#000; font-size:9px; font-weight:700; z-index:2; }
 
   /* SETUP PHASE */
-  .phase-setup { display:flex; gap:20px; flex:1; overflow:hidden; }
+  /* overflow was hidden on both this row and .grid-container below -- on
+     a laptop-height window (short viewport, wide-ish panel), the 10x10
+     grid's own rendered height could exceed the room actually left for
+     it after the header/controls/status text, and anything past that
+     line (often the Ready button and setup-status) was just clipped
+     with no way to reach it. overflow-y:auto turns that into "scrolls
+     to the rest" instead of "silently gone." */
+  .phase-setup { display:flex; gap:20px; flex:1; overflow-y:auto; }
   .ship-palette { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; width:180px; overflow-y:auto; flex-shrink:0; }
   .ship-item { background:rgba(255,215,0,.1); border:1px solid var(--gold); padding:8px; margin-bottom:8px; font-size:9px; color:var(--gold); cursor:pointer; border-radius:4px; }
   .ship-item:hover { background:rgba(255,215,0,.2); }
 
-  .grid-container { flex:1; display:flex; flex-direction:column; background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; min-width:0; overflow:hidden; }
-  .grid-controls { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
-  .grid-btn { background:var(--gold); color:#000; border:none; padding:8px 10px; font-size:8px; font-weight:700; cursor:pointer; border-radius:4px; flex:1; min-width:60px; touch-action: manipulation; }
+  .grid-container { flex:1; display:flex; flex-direction:column; background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; min-width:0; overflow-y:auto; }
+  /* The grid itself is 10 square cells (aspect-ratio:1 below), so its
+     rendered height always equals its rendered width -- on a wide
+     laptop window the flex:1 grid-container could hand it 700-800px of
+     width with nowhere near that much vertical room to show it in. This
+     caps it to whichever is tighter, viewport height or a sane max, and
+     centers it so it doesn't hug the left edge once capped. */
+  .grid { max-width:min(100%, 70vh); margin:0 auto; }
+  .grid-controls { display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+  /* Same big, black-and-gold pixel-button treatment as #duck-btn on the
+     horse game -- these were previously tiny (8px text, 8-10px padding),
+     easy to miss and fiddly to hit on mobile. */
+  .grid-btn { background:#000; color:var(--gold); border:3px solid var(--gold); padding:16px 14px; font-size:13px; font-weight:700; letter-spacing:0.5px; cursor:pointer; border-radius:8px; flex:1; min-width:110px; touch-action:manipulation; transition:background 0.15s, color 0.15s; font-family:inherit; }
   .grid { gap:1px; }
-  .grid-btn:hover { background:#ffe766; }
+  .grid-btn:hover { background:var(--gold); color:#000; }
+  #ready-btn { border-color:#00ff6a; color:#00ff6a; box-shadow:0 0 10px rgba(0,255,106,.3); }
+  #ready-btn:hover { background:#00ff6a; color:#000; }
 
   .grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; }
   .grid-cell { aspect-ratio:1; background:rgba(0,100,150,.3); border:1px solid rgba(255,215,0,.3); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:8px; position:relative; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
@@ -65,13 +88,13 @@
 
   .setup-status { font-size:10px; color:var(--muted); margin-top:10px; }
 
-  .edit-controls { display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; justify-content:center; }
-  .edit-btn { background:rgba(255,215,0,.8); color:#000; border:none; padding:8px 12px; font-size:9px; font-weight:700; cursor:pointer; border-radius:3px; min-width:50px; }
-  .edit-btn:hover { background:var(--gold); transform:scale(1.05); }
-  .edit-btn.confirm { background:#00aa00; color:#fff; }
-  .edit-btn.confirm:hover { background:#00cc00; }
-  .edit-btn.cancel { background:#aa0000; color:#fff; }
-  .edit-btn.cancel:hover { background:#cc0000; }
+  .edit-controls { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; justify-content:center; }
+  .edit-btn { background:#000; color:var(--gold); border:3px solid var(--gold); padding:14px 16px; font-size:12px; font-weight:700; cursor:pointer; border-radius:8px; min-width:90px; touch-action:manipulation; transition:background 0.15s, color 0.15s; font-family:inherit; }
+  .edit-btn:hover { background:var(--gold); color:#000; transform:scale(1.05); }
+  .edit-btn.confirm { border-color:#00ff6a; color:#00ff6a; }
+  .edit-btn.confirm:hover { background:#00ff6a; color:#000; }
+  .edit-btn.cancel { border-color:#ff5555; color:#ff5555; }
+  .edit-btn.cancel:hover { background:#ff5555; color:#000; }
 
   .grid-cell.editing { background:rgba(100,200,255,.5); border-color:#00aaff; box-shadow:0 0 8px rgba(0,170,255,.6); }
 
@@ -98,7 +121,10 @@
     .grid { gap:1px; }
   }
   .board-title { font-size:12px; color:var(--gold); margin-bottom:10px; font-weight:700; }
-  .board-grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; }
+  /* Same fix as .grid above -- square cells mean rendered height always
+     matches rendered width, and two of these side by side on a wide
+     desktop window had no cap tying that back to the viewport. */
+  .board-grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; max-width:min(100%, 55vh); margin:0 auto; }
   .board-cell { aspect-ratio:1; background:rgba(0,100,150,.2); border:1px solid rgba(255,215,0,.3); cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
   .board-cell:hover { background:rgba(0,150,200,.4); }
   .board-cell.hit { background:#ff3333; border-color:#ff0000; }
@@ -108,6 +134,25 @@
 
   .turn-indicator { font-size:10px; color:var(--muted); margin-top:10px; }
   .turn-indicator.active { color:#00ff00; font-weight:700; }
+
+  /* Hit/miss/sunk feedback -- a big jackpot-style flash so a shot's
+     outcome reads instantly instead of only the small cell-color change. */
+  .hit-banner { position:fixed; top:38%; left:50%; z-index:50; pointer-events:none; opacity:0; font-size:26px; font-weight:700; color:#ff3333; text-shadow:0 0 14px rgba(255,0,0,.8), 3px 3px 0 #000; white-space:nowrap; }
+  .hit-banner.show { animation:hitBannerPop 0.9s ease-out forwards; }
+  @keyframes hitBannerPop {
+    0% { opacity:0; transform:translate(-50%,-50%) scale(0.3); }
+    15% { opacity:1; transform:translate(-50%,-50%) scale(1.15); }
+    30% { opacity:1; transform:translate(-50%,-50%) scale(1); }
+    78% { opacity:1; transform:translate(-50%,-50%) scale(1); }
+    100% { opacity:0; transform:translate(-50%,-50%) scale(1); }
+  }
+  .hit-banner.sunk { color:#ffd700; text-shadow:0 0 18px rgba(255,215,0,.9), 3px 3px 0 #000; font-size:32px; }
+  .hit-banner.miss { color:#66ccff; text-shadow:0 0 14px rgba(100,200,255,.8), 3px 3px 0 #000; }
+
+  /* Explosion burst sprite -- same 8-frame horizontal sheet the horse
+     game's bat-collision explosion uses. */
+  .boom-sprite { position:fixed; z-index:40; pointer-events:none; background-image:url('/horse-game/explosion-sheet.png'); background-repeat:no-repeat; background-size:800% 100%; animation:boomFrames 0.5s steps(7) forwards; }
+  @keyframes boomFrames { from { background-position:0% 0; } to { background-position:-700% 0; } }
 
   /* RESULT PHASE */
   .phase-result { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
@@ -219,6 +264,8 @@
       </div>
     </div>
 
+    <div class="hit-banner" id="hit-banner"></div>
+
     <!-- RESULT PHASE -->
     <div id="phase-result" class="phase-result" style="display:none;">
       <div class="result-banner">
@@ -298,12 +345,14 @@
     else themeMusic.pause();
   });
 
-  // Sound effects
+  // Sound effects. hit/sink previously pointed at lootbox-win.mp3 and
+  // jackpot-win.mp3, neither of which exist in public/audio/sfx -- every
+  // hit and sunk ship played silently.
   const SFX = {
     place: new Audio('/audio/sfx/minesweeper-reveal.mp3'),
-    hit: new Audio('/audio/sfx/lootbox-win.mp3'),
+    hit: new Audio('/audio/sfx/plane-explosion.mp3'),
     miss: new Audio('/audio/sfx/minesweeper-unflag.mp3'),
-    sink: new Audio('/audio/sfx/jackpot-win.mp3')
+    sink: new Audio('/audio/sfx/hamood-jackpot.mp3')
   };
 
   Object.values(SFX).forEach(sfx => { sfx.volume = 0.6; });
@@ -507,6 +556,21 @@
     renderGridSetup();
   }
 
+  // Direct click-to-reposition: an editing ship's anchor jumps straight to
+  // whichever cell was clicked (or hovered, see the grid cell's mousemove
+  // listener below), clamped the same way the arrow buttons already are.
+  // The arrow/keyboard controls stay as a precise fallback, but this is
+  // the primary way to move a ship -- point at where it should go.
+  function setEditPosition(x, y) {
+    if (!editingShip) return;
+    const shipDef = SHIP_TYPES.find(s => s.name === editingShip.name);
+    const maxX = editingShip.horizontal ? 10 - shipDef.size : 10;
+    const maxY = editingShip.horizontal ? 10 : 10 - shipDef.size;
+    editX = Math.max(0, Math.min(maxX - 1, x));
+    editY = Math.max(0, Math.min(maxY - 1, y));
+    renderGridSetup();
+  }
+
   function confirmEdit() {
     if (!editingShip || editX === null || editY === null) {
       console.warn('confirmEdit: invalid state', { editingShip, editX, editY });
@@ -521,13 +585,15 @@
 
     console.log(`[EDIT] Confirming ${editingShip.name}: (${editingShip.x},${editingShip.y}) → (${editX},${editY}) ${editingShip.horizontal ? 'H' : 'V'}`);
 
-    // Verify new placement is valid BEFORE clearing old ship
-    if (!canPlaceShip(editX, editY, editingShip.name, editingShip.horizontal)) {
-      console.warn(`[EDIT] Placement invalid - rejected`);
-      return; // Invalid placement, don't change anything
-    }
-
-    // Clear old ship from grid
+    // Clear old ship from grid BEFORE validating the new position -- the
+    // ship being edited is almost always still overlapping its own old
+    // footprint (any nudge by 1 cell, or any in-place rotation, shares
+    // every cell but one/all with where it already is), so validating
+    // against a grid that still has those old cells marked as occupied
+    // made canPlaceShip() reject the ship's own former squares as a
+    // collision with itself. Every edit was silently rejected as a
+    // result. Restore these same cells if the new placement turns out
+    // to be invalid.
     const oldShip = placedShips.find(s => s.name === editingShip.name);
     if (oldShip) {
       if (oldShip.horizontal) {
@@ -539,6 +605,19 @@
           grid[oldShip.y + i][oldShip.x] = 0;
         }
       }
+    }
+
+    if (!canPlaceShip(editX, editY, editingShip.name, editingShip.horizontal)) {
+      console.warn(`[EDIT] Placement invalid - rejected`);
+      // Put the old footprint back since we speculatively cleared it above.
+      if (oldShip) {
+        if (oldShip.horizontal) {
+          for (let i = 0; i < shipDef.size; i++) grid[oldShip.y][oldShip.x + i] = 1;
+        } else {
+          for (let i = 0; i < shipDef.size; i++) grid[oldShip.y + i][oldShip.x] = 1;
+        }
+      }
+      return; // Invalid placement, don't change anything
     }
 
     // Place ship at new position
@@ -653,7 +732,9 @@
         cell.dataset.x = x;
         cell.dataset.y = y;
         cell.addEventListener('mousemove', () => {
-          if (selectedShip) {
+          if (editingShip) {
+            setEditPosition(x, y);
+          } else if (selectedShip) {
             previewX = x;
             previewY = y;
             renderGridSetup();
@@ -666,7 +747,14 @@
             renderGridSetup();
           }
         });
-        cell.addEventListener('click', () => { placeShip(x, y); SFX.place.play(); });
+        cell.addEventListener('click', () => {
+          if (editingShip) {
+            setEditPosition(x, y);
+            return;
+          }
+          placeShip(x, y);
+          SFX.place.play();
+        });
         gridEl.appendChild(cell);
       }
     }
@@ -911,10 +999,41 @@
       cell.classList.add(lastMove.hit ? 'hit' : 'miss');
       if (lastMove.sunkShip) cell.classList.add('sunk');
     }
-    if (lastMove.hit) SFX[lastMove.sunkShip ? 'sink' : 'hit'].play();
-    else SFX.miss.play();
+    if (lastMove.hit) {
+      spawnExplosion(cell);
+      SFX[lastMove.sunkShip ? 'sink' : 'hit'].play();
+      showHitBanner(lastMove.sunkShip ? `${lastMove.sunkShip} SUNK!` : 'HIT!', lastMove.sunkShip ? 'sunk' : null);
+    } else {
+      SFX.miss.play();
+      showHitBanner('MISS', 'miss');
+    }
 
     updateTurnIndicator(msg.currentTurn);
+  }
+
+  function showHitBanner(text, variant) {
+    const el = document.getElementById('hit-banner');
+    el.classList.remove('show', 'sunk', 'miss');
+    void el.offsetWidth; // restart the animation if a previous one is still fading
+    el.textContent = text;
+    if (variant) el.classList.add(variant);
+    el.classList.add('show');
+  }
+
+  const EXPLOSION_FRAME_W = 224, EXPLOSION_FRAME_H = 254;
+  function spawnExplosion(cell) {
+    if (!cell) return;
+    const rect = cell.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 2.4;
+    const h = size * (EXPLOSION_FRAME_H / EXPLOSION_FRAME_W);
+    const boom = document.createElement('div');
+    boom.className = 'boom-sprite';
+    boom.style.width = size + 'px';
+    boom.style.height = h + 'px';
+    boom.style.left = (rect.left + rect.width / 2 - size / 2) + 'px';
+    boom.style.top = (rect.top + rect.height / 2 - h / 2) + 'px';
+    document.body.appendChild(boom);
+    setTimeout(() => boom.remove(), 560);
   }
 
   function showGameResult(results) {
