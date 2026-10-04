@@ -5,8 +5,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Iantopia Tycoon</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Iantopia Village</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
@@ -19,124 +19,28 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <!--
-  is:global is REQUIRED. Astro scopes <style> by stamping data-astro-cid-* on
-  elements in the template and rewriting selectors to match. The grid and
-  every building/worker element are built at runtime via createElement, so
-  they never receive that attribute and every scoped rule silently skips
-  them. Same trap as every other page in this project.
+  is:global is REQUIRED here for the same reason as every other page: the
+  overlay rows and the stage contents are built at runtime, so Astro's
+  scoped data-astro-cid-* selectors would silently skip them.
+
+  Rewritten (was a side-view PNG skyline in a one-row DOM grid) as a
+  top-down pixel village on a Phaser 4 tile map. Every sprite is drawn
+  procedurally with Graphics -- no image assets -- so the old /tycoon/*.png
+  art is no longer used by this page.
 -->
 <style is:global>
   :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; }
   body {
-    /* A flex column filling exactly one screen, not vh-sized content
-       stacked in normal flow — vh units for the buildings don't know
-       about the header/stats-bar/CTA taking up their own space above,
-       so on a real (short-ish) viewport the grass strip and even the
-       building labels ended up below the fold entirely. Flex instead
-       gives the grid whatever space is ACTUALLY left after everything
-       else takes what it needs, so the full skyline (labels and grass
-       included) always fits on screen without scrolling, on any
-       viewport size. */
     height:100dvh;
     display:flex; flex-direction:column;
-    color:var(--ink);
+    background:#10261a; color:var(--ink);
     font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
-    cursor:none;
-    position:relative;
-    /* y-scroll as a safety net, not the plan — on a very short viewport
-       (phone landscape) the grid still gets a min-height floor below, so
-       the flex column can end up taller than 100dvh; scrolling then is
-       far better than collapsed, unclickable slots. */
+    cursor:none; position:relative;
     overflow-x:hidden; overflow-y:auto;
-  }
-
-  /* Fixed sky behind everything — this page's background is thematic, not
-     user-selectable (no bg-btn/picker here), so it's just plain CSS rather
-     than going through background-library.js. */
-  #sky-bg {
-    position:fixed; inset:0; z-index:-2;
-    background-image:url('/tycoon/sky-background.gif');
-    background-size:cover; background-position:center;
-  }
-  #sky-bg::after {
-    content:''; position:absolute; inset:0; background:rgba(0,0,0,.15);
-  }
-
-  /* Silly airplane — purely decorative, drifts across the upper sky every
-     so often. Fixed like the sky itself (not tied to the grid/grass) so it
-     reads as "way up there" regardless of scroll or how tall the skyline
-     grid ends up. */
-  #airplane-layer {
-    position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden;
-  }
-  .airplane {
-    position:absolute; height:56px; width:auto; object-fit:contain;
-    animation-timing-function:linear; animation-fill-mode:forwards;
-  }
-  @keyframes fly-right { from { left:-100px; } to { left:calc(100% + 100px); } }
-  @keyframes fly-left  { from { left:calc(100% + 100px); } to { left:-100px; } }
-  .airplane.fly-right { animation-name: fly-right; }
-  .airplane.fly-left  { animation-name: fly-left; transform:scaleX(-1); }
-  /* Grass sits directly below the grid in normal document flow, NOT fixed
-     to the viewport — a fixed strip stays glued to the bottom of the
-     screen regardless of scroll, while the building row lives in the
-     document and moves as the page scrolls, so the two would only ever
-     line up by coincidence. In-flow means the grass line is always
-     exactly where the buildings' feet are, at any scroll position or
-     page height. */
-  #grass-fg {
-    flex:0 0 130px;
-    width:100%; pointer-events:none;
-    background-image:url('/tycoon/grass-foreground.png');
-    background-repeat:repeat-x; background-position:bottom left; background-size:auto 100%;
-    /* Comes after the grid in the DOM, so it paints in front of the
-       buildings — this negative margin pulls it up so the blades actually
-       cover the bottom of each building's feet, not just touch the grid's
-       border like before. */
-    margin-top:-55px;
-    position:relative; z-index:1;
-  }
-
-  /* Pedestrians wander along the grass line, layered BEHIND it (z-index:0 <
-     grass's 1) so they read as walking through the grass, partially
-     hidden by the blades, rather than standing in front of the strip.
-     Positioned relative to <main> (position:relative already), bottom-
-     anchored so it always lines up with the grass regardless of viewport
-     height. Split into a wrapper (handles horizontal walk + the static
-     left/right flip) and an inner image (handles its own independent
-     bob) so the two transforms never fight over the same property the
-     way a single combined animation would. */
-  #pedestrian-layer {
-    /* Tall enough for the biggest sprite (112px) at its highest spawn point
-       (bottom:80px) plus the bob's -7px lift, with a little headroom —
-       130px used to clip the top of anything spawning near the high/tall
-       end of that range, since overflow:hidden cut off right at the grass
-       strip's own height instead of the sprites' actual reach. */
-    position:absolute; left:0; right:0; bottom:0; height:210px;
-    pointer-events:none; overflow:hidden; z-index:0;
-  }
-  .pedestrian-wrap {
-    position:absolute;
-    animation-timing-function:linear; animation-fill-mode:forwards;
-  }
-  .pedestrian-wrap.walk-right { animation-name: walk-right; }
-  .pedestrian-wrap.walk-left  { animation-name: walk-left; }
-  /* Mirrors the sprite — applied per-pedestrian by JS based on which way
-     its art actually faces by default, not hardcoded to one travel
-     direction (see facesRight in tycoon-buildings.js). */
-  .pedestrian-wrap.flipped { transform:scaleX(-1); }
-  @keyframes walk-right { from { left:-80px; } to { left:calc(100% + 80px); } }
-  @keyframes walk-left  { from { left:calc(100% + 80px); } to { left:-80px; } }
-  .pedestrian {
-    display:block; object-fit:contain;
-    filter:drop-shadow(0 3px 4px rgba(0,0,0,.4));
-    animation: pedestrian-bob .5s ease-in-out infinite;
-  }
-  @keyframes pedestrian-bob {
-    0%, 100% { transform:translateY(0); }
-    50%      { transform:translateY(-7px); }
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
   }
 
   #strubles-badge{
@@ -148,7 +52,7 @@
 
   main {
     position:relative; z-index:2; max-width:1200px; width:100%; margin:0 auto;
-    padding:16px 24px 0; padding-top:calc(80px + env(safe-area-inset-top));
+    padding:16px 24px 16px; padding-top:calc(80px + env(safe-area-inset-top));
     flex:1 1 auto; min-height:0;
     display:flex; flex-direction:column;
   }
@@ -175,182 +79,56 @@
   #cta-row {
     flex:0 0 auto;
     display:flex; justify-content:center; align-items:center; gap:10px; flex-wrap:wrap;
-    margin-bottom:14px;
+    margin-bottom:12px;
   }
-  #lootbox-cta {
-    display:block; text-align:center; width:fit-content;
-    color:#000; background:var(--gold); text-decoration:none; border:3px solid #000;
-    padding:10px 18px; font-size:11px; font-weight:700;
-  }
-  #lootbox-cta:hover { background:#ffe766; }
-  #leaderboard-cta {
-    display:block; text-align:center; width:fit-content;
-    color:#000; background:var(--gold); text-decoration:none; border:3px solid #000;
-    padding:10px 18px; font-size:11px; font-weight:700;
-  }
-  #leaderboard-cta:hover { background:#ffe766; }
-  #guide-btn {
+  .cta {
     color:var(--gold); background:#000; border:3px solid var(--gold);
     padding:10px 14px; font-size:11px; font-weight:700; cursor:none;
-    font-family:inherit; transition:background .2s, color .2s;
+    font-family:inherit; text-decoration:none; transition:background .2s, color .2s;
+    touch-action:manipulation;
   }
-  #guide-btn:hover { background:var(--gold); color:#000; }
-  #bank-btn {
-    color:var(--gold); background:#000; border:3px solid var(--gold);
-    padding:10px 14px; font-size:11px; font-weight:700; cursor:none;
-    font-family:inherit; transition:background .2s, color .2s;
-  }
-  #bank-btn:hover { background:var(--gold); color:#000; }
-  #expand-btn {
-    color:var(--gold); background:#000; border:3px solid var(--gold);
-    padding:10px 14px; font-size:11px; font-weight:700; cursor:none;
-    font-family:inherit; transition:background .2s, color .2s;
-  }
-  #expand-btn:hover { background:var(--gold); color:#000; }
+  .cta:hover { background:var(--gold); color:#000; }
+  .cta.primary { background:var(--gold); color:#000; border-color:#000; }
+  .cta.primary:hover { background:#ffe766; }
+
   .bank-cap-row { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:10px; }
   .bank-cap-row:last-child { border-bottom:none; }
   .bank-cap-row span:last-child { color:var(--muted); }
   .bank-buy-row { margin-top:16px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
   .bank-buy-row p { margin:0; font-size:10px; color:var(--ink); line-height:1.7; }
 
-  /* ---------- The skyline: a single row of 5 ---------- */
-  /* flex:1 + min-height:0 gives this whatever vertical space is actually
-     left after header/stats-bar/CTA/grass take theirs — NOT a share of
-     the raw viewport. Building heights below are then percentages of
-     THIS element's real height, so the tallest (skyscraper) always fits
-     with room to spare, on any screen. */
-  #tycoon-grid {
-    flex:1 1 auto; min-height:140px;
-    display:grid;
-    /* No column minimum — a floor here forces 5×min > available width on
-       narrow phones, which pushes the last building off-screen behind a
-       horizontal scroll instead of shrinking it to fit like everything
-       else on this page does. 1fr alone still splits the space evenly. */
-    grid-template-columns: repeat(5, 1fr);
-    gap:0 6px;
-    overflow-x:auto;
+  /* ---------- The village stage (Phaser canvas lives in here) ---------- */
+  #game-stage {
+    position:relative; flex:1 1 auto; min-height:300px;
+    border:3px solid #000; outline:2px solid var(--gold); outline-offset:-2px;
+    background:#1d3b22; overflow:hidden; touch-action:none;
   }
-  .tycoon-slot {
-    position:relative;
-    display:flex; align-items:flex-end; justify-content:center;
-    border-bottom:3px solid rgba(255,215,0,.35);
-    /* Grid items get an implicit min-height:auto that floors them to their
-       content's intrinsic size unless overflow is non-visible -- and
-       .building-visual's height:66% can't resolve against THIS element
-       until ITS OWN height is settled, so during that circular pass the
-       browser falls back to sizing the img by its raw intrinsic/content
-       size instead. On a tall viewport that fallback happens to be
-       smaller than the grid row's real height and nothing looks wrong;
-       on a short one (a real laptop window, not just a phone) the
-       fallback is BIGGER than the row's actual computed height, and
-       without this the slot refuses to shrink to match -- it silently
-       overflows past #tycoon-grid's bottom into the grass strip below,
-       burying the shorter buildings behind it almost entirely. Zeroing
-       the floor lets the row's real height win, which is what makes the
-       percentage below resolve correctly at any viewport size.
-     */
-    min-height:0;
-  }
-  .tycoon-slot.empty .empty-plus {
-    width:100%; height:60%; max-height:100px; display:flex; align-items:center; justify-content:center;
-    border:2px dashed rgba(255,215,0,.4); color:rgba(255,215,0,.6); font-size:28px;
-    transition:background .15s, border-color .15s;
-  }
-  .tycoon-slot.empty:hover .empty-plus {
-    border-color:var(--gold); background:rgba(255,215,0,.08);
-  }
-  /* Percentage of the SLOT's own height, which stretches to match
-     #tycoon-grid's real (flex-computed) height by grid's default
-     align-items:stretch — this is what makes the sizing adapt to
-     whatever room is actually available instead of raw vh. Regular
-     buildings sit at ~70% of what a skyscraper gets, echoing the
-     spec's "half the page" vs. "70% of the page" ratio, just resolved
-     against the grid's real height rather than the whole viewport.
-     This has to live here (not on the img) — a percentage height only
-     resolves against a definite ancestor, and .tycoon-slot's own
-     align-items:flex-end means only a flex item positioned directly
-     against IT (this element) gets that definite height; a plain child
-     of an auto-sized box would just fall back to intrinsic size and
-     ignore the percentage entirely. Sizing it here also means the
-     label/badge/workers below (all position:absolute inside this box)
-     hug exactly this building's own tier height instead of the row's
-     shared height. */
-  .building-visual {
-    position:relative;
-    height:66%;
-    transition: height .2s ease;
-  }
-  .building-visual.skyscraper { height:82%; }
-  .building-visual.prestige { height:98%; }
-  .tycoon-building-img {
-    display:block; width:auto; max-width:100%; height:100%;
-    object-fit:contain;
-    /* When max-width kicks in (narrow columns vs. a wide/square source
-       image), height and width stop matching the image's own aspect
-       ratio — contain then letterboxes it, and by default that centers
-       the visible picture in the box, leaving empty space below it
-       instead of the top. Anchoring to the bottom keeps the building's
-       actual feet touching the slot's bottom edge regardless of which
-       dimension ends up constrained. */
-    object-position: center bottom;
-    filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));
-    transition: filter .3s ease;
-  }
-  /* Some source art (Generic Building, Generic Skyscraper) is proportionally
-     wider than the portrait-shaped box `contain` has to fit it into, so it
-     was only using ~50-60% of its allotted height with empty space above —
-     making a "regular" building look shorter than Shabby Apartment despite
-     having the exact same box. `cover` fills the full height instead and
-     crops the sides, which reads fine for a building facade. */
-  .tycoon-building-img.fit-cover { object-fit: cover; }
-  .tycoon-slot.building .tycoon-building-img {
-    filter: brightness(0.5) saturate(0.6) drop-shadow(0 6px 10px rgba(0,0,0,.5));
-  }
-  .tycoon-slot.neglected .tycoon-building-img {
-    filter: brightness(0.35) saturate(0.4) drop-shadow(0 6px 10px rgba(0,0,0,.5));
-  }
-  .tycoon-slot .label-tag {
-    /* Above the building, not below — bottom used to sit right where the
-       taller/overlapping grass now covers it, making every label
-       unreadable. */
-    position:absolute; top:-2px; left:50%; transform:translateX(-50%);
-    background:#000; color:var(--gold); border:2px solid var(--gold);
-    font-size:7px; padding:3px 6px; text-align:center;
-    /* Full label can be wider than a narrow mobile column — nowrap alone
-       let neighboring labels run into and overlap each other; capping the
-       width to the slot itself and truncating keeps each one inside its
-       own lane. */
-    max-width: 100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
+  #game-stage canvas { display:block; touch-action:none; }
 
-  .construction-pct {
-    /* Sits below the label-tag now that the label moved to top:-2px (was
-       bottom, hidden by the taller grass) — the two would otherwise stack
-       right on top of each other during construction, when both show at
-       once. */
-    position:absolute; top:22px; left:50%; transform:translateX(-50%);
-    background:rgba(0,0,0,.8); color:var(--gold); padding:3px 8px;
-    font-size:9px; border:2px solid var(--gold); white-space:nowrap;
+  /* Appears while placing or moving a building: tap a tile to aim the
+     ghost, then confirm. Same two-step flow on mouse and touch so a
+     fat-finger tap can never drop a building somewhere unintended. */
+  #place-bar {
+    position:absolute; left:50%; bottom:12px; transform:translateX(-50%);
+    display:none; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center;
+    background:rgba(0,0,0,.85); border:3px solid var(--gold); padding:10px 12px;
+    z-index:5; max-width:calc(100% - 16px);
   }
-  .construction-workers {
-    position:absolute; bottom:6px; left:50%; transform:translateX(-50%);
-    display:flex; gap:2px; pointer-events:none;
+  #place-bar.open { display:flex; }
+  #place-bar-text { font-size:9px; color:var(--gold); line-height:1.6; }
+  #place-bar-text.bad { color:#ff6b6b; }
+  .bar-btn {
+    background:#000; color:var(--gold); border:3px solid var(--gold); padding:12px 14px;
+    font-size:11px; font-weight:700; cursor:none; font-family:inherit; touch-action:manipulation;
   }
-  .construction-worker {
-    height:44px; width:auto; object-fit:contain;
-    animation: worker-wiggle .7s ease-in-out infinite;
-    filter: drop-shadow(0 3px 4px rgba(0,0,0,.6));
-  }
-  .construction-worker.driller { animation-delay: .25s; }
-  @keyframes worker-wiggle {
-    0%, 100% { transform: rotate(-6deg) translateY(0); }
-    50%      { transform: rotate(6deg) translateY(-4px); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .construction-worker { animation:none; }
-  }
+  .bar-btn:hover { background:var(--gold); color:#000; }
+  .bar-btn.ok { border-color:#00ff6a; color:#00ff6a; }
+  .bar-btn.ok:hover { background:#00ff6a; color:#000; }
+  .bar-btn.ok:disabled { opacity:.35; pointer-events:none; }
+  .bar-btn.no { border-color:#ff5555; color:#ff5555; }
+  .bar-btn.no:hover { background:#ff5555; color:#000; }
 
-  /* ---------- Placement / picker overlays (same system as every other page) ---------- */
+  /* ---------- Overlays / modals (same system as every other page) ---------- */
   .overlay{
     position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:100;
     display:none; align-items:center; justify-content:center; padding:20px;
@@ -366,28 +144,23 @@
   .btn{
     color:var(--gold); text-decoration:none; border:3px solid var(--gold); padding:8px 12px;
     background:#000; font-size:9px; transition:background .2s, color .2s; cursor:none;
-    font-family:inherit; letter-spacing:1px; text-transform:uppercase;
+    font-family:inherit; letter-spacing:1px; text-transform:uppercase; touch-action:manipulation;
   }
   .btn:hover{ background:var(--gold); color:#000; }
   .picker-row { display:flex; align-items:center; padding:8px 0; border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:10px; gap:10px; cursor:pointer; }
   .picker-row:last-child { border-bottom:none; }
   .picker-row:hover { background:rgba(255,215,0,.08); }
-  .picker-row img { width:36px; height:36px; object-fit:contain; flex-shrink:0; }
-  .picker-row .row-info { flex:1; line-height:1.6; }
-  .picker-row .row-info small { color:var(--muted); display:block; font-size:8px; }
-  .picker-row .row-info small.row-desc { font-style:italic; margin-top:3px; }
+  .row-icon { font-size:26px; width:40px; text-align:center; flex-shrink:0; }
+  .picker-row .row-info, .guide-row .row-info { flex:1; line-height:1.6; }
+  .row-info small { color:var(--muted); display:block; font-size:8px; }
+  .row-info small.row-desc { font-style:italic; margin-top:3px; }
   .picker-empty { color:var(--muted); font-size:10px; padding:10px 0; line-height:1.8; text-align:center; }
 
-  /* ---------- Building Guide (legend) ---------- */
   .guide-row {
     display:flex; align-items:center; gap:10px; padding:10px 0;
     border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:10px;
   }
   .guide-row:last-child { border-bottom:none; }
-  .guide-row img { width:40px; height:40px; object-fit:contain; flex-shrink:0; }
-  .guide-row .row-info { flex:1; line-height:1.6; }
-  .guide-row .row-info small { color:var(--muted); display:block; font-size:8px; }
-  .guide-row .row-info small.row-desc { font-style:italic; margin-top:3px; }
 
   .volume-row{
     display:flex; align-items:center; gap:10px; margin-bottom:16px;
@@ -400,18 +173,13 @@
   }
 
   @media (max-width:768px) {
-    /* Building heights are already percentages of the grid's own real
-       (flex-computed) height, so they adapt on their own — no vh
-       overrides needed here anymore. */
     #stats-bar { font-size:8px; gap:10px; }
     main { padding-left:12px; padding-right:12px; }
+    .cta { font-size:10px; padding:10px 10px; }
   }
 </style>
 </head>
 <body>
-  <div id="sky-bg"></div>
-  <div id="airplane-layer" aria-hidden="true"></div>
-
   <div id="strubles-badge">
     <img src="/strubles.png" alt="Struble">
     <span id="bal">0</span>
@@ -420,49 +188,55 @@
   <main>
     <header>
       <a href="/" title="Back to Iantopia">← Home</a>
-      <h1>IANTOPIA TYCOON</h1>
+      <h1>IANTOPIA VILLAGE</h1>
       <div style="display:flex; gap:4px;">
         <button id="now-playing" title="Music options">🎵</button>
         <button id="cursor-btn" title="Change cursor">🖱️</button>
       </div>
     </header>
 
-    <div id="out-of-order-banner" style="background:rgba(180,30,30,0.9); border:2px solid #ff4444; color:#fff; padding:12px 16px; margin-bottom:14px; text-align:center; font-weight:700; letter-spacing:0.5px; display:none;">
-      🚧 Tycoon is temporarily disabled. To enable for testing, run in console:<br><code style="background:#000; padding:4px 8px; border-radius:2px;">localStorage.setItem('tycoon_dev_mode','true'); location.reload();</code>
+    <div id="out-of-order-banner" style="background:rgba(180,30,30,0.9); border:2px solid #ff4444; color:#fff; padding:12px 16px; margin-bottom:14px; text-align:center; font-weight:700; letter-spacing:0.5px; display:none; font-size:9px; line-height:1.8;">
+      🚧 Village economy is paused while it's being rebuilt. To test it, run in console:<br><code style="background:#000; padding:4px 8px; border-radius:2px;">localStorage.setItem('tycoon_dev_mode','true'); location.reload();</code>
     </div>
 
     <div id="stats-bar">
       <span>Production: <b id="stat-production">0</b>/min</span>
-      <span>Placed: <b id="stat-placed">0/5</b></span>
+      <span>Buildings: <b id="stat-placed">0/5</b></span>
       <span>Under construction: <b id="stat-building">0/3</b></span>
       <span>Upkeep: <b id="stat-upkeep">0</b>/day</span>
     </div>
 
     <div id="cta-row">
-      <a id="lootbox-cta" href="/lootbox">🏗️ Get an Iantopia Lootbox Basic</a>
-      <button id="guide-btn" type="button">📖 Building Guide</button>
-      <button id="bank-btn" type="button">🏦 Bank</button>
-      <button id="expand-btn" type="button">➕ Expand Grid</button>
-      <a id="leaderboard-cta" href="/leaderboard">🏆 Leaderboard</a>
+      <button id="build-btn" class="cta primary" type="button">🏗️ Build</button>
+      <a id="lootbox-cta" class="cta" href="/lootbox">🎁 Get Buildings</a>
+      <button id="guide-btn" class="cta" type="button">📖 Guide</button>
+      <button id="bank-btn" class="cta" type="button">🏦 Bank</button>
+      <button id="expand-btn" class="cta" type="button">➕ Slots</button>
+      <button id="recenter-btn" class="cta" type="button">🎯 Center</button>
+      <a id="leaderboard-cta" class="cta" href="/leaderboard">🏆 Ranks</a>
     </div>
 
-    <div id="tycoon-grid"></div>
-    <div id="grass-fg"></div>
-    <div id="pedestrian-layer" aria-hidden="true"></div>
+    <div id="game-stage">
+      <div id="place-bar">
+        <span id="place-bar-text"></span>
+        <button class="bar-btn ok" id="place-confirm" type="button">✓ Place</button>
+        <button class="bar-btn no" id="place-cancel" type="button">✕ Cancel</button>
+      </div>
+    </div>
   </main>
 
-  <!-- Placement picker: which owned-but-unplaced building to build here -->
+  <!-- Placement picker: which owned-but-unplaced building to build -->
   <div class="overlay" id="place-overlay">
     <div class="modal">
       <div class="modal-head">
-        <h2>Build here</h2>
+        <h2>Build</h2>
         <button class="btn" id="place-close" type="button">Close</button>
       </div>
       <div id="place-list"></div>
     </div>
   </div>
 
-  <!-- Manage an already-placed building: remove it, or swap for a different one -->
+  <!-- Manage an already-placed building: move or remove it -->
   <div class="overlay" id="manage-overlay">
     <div class="modal">
       <div class="modal-head">
@@ -470,8 +244,8 @@
         <button class="btn" id="manage-close" type="button">Close</button>
       </div>
       <div id="manage-info"></div>
-      <div id="manage-actions" style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
-        <button class="btn" id="manage-swap" type="button">🔁 Swap</button>
+      <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+        <button class="btn" id="manage-move" type="button">✋ Move</button>
         <button class="btn" id="manage-remove" type="button">🗑️ Remove</button>
       </div>
     </div>
@@ -504,11 +278,11 @@
     </div>
   </div>
 
-  <!-- Expand Grid: purchase additional skyline slots -->
+  <!-- Building slots: how many buildings your village can hold -->
   <div class="overlay" id="expand-overlay">
     <div class="modal">
       <div class="modal-head">
-        <h2>Expand Grid</h2>
+        <h2>Building Slots</h2>
         <button class="btn" id="expand-close" type="button">Close</button>
       </div>
       <p style="font-size:10px; color:var(--muted); line-height:1.7; margin:0 0 14px;">Each new slot costs roughly triple the last — a long-term sink for late-game progression.</p>
@@ -551,9 +325,7 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<!-- Headless here (no account UI on this page) — see blackjack.astro for
-     why every page needs this now, not just home. -->
-<script is:inline src="/cloud-sync.js?v=9"></script>
+<script is:inline src="/cloud-sync.js?v=10"></script>
 <script is:inline src="/music-library.js?v=13"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
@@ -563,21 +335,24 @@
 <script is:inline src="/tycoon-bank.js?v=1"></script>
 <script is:inline src="/strubles.js?v=3"></script>
 <script is:inline src="/pickers.js?v=11"></script>
+<!-- Pinned exact version: Phaser 4 is new (Apr 2026), don't float it. -->
+<script is:inline src="https://cdn.jsdelivr.net/npm/phaser@4.0.0/dist/phaser.min.js"></script>
 <script is:inline>
 (() => {
   const $ = (id) => document.getElementById(id);
-  // Temporary economy freeze: no construction progress, no production
-  // Temporarily disabled to patch exploits. Set to false in browser console
-  // (localStorage.setItem('tycoon_dev_mode', 'true')) to test locally.
-  // Production always blocks this regardless of the flag.
+
+  // Economy stays frozen outside dev mode until the server-authoritative
+  // village save lands (see the rework plan, phase 3). Placing/moving still
+  // works so the new map can be tried; production/tax/construction do not.
   const TYCOON_DISABLED = !localStorage.getItem('tycoon_dev_mode');
-  if (TYCOON_DISABLED) {
-    console.log('[Tycoon] Dev mode disabled. To enable: localStorage.setItem("tycoon_dev_mode","true"); location.reload();');
-  } else {
-    console.log('[Tycoon] Dev mode ENABLED — testing economy system');
-  }
-  const BASE_GRID_SIZE = 5;
-  const GRID_KEY = 'tycoon_grid_v1';
+  $('out-of-order-banner').style.display = TYCOON_DISABLED ? 'block' : 'none';
+
+  // ---------- Constants / data ----------
+  const T = 16;                 // pixels per tile (world units)
+  const MAP = 16;               // map is MAP x MAP tiles
+  const BASE_SLOTS = 5;         // buildings allowed before buying more slots
+  const VILLAGE_KEY = 'tycoon_village_v2';
+  const LEGACY_GRID_KEY = 'tycoon_grid_v1';
   const LAST_SEEN_KEY = 'tycoon_last_seen_v1';
   const INV_KEY = 'strubles_inventory_v1';
   const SLOTS_KEY = 'tycoon_slots_owned_v1';
@@ -589,68 +364,89 @@
   const EXPAND_BASE_COST = 200000;
   const EXPAND_GROWTH = 3;
 
-  function slotsOwned() { return Math.max(0, Number(localStorage.getItem(SLOTS_KEY)) || 0); }
-  let GRID_SIZE = BASE_GRID_SIZE + slotsOwned();
-  function expandCostForSlot(n) { return n <= 0 ? 0 : EXPAND_BASE_COST * Math.pow(EXPAND_GROWTH, n - 1); }
+  // Tile footprint + emoji for pickers (the old PNG art is no longer used).
+  const LAYOUT = {
+    shabby_apartment:   { w: 1, h: 1, icon: '🏚️' },
+    generic_building:   { w: 2, h: 1, icon: '🏢' },
+    pagoda:             { w: 2, h: 2, icon: '⛩️' },
+    generic_skyscraper: { w: 2, h: 2, icon: '🏙️' },
+    taipei_101:         { w: 3, h: 3, icon: '🗼' },
+  };
+  const foot = (key) => LAYOUT[key] || { w: 1, h: 1, icon: '🏠' };
 
+  // ---------- Persistence ----------
   function loadJSON(k, fb) { try { const v = localStorage.getItem(k); return v != null ? JSON.parse(v) : fb; } catch { return fb; } }
   function saveJSON(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
-  function loadGrid() {
-    const raw = loadJSON(GRID_KEY, null);
-    if (Array.isArray(raw)) {
-      if (raw.length === GRID_SIZE) return raw;
-      if (raw.length < GRID_SIZE) return raw.concat(new Array(GRID_SIZE - raw.length).fill(null));
-      return raw.slice(0, GRID_SIZE);
-    }
-    return new Array(GRID_SIZE).fill(null);
+  function slotsOwned() { return Math.max(0, Number(localStorage.getItem(SLOTS_KEY)) || 0); }
+  function slotCap() { return BASE_SLOTS + slotsOwned(); }
+  function expandCostForSlot(n) { return n <= 0 ? 0 : EXPAND_BASE_COST * Math.pow(EXPAND_GROWTH, n - 1); }
+
+  // Village state: { v:2, nextId, b:[{id,key,x,y,status,startedAt,completesAt,lastProductionAt,lastTaxAt,taxDebt}] }
+  function freshVillage() { return { v: 2, nextId: 1, b: [] }; }
+
+  // First load after the rework: carry the old one-row skyline's buildings
+  // over (same construction progress, same keys) into a row on the new map
+  // instead of silently dropping what players already built. The legacy key
+  // is left untouched.
+  function migrateLegacy() {
+    const v = freshVillage();
+    const old = loadJSON(LEGACY_GRID_KEY, null);
+    if (!Array.isArray(old)) return v;
+    let cx = 1;
+    old.forEach((slot) => {
+      if (!slot || !DEFS[slot.key]) return;
+      const f = foot(slot.key);
+      if (cx + f.w > MAP) return;
+      v.b.push(Object.assign({}, slot, { id: v.nextId++, x: cx, y: MAP - 1 - f.h - 1 }));
+      cx += f.w + 1;
+    });
+    return v;
   }
-  function saveGrid(grid) {
-    saveJSON(GRID_KEY, grid);
+
+  function loadVillage() {
+    const raw = loadJSON(VILLAGE_KEY, null);
+    if (raw && raw.v === 2 && Array.isArray(raw.b)) return raw;
+    const v = migrateLegacy();
+    saveJSON(VILLAGE_KEY, v);
+    return v;
+  }
+  function saveVillage() {
+    saveJSON(VILLAGE_KEY, village);
     try { window.dispatchEvent(new Event('tycoon:changed')); } catch {}
   }
 
+  let village = loadVillage();
+
+  // ---------- Inventory / counts ----------
   function ownedCounts() {
     const inv = loadJSON(INV_KEY, {});
-    const buildings = Array.isArray(inv.buildings) ? inv.buildings : [];
+    const list = Array.isArray(inv.buildings) ? inv.buildings : [];
     const counts = {};
     ORDER.forEach((k) => { counts[k] = 0; });
-    buildings.forEach((k) => { if (counts[k] != null) counts[k]++; });
+    list.forEach((k) => { if (counts[k] != null) counts[k]++; });
     return counts;
   }
-  function placedCounts(grid) {
+  function placedCounts(excludeId) {
     const counts = {};
     ORDER.forEach((k) => { counts[k] = 0; });
-    grid.forEach((slot) => { if (slot && counts[slot.key] != null) counts[slot.key]++; });
+    village.b.forEach((s) => { if (s.id !== excludeId && counts[s.key] != null) counts[s.key]++; });
     return counts;
   }
-  function availableCounts(grid) {
-    const owned = ownedCounts(), placed = placedCounts(grid);
+  function availableCounts() {
+    const owned = ownedCounts(), placed = placedCounts();
     const avail = {};
     ORDER.forEach((k) => { avail[k] = Math.max(0, owned[k] - placed[k]); });
     return avail;
   }
-  function buildingCount(grid) {
-    return grid.filter((s) => s && s.status === 'building').length;
-  }
+  const buildingCount = () => village.b.filter((s) => s.status === 'building').length;
 
-  // Reconciles construction completion + production accrual since the
-  // last check-in. Used to also cap this against an 8h "offline" window
-  // (OFFLINE_CAP_MS) so a long absence didn't retroactively finish/produce
-  // forever -- replaced by the wallet cap (tycoon-bank.js + strubles.js's
-  // add()), which bounds the BALANCE directly and uniformly regardless of
-  // online/offline state, so a duration-based cap here is redundant. This
-  // also fixes a side effect the old cap had: construction completion
-  // itself was being gated by the same capped clock as production, even
-  // though only production payout was ever meant to be bounded -- a
-  // building now always finishes exactly when its own timer says it will.
-  function tick(grid) {
+  // ---------- Economy tick (same math as the old skyline) ----------
+  function tick() {
     if (TYCOON_DISABLED) return false;
     const now = Date.now();
-    let earned = 0;
-    let changed = false;
-    grid.forEach((slot) => {
-      if (!slot) return;
+    let earned = 0, changed = false;
+    village.b.forEach((slot) => {
       const def = DEFS[slot.key];
       if (!def) return;
       if (slot.status === 'building' && now >= slot.completesAt) {
@@ -661,195 +457,375 @@
         changed = true;
       }
       if (slot.status === 'complete') {
-        // Initialize tax checkpoint on first encounter (migration for pre-existing saves)
-        if (slot.lastTaxAt == null) {
-          slot.lastTaxAt = now;
-          slot.taxDebt = 0;
-          changed = true;
-        }
-        // Accrual: if debt is outstanding, production is halved
+        if (slot.lastTaxAt == null) { slot.lastTaxAt = now; slot.taxDebt = 0; changed = true; }
         const neglected = slot.taxDebt > 0;
         const elapsedMin = Math.max(0, now - slot.lastProductionAt) / 60000;
-        const effectiveProduction = def.production * (neglected ? 0.5 : 1);
-        const gain = Math.floor(elapsedMin * effectiveProduction);
+        const eff = def.production * (neglected ? 0.5 : 1);
+        const gain = Math.floor(elapsedMin * eff);
         if (gain > 0) {
           earned += gain;
-          slot.lastProductionAt += (gain / effectiveProduction) * 60000;
+          slot.lastProductionAt += (gain / eff) * 60000;
           changed = true;
         }
-        // Tax accrual
         const dailyUpkeep = def.cost * (def.upkeepPct || 0);
-        const elapsedMinTax = Math.max(0, now - slot.lastTaxAt) / 60000;
-        const taxOwed = Math.floor(elapsedMinTax * (dailyUpkeep / 1440));
+        const elapsedTax = Math.max(0, now - slot.lastTaxAt) / 60000;
+        const perMin = dailyUpkeep / 1440;
+        const taxOwed = perMin > 0 ? Math.floor(elapsedTax * perMin) : 0;
         if (taxOwed > 0) {
           slot.taxDebt = (slot.taxDebt || 0) + taxOwed;
-          slot.lastTaxAt += (taxOwed / (dailyUpkeep / 1440)) * 60000;
+          slot.lastTaxAt += (taxOwed / perMin) * 60000;
           changed = true;
         }
       }
     });
     localStorage.setItem(LAST_SEEN_KEY, String(now));
     if (earned > 0) { try { Strubles.add(earned); } catch {} }
-    // Auto-pay accumulated tax debt from balance
-    grid.forEach((slot) => {
-      if (slot && slot.status === 'complete' && slot.taxDebt > 0) {
-        if (Strubles.spend(slot.taxDebt)) {
-          slot.taxDebt = 0;
-          changed = true;
-        }
+    village.b.forEach((slot) => {
+      if (slot.status === 'complete' && slot.taxDebt > 0 && Strubles.spend(slot.taxDebt)) {
+        slot.taxDebt = 0;
+        changed = true;
       }
     });
     return changed;
   }
 
-  function syncBalance() { try { $('bal').textContent = Strubles.get().toLocaleString(); } catch {} }
-
-  function fmtRemaining(ms) {
-    const s = Math.max(0, Math.ceil(ms / 1000));
-    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
-    if (h > 0) return `${h}h ${m}m left`;
-    if (m > 0) return `${m}m ${sec}s left`;
-    return `${sec}s left`;
+  // ---------- Map helpers ----------
+  function inBounds(x, y, f) { return x >= 0 && y >= 0 && x + f.w <= MAP && y + f.h <= MAP; }
+  function overlaps(a, b) {
+    return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  }
+  // ignoreId lets a building being moved ignore its own old footprint.
+  function canPlace(key, x, y, ignoreId) {
+    const f = foot(key);
+    if (!inBounds(x, y, f)) return false;
+    const rect = { x, y, w: f.w, h: f.h };
+    return !village.b.some((s) => {
+      if (s.id === ignoreId) return false;
+      const sf = foot(s.key);
+      return overlaps(rect, { x: s.x, y: s.y, w: sf.w, h: sf.h });
+    });
+  }
+  function buildingAt(tx, ty) {
+    return village.b.find((s) => {
+      const f = foot(s.key);
+      return tx >= s.x && tx < s.x + f.w && ty >= s.y && ty < s.y + f.h;
+    }) || null;
   }
 
-  let grid = loadGrid();
-  let renderTimer = null;
+  function syncBalance() { try { $('bal').textContent = Strubles.get().toLocaleString(); } catch {} }
+  function fmtDuration(min) {
+    if (min >= 1440) return (min / 1440).toFixed(min % 1440 === 0 ? 0 : 1) + 'd';
+    if (min >= 60) return (min / 60).toFixed(min % 60 === 0 ? 0 : 1) + 'h';
+    return min + 'm';
+  }
 
-  function render() {
-    const gridEl = $('tycoon-grid');
-    gridEl.style.gridTemplateColumns = `repeat(${GRID_SIZE}, 1fr)`;
-    gridEl.innerHTML = '';
-    const now = Date.now();
-    let totalProduction = 0;
-    let totalUpkeep = 0;
+  // ---------- Procedural pixel art (1 world px per art px, T=16 per tile) ----------
+  const hex = (s) => parseInt(s.replace('#', ''), 16);
+  function rect(g, color, x, y, w, h, alpha) {
+    g.fillStyle(hex(color), alpha == null ? 1 : alpha);
+    g.fillRect(x, y, w, h);
+  }
 
-    grid.forEach((slot, i) => {
-      const cell = document.createElement('div');
-      cell.className = 'tycoon-slot';
-      cell.dataset.slot = i;
-
-      if (!slot) {
-        cell.classList.add('empty');
-        const plus = document.createElement('div');
-        plus.className = 'empty-plus';
-        plus.textContent = '+';
-        cell.appendChild(plus);
-        cell.addEventListener('click', () => openPlacePicker(i));
-        gridEl.appendChild(cell);
-        return;
+  const ART = {
+    shabby_apartment(g, ox, oy) {
+      rect(g, '#2b1a10', ox + 1, oy + 2, 14, 13);
+      rect(g, '#a8845a', ox + 2, oy + 5, 12, 9);
+      rect(g, '#7a3b2e', ox + 1, oy + 2, 14, 4);
+      rect(g, '#8f4a3a', ox + 1, oy + 2, 14, 1);
+      rect(g, '#ffe08a', ox + 3, oy + 8, 3, 3);
+      rect(g, '#ffe08a', ox + 10, oy + 8, 3, 3);
+      rect(g, '#4a2c17', ox + 7, oy + 10, 3, 4);
+      rect(g, '#6b6b6b', ox + 11, oy, 2, 3);
+    },
+    generic_building(g, ox, oy) {
+      rect(g, '#2a2f38', ox + 1, oy + 1, 30, 14);
+      rect(g, '#8a93a0', ox + 2, oy + 3, 28, 11);
+      rect(g, '#5d6672', ox + 1, oy + 1, 30, 3);
+      rect(g, '#9aa3b0', ox + 4, oy + 1, 5, 2);
+      for (let i = 0; i < 6; i++) rect(g, '#bfe3ff', ox + 4 + i * 4, oy + 6, 3, 3);
+      rect(g, '#4a2c17', ox + 14, oy + 10, 4, 4);
+    },
+    pagoda(g, ox, oy) {
+      rect(g, '#5a432c', ox + 4, oy + 28, 24, 3);
+      const tiers = [
+        { y: 20, w: 24, wall: 6 },
+        { y: 12, w: 18, wall: 6 },
+        { y: 4,  w: 12, wall: 5 },
+      ];
+      tiers.forEach((t) => {
+        const x = ox + 16 - t.w / 2;
+        rect(g, '#e8d9b0', x + 2, oy + t.y + 3, t.w - 4, t.wall);
+        rect(g, '#7a1f16', x - 3, oy + t.y, t.w + 6, 3);
+        rect(g, '#c0392b', x - 2, oy + t.y, t.w + 4, 2);
+        rect(g, '#ffd700', x - 3, oy + t.y + 2, t.w + 6, 1);
+      });
+      rect(g, '#ffd700', ox + 15, oy, 2, 5);
+      rect(g, '#4a2c17', ox + 14, oy + 23, 4, 5);
+    },
+    generic_skyscraper(g, ox, oy) {
+      rect(g, '#1b2a3a', ox + 5, oy + 3, 22, 28);
+      rect(g, '#4a7fb5', ox + 6, oy + 4, 20, 26);
+      rect(g, '#2f4a66', ox + 6, oy + 4, 20, 3);
+      for (let r = 0; r < 5; r++) {
+        for (let c = 0; c < 4; c++) rect(g, r % 2 ? '#bfe3ff' : '#8fc2ea', ox + 8 + c * 5, oy + 9 + r * 4, 3, 2);
       }
+      rect(g, '#cfd6de', ox + 15, oy, 2, 4);
+      rect(g, '#ff4444', ox + 15, oy, 2, 1);
+    },
+    taipei_101(g, ox, oy) {
+      rect(g, '#1c3b2a', ox + 10, oy + 40, 28, 7);
+      for (let i = 0; i < 8; i++) {
+        const w = i === 0 ? 14 : 12 + (i % 2 ? 4 : 0);
+        const x = ox + 24 - w / 2;
+        const y = oy + 36 - i * 4;
+        rect(g, '#2e8b57', x, y, w, 4);
+        rect(g, '#3fae70', x, y, w, 1);
+        rect(g, '#ffd700', x - 1, y + 3, w + 2, 1);
+        rect(g, '#bfe3ff', x + 2, y + 1, 2, 2);
+        rect(g, '#bfe3ff', x + w - 4, y + 1, 2, 2);
+      }
+      rect(g, '#2e8b57', ox + 18, oy + 2, 12, 3);
+      rect(g, '#cfd6de', ox + 23, oy, 2, 3);
+    },
+  };
 
-      const def = DEFS[slot.key];
-      if (!def) { gridEl.appendChild(cell); return; }
-      const rarity = RARITY[def.tier] || {};
+  // Scaffold look while a building is under construction.
+  function drawScaffold(g, ox, oy, w, h, pct) {
+    rect(g, '#000000', ox + 1, oy + 2, w - 2, h - 2, 0.35);
+    for (let i = 0; i < w - 2; i += 4) rect(g, i % 8 === 0 ? '#ffd23f' : '#262626', ox + 1 + i, oy + 2, 4, 2);
+    rect(g, '#262626', ox + 1, oy + 2, 2, h - 2);
+    rect(g, '#262626', ox + w - 3, oy + 2, 2, h - 2);
+    const fillH = Math.max(1, Math.floor(((h - 6) * pct) / 100));
+    rect(g, '#b99b6b', ox + 3, oy + h - 2 - fillH, w - 6, fillH);
+    rect(g, '#000000', ox + 1, oy + h - 1, w - 2, 1, 0.6);
+  }
 
-      // Wraps just the image (shrinks to its actual rendered size, not the
-      // slot/row's full height) so the label/badge below position relative
-      // to THIS building's own top edge — a short building sharing a row
-      // with a tall one used to leave its label floating way up near the
-      // row's top, since it was positioned relative to the slot instead.
-      const visual = document.createElement('div');
-      visual.className = 'building-visual' + (def.prestige ? ' prestige' : (def.skyscraper ? ' skyscraper' : ''));
+  function drawTerrain(g) {
+    for (let y = 0; y < MAP; y++) {
+      for (let x = 0; x < MAP; x++) {
+        const n = ((x * 73856093) ^ (y * 19349663)) >>> 0;
+        const shade = (x + y) % 2 ? '#3f7d3a' : '#3a7635';
+        rect(g, shade, x * T, y * T, T, T);
+        if (n % 5 === 0) rect(g, '#4f9247', x * T + (n >> 3) % 12 + 1, y * T + (n >> 6) % 12 + 1, 2, 1);
+        if (n % 11 === 0) rect(g, '#2f6a2c', x * T + (n >> 4) % 11 + 2, y * T + (n >> 7) % 11 + 2, 1, 2);
+      }
+    }
+    // Dirt border so the buildable area reads as a plot, not an endless field.
+    g.lineStyle(2, hex('#6b4a2e'), 1);
+    g.strokeRect(-1, -1, MAP * T + 2, MAP * T + 2);
+  }
 
-      const img = document.createElement('img');
-      img.className = 'tycoon-building-img' + (def.fillMode === 'cover' ? ' fit-cover' : '');
-      img.src = def.img;
-      img.alt = def.label;
-      visual.appendChild(img);
+  // ---------- Phaser scene ----------
+  let scene = null, cam = null;
+  let camCX = (MAP * T) / 2, camCY = (MAP * T) / 2;
+  let selectedId = null;
+  // Placement mode: { key, moveId|null, tx, ty, restore|null }
+  let placing = null;
+  let layer, ghostG, gridG, labels = [];
 
-      const tag = document.createElement('div');
-      tag.className = 'label-tag';
-      tag.style.color = rarity.color || 'var(--gold)';
-      tag.style.borderColor = rarity.color || 'var(--gold)';
+  function clampCam() {
+    const vw = cam.width / cam.zoom, vh = cam.height / cam.zoom;
+    const wW = MAP * T, wH = MAP * T, pad = 24;
+    camCX = vw >= wW + pad * 2 ? wW / 2 : Math.max(vw / 2 - pad, Math.min(wW + pad - vw / 2, camCX));
+    camCY = vh >= wH + pad * 2 ? wH / 2 : Math.max(vh / 2 - pad, Math.min(wH + pad - vh / 2, camCY));
+    cam.centerOn(camCX, camCY);
+  }
+  function fitZoom() {
+    const z = Math.min(cam.width / (MAP * T + 48), cam.height / (MAP * T + 48));
+    return Math.max(0.5, z);
+  }
+  function recenter() {
+    camCX = (MAP * T) / 2; camCY = (MAP * T) / 2;
+    cam.setZoom(fitZoom());
+    clampCam();
+  }
+  function setZoom(z) {
+    const min = fitZoom() * 0.75;
+    cam.setZoom(Math.max(min, Math.min(8, z)));
+    clampCam();
+  }
 
-      if (slot.status === 'building') {
-        cell.classList.add('building');
-        const pct = Math.min(100, Math.round(((now - slot.startedAt) / (slot.completesAt - slot.startedAt)) * 100));
-        const badge = document.createElement('div');
-        badge.className = 'construction-pct';
-        badge.textContent = `${pct}% — ${fmtRemaining(slot.completesAt - now)}`;
-        visual.appendChild(badge);
+  function refresh() {
+    if (!scene) return;
+    layer.clear();
+    labels.forEach((t) => t.destroy());
+    labels = [];
+    const now = Date.now();
+    let totalProduction = 0, totalUpkeep = 0;
 
-        const workers = document.createElement('div');
-        workers.className = 'construction-workers';
-        const w1 = document.createElement('img');
-        w1.className = 'construction-worker';
-        w1.src = '/tycoon/worker-pointing.png';
-        w1.alt = '';
-        const w2 = document.createElement('img');
-        w2.className = 'construction-worker driller';
-        w2.src = '/tycoon/worker-driller.png';
-        w2.alt = '';
-        workers.appendChild(w1);
-        workers.appendChild(w2);
-        visual.appendChild(workers);
-
-        tag.textContent = def.label;
+    // Draw back-to-front so taller buildings overlap the ones behind them.
+    const sorted = village.b.slice().sort((a, b) => (a.y + foot(a.key).h) - (b.y + foot(b.key).h));
+    sorted.forEach((s) => {
+      if (placing && placing.moveId === s.id) return;
+      const def = DEFS[s.key];
+      if (!def) return;
+      const f = foot(s.key);
+      const ox = s.x * T, oy = s.y * T, w = f.w * T, h = f.h * T;
+      // Ground shadow
+      rect(layer, '#000000', ox + 2, oy + h - 3, w - 2, 4, 0.28);
+      let tag = '';
+      if (s.status === 'building') {
+        const pct = Math.min(100, Math.round(((now - s.startedAt) / (s.completesAt - s.startedAt)) * 100));
+        drawScaffold(layer, ox, oy, w, h, pct);
+        tag = `${pct}%`;
       } else {
-        // Complete building: show actual (possibly halved) production
-        const dailyUpkeep = def.cost * (def.upkeepPct || 0);
-        totalUpkeep += dailyUpkeep;
-        const neglected = slot.taxDebt > 0;
-        const displayProduction = def.production * (neglected ? 0.5 : 1);
-        totalProduction += displayProduction;
-        tag.textContent = `${def.label} · +${displayProduction}/min`;
-
-        // Render neglected badge if debt outstanding
+        (ART[s.key] || ART.shabby_apartment)(layer, ox, oy);
+        const neglected = s.taxDebt > 0;
+        const prod = def.production * (neglected ? 0.5 : 1);
+        totalProduction += prod;
+        totalUpkeep += def.cost * (def.upkeepPct || 0);
         if (neglected) {
-          cell.classList.add('neglected');
-          img.style.filter = 'brightness(0.35) saturate(0.4) drop-shadow(0 6px 10px rgba(0,0,0,.5))';
-          const debtBadge = document.createElement('div');
-          debtBadge.className = 'construction-pct';
-          debtBadge.style.color = '#ff6b6b';
-          debtBadge.textContent = `⚠ Owes ${Math.floor(slot.taxDebt)} — half production`;
-          visual.appendChild(debtBadge);
+          rect(layer, '#000000', ox, oy, w, h, 0.45);
+          rect(layer, '#ff4444', ox + w - 5, oy + 1, 4, 4);
         }
       }
-      visual.appendChild(tag);
-      cell.appendChild(visual);
-      cell.addEventListener('click', () => openManagePicker(i));
-      gridEl.appendChild(cell);
+      if (s.id === selectedId) {
+        layer.lineStyle(1, hex('#ffd700'), 1);
+        layer.strokeRect(ox - 0.5, oy - 0.5, w + 1, h + 1);
+      }
+      if (tag) {
+        const t = scene.add.text(ox + w / 2, oy + h / 2, tag, { fontFamily: 'monospace', fontSize: '8px', color: '#ffffff', stroke: '#000000', strokeThickness: 2 });
+        t.setOrigin(0.5);
+        t.setResolution(4);
+        labels.push(t);
+      }
     });
 
+    drawGhost();
+
     $('stat-production').textContent = Math.floor(totalProduction);
-    $('stat-placed').textContent = grid.filter(Boolean).length + '/' + GRID_SIZE;
-    $('stat-building').textContent = buildingCount(grid) + '/' + MAX_CONCURRENT;
-    // Add upkeep stat to stats bar
-    const upkeepSpan = $('stat-upkeep');
-    if (upkeepSpan) {
-      upkeepSpan.textContent = Math.floor(totalUpkeep);
-    }
+    $('stat-placed').textContent = village.b.length + '/' + slotCap();
+    $('stat-building').textContent = buildingCount() + '/' + MAX_CONCURRENT;
+    $('stat-upkeep').textContent = Math.floor(totalUpkeep);
     syncBalance();
-    // Push leaderboard score (net production after upkeep)
-    const netProduction = totalProduction - (totalUpkeep / 1440);
-    maybePushLeaderboardScore(netProduction);
+    maybePushLeaderboardScore(totalProduction - (totalUpkeep / 1440));
   }
 
-  function scheduleReconcile() {
-    if (tick(grid)) saveGrid(grid);
-    render();
-    if (renderTimer) clearInterval(renderTimer);
-    // Re-render often enough for the percentage/timer to feel live and for
-    // production to land promptly, without hammering localStorage.
-    renderTimer = setInterval(() => {
-      const changed = tick(grid);
-      if (changed) saveGrid(grid);
-      render();
-    }, 10000);
+  function drawGhost() {
+    ghostG.clear();
+    gridG.clear();
+    if (!placing) return;
+    // Faint tile grid while aiming.
+    gridG.lineStyle(1, 0xffffff, 0.12);
+    for (let i = 0; i <= MAP; i++) {
+      gridG.lineBetween(i * T, 0, i * T, MAP * T);
+      gridG.lineBetween(0, i * T, MAP * T, i * T);
+    }
+    if (placing.tx == null) return;
+    const f = foot(placing.key);
+    const ok = canPlace(placing.key, placing.tx, placing.ty, placing.moveId);
+    const ox = placing.tx * T, oy = placing.ty * T;
+    ghostG.setAlpha(0.8);
+    if (ok) (ART[placing.key] || ART.shabby_apartment)(ghostG, ox, oy);
+    rect(ghostG, ok ? '#00ff6a' : '#ff3b3b', ox, oy, f.w * T, f.h * T, ok ? 0.22 : 0.45);
+    ghostG.lineStyle(1, hex(ok ? '#00ff6a' : '#ff3b3b'), 1);
+    ghostG.strokeRect(ox + 0.5, oy + 0.5, f.w * T - 1, f.h * T - 1);
+    const txt = $('place-bar-text');
+    const inb = inBounds(placing.tx, placing.ty, f);
+    txt.textContent = ok ? `${DEFS[placing.key].label} — tap ✓ to place` : (inb ? 'Something is in the way' : 'Out of bounds');
+    txt.classList.toggle('bad', !ok);
+    $('place-confirm').disabled = !ok;
   }
 
-  // --- Placement flow ---
+  function tileFromPointer(pointer) {
+    const wp = cam.getWorldPoint(pointer.x, pointer.y);
+    return { tx: Math.floor(wp.x / T), ty: Math.floor(wp.y / T) };
+  }
+
+  function aimGhost(tx, ty) {
+    if (!placing) return;
+    const f = foot(placing.key);
+    // The tapped tile becomes the building's centre-ish anchor, clamped inside the map.
+    placing.tx = Math.max(0, Math.min(MAP - f.w, tx - Math.floor((f.w - 1) / 2)));
+    placing.ty = Math.max(0, Math.min(MAP - f.h, ty - Math.floor((f.h - 1) / 2)));
+    refresh();
+  }
+
+  function create() {
+    scene = this;
+    cam = this.cameras.main;
+    const terrain = this.add.graphics();
+    drawTerrain(terrain);
+    gridG = this.add.graphics();
+    layer = this.add.graphics();
+    ghostG = this.add.graphics();
+    ghostG.setDepth(10);
+    this.input.addPointer(1);
+
+    let down = null;
+    this.input.on('pointerdown', (p) => { down = { x: p.x, y: p.y, t: performance.now(), moved: false }; });
+    this.input.on('pointermove', (p) => {
+      if (!p.isDown || !down) return;
+      const p1 = this.input.pointer1, p2 = this.input.pointer2;
+      if (p1.isDown && p2.isDown) {
+        // Pinch zoom
+        const d = Phaser.Math.Distance.Between(p1.x, p1.y, p2.x, p2.y);
+        if (down.pinch) setZoom(cam.zoom * (d / down.pinch));
+        down.pinch = d;
+        down.moved = true;
+        return;
+      }
+      down.pinch = null;
+      const dx = p.x - p.prevPosition.x, dy = p.y - p.prevPosition.y;
+      if (!down.moved && Math.hypot(p.x - down.x, p.y - down.y) < 6) return;
+      down.moved = true;
+      camCX -= dx / cam.zoom;
+      camCY -= dy / cam.zoom;
+      clampCam();
+    });
+    this.input.on('pointerup', (p) => {
+      if (!down) return;
+      const wasTap = !down.moved && performance.now() - down.t < 600;
+      down = null;
+      if (!wasTap) return;
+      const { tx, ty } = tileFromPointer(p);
+      if (placing) { aimGhost(tx, ty); return; }
+      const b = buildingAt(tx, ty);
+      selectedId = b ? b.id : null;
+      refresh();
+      if (b) openManage(b.id);
+    });
+    this.input.on('wheel', (p, objs, dx, dy) => setZoom(cam.zoom * (dy > 0 ? 0.9 : 1.1)));
+    this.scale.on('resize', () => clampCam());
+
+    recenter();
+    refresh();
+  }
+
+  new Phaser.Game({
+    type: Phaser.AUTO,
+    parent: 'game-stage',
+    backgroundColor: '#1d3b22',
+    pixelArt: true,
+    antialias: false,
+    roundPixels: true,
+    scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
+    scene: { create },
+  });
+
+  // ---------- Placement flow ----------
   const placeOverlay = $('place-overlay');
   const placeList = $('place-list');
-  let targetSlot = null;
 
-  function openPlacePicker(slotIndex) {
-    targetSlot = slotIndex;
-    const avail = availableCounts(grid);
+  function startPlacing(key, moveId) {
+    placing = { key, moveId: moveId || null, tx: null, ty: null };
+    $('place-bar').classList.add('open');
+    $('place-confirm').disabled = true;
+    $('place-bar-text').textContent = `Tap the map to aim your ${DEFS[key].label}`;
+    $('place-bar-text').classList.remove('bad');
+    refresh();
+  }
+  function stopPlacing() {
+    placing = null;
+    $('place-bar').classList.remove('open');
+    refresh();
+  }
+
+  function openPlacePicker() {
+    const avail = availableCounts();
     const owned = ownedCounts();
     placeList.innerHTML = '';
-    const anyAvailable = ORDER.some((k) => avail[k] > 0);
-    if (!anyAvailable) {
+    if (!ORDER.some((k) => avail[k] > 0)) {
       const empty = document.createElement('div');
       empty.className = 'picker-empty';
       empty.textContent = "You don't have any unplaced buildings — open an Iantopia Lootbox Basic on the Lootbox page to win one.";
@@ -861,183 +837,162 @@
       if (avail[key] <= 0) return;
       const def = DEFS[key];
       const rarity = RARITY[def.tier] || {};
+      const f = foot(key);
       const row = document.createElement('div');
       row.className = 'picker-row';
-      const img = document.createElement('img');
-      img.src = def.img;
-      img.alt = def.label;
-      const info = document.createElement('div');
-      info.className = 'row-info';
-      info.innerHTML = `${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE} · ${avail[key]} unplaced</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done</small>${def.description ? `<small class="row-desc">${def.description}</small>` : ''}`;
-      row.appendChild(img);
-      row.appendChild(info);
-      row.addEventListener('click', () => placeBuilding(key));
+      row.innerHTML = `<div class="row-icon">${f.icon}</div><div class="row-info">${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE} · ${avail[key]} unplaced · ${f.w}x${f.h} tiles</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done</small>${def.description ? `<small class="row-desc">${def.description}</small>` : ''}</div>`;
+      row.addEventListener('click', () => {
+        if (village.b.length >= slotCap()) {
+          alert(`Your village is full (${slotCap()} buildings). Buy more slots, or remove a building first.`);
+          return;
+        }
+        if (buildingCount() >= MAX_CONCURRENT) {
+          alert(`Only ${MAX_CONCURRENT} buildings can be under construction at once — wait for one to finish first.`);
+          return;
+        }
+        placeOverlay.classList.remove('open');
+        startPlacing(key, null);
+      });
       placeList.appendChild(row);
     });
     placeOverlay.classList.add('open');
   }
-  function fmtDuration(min) {
-    if (min >= 1440) return (min / 1440).toFixed(min % 1440 === 0 ? 0 : 1) + 'd';
-    if (min >= 60) return (min / 60).toFixed(min % 60 === 0 ? 0 : 1) + 'h';
-    return min + 'm';
-  }
 
-  function placeBuilding(key) {
-    const def = DEFS[key];
-    if (!def || targetSlot == null) return;
-    if (buildingCount(grid) >= MAX_CONCURRENT) {
-      alert(`Only ${MAX_CONCURRENT} buildings can be under construction at once — wait for one to finish first.`);
-      return;
-    }
-    if (!Strubles.spend(def.cost)) {
-      alert(`Not enough Strubles for the permit (need ${def.cost.toLocaleString()}).`);
-      return;
-    }
-    const now = Date.now();
-    grid[targetSlot] = {
-      key,
-      status: 'building',
-      startedAt: now,
-      completesAt: now + def.buildMinutes * 60000,
-      lastProductionAt: now,
-    };
-    saveGrid(grid);
-    placeOverlay.classList.remove('open');
-    render();
-  }
-
-  document.querySelectorAll('#place-overlay, #place-close').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      if (e.target.id === 'place-overlay' || e.target.id === 'place-close') {
-        placeOverlay.classList.remove('open');
+  function confirmPlacing() {
+    if (!placing || placing.tx == null) return;
+    const { key, moveId, tx, ty } = placing;
+    if (!canPlace(key, tx, ty, moveId)) return;
+    if (moveId != null) {
+      const b = village.b.find((s) => s.id === moveId);
+      if (b) { b.x = tx; b.y = ty; }
+    } else {
+      const def = DEFS[key];
+      if (!Strubles.spend(def.cost)) {
+        alert(`Not enough Strubles for the permit (need ${def.cost.toLocaleString()}).`);
+        return;
       }
-    });
+      const now = Date.now();
+      village.b.push({
+        id: village.nextId++, key, x: tx, y: ty,
+        status: 'building', startedAt: now,
+        completesAt: now + def.buildMinutes * 60000,
+        lastProductionAt: now,
+      });
+    }
+    saveVillage();
+    stopPlacing();
+  }
+
+  $('build-btn').addEventListener('click', openPlacePicker);
+  $('place-confirm').addEventListener('click', confirmPlacing);
+  $('place-cancel').addEventListener('click', stopPlacing);
+  $('recenter-btn').addEventListener('click', () => { if (cam) recenter(); });
+  window.addEventListener('keydown', (e) => {
+    if (!placing) return;
+    if (e.key === 'Enter') { e.preventDefault(); confirmPlacing(); }
+    else if (e.key === 'Escape') { e.preventDefault(); stopPlacing(); }
+    else if (placing.tx != null && e.key.startsWith('Arrow')) {
+      e.preventDefault();
+      const dx = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
+      const dy = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+      const f = foot(placing.key);
+      placing.tx = Math.max(0, Math.min(MAP - f.w, placing.tx + dx));
+      placing.ty = Math.max(0, Math.min(MAP - f.h, placing.ty + dy));
+      refresh();
+    }
   });
+  function wireClose(overlayId, closeId) {
+    document.querySelectorAll(`#${overlayId}, #${closeId}`).forEach((el) => {
+      el.addEventListener('click', (e) => {
+        if (e.target.id === overlayId || e.target.id === closeId) $(overlayId).classList.remove('open');
+      });
+    });
+  }
+  wireClose('place-overlay', 'place-close');
 
-  // --- Manage an occupied slot: remove it, or swap it for something else.
-  // Swap reuses openPlacePicker as-is — placeBuilding() already just
-  // overwrites whatever's in the target slot unconditionally, so the old
-  // occupant naturally becomes "unplaced" again (ownership is owned minus
-  // placed, scanned fresh from the current grid) with no separate
-  // bookkeeping needed. ---
+  // ---------- Manage a placed building ----------
   const manageOverlay = $('manage-overlay');
-  let manageSlot = null;
+  let manageId = null;
 
-  function openManagePicker(slotIndex) {
-    const slot = grid[slotIndex];
-    if (!slot) return;
-    manageSlot = slotIndex;
-    const def = DEFS[slot.key];
+  function openManage(id) {
+    const s = village.b.find((x) => x.id === id);
+    if (!s) return;
+    manageId = id;
+    const def = DEFS[s.key];
     const rarity = RARITY[def.tier] || {};
+    const f = foot(s.key);
     const dailyUpkeep = def.cost * (def.upkeepPct || 0);
     $('manage-title').textContent = def.label;
-    let statusLine = slot.status === 'building'
-      ? 'Currently under construction — removing forfeits progress, no refund.'
+    const statusLine = s.status === 'building'
+      ? 'Under construction — removing forfeits progress, no refund.'
       : `Producing +${def.production}/min.`;
     let upkeepLine = '';
-    if (slot.status === 'complete') {
-      if (slot.taxDebt > 0) {
-        upkeepLine = `<small style="color:#ff6b6b;">⚠ Neglected — owes ${Math.floor(slot.taxDebt)} Strubles (half production until paid). Upkeep ${Math.floor(dailyUpkeep)}/day.</small>`;
-      } else {
-        upkeepLine = `<small>Upkeep ${Math.floor(dailyUpkeep)}/day, auto-paid from balance.</small>`;
-      }
+    if (s.status === 'complete') {
+      upkeepLine = s.taxDebt > 0
+        ? `<small style="color:#ff6b6b;">⚠ Neglected — owes ${Math.floor(s.taxDebt)} Strubles (half production until paid). Upkeep ${Math.floor(dailyUpkeep)}/day.</small>`
+        : `<small>Upkeep ${Math.floor(dailyUpkeep)}/day, auto-paid from balance.</small>`;
     }
-    $('manage-info').innerHTML = `
-      <div class="guide-row">
-        <img src="${def.img}" alt="${def.label}">
-        <div class="row-info">
-          ${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''}</small>
-          <small>${statusLine}</small>
-          ${upkeepLine}
-          ${def.description ? `<small class="row-desc">${def.description}</small>` : ''}
-        </div>
-      </div>`;
+    $('manage-info').innerHTML = `<div class="guide-row"><div class="row-icon">${f.icon}</div><div class="row-info">${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''}</small><small>${statusLine}</small>${upkeepLine}${def.description ? `<small class="row-desc">${def.description}</small>` : ''}</div></div>`;
     manageOverlay.classList.add('open');
   }
-
-  $('manage-swap').addEventListener('click', () => {
-    if (manageSlot == null) return;
+  function closeManage() {
     manageOverlay.classList.remove('open');
-    openPlacePicker(manageSlot);
+    selectedId = null;
+    refresh();
+  }
+  $('manage-move').addEventListener('click', () => {
+    const s = village.b.find((x) => x.id === manageId);
+    manageOverlay.classList.remove('open');
+    if (!s) return;
+    selectedId = null;
+    startPlacing(s.key, s.id);
+    placing.tx = s.x; placing.ty = s.y;
+    refresh();
   });
   $('manage-remove').addEventListener('click', () => {
-    if (manageSlot == null) return;
-    grid[manageSlot] = null;
-    saveGrid(grid);
-    manageOverlay.classList.remove('open');
-    render();
+    village.b = village.b.filter((x) => x.id !== manageId);
+    saveVillage();
+    closeManage();
   });
   document.querySelectorAll('#manage-overlay, #manage-close').forEach((el) => {
     el.addEventListener('click', (e) => {
-      if (e.target.id === 'manage-overlay' || e.target.id === 'manage-close') {
-        manageOverlay.classList.remove('open');
-      }
+      if (e.target.id === 'manage-overlay' || e.target.id === 'manage-close') closeManage();
     });
   });
 
-  // --- Building Guide: every tier, regardless of ownership — the "no
-  // legend" gap. Rendered fresh each open so owned-count stays current if
-  // you check it again mid-session. ---
-  const guideOverlay = $('guide-overlay');
-  const guideList = $('guide-list');
+  // ---------- Building Guide ----------
   $('guide-btn').addEventListener('click', () => {
     const owned = ownedCounts();
-    guideList.innerHTML = '';
+    const list = $('guide-list');
+    list.innerHTML = '';
     ORDER.forEach((key) => {
       const def = DEFS[key];
       const rarity = RARITY[def.tier] || {};
+      const f = foot(key);
       const dailyUpkeep = def.cost * (def.upkeepPct || 0);
       const row = document.createElement('div');
       row.className = 'guide-row';
-      const img = document.createElement('img');
-      img.src = def.img;
-      img.alt = def.label;
-      const info = document.createElement('div');
-      info.className = 'row-info';
-      info.innerHTML = `${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE}</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done · Upkeep ${Math.floor(dailyUpkeep)}/day</small>${def.description ? `<small class="row-desc">${def.description}</small>` : ''}`;
-      row.appendChild(img);
-      row.appendChild(info);
-      guideList.appendChild(row);
+      row.innerHTML = `<div class="row-icon">${f.icon}</div><div class="row-info">${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE} · ${f.w}x${f.h} tiles</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done · Upkeep ${Math.floor(dailyUpkeep)}/day</small>${def.description ? `<small class="row-desc">${def.description}</small>` : ''}</div>`;
+      list.appendChild(row);
     });
-    guideOverlay.classList.add('open');
+    $('guide-overlay').classList.add('open');
   });
-  document.querySelectorAll('#guide-overlay, #guide-close').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      if (e.target.id === 'guide-overlay' || e.target.id === 'guide-close') {
-        guideOverlay.classList.remove('open');
-      }
-    });
-  });
+  wireClose('guide-overlay', 'guide-close');
 
-  // --- Bank: raise the wallet cap. Re-rendered fresh each open so a
-  // level bought (or a Taipei placed/removed) elsewhere stays current. ---
-  const bankOverlay = $('bank-overlay');
-  const bankBreakdown = $('bank-cap-breakdown');
-  const bankNextInfo = $('bank-next-info');
-  const bankBuyBtn = $('bank-buy');
-
+  // ---------- Bank (unchanged behaviour: raises the wallet cap) ----------
   function renderBank() {
     const TB = window.TycoonBank;
     const level = TB.currentLevel();
     const bankCap = TB.capForLevel(level);
     const taipei = TB.taipeiBonus();
-    const total = bankCap + taipei;
-    const nextCost = TB.costForLevel(level + 1);
-    const nextGain = TB.capGainForLevel(level + 1);
-
-    bankBreakdown.innerHTML = `
+    $('bank-cap-breakdown').innerHTML = `
       <div class="bank-cap-row"><span>Bank (level ${level})</span><span>${bankCap.toLocaleString()} Strubles</span></div>
       <div class="bank-cap-row"><span>Taipei 101 bonus</span><span>+${taipei.toLocaleString()} Strubles</span></div>
-      <div class="bank-cap-row"><span><b>Total cap</b></span><span><b>${total.toLocaleString()} Strubles</b></span></div>
-    `;
-    bankNextInfo.textContent = `Next: Level ${level + 1} — costs ${nextCost.toLocaleString()}, raises the cap by ${nextGain.toLocaleString()}.`;
+      <div class="bank-cap-row"><span><b>Total cap</b></span><span><b>${(bankCap + taipei).toLocaleString()} Strubles</b></span></div>`;
+    $('bank-next-info').textContent = `Next: Level ${level + 1} — costs ${TB.costForLevel(level + 1).toLocaleString()}, raises the cap by ${TB.capGainForLevel(level + 1).toLocaleString()}.`;
   }
-
-  $('bank-btn').addEventListener('click', () => {
-    renderBank();
-    bankOverlay.classList.add('open');
-  });
-  bankBuyBtn.addEventListener('click', () => {
+  $('bank-btn').addEventListener('click', () => { renderBank(); $('bank-overlay').classList.add('open'); });
+  $('bank-buy').addEventListener('click', () => {
     const TB = window.TycoonBank;
     const level = TB.currentLevel();
     const cost = TB.costForLevel(level + 1);
@@ -1046,76 +1001,45 @@
       return;
     }
     localStorage.setItem(TB.BANK_LEVEL_KEY, String(level + 1));
-    try { window.dispatchEvent(new Event('tycoon:changed')); } catch {} // Strubles.spend() above already fired strubles:change for the balance itself
+    try { window.dispatchEvent(new Event('tycoon:changed')); } catch {}
     renderBank();
     syncBalance();
   });
-  document.querySelectorAll('#bank-overlay, #bank-close').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      if (e.target.id === 'bank-overlay' || e.target.id === 'bank-close') {
-        bankOverlay.classList.remove('open');
-      }
-    });
-  });
+  wireClose('bank-overlay', 'bank-close');
 
-  // --- Grid expansion: purchase additional slots ---
-  const expandOverlay = $('expand-overlay');
-  const expandInfoBreakdown = $('expand-info-breakdown');
-  const expandNextInfo = $('expand-next-info');
-  const expandBuyBtn = $('expand-buy');
-
+  // ---------- Building slots ----------
   function renderExpand() {
     const owned = slotsOwned();
-    const currentSize = BASE_GRID_SIZE + owned;
-    const nextSlotNum = owned + 1;
-    const nextCost = expandCostForSlot(nextSlotNum);
-    const nextSize = BASE_GRID_SIZE + nextSlotNum;
-
-    expandInfoBreakdown.innerHTML = `
-      <div class="bank-cap-row"><span>Current grid size</span><span>${currentSize} slots</span></div>
-      <div class="bank-cap-row"><span>Slots purchased</span><span>${owned}</span></div>
-    `;
-    expandNextInfo.textContent = `Next: Slot ${nextSize} — costs ${nextCost.toLocaleString()} Strubles.`;
+    $('expand-info-breakdown').innerHTML = `
+      <div class="bank-cap-row"><span>Building slots</span><span>${BASE_SLOTS + owned}</span></div>
+      <div class="bank-cap-row"><span>Slots purchased</span><span>${owned}</span></div>`;
+    $('expand-next-info').textContent = `Next: slot ${BASE_SLOTS + owned + 1} — costs ${expandCostForSlot(owned + 1).toLocaleString()} Strubles.`;
   }
-
-  $('expand-btn').addEventListener('click', () => {
-    renderExpand();
-    expandOverlay.classList.add('open');
-  });
-  expandBuyBtn.addEventListener('click', () => {
+  $('expand-btn').addEventListener('click', () => { renderExpand(); $('expand-overlay').classList.add('open'); });
+  $('expand-buy').addEventListener('click', () => {
     const owned = slotsOwned();
-    const nextSlotNum = owned + 1;
-    const cost = expandCostForSlot(nextSlotNum);
+    const cost = expandCostForSlot(owned + 1);
     if (!Strubles.spend(cost)) {
       alert(`Not enough Strubles for the next slot (need ${cost.toLocaleString()}).`);
       return;
     }
-    const newOwned = owned + 1;
-    localStorage.setItem(SLOTS_KEY, String(newOwned));
-    GRID_SIZE = BASE_GRID_SIZE + newOwned;
-    grid.push(null);
-    saveGrid(grid);
+    localStorage.setItem(SLOTS_KEY, String(owned + 1));
     try { window.dispatchEvent(new Event('tycoon:changed')); } catch {}
     renderExpand();
-    render();
+    refresh();
     syncBalance();
   });
-  document.querySelectorAll('#expand-overlay, #expand-close').forEach((el) => {
-    el.addEventListener('click', (e) => {
-      if (e.target.id === 'expand-overlay' || e.target.id === 'expand-close') {
-        expandOverlay.classList.remove('open');
-      }
-    });
-  });
+  wireClose('expand-overlay', 'expand-close');
 
-  window.addEventListener('inventory:changed', () => { grid = loadGrid(); render(); });
+  window.addEventListener('inventory:changed', () => refresh());
   window.addEventListener('strubles:change', syncBalance);
   window.addEventListener('storage', (e) => {
-    if (e.key === GRID_KEY) { grid = loadGrid(); render(); }
-    if (e.key === INV_KEY) render();
+    if (e.key === VILLAGE_KEY) { village = loadVillage(); refresh(); }
+    if (e.key === INV_KEY) refresh();
   });
+  // Cloud pull reloads the page itself, so no extra reconcile hook is needed.
 
-  // --- Sound (same pattern as every other page) ---
+  // ---------- Sound (same pattern as every other page) ----------
   let audioEnabled = true;
   const themeMusic = $('theme-music');
   const VOLUME_KEY = 'music_volume_v1';
@@ -1142,73 +1066,14 @@
     if (audioEnabled) tryPlayTheme(); else themeMusic.pause();
   });
 
-  scheduleReconcile();
+  // ---------- Reconcile loop ----------
+  if (tick()) saveVillage();
+  setInterval(() => {
+    if (tick()) saveVillage();
+    refresh();
+  }, 1000);
 
-  // --- Pedestrians: purely decorative, but their frequency scales with
-  // how developed the city is (complete buildings), so a fresh empty grid
-  // feels quiet and a full skyline feels lively. ---
-  const PEDESTRIANS = window.TYCOON_PEDESTRIANS || [];
-  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  function spawnPedestrian() {
-    const layer = $('pedestrian-layer');
-    if (!layer || !PEDESTRIANS.length) return;
-    const p = PEDESTRIANS[Math.floor(Math.random() * PEDESTRIANS.length)];
-    const wrap = document.createElement('div');
-    // Higher and with bigger sprites than before — enough was getting
-    // swallowed by the grass that "walking through it" read as "barely
-    // visible." Still dips low enough on the bob to graze the blades.
-    wrap.style.bottom = (25 + Math.random() * 55) + 'px';
-    const duration = 9 + Math.random() * 6; // 9-15s to cross
-    wrap.style.animationDuration = duration + 's';
-    const goingRight = Math.random() < 0.5;
-    const facesRight = p.facesRight !== false;
-    const needsFlip = goingRight ? !facesRight : facesRight;
-    wrap.className = 'pedestrian-wrap ' + (goingRight ? 'walk-right' : 'walk-left') + (needsFlip ? ' flipped' : '');
-    const el = document.createElement('img');
-    el.src = p.img;
-    el.alt = '';
-    el.style.height = p.height + 'px';
-    el.className = 'pedestrian';
-    wrap.appendChild(el);
-    layer.appendChild(wrap);
-    setTimeout(() => wrap.remove(), duration * 1000 + 200);
-  }
-  function scheduleNextPedestrian() {
-    // 0 complete buildings -> ~8-9.5s between walkers; a full skyline (5
-    // complete) -> ~2-3.5s. Complete only, not under-construction — a
-    // building site isn't foot traffic yet.
-    const completedCount = grid.filter((s) => s && s.status === 'complete').length;
-    const base = Math.max(2000, 8000 - completedCount * 1200);
-    setTimeout(() => {
-      spawnPedestrian();
-      scheduleNextPedestrian();
-    }, base + Math.random() * 1500);
-  }
-  if (!reduceMotion) scheduleNextPedestrian();
-
-  // --- Silly airplane: rare, purely for fun, doesn't scale with anything ---
-  function spawnAirplane() {
-    const layer = $('airplane-layer');
-    if (!layer) return;
-    const el = document.createElement('img');
-    el.src = '/tycoon/silly-airplane.gif';
-    el.alt = '';
-    el.style.top = (6 + Math.random() * 18) + '%';
-    const duration = 16 + Math.random() * 10; // 16-26s, a leisurely drift
-    el.style.animationDuration = duration + 's';
-    el.className = 'airplane ' + (Math.random() < 0.5 ? 'fly-right' : 'fly-left');
-    layer.appendChild(el);
-    setTimeout(() => el.remove(), duration * 1000 + 200);
-  }
-  function scheduleNextAirplane() {
-    setTimeout(() => {
-      spawnAirplane();
-      scheduleNextAirplane();
-    }, 45000 + Math.random() * 45000); // one every 45-90s
-  }
-  if (!reduceMotion) scheduleNextAirplane();
-
-  // --- Leaderboard score push ---
+  // ---------- Leaderboard score push (unchanged) ----------
   let lastPushedNetProduction = null;
   let leaderboardPushInFlight = false;
   function maybePushLeaderboardScore(netProduction) {
@@ -1226,6 +1091,11 @@
       .catch((err) => console.error('[leaderboard] push failed:', err))
       .finally(() => { leaderboardPushInFlight = false; });
   }
+
+  // Read-only introspection for QA (same idea as window.HorseGame).
+  window.TycoonGame = {
+    getState: () => ({ village, slotCap: slotCap(), placing, zoom: cam && cam.zoom }),
+  };
 
   if (window.initPickers) setTimeout(window.initPickers, 100);
 })();
