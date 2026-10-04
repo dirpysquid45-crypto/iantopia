@@ -222,18 +222,17 @@ window.CASES = {
     // on its own anymore.
     cost: 2000,
     emoji: '🏗️',
-    blurb: 'Drops a building for your Iantopia Tycoon skyline. Taipei 101 is a real shot at 5% — and owning Pagodas nudges every future pull further from Common.',
+    blurb: 'Drops a building for your Iantopia village. Taipei 101 is a prestige shot at 2% — and owning Pagodas nudges every future pull further from Common.',
     // Rarity tiers reused as the building rarity odds specified for this
     // case specifically, mapped onto the shared mil_spec..exceedingly_rare
-    // scale rather than inventing a parallel one. Taipei 101 bumped from
-    // 1% to 5% per request; the 4-point difference comes out of Common
-    // (50 -> 46) so the total still lands on 100.
+    // scale rather than inventing a parallel one. Taipei 101 is prestige-tier
+    // rarity; the others climb toward it in proportion.
     odds: {
-      mil_spec: 46.0,
-      restricted: 30.0,
+      mil_spec: 52.0,
+      restricted: 25.0,
       classified: 15.0,
-      covert: 4.0,
-      exceedingly_rare: 5.0,
+      covert: 6.0,
+      exceedingly_rare: 2.0,
     },
     // Owning Pagodas shifts these odds further off mil_spec at open time —
     // see lootbox.js's oddsFor(), which checks this flag rather than
