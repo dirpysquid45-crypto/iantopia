@@ -117,6 +117,17 @@
   #place-bar.open { display:flex; }
   #place-bar-text { font-size:9px; color:var(--gold); line-height:1.6; }
   #place-bar-text.bad { color:#ff6b6b; }
+  /* Same bar, pinned to the top of the stage so a brush stroke along the
+     bottom edge of the map never lands on it. */
+  #brush-bar {
+    position:absolute; left:50%; top:12px; transform:translateX(-50%);
+    display:none; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center;
+    background:rgba(0,0,0,.85); border:3px solid var(--gold); padding:10px 12px;
+    z-index:5; max-width:calc(100% - 16px);
+  }
+  #brush-bar.open { display:flex; }
+  #brush-bar-text { font-size:9px; color:var(--gold); line-height:1.6; }
+  #brush-bar-text.bad { color:#ff6b6b; }
   .bar-btn {
     background:#000; color:var(--gold); border:3px solid var(--gold); padding:12px 14px;
     font-size:11px; font-weight:700; cursor:none; font-family:inherit; touch-action:manipulation;
@@ -202,12 +213,20 @@
     <div id="stats-bar">
       <span>Production: <b id="stat-production">0</b>/min</span>
       <span>Buildings: <b id="stat-placed">0/5</b></span>
-      <span>Under construction: <b id="stat-building">0/3</b></span>
+      <span>Building: <b id="stat-building">0/3</b></span>
+      <span>On a road: <b id="stat-road">0/0</b></span>
+      <span>Mood: <b id="stat-mood">50%</b></span>
       <span>Upkeep: <b id="stat-upkeep">0</b>/day</span>
     </div>
 
     <div id="cta-row">
       <button id="build-btn" class="cta primary" type="button">🏗️ Build</button>
+      <button id="brush-road" class="cta" type="button" data-brush="road">🛣️ Road 25</button>
+      <button id="brush-res" class="cta" type="button" data-brush="residential">🏘️ Res 10</button>
+      <button id="brush-com" class="cta" type="button" data-brush="commercial">🏬 Com 10</button>
+      <button id="brush-ind" class="cta" type="button" data-brush="industrial">🏭 Ind 10</button>
+      <button id="brush-water" class="cta" type="button" data-brush="water">💧 Water</button>
+      <button id="brush-erase" class="cta" type="button" data-brush="erase">🧽 Erase</button>
       <a id="lootbox-cta" class="cta" href="/lootbox">🎁 Get Buildings</a>
       <button id="guide-btn" class="cta" type="button">📖 Guide</button>
       <button id="bank-btn" class="cta" type="button">🏦 Bank</button>
@@ -217,6 +236,10 @@
     </div>
 
     <div id="game-stage">
+      <div id="brush-bar">
+        <span id="brush-bar-text"></span>
+        <button class="bar-btn no" id="brush-done" type="button">✕ Done</button>
+      </div>
       <div id="place-bar">
         <span id="place-bar-text"></span>
         <button class="bar-btn ok" id="place-confirm" type="button">✓ Place</button>
@@ -382,8 +405,9 @@
   function slotCap() { return BASE_SLOTS + slotsOwned(); }
   function expandCostForSlot(n) { return n <= 0 ? 0 : EXPAND_BASE_COST * Math.pow(EXPAND_GROWTH, n - 1); }
 
-  // Village state: { v:2, nextId, b:[{id,key,x,y,status,startedAt,completesAt,lastProductionAt,lastTaxAt,taxDebt}] }
-  function freshVillage() { return { v: 2, nextId: 1, b: [] }; }
+  // Village state: { v:2, nextId, b:[...buildings], tiles:{tx_ty: type} }
+  // tiles map: "x_y" -> "residential"/"commercial"/"industrial"/"road"/"water"
+  function freshVillage() { return { v: 2, nextId: 1, b: [], tiles: {} }; }
 
   // First load after the rework: carry the old one-row skyline's buildings
   // over (same construction progress, same keys) into a row on the new map
@@ -417,6 +441,21 @@
   }
 
   let village = loadVillage();
+  let brushMode = null;  // "residential" | "commercial" | "industrial" | "road" | "water" | null
+
+  // Zoning is the layout puzzle: a building earns more standing on the zone
+  // it wants, and nothing at all without a road touching it. Industrial is
+  // the dirty option — it pays everyone nearby, and tanks village mood.
+  const ZONE_AFFINITY = {
+    shabby_apartment: 'residential',
+    generic_building: 'residential',
+    pagoda: 'commercial',
+    generic_skyscraper: 'commercial',
+    taipei_101: 'commercial',
+  };
+  const TILE_COST = { residential: 10, commercial: 10, industrial: 10, road: 25, water: 0 };
+  const ZONE_BONUS = 0.25;      // full footprint on its own zone
+  const INDUSTRIAL_BONUS = 0.15; // adjacent industrial, at a mood cost
 
   // ---------- Inventory / counts ----------
   function ownedCounts() {
@@ -445,6 +484,7 @@
   function tick() {
     if (TYCOON_DISABLED) return false;
     const now = Date.now();
+    const mood = computeMood();
     let earned = 0, changed = false;
     village.b.forEach((slot) => {
       const def = DEFS[slot.key];
@@ -458,14 +498,20 @@
       }
       if (slot.status === 'complete') {
         if (slot.lastTaxAt == null) { slot.lastTaxAt = now; slot.taxDebt = 0; changed = true; }
-        const neglected = slot.taxDebt > 0;
-        const elapsedMin = Math.max(0, now - slot.lastProductionAt) / 60000;
-        const eff = def.production * (neglected ? 0.5 : 1);
-        const gain = Math.floor(elapsedMin * eff);
-        if (gain > 0) {
-          earned += gain;
-          slot.lastProductionAt += (gain / eff) * 60000;
-          changed = true;
+        const eff = productionFor(slot, mood);
+        if (eff <= 0) {
+          // Unproductive time is forfeited, not banked — otherwise cutting a
+          // building off the road network and reconnecting it a day later
+          // would pay out that whole day at once.
+          if (now - slot.lastProductionAt > 60000) { slot.lastProductionAt = now; changed = true; }
+        } else {
+          const elapsedMin = Math.max(0, now - slot.lastProductionAt) / 60000;
+          const gain = Math.floor(elapsedMin * eff);
+          if (gain > 0) {
+            earned += gain;
+            slot.lastProductionAt += (gain / eff) * 60000;
+            changed = true;
+          }
         }
         const dailyUpkeep = def.cost * (def.upkeepPct || 0);
         const elapsedTax = Math.max(0, now - slot.lastTaxAt) / 60000;
@@ -498,6 +544,11 @@
   function canPlace(key, x, y, ignoreId) {
     const f = foot(key);
     if (!inBounds(x, y, f)) return false;
+    for (let ty = y; ty < y + f.h; ty++) {
+      for (let tx = x; tx < x + f.w; tx++) {
+        if (getTileType(tx, ty) === 'water') return false;
+      }
+    }
     const rect = { x, y, w: f.w, h: f.h };
     return !village.b.some((s) => {
       if (s.id === ignoreId) return false;
@@ -505,6 +556,71 @@
       return overlaps(rect, { x: s.x, y: s.y, w: sf.w, h: sf.h });
     });
   }
+  // --- Layout rules. Every one of these is read by productionFor(), which is
+  // the only place production is computed, so the stat bar and the payout can
+  // never disagree. ---
+
+  // Any tile of `type` orthogonally touching the footprint's edge.
+  // Strictly orthogonal — a tile meeting only a diagonal corner does not count.
+  function touchesTile(s, type) {
+    const f = foot(s.key);
+    for (let x = s.x; x < s.x + f.w; x++) {
+      if (getTileType(x, s.y - 1) === type) return true;
+      if (getTileType(x, s.y + f.h) === type) return true;
+    }
+    for (let y = s.y; y < s.y + f.h; y++) {
+      if (getTileType(s.x - 1, y) === type) return true;
+      if (getTileType(s.x + f.w, y) === type) return true;
+    }
+    return false;
+  }
+  const isRoadConnected = (s) => touchesTile(s, 'road');
+
+  // Fraction of the footprint standing on the zone this building wants.
+  function zoneMatch(s) {
+    const want = ZONE_AFFINITY[s.key];
+    if (!want) return 0;
+    const f = foot(s.key);
+    let hit = 0;
+    for (let y = s.y; y < s.y + f.h; y++) {
+      for (let x = s.x; x < s.x + f.w; x++) if (getTileType(x, y) === want) hit++;
+    }
+    return hit / (f.w * f.h);
+  }
+
+  function countZones(type) {
+    let c = 0;
+    for (const k in village.tiles) if (village.tiles[k] === type) c++;
+    return c;
+  }
+
+  // Village mood, derived entirely from the layout — it is a readout of the
+  // player's decisions, not an independent simulation.
+  function computeMood() {
+    const done = village.b.filter((s) => s.status === 'complete');
+    if (!done.length) return 50;
+    let m = 50;
+    m += 30 * (done.filter(isRoadConnected).length / done.length);
+    m += 20 * (done.reduce((a, s) => a + zoneMatch(s), 0) / done.length);
+    const ind = countZones('industrial');
+    const zoned = countZones('residential') + countZones('commercial') + ind;
+    if (zoned > 0) m -= 25 * (ind / zoned);
+    if (countZones('water') > 0) m += 8;
+    return Math.max(0, Math.min(100, m));
+  }
+  const moodMultiplier = (mood) => 0.75 + (mood / 100) * 0.4; // 0.75x .. 1.15x
+
+  function productionFor(s, mood) {
+    const def = DEFS[s.key];
+    if (!def || s.status !== 'complete') return 0;
+    if (!isRoadConnected(s)) return 0; // no road, no business
+    let p = def.production;
+    p *= 1 + ZONE_BONUS * zoneMatch(s);
+    if (touchesTile(s, 'industrial')) p *= 1 + INDUSTRIAL_BONUS;
+    if (s.taxDebt > 0) p *= 0.5;
+    return p * moodMultiplier(mood);
+  }
+
   function buildingAt(tx, ty) {
     return village.b.find((s) => {
       const f = foot(s.key);
@@ -600,6 +716,12 @@
     rect(g, '#000000', ox + 1, oy + h - 1, w - 2, 1, 0.6);
   }
 
+  function getTileType(x, y) { return village.tiles[x + '_' + y] || null; }
+  function setTileType(x, y, type) {
+    if (type) village.tiles[x + '_' + y] = type;
+    else delete village.tiles[x + '_' + y];
+  }
+
   function drawTerrain(g) {
     for (let y = 0; y < MAP; y++) {
       for (let x = 0; x < MAP; x++) {
@@ -610,7 +732,43 @@
         if (n % 11 === 0) rect(g, '#2f6a2c', x * T + (n >> 4) % 11 + 2, y * T + (n >> 7) % 11 + 2, 1, 2);
       }
     }
-    // Dirt border so the buildable area reads as a plot, not an endless field.
+    // Draw zones and features
+    for (let y = 0; y < MAP; y++) {
+      for (let x = 0; x < MAP; x++) {
+        const type = getTileType(x, y);
+        const ox = x * T, oy = y * T;
+        // Each zone carries a shape as well as a hue, so they stay telling
+        // apart at low zoom and without relying on color alone.
+        if (type === 'residential') {
+          rect(g, '#2f6fd0', ox, oy, T, T, 0.38);
+          rect(g, '#9fd0ff', ox + 4, oy + 7, 8, 5);
+          rect(g, '#9fd0ff', ox + 6, oy + 5, 4, 2);
+        } else if (type === 'commercial') {
+          rect(g, '#e08a1f', ox, oy, T, T, 0.38);
+          rect(g, '#ffdca8', ox + 3, oy + 5, 10, 3);
+          rect(g, '#ffdca8', ox + 3, oy + 9, 10, 2);
+        } else if (type === 'industrial') {
+          rect(g, '#7b3fa0', ox, oy, T, T, 0.42);
+          for (let i = -T; i < T; i += 5) {
+            for (let j = 0; j < T; j++) {
+              const px = ox + i + j, py = oy + j;
+              if (px >= ox && px < ox + T) rect(g, '#e0bcff', px, py, 1, 1, 0.75);
+            }
+          }
+        } else if (type === 'road') {
+          // Full-tile asphalt so a painted run reads as one continuous road.
+          rect(g, '#55585e', ox, oy, T, T);
+          rect(g, '#6a6e76', ox, oy, T, 1);
+          rect(g, '#d8d2a0', ox + 6, oy + 7, 4, 2);
+        } else if (type === 'water') {
+          rect(g, '#1d4f73', ox, oy, T, T);
+          rect(g, '#2f79a8', ox + 2, oy + 4, 6, 1);
+          rect(g, '#2f79a8', ox + 8, oy + 9, 5, 1);
+          rect(g, '#79c4ec', ox + 4, oy + 11, 3, 1, 0.8);
+        }
+      }
+    }
+    // Dirt border
     g.lineStyle(2, hex('#6b4a2e'), 1);
     g.strokeRect(-1, -1, MAP * T + 2, MAP * T + 2);
   }
@@ -621,7 +779,74 @@
   let selectedId = null;
   // Placement mode: { key, moveId|null, tx, ty, restore|null }
   let placing = null;
-  let layer, ghostG, gridG, labels = [];
+  let layer, ghostG, gridG, terrainG, labels = [];
+
+  // Villagers are the village's thermometer, not simulated citizens: how many
+  // there are and what they wear is read off the economy. They wander, and
+  // they prefer roads. Driven by Phaser's own update() at ~60fps — the old
+  // version stepped off the 1s economy interval, which is what made every
+  // movement look like a stutter.
+  const villagers = [];
+  let villagerG = null;
+  let mood = 50;
+  const WALK = 1.3; // tiles per second
+
+  const villagerCap = () => Math.min(24, village.b.filter((s) => s.status === 'complete').length * 3);
+  const walkable = (tx, ty) =>
+    tx >= 0 && ty >= 0 && tx < MAP && ty < MAP && !buildingAt(tx, ty) && getTileType(tx, ty) !== 'water';
+
+  function spawnVillager() {
+    let sx = 0, sy = 0, ok = false;
+    for (let i = 0; i < 12 && !ok; i++) {
+      sx = Math.random() * MAP; sy = Math.random() * MAP;
+      ok = walkable(Math.floor(sx), Math.floor(sy));
+    }
+    if (!ok) return;
+    const a = Math.random() * Math.PI * 2;
+    villagers.push({ x: sx, y: sy, vx: Math.cos(a), vy: Math.sin(a), pause: 0 });
+  }
+
+  function stepVillagers(dt) {
+    const want = villagerCap();
+    if (villagers.length < want) spawnVillager();
+    while (villagers.length > want) villagers.pop();
+
+    villagers.forEach((v) => {
+      if (v.pause > 0) { v.pause -= dt; return; }
+      // Roads are the nice place to be, so walking one is slower (lingering).
+      const onRoad = getTileType(Math.floor(v.x), Math.floor(v.y)) === 'road';
+      const speed = WALK * (onRoad ? 0.7 : 1);
+      const nx = v.x + v.vx * speed * dt;
+      const ny = v.y + v.vy * speed * dt;
+      if (!walkable(Math.floor(nx), Math.floor(ny))) {
+        // Turn and wait rather than reversing velocity, which used to leave
+        // them vibrating against a wall forever.
+        const a = Math.random() * Math.PI * 2;
+        v.vx = Math.cos(a); v.vy = Math.sin(a);
+        v.pause = 0.2 + Math.random() * 0.5;
+        return;
+      }
+      v.x = nx; v.y = ny;
+      if (Math.random() < dt * 0.35) v.pause = 0.4 + Math.random() * 1.2;
+      else if (Math.random() < dt * 0.5) {
+        const a = Math.atan2(v.vy, v.vx) + (Math.random() - 0.5) * 1.4;
+        v.vx = Math.cos(a); v.vy = Math.sin(a);
+      }
+    });
+  }
+
+  // Tan head, a couple of pixels of clothing underneath. The coat color is the
+  // only thing mood changes — the head stays skin-toned.
+  function drawVillagers() {
+    villagerG.clear();
+    const coat = mood > 66 ? '#3f6fa8' : mood > 33 ? '#6b5a3f' : '#3a3a3a';
+    villagers.forEach((v) => {
+      const px = Math.round(v.x * T), py = Math.round(v.y * T);
+      rect(villagerG, '#000000', px - 1, py + 4, 3, 1, 0.3);
+      rect(villagerG, '#d9a877', px - 1, py - 2, 3, 3);
+      rect(villagerG, coat, px - 1, py + 1, 3, 2);
+    });
+  }
 
   function clampCam() {
     const vw = cam.width / cam.zoom, vh = cam.height / cam.zoom;
@@ -648,10 +873,15 @@
   function refresh() {
     if (!scene) return;
     layer.clear();
+    // Terrain carries the painted zones/roads/water, so it has to be redrawn
+    // whenever tiles change — drawing it once at create() meant a freshly
+    // painted tile didn't appear until the page was reloaded.
+    drawTerrain(terrainG);
     labels.forEach((t) => t.destroy());
     labels = [];
     const now = Date.now();
-    let totalProduction = 0, totalUpkeep = 0;
+    mood = computeMood();
+    let totalProduction = 0, totalUpkeep = 0, onRoadCount = 0;
 
     // Draw back-to-front so taller buildings overlap the ones behind them.
     const sorted = village.b.slice().sort((a, b) => (a.y + foot(a.key).h) - (b.y + foot(b.key).h));
@@ -670,13 +900,25 @@
         tag = `${pct}%`;
       } else {
         (ART[s.key] || ART.shabby_apartment)(layer, ox, oy);
-        const neglected = s.taxDebt > 0;
-        const prod = def.production * (neglected ? 0.5 : 1);
-        totalProduction += prod;
+        totalProduction += productionFor(s, mood);
         totalUpkeep += def.cost * (def.upkeepPct || 0);
-        if (neglected) {
+        if (s.taxDebt > 0) {
           rect(layer, '#000000', ox, oy, w, h, 0.45);
           rect(layer, '#ff4444', ox + w - 5, oy + 1, 4, 4);
+        }
+        // The single most important piece of feedback on the map: a building
+        // with no road touching it earns nothing, and says so.
+        if (!isRoadConnected(s)) {
+          rect(layer, '#000000', ox, oy, w, h, 0.5);
+          const bx = ox + w / 2 - 5, by = oy + h / 2 - 3;
+          rect(layer, '#ff3b3b', bx, by, 10, 6);
+          rect(layer, '#000000', bx + 2, by + 2, 6, 2);
+        } else {
+          onRoadCount++;
+          if (zoneMatch(s) > 0) {
+            // Small gold corner pip = standing on the zone it wants.
+            rect(layer, '#ffd700', ox + w - 4, oy + h - 4, 3, 3);
+          }
         }
       }
       if (s.id === selectedId) {
@@ -693,9 +935,13 @@
 
     drawGhost();
 
+    const doneCount = village.b.filter((s) => s.status === 'complete').length;
     $('stat-production').textContent = Math.floor(totalProduction);
     $('stat-placed').textContent = village.b.length + '/' + slotCap();
     $('stat-building').textContent = buildingCount() + '/' + MAX_CONCURRENT;
+    $('stat-road').textContent = onRoadCount + '/' + doneCount;
+    $('stat-road').style.color = doneCount && onRoadCount < doneCount ? '#ff6b6b' : '';
+    $('stat-mood').textContent = Math.round(mood) + '%';
     $('stat-upkeep').textContent = Math.floor(totalUpkeep);
     syncBalance();
     maybePushLeaderboardScore(totalProduction - (totalUpkeep / 1440));
@@ -744,10 +990,11 @@
   function create() {
     scene = this;
     cam = this.cameras.main;
-    const terrain = this.add.graphics();
-    drawTerrain(terrain);
+    terrainG = this.add.graphics();
     gridG = this.add.graphics();
     layer = this.add.graphics();
+    villagerG = this.add.graphics();
+    villagerG.setDepth(5);
     ghostG = this.add.graphics();
     ghostG.setDepth(10);
     this.input.addPointer(1);
@@ -756,6 +1003,14 @@
     this.input.on('pointerdown', (p) => { down = { x: p.x, y: p.y, t: performance.now(), moved: false }; });
     this.input.on('pointermove', (p) => {
       if (!p.isDown || !down) return;
+      // Dragging with a brush selected paints a stroke instead of panning —
+      // tile-by-tile tapping to lay a road was unusable.
+      if (brushMode && !this.input.pointer2.isDown) {
+        down.moved = true;
+        const t = tileFromPointer(p);
+        paintTile(t.tx, t.ty);
+        return;
+      }
       const p1 = this.input.pointer1, p2 = this.input.pointer2;
       if (p1.isDown && p2.isDown) {
         // Pinch zoom
@@ -780,6 +1035,7 @@
       if (!wasTap) return;
       const { tx, ty } = tileFromPointer(p);
       if (placing) { aimGhost(tx, ty); return; }
+      if (brushMode) { paintTile(tx, ty); return; }
       const b = buildingAt(tx, ty);
       selectedId = b ? b.id : null;
       refresh();
@@ -792,6 +1048,14 @@
     refresh();
   }
 
+  // Phaser's own render loop. Only villagers animate here; village state is
+  // never touched, so this can run every frame without saving anything.
+  function update(time, delta) {
+    if (!villagerG) return;
+    stepVillagers(Math.min(0.05, delta / 1000));
+    drawVillagers();
+  }
+
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: 'game-stage',
@@ -800,7 +1064,7 @@
     antialias: false,
     roundPixels: true,
     scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
-    scene: { create },
+    scene: { create, update },
   });
 
   // ---------- Placement flow ----------
@@ -883,10 +1147,75 @@
     stopPlacing();
   }
 
-  $('build-btn').addEventListener('click', openPlacePicker);
+  $('build-btn').addEventListener('click', () => { setBrush(null); openPlacePicker(); });
   $('place-confirm').addEventListener('click', confirmPlacing);
   $('place-cancel').addEventListener('click', stopPlacing);
   $('recenter-btn').addEventListener('click', () => { if (cam) recenter(); });
+
+  // --- Brush: paint zones, roads and water. Zones may go under a building
+  // (that's how a building ends up matched to its zone); roads and water may
+  // not. ---
+  const BRUSH_LABEL = {
+    residential: 'Residential', commercial: 'Commercial', industrial: 'Industrial',
+    road: 'Road', water: 'Water', erase: 'Erase',
+  };
+  let brushMsgTimer = null;
+  function brushMsg(text, bad) {
+    const el = $('brush-bar-text');
+    el.textContent = text;
+    el.classList.toggle('bad', !!bad);
+    clearTimeout(brushMsgTimer);
+    brushMsgTimer = setTimeout(setBrushLabel, 1600);
+  }
+  function setBrushLabel() {
+    if (!brushMode) return;
+    const cost = TILE_COST[brushMode] || 0;
+    const el = $('brush-bar-text');
+    el.classList.remove('bad');
+    el.textContent = brushMode === 'erase'
+      ? 'Erase — drag to clear tiles (no refund)'
+      : `${BRUSH_LABEL[brushMode]} — ${cost ? cost + ' each' : 'free'}, drag to paint`;
+  }
+
+  function paintTile(tx, ty) {
+    if (!brushMode || tx < 0 || ty < 0 || tx >= MAP || ty >= MAP) return;
+    const existing = getTileType(tx, ty);
+    if (brushMode === 'erase') {
+      if (!existing) return;
+      setTileType(tx, ty, null);
+      saveVillage(); refresh();
+      return;
+    }
+    if (existing === brushMode) return;
+    if (buildingAt(tx, ty) && (brushMode === 'road' || brushMode === 'water')) {
+      brushMsg("Can't go under a building", true);
+      return;
+    }
+    const cost = TILE_COST[brushMode] || 0;
+    if (cost > 0 && !Strubles.spend(cost)) {
+      brushMsg(`Need ${cost} Strubles`, true);
+      return;
+    }
+    setTileType(tx, ty, brushMode);
+    saveVillage(); refresh();
+  }
+
+  function setBrush(mode) {
+    brushMode = mode;
+    document.querySelectorAll('[data-brush]').forEach((b) => {
+      b.style.opacity = (mode && b.dataset.brush === mode) ? '0.55' : '1';
+    });
+    $('brush-bar').classList.toggle('open', !!mode);
+    if (mode) { stopPlacing(); selectedId = null; setBrushLabel(); }
+    refresh();
+  }
+  document.querySelectorAll('[data-brush]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const next = e.currentTarget.dataset.brush;
+      setBrush(brushMode === next ? null : next); // clicking the active brush puts it down
+    });
+  });
+  $('brush-done').addEventListener('click', () => setBrush(null));
   window.addEventListener('keydown', (e) => {
     if (!placing) return;
     if (e.key === 'Enter') { e.preventDefault(); confirmPlacing(); }
@@ -964,7 +1293,29 @@
   $('guide-btn').addEventListener('click', () => {
     const owned = ownedCounts();
     const list = $('guide-list');
-    list.innerHTML = '';
+    // The layout rules have to be stated somewhere — they're invisible
+    // otherwise, and they're the whole game.
+    list.innerHTML = `
+      <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">🛣️</div>
+        <div class="row-info"><b style="color:#ff6b6b">Roads are required.</b>
+          <small>A building with no road touching one of its sides earns nothing at all. Roads cost ${TILE_COST.road} Strubles a tile.</small></div>
+      </div>
+      <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">🏘️</div>
+        <div class="row-info"><b>Zone under your buildings.</b>
+          <small>Standing on the zone it wants pays up to +${Math.round(ZONE_BONUS * 100)}%. Each building's zone is listed below. Zones cost ${TILE_COST.residential} a tile and can be painted underneath an existing building.</small></div>
+      </div>
+      <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">🏭</div>
+        <div class="row-info"><b>Industry is the dirty option.</b>
+          <small>Industrial next door adds +${Math.round(INDUSTRIAL_BONUS * 100)}% to any building, but drags village mood down — and mood scales everything from 0.75x to 1.15x.</small></div>
+      </div>
+      <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">💧</div>
+        <div class="row-info"><b>Water is scenery you can't build on.</b>
+          <small>Free to paint, lifts mood a little, and permanently blocks that tile until you erase it.</small></div>
+      </div>`;
     ORDER.forEach((key) => {
       const def = DEFS[key];
       const rarity = RARITY[def.tier] || {};
@@ -972,7 +1323,7 @@
       const dailyUpkeep = def.cost * (def.upkeepPct || 0);
       const row = document.createElement('div');
       row.className = 'guide-row';
-      row.innerHTML = `<div class="row-icon">${f.icon}</div><div class="row-info">${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE} · ${f.w}x${f.h} tiles</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done · Upkeep ${Math.floor(dailyUpkeep)}/day</small>${def.description ? `<small class="row-desc">${def.description}</small>` : ''}</div>`;
+      row.innerHTML = `<div class="row-icon">${f.icon}</div><div class="row-info">${def.label} <small style="color:${rarity.color || ''}">${rarity.label || ''} · own ${owned[key]}/${MAX_PER_TYPE} · ${f.w}x${f.h} tiles · wants ${ZONE_AFFINITY[key] || 'any'} zone</small><small>Cost ${def.cost.toLocaleString()} Strubles · builds in ${fmtDuration(def.buildMinutes)} · +${def.production}/min when done · Upkeep ${Math.floor(dailyUpkeep)}/day</small>${def.description ? `<small class="row-desc">${def.description}</small>` : ''}</div>`;
       list.appendChild(row);
     });
     $('guide-overlay').classList.add('open');
@@ -1094,7 +1445,11 @@
 
   // Read-only introspection for QA (same idea as window.HorseGame).
   window.TycoonGame = {
-    getState: () => ({ village, slotCap: slotCap(), placing, zoom: cam && cam.zoom }),
+    getState: () => ({
+      village, slotCap: slotCap(), placing, brushMode, mood,
+      zoom: cam && cam.zoom, villagers: villagers.length,
+      connected: village.b.filter((s) => s.status === 'complete' && isRoadConnected(s)).length,
+    }),
   };
 
   if (window.initPickers) setTimeout(window.initPickers, 100);
