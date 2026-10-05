@@ -210,7 +210,10 @@
   document.querySelectorAll('.board-tab').forEach((tab) => {
     tab.addEventListener('click', () => loadBoard(tab.dataset.board));
   });
-  loadBoard('tycoon');
+  // /leaderboard?board=horse deep-links straight to a tab (the horse game
+  // links here); anything unrecognised falls back to the village board.
+  const wanted = new URLSearchParams(location.search).get('board');
+  loadBoard(BOARDS[wanted] ? wanted : 'tycoon');
 })();
 </script>
 </body>

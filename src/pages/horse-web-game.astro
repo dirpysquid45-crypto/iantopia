@@ -122,7 +122,14 @@
     background:rgba(0,0,0,.72);
     display:flex; align-items:center; justify-content:center;
     text-align:center; padding:20px;
+    /* The start screen is taller than the stage on shorter windows (and more
+       so with the Top Riders panel), which used to clip the bottom of it. */
+    overflow-y:auto;
   }
+  /* Auto margins centre the box when it fits and fall back to top-aligned
+     scrolling when it doesn't, which align-items:center can't do (it clips
+     the top instead). */
+  .stage-overlay > .stage-box { margin:auto; }
   .stage-overlay[hidden] { display:none; }
   .stage-box h2 { margin:0 0 12px; font-size:14px; color:var(--gold); text-shadow:2px 2px 0 #000; }
   .stage-box p { margin:0 0 16px; font-size:9px; line-height:1.9; color:var(--ink); }
@@ -133,6 +140,17 @@
     font-family:inherit; touch-action:manipulation; -webkit-user-select:none; user-select:none;
   }
   .stage-box .btn:hover { background:#ffe766; }
+  .top-riders { margin:0 auto 16px; padding:10px 14px; max-width:260px; border:2px solid rgba(255,215,0,.45); background:rgba(0,0,0,.45); text-align:left; }
+  .top-riders[hidden] { display:none; }
+  .top-riders-title { font-size:9px; color:var(--gold); margin-bottom:8px; text-align:center; }
+  .top-riders ol { margin:0; padding:0; list-style:none; counter-reset:rider; }
+  .top-riders li { counter-increment:rider; display:flex; justify-content:space-between; gap:10px; font-size:8px; line-height:2; color:var(--ink); }
+  .top-riders li::before { content:'#' counter(rider); color:var(--gold); width:22px; flex-shrink:0; }
+  .top-riders li span:nth-child(1) { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .top-riders li.me { color:var(--gold); }
+  .top-riders a, .rank-link { display:block; margin-top:8px; text-align:center; font-size:8px; color:var(--gold); text-decoration:none; cursor:none; }
+  .top-riders a:hover, .rank-link:hover { text-decoration:underline; }
+  .rank-link { margin-top:14px; }
   #sound-hint {
     margin:14px 0 0; font-size:7px; color:var(--muted); line-height:1.7;
     max-width:260px;
@@ -189,6 +207,7 @@
       <a href="/" title="Back to Iantopia">← Home</a>
       <h1>HORSE GAME</h1>
       <div style="display:flex; gap:6px; align-items:center;">
+        <a id="ranks-link" href="/leaderboard?board=horse" title="Horse leaderboard" style="padding:4px 8px; font-size:14px;">🏆</a>
         <button id="track-btn" title="Switch music">🎵</button>
         <input type="range" id="vol-slider" min="0" max="100" value="30" title="Volume" style="width:60px; accent-color: var(--gold);">
         <button id="mute-btn" title="Toggle sound">🔊</button>
@@ -212,6 +231,11 @@
           After 50 hurdles cleared, low planes start flying in — ↓ / S / the ⬇ button to duck under one, or it's game over.<br>
           Only coins pay <b>Strubles</b> — clearing hurdles just builds your streak. Some orb boosts lead to a rare glowing rice bag: grab it for a few seconds of invincibility.<br>
           Past 100 hurdles, the whole run flips — new stone ground, everything mirrored.</p>
+          <div class="top-riders" id="top-riders" hidden>
+            <div class="top-riders-title">🏆 Top Riders</div>
+            <ol id="top-riders-list"></ol>
+            <a href="/leaderboard?board=horse">Full leaderboard →</a>
+          </div>
           <button class="btn" id="start-btn" type="button">▶ Start Running</button>
           <p id="sound-hint">🔇 Browsers block audio until you interact — sound starts the moment you press Start.</p>
         </div>
@@ -223,6 +247,7 @@
           <p>Hurdles cleared: <b id="final-cleared">0</b><br>Strubles earned: <b id="final-earned">0</b><br>Best: <b id="final-best">0</b></p>
           <p id="cap-warning" style="color:#ff6b6b; font-size:8px; display:none; margin:8px 0 0;">⚠️ Wallet cap reached! Upgrade your Bank on /tycoon to continue earning.</p>
           <button class="btn" id="restart-btn" type="button">↻ Try Again</button>
+          <a class="rank-link" href="/leaderboard?board=horse">🏆 See where you rank</a>
         </div>
       </div>
     </div>
@@ -647,20 +672,63 @@
   // write on every run. Failures are silent -- a leaderboard write must never
   // interfere with finishing a run.
   let horsePushInFlight = false;
+  let horsePushQueued = null;
+  // A transaction that only ever raises the stored value. The best score is
+  // device-local (horse_game_best_v1 isn't cloud-synced), so a plain set()
+  // from a second device with a lower record would overwrite a higher one.
   function pushHorseScore(value) {
-    if (horsePushInFlight) return;
     if (!window.CloudSync || !CloudSync.isSignedIn()) return;
     const user = CloudSync.currentUser;
     if (!user) return;
+    if (horsePushInFlight) { horsePushQueued = Math.max(horsePushQueued || 0, value); return; }
     horsePushInFlight = true;
-    firebase.firestore().collection('horse_leaderboard').doc(user.uid).set({
-      displayName: user.displayName || 'Anonymous Rider',
-      best: Math.round(value),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true })
+    const db = firebase.firestore();
+    const ref = db.collection('horse_leaderboard').doc(user.uid);
+    db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const stored = snap.exists ? Number(snap.data().best) || 0 : 0;
+      if (Math.round(value) <= stored) return;
+      tx.set(ref, {
+        displayName: user.displayName || 'Anonymous Rider',
+        best: Math.round(value),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    })
       .catch((err) => console.error('[horse-leaderboard] push failed:', err))
-      .finally(() => { horsePushInFlight = false; });
+      .finally(() => {
+        horsePushInFlight = false;
+        if (horsePushQueued != null) { const v = horsePushQueued; horsePushQueued = null; pushHorseScore(v); }
+      });
   }
+
+  // Anyone whose record predates the leaderboard would otherwise never
+  // appear until they beat it, so publish the stored best once per sign-in.
+  function backfillHorseBest() {
+    if (best > 0) pushHorseScore(best);
+  }
+
+  // Top-5 panel on the start screen. Read-only and best-effort: if the query
+  // fails (rules, offline) the panel just stays hidden.
+  function loadTopRiders() {
+    if (!window.firebase || !firebase.firestore) return;
+    firebase.firestore().collection('horse_leaderboard')
+      .orderBy('best', 'desc').limit(5).get()
+      .then((snap) => {
+        if (snap.empty) return;
+        const me = window.CloudSync && CloudSync.currentUser ? CloudSync.currentUser.uid : null;
+        const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+        $('top-riders-list').innerHTML = snap.docs.map((d) => {
+          const v = d.data();
+          return `<li class="${d.id === me ? 'me' : ''}"><span>${esc(v.displayName || 'Anonymous Rider')}</span><span>${Number(v.best || 0).toLocaleString()}</span></li>`;
+        }).join('');
+        $('top-riders').hidden = false;
+      })
+      .catch(() => {});
+  }
+  window.addEventListener('cloudsync:authchanged', (e) => {
+    if (e.detail && e.detail.user) { backfillHorseBest(); loadTopRiders(); }
+  });
+  setTimeout(() => { if (window.CloudSync && CloudSync.isSignedIn()) { backfillHorseBest(); } loadTopRiders(); }, 1500);
 
   function endGame(reason) {
     state = 'over';
