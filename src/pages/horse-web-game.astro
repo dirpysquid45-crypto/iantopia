@@ -642,6 +642,26 @@
   function startDuck() { horse.ducking = true; }
   function endDuck() { horse.ducking = false; }
 
+  // Publishes a new personal best to the horse board on /leaderboard. Only
+  // ever called when the record actually improves, so a long session doesn't
+  // write on every run. Failures are silent -- a leaderboard write must never
+  // interfere with finishing a run.
+  let horsePushInFlight = false;
+  function pushHorseScore(value) {
+    if (horsePushInFlight) return;
+    if (!window.CloudSync || !CloudSync.isSignedIn()) return;
+    const user = CloudSync.currentUser;
+    if (!user) return;
+    horsePushInFlight = true;
+    firebase.firestore().collection('horse_leaderboard').doc(user.uid).set({
+      displayName: user.displayName || 'Anonymous Rider',
+      best: Math.round(value),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true })
+      .catch((err) => console.error('[horse-leaderboard] push failed:', err))
+      .finally(() => { horsePushInFlight = false; });
+  }
+
   function endGame(reason) {
     state = 'over';
     shake = 0.25;
@@ -650,6 +670,7 @@
     if (cleared > best) {
       best = cleared;
       localStorage.setItem(BEST_KEY, String(best));
+      pushHorseScore(best);
     }
     $('gameover-title').textContent = deathReason;
     $('final-cleared').textContent = cleared.toLocaleString();

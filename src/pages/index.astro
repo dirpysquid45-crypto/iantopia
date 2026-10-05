@@ -1345,6 +1345,35 @@
       z-index: 20;
     }
     #patch-btn:hover { transform: translateY(-1px); }
+
+    #suggest-btn {
+      position: fixed;
+      top: calc(358px + env(safe-area-inset-top));
+      left: calc(20px + env(safe-area-inset-left));
+      background: rgba(0, 0, 0, 0.6);
+      color: #fff;
+      border: 1px solid #2a3245;
+      border-radius: 10px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: none;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+      z-index: 20;
+    }
+    #suggest-btn:hover { transform: translateY(-1px); }
+    #suggest-text {
+      width: 100%; min-height: 110px; resize: vertical;
+      background: #0d1119; color: #e9eef9; border: 1px solid #2a3245;
+      border-radius: 8px; padding: 10px; font-family: inherit; font-size: 13px;
+      line-height: 1.6; cursor: none;
+    }
+    #suggest-text:focus { outline: 2px solid #4a7fb5; outline-offset: 1px; }
+    #suggest-meta { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:8px; }
+    #suggest-count { font-size: 11px; color: #888; }
+    #suggest-status { font-size: 12px; margin-top: 10px; min-height: 18px; line-height:1.6; }
+    #suggest-status.ok { color: #6ddc8b; }
+    #suggest-status.bad { color: #ff8080; }
+
     #patch-list .patch-entry { padding: 10px 0; border-bottom: 1px solid #2a3245; }
     #patch-list .patch-entry:last-child { border-bottom: none; }
     #patch-list .patch-date { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -1505,7 +1534,7 @@
   <div class="button-grid">
     <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
     <a class="big neon-mines" href="/minesweeper">💣 Minesweeper</a>
-    <a class="big neon-tycoon disabled" role="link" aria-disabled="true" title="Temporarily out of order">🏙️ Iantopia Tycoon</a>
+    <a class="big neon-tycoon disabled" role="link" aria-disabled="true" title="Temporarily out of order">🏙️ My Iantopia</a>
     <a class="big neon-horse" href="/horse-web-game">🐴 Horse Game</a>
     <a class="big neon-arena" href="/arena">⚔️ Arena</a>
     <a class="big neon-shop" href="/lootbox">🍺 Shop</a>
@@ -1550,6 +1579,7 @@
     <span id="account-btn-label">Sign In</span>
   </button>
   <button id="patch-btn" title="Patch Notes">📋 Patch Notes</button>
+  <button id="suggest-btn" title="Send a suggestion">💡 Suggest</button>
   <video id="bg-video" autoplay muted loop playsinline></video>
 
   <!-- Account modal -->
@@ -1625,6 +1655,23 @@
       <h2 id="patch-title">Patch Notes</h2>
       <div id="patch-list"></div>
       <button class="modal-close" id="patch-close">Close</button>
+    </div>
+  </div>
+
+  <!-- Suggestion box -->
+  <div class="modal-overlay" id="suggest-overlay" role="dialog" aria-modal="true" aria-labelledby="suggest-title">
+    <div class="modal-box">
+      <h2 id="suggest-title">Suggestion Box</h2>
+      <p style="font-size:12px; color:#888; margin:0 0 12px; line-height:1.7;">
+        Ideas, bugs, things you want added — it goes straight to the admin.
+      </p>
+      <textarea id="suggest-text" maxlength="1000" placeholder="What should Iantopia add next?"></textarea>
+      <div id="suggest-meta">
+        <span id="suggest-count">0 / 1000</span>
+        <button class="modal-close" id="suggest-send" style="margin:0;">Send</button>
+      </div>
+      <div id="suggest-status"></div>
+      <button class="modal-close" id="suggest-close">Close</button>
     </div>
   </div>
 
@@ -2059,6 +2106,73 @@
       patchClose.addEventListener('click', () => patchOverlay.classList.remove('open'));
       patchOverlay.addEventListener('click', (e) => {
         if (e.target === patchOverlay) patchOverlay.classList.remove('open');
+      });
+
+      // --- Suggestion box ---
+      // Writes straight to a `suggestions` Firestore collection, the same way
+      // the leaderboards write their own. Sign-in is required so each note
+      // carries an author and the collection's rules can be create-only.
+      const suggestBtn = document.getElementById('suggest-btn');
+      const suggestOverlay = document.getElementById('suggest-overlay');
+      const suggestText = document.getElementById('suggest-text');
+      const suggestSend = document.getElementById('suggest-send');
+      const suggestStatus = document.getElementById('suggest-status');
+      const suggestCount = document.getElementById('suggest-count');
+      const SUGGEST_MAX = 1000;
+      let suggestSending = false;
+
+      function setSuggestStatus(msg, kind) {
+        suggestStatus.textContent = msg || '';
+        suggestStatus.className = kind || '';
+      }
+      suggestText.addEventListener('input', () => {
+        suggestCount.textContent = `${suggestText.value.length} / ${SUGGEST_MAX}`;
+      });
+      suggestBtn.addEventListener('click', () => {
+        setSuggestStatus('');
+        suggestCount.textContent = `${suggestText.value.length} / ${SUGGEST_MAX}`;
+        if (!window.CloudSync || !CloudSync.isSignedIn()) {
+          setSuggestStatus('Sign in first so I know who to credit.', 'bad');
+        }
+        suggestOverlay.classList.add('open');
+        suggestText.focus();
+      });
+      suggestSend.addEventListener('click', () => {
+        if (suggestSending) return;
+        const body = suggestText.value.trim();
+        if (!body) { setSuggestStatus('Write something first.', 'bad'); return; }
+        if (!window.CloudSync || !CloudSync.isSignedIn()) {
+          setSuggestStatus('Sign in first — the Sign In button is up top.', 'bad');
+          return;
+        }
+        const user = CloudSync.currentUser;
+        suggestSending = true;
+        suggestSend.disabled = true;
+        setSuggestStatus('Sending...');
+        firebase.firestore().collection('suggestions').add({
+          text: body.slice(0, SUGGEST_MAX),
+          uid: user.uid,
+          displayName: user.displayName || 'Anonymous',
+          page: location.pathname,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        })
+          .then(() => {
+            suggestText.value = '';
+            suggestCount.textContent = `0 / ${SUGGEST_MAX}`;
+            setSuggestStatus('Sent — thank you!', 'ok');
+          })
+          .catch((err) => {
+            console.error('[suggestions] send failed:', err);
+            setSuggestStatus(err.code === 'permission-denied'
+              ? "Suggestions aren't switched on yet — try again later."
+              : 'Could not send. Please try again.', 'bad');
+          })
+          .finally(() => { suggestSending = false; suggestSend.disabled = false; });
+      });
+      document.getElementById('suggest-close')
+        .addEventListener('click', () => suggestOverlay.classList.remove('open'));
+      suggestOverlay.addEventListener('click', (e) => {
+        if (e.target === suggestOverlay) suggestOverlay.classList.remove('open');
       });
 
       // --- Background switcher ---

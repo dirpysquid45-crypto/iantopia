@@ -6,7 +6,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Iantopia Tycoon Leaderboard</title>
+<title>Iantopia Leaderboards</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
@@ -85,20 +85,35 @@
   .leaderboard-name { color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .leaderboard-score { color:var(--muted); text-align:right; }
 
+  #board-tabs { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  .board-tab {
+    flex:1; min-width:130px; background:#000; color:var(--gold); border:3px solid var(--gold);
+    padding:12px 10px; font-family:inherit; font-size:10px; font-weight:700; cursor:pointer;
+    touch-action:manipulation; transition:background .15s, color .15s;
+  }
+  .board-tab:hover { background:rgba(255,215,0,.15); }
+  .board-tab.active { background:var(--gold); color:#000; }
+
   @media (max-width:768px) {
     main { padding-left:12px; padding-right:12px; }
     .leaderboard-row { grid-template-columns:30px 1fr 100px; font-size:9px; padding:10px 12px; }
     header a { font-size:9px; padding:6px 10px; }
+    .board-tab { font-size:9px; padding:11px 8px; }
   }
 </style>
 </head>
 <body>
   <main>
     <header>
-      <a href="/tycoon" title="Back to Tycoon">← Tycoon</a>
-      <h1>TYCOON LEADERBOARD</h1>
+      <a href="/tycoon" title="Back to My Iantopia">← Village</a>
+      <h1>LEADERBOARDS</h1>
       <div style="width:80px;"></div>
     </header>
+
+    <div id="board-tabs">
+      <button class="board-tab active" type="button" data-board="tycoon">🏙️ Village</button>
+      <button class="board-tab" type="button" data-board="horse">🐎 Horse Run</button>
+    </div>
 
     <div id="leaderboard-list">
       <div class="leaderboard-loading">Loading leaderboard...</div>
@@ -119,8 +134,26 @@
     listEl.innerHTML = '<div class="leaderboard-loading">Loading leaderboard...</div>';
   }
 
+  // Two boards, same shape: a Firestore collection keyed by uid with one
+  // numeric field to sort on.
+  const BOARDS = {
+    tycoon: {
+      collection: 'leaderboard', field: 'netProduction',
+      empty: 'No villages ranked yet — be the first!',
+      fallbackName: 'Anonymous Tycoon',
+      format: (v) => `${Number(v || 0).toFixed(1)}/min`,
+    },
+    horse: {
+      collection: 'horse_leaderboard', field: 'best',
+      empty: 'No riders ranked yet — go clear some hurdles!',
+      fallbackName: 'Anonymous Rider',
+      format: (v) => `${Number(v || 0).toLocaleString()} hurdles`,
+    },
+  };
+  let activeBoard = 'tycoon';
+
   function renderEmpty() {
-    listEl.innerHTML = '<div class="leaderboard-empty">No tycoons ranked yet — be the first!</div>';
+    listEl.innerHTML = `<div class="leaderboard-empty">${BOARDS[activeBoard].empty}</div>`;
   }
 
   function renderError(message) {
@@ -132,39 +165,52 @@
       renderEmpty();
       return;
     }
+    const board = BOARDS[activeBoard];
     listEl.innerHTML = docs.map((doc, idx) => {
       const data = doc.data();
       const rank = idx + 1;
       const isCurrentUser = doc.id === currentUserId;
+      const name = String(data.displayName || board.fallbackName)
+        .replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
       return `
         <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}">
           <div class="leaderboard-rank">#${rank}</div>
-          <div class="leaderboard-name">${data.displayName || 'Anonymous Tycoon'}</div>
-          <div class="leaderboard-score">${Number(data.netProduction || 0).toFixed(1)}/min</div>
+          <div class="leaderboard-name">${name}</div>
+          <div class="leaderboard-score">${board.format(data[board.field])}</div>
         </div>
       `;
     }).join('');
   }
 
-  renderLoading();
-  firebase.firestore().collection('leaderboard')
-    .orderBy('netProduction', 'desc').limit(50).get()
-    .then((snap) => {
-      const docs = snap.docs;
-      if (docs.length === 0) {
-        renderEmpty();
-      } else {
-        renderList(docs);
-      }
-    })
-    .catch((err) => {
-      console.error('[leaderboard] query failed:', err);
-      if (err.code === 'permission-denied') {
-        renderError('Leaderboard not yet available — check back soon!');
-      } else {
-        renderError('Failed to load leaderboard. Please try again later.');
-      }
+  function loadBoard(key) {
+    activeBoard = key;
+    document.querySelectorAll('.board-tab').forEach((t) => {
+      t.classList.toggle('active', t.dataset.board === key);
     });
+    const board = BOARDS[key];
+    renderLoading();
+    firebase.firestore().collection(board.collection)
+      .orderBy(board.field, 'desc').limit(50).get()
+      .then((snap) => {
+        if (activeBoard !== key) return; // a later tab click already won
+        if (snap.docs.length === 0) renderEmpty();
+        else renderList(snap.docs);
+      })
+      .catch((err) => {
+        console.error('[leaderboard] query failed:', err);
+        if (activeBoard !== key) return;
+        if (err.code === 'permission-denied') {
+          renderError('This leaderboard is not available yet — check back soon!');
+        } else {
+          renderError('Failed to load leaderboard. Please try again later.');
+        }
+      });
+  }
+
+  document.querySelectorAll('.board-tab').forEach((tab) => {
+    tab.addEventListener('click', () => loadBoard(tab.dataset.board));
+  });
+  loadBoard('tycoon');
 })();
 </script>
 </body>
