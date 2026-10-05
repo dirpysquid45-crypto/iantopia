@@ -219,19 +219,16 @@
       <span>Upkeep: <b id="stat-upkeep">0</b>/day</span>
     </div>
 
+    <!-- Five controls, not thirteen. The zoning brushes moved behind one
+         Zoning panel that names and explains each one, and Slots folded into
+         the Bank since both are "upgrades you buy". -->
     <div id="cta-row">
       <button id="build-btn" class="cta primary" type="button">🏗️ Build</button>
-      <button id="brush-road" class="cta" type="button" data-brush="road">🛣️ Road 25</button>
-      <button id="brush-res" class="cta" type="button" data-brush="residential">🏘️ Res 10</button>
-      <button id="brush-com" class="cta" type="button" data-brush="commercial">🏬 Com 10</button>
-      <button id="brush-ind" class="cta" type="button" data-brush="industrial">🏭 Ind 10</button>
-      <button id="brush-water" class="cta" type="button" data-brush="water">💧 Water</button>
-      <button id="brush-erase" class="cta" type="button" data-brush="erase">🧽 Erase</button>
-      <a id="lootbox-cta" class="cta" href="/lootbox">🎁 Get Buildings</a>
-      <button id="guide-btn" class="cta" type="button">📖 Guide</button>
+      <button id="zoning-btn" class="cta" type="button">🗺️ Zoning</button>
       <button id="bank-btn" class="cta" type="button">🏦 Bank</button>
-      <button id="expand-btn" class="cta" type="button">➕ Slots</button>
+      <button id="guide-btn" class="cta" type="button">📖 Guide</button>
       <button id="recenter-btn" class="cta" type="button">🎯 Center</button>
+      <a id="lootbox-cta" class="cta" href="/lootbox">🎁 Buildings</a>
       <a id="leaderboard-cta" class="cta" href="/leaderboard">🏆 Ranks</a>
     </div>
 
@@ -274,6 +271,22 @@
     </div>
   </div>
 
+  <!-- Zoning: every paintable tile, grouped by what it's for, so "Com"/"Ind"
+       read as zoning laws rather than unlabelled coloured buttons. -->
+  <div class="overlay" id="zoning-overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Zoning</h2>
+        <button class="btn" id="zoning-close" type="button">Close</button>
+      </div>
+      <p style="font-size:9px; color:var(--muted); line-height:1.8; margin:0 0 14px;">
+        Pick a law, then drag across the map to apply it. Buildings earn nothing
+        without a road, and earn more standing on the zone they want.
+      </p>
+      <div id="zoning-list"></div>
+    </div>
+  </div>
+
   <!-- Building Guide: every tier's stats + description, regardless of ownership -->
   <div class="overlay" id="guide-overlay">
     <div class="modal">
@@ -298,17 +311,11 @@
         <p id="bank-next-info"></p>
         <button class="btn" id="bank-buy" type="button">Upgrade</button>
       </div>
-    </div>
-  </div>
 
-  <!-- Building slots: how many buildings your village can hold -->
-  <div class="overlay" id="expand-overlay">
-    <div class="modal">
-      <div class="modal-head">
-        <h2>Building Slots</h2>
-        <button class="btn" id="expand-close" type="button">Close</button>
-      </div>
-      <p style="font-size:10px; color:var(--muted); line-height:1.7; margin:0 0 14px;">Each new slot costs roughly triple the last — a long-term sink for late-game progression.</p>
+      <!-- Building slots used to be their own button and modal. Both are
+           "spend Strubles to raise a ceiling", so they live together now. -->
+      <h2 style="font-size:12px; color:var(--gold); font-weight:400; margin:22px 0 10px; padding-top:16px; border-top:1px solid rgba(255,215,0,.25);">Building Slots</h2>
+      <p style="font-size:10px; color:var(--muted); line-height:1.7; margin:0 0 14px;">How many buildings your village can hold. Each new slot costs roughly triple the last.</p>
       <div id="expand-info-breakdown"></div>
       <div class="bank-buy-row">
         <p id="expand-next-info"></p>
@@ -480,9 +487,13 @@
   }
   const buildingCount = () => village.b.filter((s) => s.status === 'building').length;
 
-  // ---------- Economy tick (same math as the old skyline) ----------
+  // ---------- Economy tick ----------
+  // The freeze bounds PAYOUT, not the passage of time. Returning early for
+  // everything meant a building never left 'building' once its timer ran
+  // out: it rendered at 100% forever, still counted against the 3 concurrent
+  // builds, and after three of them no further building could be started at
+  // all. Construction now always settles; only earning is gated.
   function tick() {
-    if (TYCOON_DISABLED) return false;
     const now = Date.now();
     const mood = computeMood();
     let earned = 0, changed = false;
@@ -496,7 +507,15 @@
         slot.taxDebt = slot.taxDebt || 0;
         changed = true;
       }
-      if (slot.status === 'complete') {
+      if (slot.status === 'complete' && TYCOON_DISABLED) {
+        // Keep the clocks pinned while frozen, so lifting the freeze doesn't
+        // pay out everything that "accrued" with the economy switched off.
+        if (now - slot.lastProductionAt > 60000) {
+          slot.lastProductionAt = now;
+          slot.lastTaxAt = now;
+          changed = true;
+        }
+      } else if (slot.status === 'complete') {
         if (slot.lastTaxAt == null) { slot.lastTaxAt = now; slot.taxDebt = 0; changed = true; }
         const eff = productionFor(slot, mood);
         if (eff <= 0) {
@@ -525,6 +544,7 @@
       }
     });
     localStorage.setItem(LAST_SEEN_KEY, String(now));
+    if (TYCOON_DISABLED) return changed;
     if (earned > 0) { try { Strubles.add(earned); } catch {} }
     village.b.forEach((slot) => {
       if (slot.status === 'complete' && slot.taxDebt > 0 && Strubles.spend(slot.taxDebt)) {
@@ -642,66 +662,139 @@
     g.fillRect(x, y, w, h);
   }
 
+  // --- Shading helpers. Everything below is still 1-world-pixel pixel art;
+  // the gradients are literal stacks of 1px bands, not smooth fills, so the
+  // result stays crisp under Phaser's nearest-neighbour scaling. ---
+  function mix(c1, c2, t) {
+    const a = hex(c1), b = hex(c2);
+    const r = Math.round(((a >> 16) & 255) + ((((b >> 16) & 255) - ((a >> 16) & 255)) * t));
+    const g = Math.round(((a >> 8) & 255) + ((((b >> 8) & 255) - ((a >> 8) & 255)) * t));
+    const bl = Math.round((a & 255) + (((b & 255) - (a & 255)) * t));
+    return (r << 16) | (g << 8) | bl;
+  }
+  // Vertical gradient, one 1px band per row.
+  function vgrad(g, x, y, w, h, top, bottom, alpha) {
+    for (let i = 0; i < h; i++) {
+      g.fillStyle(mix(top, bottom, h <= 1 ? 0 : i / (h - 1)), alpha == null ? 1 : alpha);
+      g.fillRect(x, y + i, w, 1);
+    }
+  }
+  // Horizontal gradient — used for the lit/shadowed sides of a facade.
+  function hgrad(g, x, y, w, h, left, right, alpha) {
+    for (let i = 0; i < w; i++) {
+      g.fillStyle(mix(left, right, w <= 1 ? 0 : i / (w - 1)), alpha == null ? 1 : alpha);
+      g.fillRect(x + i, y, 1, h);
+    }
+  }
+  // Stable per-tile pseudo-random so scenery doesn't crawl between redraws.
+  const rnd = (x, y, salt) => {
+    const n = Math.imul((x * 73856093) ^ (y * 19349663) ^ ((salt || 0) * 83492791), 2654435761) >>> 0;
+    return n / 4294967296;
+  };
+
+  // Light comes from the upper-left throughout, so every facade has a lit
+  // edge and a shadowed one and the roofs carry a top highlight.
   const ART = {
     shabby_apartment(g, ox, oy) {
-      rect(g, '#2b1a10', ox + 1, oy + 2, 14, 13);
-      rect(g, '#a8845a', ox + 2, oy + 5, 12, 9);
-      rect(g, '#7a3b2e', ox + 1, oy + 2, 14, 4);
-      rect(g, '#8f4a3a', ox + 1, oy + 2, 14, 1);
-      rect(g, '#ffe08a', ox + 3, oy + 8, 3, 3);
-      rect(g, '#ffe08a', ox + 10, oy + 8, 3, 3);
-      rect(g, '#4a2c17', ox + 7, oy + 10, 3, 4);
-      rect(g, '#6b6b6b', ox + 11, oy, 2, 3);
+      rect(g, '#1a0f08', ox + 1, oy + 3, 14, 12, 0.5);          // footing shadow
+      vgrad(g, ox + 2, oy + 5, 12, 10, '#bb9468', '#6d4f33');   // brick body
+      hgrad(g, ox + 2, oy + 5, 4, 10, '#d4ab7c', '#bb9468');    // lit left face
+      rect(g, '#573a22', ox + 13, oy + 5, 1, 10);               // shadowed right edge
+      for (let r = 0; r < 4; r++) rect(g, '#5d4028', ox + 2, oy + 7 + r * 2, 12, 1, 0.35); // courses
+      vgrad(g, ox + 1, oy + 2, 14, 4, '#9c4b38', '#6d2f22');    // roof
+      rect(g, '#c06a4e', ox + 1, oy + 2, 14, 1);                // roof highlight
+      rect(g, '#3a1d14', ox + 1, oy + 5, 14, 1);                // eaves line
+      [3, 10].forEach((wx) => {                                  // lit windows
+        rect(g, '#2a1a10', ox + wx, oy + 8, 3, 3);
+        vgrad(g, ox + wx, oy + 8, 3, 3, '#ffe9a8', '#e8a94c');
+        rect(g, '#fff6d2', ox + wx, oy + 8, 1, 1);
+      });
+      vgrad(g, ox + 7, oy + 10, 3, 5, '#5e3a1e', '#3a2412');    // door
+      rect(g, '#d7b06a', ox + 9, oy + 12, 1, 1);                // handle
+      vgrad(g, ox + 11, oy - 1, 2, 4, '#7d7d7d', '#4e4e4e');    // chimney
+      rect(g, '#cfcfcf', ox + 11, oy - 2, 2, 1, 0.5);           // smoke
     },
+
     generic_building(g, ox, oy) {
-      rect(g, '#2a2f38', ox + 1, oy + 1, 30, 14);
-      rect(g, '#8a93a0', ox + 2, oy + 3, 28, 11);
-      rect(g, '#5d6672', ox + 1, oy + 1, 30, 3);
-      rect(g, '#9aa3b0', ox + 4, oy + 1, 5, 2);
-      for (let i = 0; i < 6; i++) rect(g, '#bfe3ff', ox + 4 + i * 4, oy + 6, 3, 3);
-      rect(g, '#4a2c17', ox + 14, oy + 10, 4, 4);
+      rect(g, '#14171c', ox + 1, oy + 2, 30, 13, 0.5);
+      vgrad(g, ox + 2, oy + 4, 28, 11, '#a7b0bd', '#5c6470');   // concrete
+      hgrad(g, ox + 2, oy + 4, 6, 11, '#c3cad4', '#a7b0bd');    // lit side
+      rect(g, '#464d58', ox + 29, oy + 4, 1, 11);
+      vgrad(g, ox + 1, oy + 1, 30, 4, '#78818e', '#4a515c');    // parapet
+      rect(g, '#99a2ae', ox + 1, oy + 1, 30, 1);
+      rect(g, '#aeb7c2', ox + 4, oy, 5, 2);                     // roof box
+      for (let r = 0; r < 2; r++) {                              // window bands
+        for (let i = 0; i < 6; i++) {
+          const wx = ox + 4 + i * 4, wy = oy + 6 + r * 4;
+          rect(g, '#20262e', wx - 1, wy - 1, 4, 4, 0.55);
+          vgrad(g, wx, wy, 3, 3, '#d8f0ff', '#6f9fc4');
+          rect(g, '#ffffff', wx, wy, 1, 1, 0.8);
+        }
+      }
+      vgrad(g, ox + 14, oy + 11, 4, 4, '#4a2c17', '#2c1a0e');   // entrance
+      rect(g, '#ffd98a', ox + 13, oy + 10, 6, 1, 0.75);         // canopy light
     },
+
     pagoda(g, ox, oy) {
-      rect(g, '#5a432c', ox + 4, oy + 28, 24, 3);
-      const tiers = [
-        { y: 20, w: 24, wall: 6 },
-        { y: 12, w: 18, wall: 6 },
-        { y: 4,  w: 12, wall: 5 },
-      ];
+      rect(g, '#120d06', ox + 5, oy + 27, 22, 5, 0.5);
+      vgrad(g, ox + 4, oy + 27, 24, 4, '#6d5436', '#3f2f1d');   // stone base
+      rect(g, '#8a6c48', ox + 4, oy + 27, 24, 1);
+      const tiers = [{ y: 20, w: 24, wall: 6 }, { y: 12, w: 18, wall: 6 }, { y: 4, w: 12, wall: 5 }];
       tiers.forEach((t) => {
         const x = ox + 16 - t.w / 2;
-        rect(g, '#e8d9b0', x + 2, oy + t.y + 3, t.w - 4, t.wall);
-        rect(g, '#7a1f16', x - 3, oy + t.y, t.w + 6, 3);
-        rect(g, '#c0392b', x - 2, oy + t.y, t.w + 4, 2);
-        rect(g, '#ffd700', x - 3, oy + t.y + 2, t.w + 6, 1);
+        vgrad(g, x + 2, oy + t.y + 3, t.w - 4, t.wall, '#f3e6c2', '#bda77c'); // plaster
+        hgrad(g, x + 2, oy + t.y + 3, 3, t.wall, '#fff6dd', '#f3e6c2');
+        for (let i = 0; i < 3; i++) rect(g, '#7c3b22', x + 4 + i * ((t.w - 8) / 2), oy + t.y + 4, 1, t.wall - 2, 0.6);
+        vgrad(g, x - 3, oy + t.y, t.w + 6, 3, '#d4503a', '#7a1f16'); // flared roof
+        rect(g, '#ef7a5e', x - 2, oy + t.y, t.w + 4, 1);
+        rect(g, '#ffd700', x - 3, oy + t.y + 2, t.w + 6, 1);          // gold trim
+        rect(g, '#b8911f', x - 3, oy + t.y + 3, t.w + 6, 1, 0.5);
+        rect(g, '#ffd700', x - 3, oy + t.y + 1, 1, 2);                // upturned eaves
+        rect(g, '#ffd700', x + t.w + 2, oy + t.y + 1, 1, 2);
       });
-      rect(g, '#ffd700', ox + 15, oy, 2, 5);
-      rect(g, '#4a2c17', ox + 14, oy + 23, 4, 5);
+      vgrad(g, ox + 15, oy - 1, 2, 6, '#fff0a8', '#c9a21a');    // finial
+      vgrad(g, ox + 14, oy + 23, 4, 5, '#6b3f1c', '#38200e');   // doorway
+      rect(g, '#ffce6b', ox + 14, oy + 25, 4, 1, 0.5);
     },
+
     generic_skyscraper(g, ox, oy) {
-      rect(g, '#1b2a3a', ox + 5, oy + 3, 22, 28);
-      rect(g, '#4a7fb5', ox + 6, oy + 4, 20, 26);
-      rect(g, '#2f4a66', ox + 6, oy + 4, 20, 3);
-      for (let r = 0; r < 5; r++) {
-        for (let c = 0; c < 4; c++) rect(g, r % 2 ? '#bfe3ff' : '#8fc2ea', ox + 8 + c * 5, oy + 9 + r * 4, 3, 2);
+      rect(g, '#0b1118', ox + 5, oy + 4, 23, 27, 0.5);
+      vgrad(g, ox + 6, oy + 4, 20, 27, '#6ea6d8', '#1e3550');       // glass curtain
+      hgrad(g, ox + 6, oy + 4, 5, 27, '#9fd0f2', '#6ea6d8', 0.55);  // lit face
+      rect(g, '#16293d', ox + 25, oy + 4, 1, 27);                   // shadow edge
+      vgrad(g, ox + 6, oy + 4, 20, 3, '#395d80', '#24405c');        // crown setback
+      for (let r = 0; r < 6; r++) {                                  // window grid
+        for (let c = 0; c < 4; c++) {
+          const wx = ox + 8 + c * 5, wy = oy + 9 + r * 4;
+          const lit = rnd(c, r, 7) > 0.45;
+          rect(g, '#101d2b', wx - 1, wy - 1, 4, 3, 0.5);
+          vgrad(g, wx, wy, 3, 2, lit ? '#ffeab0' : '#9fd0f2', lit ? '#d99a3a' : '#4d7ba6');
+        }
       }
-      rect(g, '#cfd6de', ox + 15, oy, 2, 4);
-      rect(g, '#ff4444', ox + 15, oy, 2, 1);
+      rect(g, '#2a4055', ox + 6, oy + 30, 20, 1);                   // plinth
+      vgrad(g, ox + 15, oy - 2, 2, 6, '#e3e9ef', '#8d949c');        // mast
+      rect(g, '#ff4444', ox + 15, oy - 3, 2, 1);                    // beacon
     },
     taipei_101(g, ox, oy) {
-      rect(g, '#1c3b2a', ox + 10, oy + 40, 28, 7);
-      for (let i = 0; i < 8; i++) {
+      rect(g, '#0a1710', ox + 9, oy + 39, 30, 8, 0.5);
+      vgrad(g, ox + 10, oy + 39, 28, 8, '#2c5a42', '#15301f');   // podium
+      rect(g, '#3f7a5c', ox + 10, oy + 39, 28, 1);
+      for (let i = 0; i < 8; i++) {                               // flared sections
         const w = i === 0 ? 14 : 12 + (i % 2 ? 4 : 0);
         const x = ox + 24 - w / 2;
         const y = oy + 36 - i * 4;
-        rect(g, '#2e8b57', x, y, w, 4);
-        rect(g, '#3fae70', x, y, w, 1);
-        rect(g, '#ffd700', x - 1, y + 3, w + 2, 1);
-        rect(g, '#bfe3ff', x + 2, y + 1, 2, 2);
-        rect(g, '#bfe3ff', x + w - 4, y + 1, 2, 2);
+        vgrad(g, x, y, w, 4, '#49b584', '#1f6b4a');               // each tier lighter at its top
+        hgrad(g, x, y, 3, 4, '#7fd9ae', '#49b584', 0.7);          // lit left edge
+        rect(g, '#144a33', x + w - 1, y, 1, 4);                   // shadowed right edge
+        rect(g, '#ffd700', x - 1, y + 3, w + 2, 1);               // gold band between tiers
+        rect(g, '#9c7a12', x - 1, y + 4, w + 2, 1, 0.45);
+        rect(g, '#dff4ff', x + 2, y + 1, 2, 2, 0.9);              // glazing
+        rect(g, '#dff4ff', x + w - 4, y + 1, 2, 2, 0.9);
       }
-      rect(g, '#2e8b57', ox + 18, oy + 2, 12, 3);
-      rect(g, '#cfd6de', ox + 23, oy, 2, 3);
+      vgrad(g, ox + 18, oy + 2, 12, 4, '#49b584', '#246b4c');     // crown
+      rect(g, '#ffd700', ox + 18, oy + 5, 12, 1);
+      vgrad(g, ox + 23, oy - 3, 2, 6, '#f2f6fa', '#9aa3ab');      // spire
+      rect(g, '#ff5555', ox + 23, oy - 4, 2, 1);                  // aircraft light
     },
   };
 
@@ -720,51 +813,125 @@
   function setTileType(x, y, type) {
     if (type) village.tiles[x + '_' + y] = type;
     else delete village.tiles[x + '_' + y];
+    terrainDirty = true;
+  }
+  // The meadow and its zones are expensive to draw now that every tile is
+  // shaded, and they only change when a tile is painted — so they are not
+  // part of the once-a-second refresh.
+  let terrainDirty = true;
+
+  // Roads are autotiled off a 4-bit cardinal mask of their neighbours
+  // (N=1,E=2,S=4,W=8), which is what makes a painted run read as one road
+  // with proper corners, tees and junctions. Drawing every tile the same way
+  // was why they looked unoriented: a corner and a straight were identical.
+  function roadMask(x, y) {
+    return (getTileType(x, y - 1) === 'road' ? 1 : 0)
+         | (getTileType(x + 1, y) === 'road' ? 2 : 0)
+         | (getTileType(x, y + 1) === 'road' ? 4 : 0)
+         | (getTileType(x - 1, y) === 'road' ? 8 : 0);
+  }
+
+  function drawRoadTile(g, x, y, ox, oy) {
+    const m = roadMask(x, y);
+    const n = !!(m & 1), e = !!(m & 2), s = !!(m & 4), w = !!(m & 8);
+    const HALF = T / 2, LANE = 12, EDGE = (T - LANE) / 2; // wide enough to read as a road
+
+    // Asphalt with a pale kerb down each side of the carriageway.
+    const armV = (ay, ah) => {
+      vgrad(g, ox + EDGE, ay, LANE, ah, '#787d85', '#5e636b');
+      rect(g, '#9aa0a8', ox + EDGE, ay, 1, ah);
+      rect(g, '#43474e', ox + EDGE + LANE - 1, ay, 1, ah);
+    };
+    const armH = (ax, aw) => {
+      vgrad(g, ax, oy + EDGE, aw, LANE, '#787d85', '#5e636b');
+      rect(g, '#9aa0a8', ax, oy + EDGE, aw, 1);
+      rect(g, '#43474e', ax, oy + EDGE + LANE - 1, aw, 1);
+    };
+    vgrad(g, ox + EDGE, oy + EDGE, LANE, LANE, '#787d85', '#5e636b'); // junction core
+    if (n) armV(oy, HALF + 1);
+    if (s) armV(oy + HALF - 1, HALF + 1);
+    if (w) armH(ox, HALF + 1);
+    if (e) armH(ox + HALF - 1, HALF + 1);
+    if (!m) { // isolated tile: a little paved square rather than nothing
+      rect(g, '#9aa0a8', ox + EDGE, oy + EDGE, LANE, 1);
+      rect(g, '#43474e', ox + EDGE, oy + EDGE + LANE - 1, LANE, 1);
+    }
+
+    // Centre dashes only along a straight run; a junction gets a dot instead,
+    // so turns don't look like a painted line running into a kerb.
+    const straightV = n && s && !e && !w, straightH = e && w && !n && !s;
+    if (straightV) { rect(g, '#e2dcae', ox + HALF - 1, oy + 1, 2, 5); rect(g, '#e2dcae', ox + HALF - 1, oy + 10, 2, 5); }
+    else if (straightH) { rect(g, '#e2dcae', ox + 1, oy + HALF - 1, 5, 2); rect(g, '#e2dcae', ox + 10, oy + HALF - 1, 5, 2); }
+    else if (m) rect(g, '#e2dcae', ox + HALF - 1, oy + HALF - 1, 2, 2);
   }
 
   function drawTerrain(g) {
+    // Meadow: a soft vertical gradient per tile plus scattered tufts, clover
+    // and the odd flower, all keyed off a stable hash so nothing crawls
+    // between redraws.
     for (let y = 0; y < MAP; y++) {
       for (let x = 0; x < MAP; x++) {
-        const n = ((x * 73856093) ^ (y * 19349663)) >>> 0;
-        const shade = (x + y) % 2 ? '#3f7d3a' : '#3a7635';
-        rect(g, shade, x * T, y * T, T, T);
-        if (n % 5 === 0) rect(g, '#4f9247', x * T + (n >> 3) % 12 + 1, y * T + (n >> 6) % 12 + 1, 2, 1);
-        if (n % 11 === 0) rect(g, '#2f6a2c', x * T + (n >> 4) % 11 + 2, y * T + (n >> 7) % 11 + 2, 1, 2);
+        const ox = x * T, oy = y * T;
+        // A shallow gradient only. A full light-to-dark ramp per tile turned
+        // the whole meadow into horizontal stripes, because every tile
+        // restarted the ramp at its own top edge.
+        const t = rnd(x, y, 1);
+        const top = t > 0.66 ? '#4e9a47' : t > 0.33 ? '#489340' : '#438c3c';
+        vgrad(g, ox, oy, T, T, top, '#3d8137');
+        const blades = 2 + Math.floor(rnd(x, y, 2) * 3);
+        for (let i = 0; i < blades; i++) {
+          const bx = ox + Math.floor(rnd(x + i, y, 3) * (T - 2)) + 1;
+          const by = oy + Math.floor(rnd(x, y + i, 4) * (T - 4)) + 2;
+          rect(g, '#5fb356', bx, by, 1, 2, 0.8);
+          rect(g, '#2a5f28', bx + 1, by + 1, 1, 1, 0.5);
+        }
+        if (rnd(x, y, 5) > 0.93) {                               // wildflower
+          const fx = ox + 3 + Math.floor(rnd(x, y, 6) * 9);
+          const fy = oy + 3 + Math.floor(rnd(x, y, 7) * 9);
+          rect(g, '#2a5f28', fx, fy + 1, 1, 2);
+          rect(g, rnd(x, y, 8) > 0.5 ? '#ffe36b' : '#ff9ecb', fx, fy, 1, 1);
+        }
       }
     }
-    // Draw zones and features
+    // Zones and features paint over the meadow. Each zone carries a shape as
+    // well as a hue so they stay distinguishable at low zoom and without
+    // relying on colour alone.
     for (let y = 0; y < MAP; y++) {
       for (let x = 0; x < MAP; x++) {
         const type = getTileType(x, y);
+        if (!type) continue;
         const ox = x * T, oy = y * T;
-        // Each zone carries a shape as well as a hue, so they stay telling
-        // apart at low zoom and without relying on color alone.
         if (type === 'residential') {
-          rect(g, '#2f6fd0', ox, oy, T, T, 0.38);
-          rect(g, '#9fd0ff', ox + 4, oy + 7, 8, 5);
-          rect(g, '#9fd0ff', ox + 6, oy + 5, 4, 2);
+          vgrad(g, ox, oy, T, T, '#3f86e8', '#1f4e9c', 0.4);
+          rect(g, '#0d2a52', ox + 4, oy + 8, 8, 4, 0.55);        // house shadow
+          vgrad(g, ox + 4, oy + 6, 8, 5, '#cfe6ff', '#7fb0e4');  // walls
+          rect(g, '#9fd0ff', ox + 5, oy + 4, 6, 2);              // roof
+          rect(g, '#e8f4ff', ox + 6, oy + 3, 4, 1);
         } else if (type === 'commercial') {
-          rect(g, '#e08a1f', ox, oy, T, T, 0.38);
-          rect(g, '#ffdca8', ox + 3, oy + 5, 10, 3);
-          rect(g, '#ffdca8', ox + 3, oy + 9, 10, 2);
+          vgrad(g, ox, oy, T, T, '#f0a63a', '#b06a12', 0.4);
+          vgrad(g, ox + 3, oy + 4, 10, 7, '#ffe9c4', '#d99a4e'); // shopfront
+          rect(g, '#b8651c', ox + 3, oy + 7, 10, 1);
+          for (let i = 0; i < 5; i++) rect(g, i % 2 ? '#ffffff' : '#e05a3a', ox + 3 + i * 2, oy + 4, 2, 2); // awning
+          rect(g, '#7a4a12', ox + 7, oy + 8, 3, 3);              // door
         } else if (type === 'industrial') {
-          rect(g, '#7b3fa0', ox, oy, T, T, 0.42);
-          for (let i = -T; i < T; i += 5) {
+          vgrad(g, ox, oy, T, T, '#8e52b5', '#5a2a7d', 0.44);
+          for (let i = -T; i < T; i += 5) {                       // hazard hatching
             for (let j = 0; j < T; j++) {
-              const px = ox + i + j, py = oy + j;
-              if (px >= ox && px < ox + T) rect(g, '#e0bcff', px, py, 1, 1, 0.75);
+              const px = ox + i + j;
+              if (px >= ox && px < ox + T) rect(g, '#e8cfff', px, oy + j, 1, 1, 0.55);
             }
           }
+          vgrad(g, ox + 4, oy + 5, 3, 7, '#b9a0c9', '#6a5480'); // chimney
+          rect(g, '#d8c7e6', ox + 3, oy + 3, 5, 2, 0.75);        // smoke
         } else if (type === 'road') {
-          // Full-tile asphalt so a painted run reads as one continuous road.
-          rect(g, '#55585e', ox, oy, T, T);
-          rect(g, '#6a6e76', ox, oy, T, 1);
-          rect(g, '#d8d2a0', ox + 6, oy + 7, 4, 2);
+          drawRoadTile(g, x, y, ox, oy);
         } else if (type === 'water') {
-          rect(g, '#1d4f73', ox, oy, T, T);
-          rect(g, '#2f79a8', ox + 2, oy + 4, 6, 1);
-          rect(g, '#2f79a8', ox + 8, oy + 9, 5, 1);
-          rect(g, '#79c4ec', ox + 4, oy + 11, 3, 1, 0.8);
+          vgrad(g, ox, oy, T, T, '#2b6f9c', '#113b5c');          // depth
+          const w1 = Math.floor(rnd(x, y, 9) * 6);
+          rect(g, '#59a8d6', ox + 1 + w1, oy + 4, 6, 1, 0.75);   // ripples
+          rect(g, '#59a8d6', ox + 7, oy + 9, 5, 1, 0.6);
+          rect(g, '#b9e6ff', ox + 3 + w1, oy + 11, 3, 1, 0.8);   // glint
+          rect(g, '#0d2b44', ox, oy + T - 1, T, 1, 0.5);
         }
       }
     }
@@ -876,7 +1043,7 @@
     // Terrain carries the painted zones/roads/water, so it has to be redrawn
     // whenever tiles change — drawing it once at create() meant a freshly
     // painted tile didn't appear until the page was reloaded.
-    drawTerrain(terrainG);
+    if (terrainDirty) { terrainG.clear(); drawTerrain(terrainG); terrainDirty = false; }
     labels.forEach((t) => t.destroy());
     labels = [];
     const now = Date.now();
@@ -909,7 +1076,7 @@
         // The single most important piece of feedback on the map: a building
         // with no road touching it earns nothing, and says so.
         if (!isRoadConnected(s)) {
-          rect(layer, '#000000', ox, oy, w, h, 0.5);
+          rect(layer, '#000000', ox, oy, w, h, 0.34);
           const bx = ox + w / 2 - 5, by = oy + h / 2 - 3;
           rect(layer, '#ff3b3b', bx, by, 10, 6);
           rect(layer, '#000000', bx + 2, by + 2, 6, 2);
@@ -1209,13 +1376,57 @@
     if (mode) { stopPlacing(); selectedId = null; setBrushLabel(); }
     refresh();
   }
-  document.querySelectorAll('[data-brush]').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      const next = e.currentTarget.dataset.brush;
-      setBrush(brushMode === next ? null : next); // clicking the active brush puts it down
-    });
-  });
   $('brush-done').addEventListener('click', () => setBrush(null));
+
+  // Grouped so the three zone colours read as a category with a shared
+  // purpose, instead of three unexplained buttons sitting next to Road.
+  const ZONING_GROUPS = [
+    { title: 'Infrastructure', rows: [
+      { brush: 'road', icon: '🛣️', name: 'Road',
+        blurb: 'Required. A building with no road touching one of its sides earns nothing at all. Roads also carry your villagers.' },
+    ]},
+    { title: 'Zones', rows: [
+      { brush: 'residential', icon: '🏘️', name: 'Residential',
+        blurb: 'Homes. Apartments and mid-rises pay up to +25% standing on it.' },
+      { brush: 'commercial', icon: '🏬', name: 'Commercial',
+        blurb: 'Shops and offices. Pagodas, skyscrapers and Taipei 101 pay up to +25% standing on it.' },
+      { brush: 'industrial', icon: '🏭', name: 'Industrial',
+        blurb: 'Adds +15% to any building it touches, but every industrial tile drags village mood down — and mood scales all production from 0.75x to 1.15x.' },
+    ]},
+    { title: 'Terrain', rows: [
+      { brush: 'water', icon: '💧', name: 'Water',
+        blurb: 'Scenery. Lifts mood a little, and permanently blocks building on that tile until erased.' },
+      { brush: 'erase', icon: '🧽', name: 'Erase',
+        blurb: 'Clears any painted tile. No refund.' },
+    ]},
+  ];
+
+  function openZoning() {
+    const list = $('zoning-list');
+    list.innerHTML = '';
+    ZONING_GROUPS.forEach((group) => {
+      const h = document.createElement('div');
+      h.style.cssText = 'font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin:12px 0 4px;';
+      h.textContent = group.title;
+      list.appendChild(h);
+      group.rows.forEach((r) => {
+        const cost = TILE_COST[r.brush] || 0;
+        const row = document.createElement('div');
+        row.className = 'picker-row';
+        row.innerHTML = `<div class="row-icon">${r.icon}</div><div class="row-info">${r.name}
+          <small style="color:var(--gold)">${r.brush === 'erase' ? 'free' : (cost ? cost + ' Strubles per tile' : 'free')}</small>
+          <small class="row-desc">${r.blurb}</small></div>`;
+        row.addEventListener('click', () => {
+          $('zoning-overlay').classList.remove('open');
+          setBrush(r.brush);
+        });
+        list.appendChild(row);
+      });
+    });
+    $('zoning-overlay').classList.add('open');
+  }
+  $('zoning-btn').addEventListener('click', openZoning);
+  wireClose('zoning-overlay', 'zoning-close');
   window.addEventListener('keydown', (e) => {
     if (!placing) return;
     if (e.key === 'Enter') { e.preventDefault(); confirmPlacing(); }
@@ -1342,7 +1553,7 @@
       <div class="bank-cap-row"><span><b>Total cap</b></span><span><b>${(bankCap + taipei).toLocaleString()} Strubles</b></span></div>`;
     $('bank-next-info').textContent = `Next: Level ${level + 1} — costs ${TB.costForLevel(level + 1).toLocaleString()}, raises the cap by ${TB.capGainForLevel(level + 1).toLocaleString()}.`;
   }
-  $('bank-btn').addEventListener('click', () => { renderBank(); $('bank-overlay').classList.add('open'); });
+  $('bank-btn').addEventListener('click', () => { renderBank(); renderExpand(); $('bank-overlay').classList.add('open'); });
   $('bank-buy').addEventListener('click', () => {
     const TB = window.TycoonBank;
     const level = TB.currentLevel();
@@ -1366,7 +1577,6 @@
       <div class="bank-cap-row"><span>Slots purchased</span><span>${owned}</span></div>`;
     $('expand-next-info').textContent = `Next: slot ${BASE_SLOTS + owned + 1} — costs ${expandCostForSlot(owned + 1).toLocaleString()} Strubles.`;
   }
-  $('expand-btn').addEventListener('click', () => { renderExpand(); $('expand-overlay').classList.add('open'); });
   $('expand-buy').addEventListener('click', () => {
     const owned = slotsOwned();
     const cost = expandCostForSlot(owned + 1);
@@ -1380,7 +1590,6 @@
     refresh();
     syncBalance();
   });
-  wireClose('expand-overlay', 'expand-close');
 
   window.addEventListener('inventory:changed', () => refresh());
   window.addEventListener('strubles:change', syncBalance);
