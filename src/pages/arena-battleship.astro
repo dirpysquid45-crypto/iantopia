@@ -98,6 +98,8 @@
 
   .grid-cell.editing { background:rgba(100,200,255,.5); border-color:#00aaff; box-shadow:0 0 8px rgba(0,170,255,.6); }
 
+  #place-hint { flex:1 0 100%; text-align:center; font-size:10px; line-height:1.6; color:var(--gold); }
+
   /* BATTLE PHASE */
   .phase-battle { display:grid; grid-template-columns:1fr 1fr; gap:20px; flex:1; }
   .battle-board { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:clamp(10px, 2vw, 20px); display:flex; flex-direction:column; }
@@ -106,19 +108,56 @@
   }
   @media (max-width:1200px) {
     .ship-palette { width:140px; padding:12px; }
-    .grid-btn { font-size:7px; padding:6px 8px; }
   }
 
   @media (max-width:768px) {
-    .phase-setup { flex-direction:column; gap:12px; }
-    .ship-palette { width:100%; height:auto; max-height:120px; overflow-x:auto; overflow-y:hidden; display:flex; gap:8px; padding:10px; flex-wrap:wrap; }
+    /* The back link is fixed to the top-left corner, which on a phone lands
+       directly on top of the title once that wraps to two lines. In the
+       flow it just sits above everything instead. */
+    .back-link { position:static; display:inline-block; margin:0 0 10px; }
+    .top-bar { flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:12px; }
+    .title { font-size:14px; }
+    /* The setup column used to be a nested scroll container inside another
+       nested scroll container, with the page itself as a third. On a phone
+       that meant the controls below the board were clipped by whichever
+       box ran out of room first and were effectively unreachable. One
+       scroller -- the page -- fixes it: everything in here lays out at its
+       natural height and the document scrolls. */
+    .phase-setup { flex-direction:column; gap:12px; overflow:visible; flex:0 0 auto; }
+    .grid-container { overflow:visible; flex:0 0 auto; min-height:0; padding:12px; }
+    main { padding:8px 8px 96px; flex:0 0 auto; }
+    body { height:auto; min-height:100dvh; }
+    .ship-palette { width:100%; height:auto; max-height:none; overflow:visible; display:flex; gap:8px; padding:10px; flex-wrap:wrap; flex:0 0 auto; }
     .ship-item { min-width:80px; margin-bottom:0; }
-    .grid-container { flex:1; min-height:350px; padding:12px; }
-    main { padding:8px; }
     .grid-cell, .board-cell { font-size:7px; }
-    .grid-btn, .edit-btn { font-size:8px; padding:6px 8px; }
-    .edit-controls { gap:6px; }
     .grid { gap:1px; }
+    /* Buttons stay thumb-sized on a phone. A max-width:1200px rule used to
+       shrink these to 7px text with 6px padding, which covered every phone
+       and undid the whole point of the big pixel buttons. */
+    .grid-btn { font-size:11px; padding:14px 10px; min-width:90px; }
+    /* The aiming bar follows you down the page instead of sitting below a
+       board that is itself taller than the screen. As a wrapping flex row it
+       grew tall enough to push its own ✓/✕ off the bottom of the screen, so
+       on a phone it's a fixed 5-column grid: hint, one row of nudges, then
+       the two decisions. */
+    #place-controls, #edit-controls {
+      position:sticky; bottom:0; z-index:6;
+      display:grid; grid-template-columns:repeat(5, 1fr); gap:5px;
+      background:rgba(8,10,14,.97); border-top:2px solid var(--gold);
+      margin:10px -12px 0; padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+    }
+    #place-controls .edit-btn, #edit-controls .edit-btn {
+      font-size:11px; padding:12px 2px; min-width:0; flex:none;
+    }
+    #place-hint { grid-column:1 / -1; font-size:9px; }
+    /* Needs the parent ID to outrank `#place-controls .edit-btn` above --
+       on its own this lost the cascade and the word rendered on top of the
+       glyph. The label is dropped here purely for width. */
+    #place-controls #place-rotate-btn, #edit-controls #edit-rotate-btn { font-size:0; }
+    #place-controls #place-rotate-btn::after,
+    #edit-controls #edit-rotate-btn::after { content:'⟳'; font-size:17px; }
+    #place-confirm-btn, #edit-confirm-btn { grid-column:1 / 4; }
+    #place-cancel-btn, #edit-cancel-btn { grid-column:4 / -1; }
   }
   .board-title { font-size:12px; color:var(--gold); margin-bottom:10px; font-weight:700; }
   /* Same fix as .grid above -- square cells mean rendered height always
@@ -178,6 +217,13 @@
   .volume-mute-btn{ all:unset; cursor:none; font-size:16px; padding:4px 8px; border:1px solid var(--gold); background:#000; }
   #now-playing { position:fixed; bottom:20px; right:20px; z-index:20; color:var(--gold); background:#000; border:3px solid var(--gold); padding:10px 14px; font-size:14px; cursor:none; transition:background 0.2s; }
   #now-playing:hover { background:var(--gold); color:#000; }
+  /* Has to come after the rule above, not in the earlier mobile block --
+     equal specificity means source order decides, so an override up there
+     silently lost and this button kept sitting on the sticky controls,
+     swallowing taps meant for the nudge buttons. */
+  @media (max-width:768px) {
+    #now-playing { bottom:auto; top:calc(6px + env(safe-area-inset-top)); right:6px; padding:6px 9px; font-size:12px; z-index:4; }
+  }
 
   /* BET PHASE (lobby browsing) */
   .phase-bet { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:20px; max-width:400px; margin:0 auto; }
@@ -239,6 +285,19 @@
           <div class="grid" id="grid-placement"></div>
         </div>
         <div class="setup-status" id="setup-status">Place all ships to continue...</div>
+        <!-- Aiming a new ship. Tapping the board only moves the ghost; this
+             bar is the only thing that commits it, so a mis-tap on a phone
+             can't drop a ship somewhere you didn't mean. -->
+        <div class="edit-controls" id="place-controls" style="display:none;">
+          <div id="place-hint"></div>
+          <button class="edit-btn" id="place-rotate-btn">⟳ Rotate</button>
+          <button class="edit-btn" id="place-up-btn">↑</button>
+          <button class="edit-btn" id="place-down-btn">↓</button>
+          <button class="edit-btn" id="place-left-btn">←</button>
+          <button class="edit-btn" id="place-right-btn">→</button>
+          <button class="edit-btn confirm" id="place-confirm-btn">✓ Place</button>
+          <button class="edit-btn cancel" id="place-cancel-btn">✕ Cancel</button>
+        </div>
         <div class="edit-controls" id="edit-controls" style="display:none;">
           <button class="edit-btn" id="edit-rotate-btn">Rotate (R)</button>
           <button class="edit-btn" id="edit-up-btn">↑ Up</button>
@@ -444,10 +503,80 @@
   function selectShip(name) {
     if (placedShips.find(s => s.name === name)) return;
     selectedShip = name;
+    aimed = false;
     previewX = null;
     previewY = null;
     exitEditMode(); // Ensure no edit state when selecting new ship
     renderGridSetup();
+  }
+
+  // --- Two-step placement: aim, then commit. ---
+  let suppressNextClick = false;
+  let aimed = false;
+
+  // Keeps the whole ship on the board, so the ghost is never half off the
+  // edge and the arrows can't walk it out of bounds.
+  function clampPreview(x, y) {
+    const ship = SHIP_TYPES.find((s) => s.name === selectedShip);
+    if (!ship) return [x, y];
+    const maxX = horizontal ? 10 - ship.size : 9;
+    const maxY = horizontal ? 9 : 10 - ship.size;
+    return [Math.max(0, Math.min(maxX, x)), Math.max(0, Math.min(maxY, y))];
+  }
+
+  function setPreview(x, y) {
+    if (!selectedShip) return;
+    [previewX, previewY] = clampPreview(x, y);
+    renderGridSetup();
+  }
+
+  function nudgePreview(dx, dy) {
+    if (!selectedShip || previewX === null) return;
+    setPreview(previewX + dx, previewY + dy);
+  }
+
+  function cancelPlacement() {
+    selectedShip = null;
+    aimed = false;
+    previewX = previewY = null;
+    renderGridSetup();
+    renderShipPalette();
+  }
+
+  function commitPlacement() {
+    if (!selectedShip || previewX === null) return;
+    if (!canPlaceShip(previewX, previewY, selectedShip, horizontal)) return;
+    placeShip(previewX, previewY);
+    SFX.place.play();
+  }
+
+  // Shows the aiming bar and reports whether the current spot is legal, so
+  // the reason a placement won't commit is on screen rather than silent.
+  function updatePlaceControls() {
+    const bar = document.getElementById('place-controls');
+    if (!bar) return;
+    const aiming = !!selectedShip && previewX !== null && !editingShip;
+    bar.style.display = aiming ? '' : 'none';
+    if (!aiming) {
+      if (selectedShip && !editingShip) {
+        document.getElementById('setup-status').textContent =
+          `${selectedShip} is up — tap the board to aim it`;
+      }
+      return;
+    }
+    const ok = canPlaceShip(previewX, previewY, selectedShip, horizontal);
+    const confirm = document.getElementById('place-confirm-btn');
+    confirm.disabled = !ok;
+    confirm.style.opacity = ok ? '1' : '.4';
+    const msg = ok
+      ? `${selectedShip} — press ✓ Place to lock it in`
+      : `${selectedShip} won't fit there — move or rotate it`;
+    document.getElementById('setup-status').textContent = msg;
+    // Repeated inside the bar because on a phone the bar is pinned to the
+    // bottom and covers the status line underneath it.
+    const hint = document.getElementById('place-hint');
+    hint.textContent = msg;
+    hint.style.color = ok ? 'var(--gold)' : '#ff6b6b';
   }
 
   let previewX = null;
@@ -731,33 +860,51 @@
 
         cell.dataset.x = x;
         cell.dataset.y = y;
+        // Hover keeps previewing on a mouse, but only until you've actually
+        // aimed — after that the ghost stays put so the ✓ button refers to
+        // a fixed spot rather than wherever the pointer drifted.
         cell.addEventListener('mousemove', () => {
           if (editingShip) {
             setEditPosition(x, y);
-          } else if (selectedShip) {
-            previewX = x;
-            previewY = y;
-            renderGridSetup();
+          } else if (selectedShip && !aimed) {
+            setPreview(x, y);
           }
         });
         cell.addEventListener('mouseleave', () => {
-          if (selectedShip) {
+          if (selectedShip && !aimed) {
             previewX = null;
             previewY = null;
             renderGridSetup();
           }
         });
+        // Touch has no hover, so the first tap is what reveals the ghost.
+        // It also suppresses the synthetic click that follows, otherwise
+        // that click would immediately commit the placement the tap was
+        // only meant to aim.
+        cell.addEventListener('touchstart', () => {
+          if (editingShip) { setEditPosition(x, y); suppressNextClick = true; return; }
+          if (!selectedShip) return;
+          aimed = true;
+          setPreview(x, y);
+          suppressNextClick = true;
+        }, { passive: true });
+
         cell.addEventListener('click', () => {
+          if (suppressNextClick) { suppressNextClick = false; return; }
           if (editingShip) {
             setEditPosition(x, y);
             return;
           }
-          placeShip(x, y);
-          SFX.place.play();
+          if (!selectedShip) return;
+          // Clicking the aimed origin again commits — keeps the mouse flow
+          // to two quick clicks while the ✓ button stays the explicit path.
+          if (aimed && previewX === x && previewY === y) commitPlacement();
+          else { aimed = true; setPreview(x, y); }
         });
         gridEl.appendChild(cell);
       }
     }
+    updatePlaceControls();
   }
 
   function placeShip(x, y) {
@@ -797,12 +944,20 @@
     placedShips.push({ name: selectedShip, x, y, horizontal });
     console.log(`[PLACE] ${selectedShip} placed at (${x},${y}) ${horizontal ? 'H' : 'V'}`);
     selectedShip = null;
+    aimed = false;
+    previewX = previewY = null;
     validateGridState();
+
+    // Hand over the next unplaced ship automatically — going back to the
+    // palette between every ship is a lot of hunting on a phone.
+    const next = SHIP_TYPES.find((s) => !placedShips.find((p) => p.name === s.name));
+    if (next) selectShip(next.name);
+
     renderGridSetup();
     renderShipPalette();
 
     if (placedShips.length === 5) {
-      document.getElementById('setup-status').textContent = 'All ships placed! Click Ready to proceed.';
+      document.getElementById('setup-status').textContent = 'All ships placed! Press Ready! to proceed.';
       console.log('[SETUP] All 5 ships placed successfully');
     }
   }
@@ -818,10 +973,21 @@
     ws.send(JSON.stringify({ type: 'place_ships', ships }));
   }
 
-  document.getElementById('rotate-btn').addEventListener('click', () => {
+  function rotatePlacement() {
     horizontal = !horizontal;
+    // Rotating near an edge can push the ship off the board, so re-clamp.
+    if (selectedShip && previewX !== null) [previewX, previewY] = clampPreview(previewX, previewY);
     renderGridSetup();
-  });
+  }
+  document.getElementById('rotate-btn').addEventListener('click', rotatePlacement);
+
+  document.getElementById('place-rotate-btn').addEventListener('click', rotatePlacement);
+  document.getElementById('place-up-btn').addEventListener('click', () => nudgePreview(0, -1));
+  document.getElementById('place-down-btn').addEventListener('click', () => nudgePreview(0, 1));
+  document.getElementById('place-left-btn').addEventListener('click', () => nudgePreview(-1, 0));
+  document.getElementById('place-right-btn').addEventListener('click', () => nudgePreview(1, 0));
+  document.getElementById('place-confirm-btn').addEventListener('click', commitPlacement);
+  document.getElementById('place-cancel-btn').addEventListener('click', cancelPlacement);
 
   document.getElementById('clear-btn').addEventListener('click', () => {
     grid = Array(10).fill(null).map(() => Array(10).fill(0));
@@ -846,7 +1012,7 @@
 
   // Update edit controls visibility when entering/exiting edit mode
   function updateEditControlsVisibility() {
-    document.getElementById('edit-controls').style.display = editingShip ? 'flex' : 'none';
+    document.getElementById('edit-controls').style.display = editingShip ? '' : 'none';
   }
 
   // Hook into enterEditMode and exitEditMode
@@ -892,11 +1058,13 @@
   // Rotate on main setup phase (not editing) with R key
   document.addEventListener('keydown', (e) => {
     if (editingShip || selectedShip === null) return;
-    if (e.key.toLowerCase() === 'r') {
-      e.preventDefault();
-      horizontal = !horizontal;
-      renderGridSetup();
-    }
+    if (e.key.toLowerCase() === 'r') { e.preventDefault(); rotatePlacement(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); nudgePreview(0, -1); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); nudgePreview(0, 1); }
+    else if (e.key === 'ArrowLeft') { e.preventDefault(); nudgePreview(-1, 0); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); nudgePreview(1, 0); }
+    else if (e.key === 'Enter') { e.preventDefault(); commitPlacement(); }
+    else if (e.key === 'Escape') { e.preventDefault(); cancelPlacement(); }
   });
 
   // Connect and authenticate as soon as we know the user's signed in --
