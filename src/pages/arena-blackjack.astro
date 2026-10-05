@@ -430,6 +430,19 @@
     });
   }
 
+  // Puts the end-of-hand prompt back to its "ready to answer" state. Every
+  // path that shows the result screen goes through this, so a button can't be
+  // left disabled from a previous hand.
+  function resetRematchPrompt() {
+    const accept = document.getElementById('rematch-accept');
+    const decline = document.getElementById('rematch-decline');
+    accept.style.display = '';
+    accept.disabled = false;
+    decline.disabled = false;
+    decline.textContent = 'Back to Lobby';
+    document.getElementById('rematch-status').style.display = 'none';
+  }
+
   function handleMessage(msg) {
     if (msg.type === 'auth_ok') {
       showStatus('Connected. Enter a bet to open a lobby, or match one below.');
@@ -443,11 +456,21 @@
       myQueueId = null;
       prevHandLengths = [0, 0];
       document.getElementById('bet-section').style.display = 'none';
+      // A rematch arrives as a game_start too, so the previous hand's result
+      // screen has to be torn down right here. This used to live in a
+      // separate `game_start && isRematch` branch further down the chain --
+      // which this branch always matched first, so it was dead code. The
+      // visible symptom was the finished-hand prompt staying on screen with
+      // both its buttons still disabled from the click that started the
+      // rematch, i.e. "the buttons after a match aren't clickable".
+      resetRematchPrompt();
+      document.getElementById('result-section').style.display = 'none';
       document.getElementById('game-section').style.display = 'block';
       document.getElementById('your-row').classList.add('active-hand');
       document.getElementById('hit').disabled = false;
       document.getElementById('stand').disabled = false;
       renderGameState(msg.yourHand, msg.opponentVisibleCards, msg.yourBustLimit, msg.opponentBustLimit, [false, false]);
+      if (msg.isRematch) showStatus('Rematch started!');
     } else if (msg.type === 'game_update') {
       renderGameState(msg.yourHand, msg.opponentVisibleCards, null, null, msg.done);
       const youDone = !!(msg.done && msg.done[yourIndex]);
@@ -465,37 +488,36 @@
         playRandomSound('chips-stack', 6);
       }
       updateBalance();
-      // Show rematch prompt
-      document.getElementById('rematch-accept').disabled = false;
-      document.getElementById('rematch-decline').disabled = false;
-      document.getElementById('rematch-status').style.display = 'none';
+      resetRematchPrompt();
     } else if (msg.type === 'show_rematch_prompt') {
       // Server initiated rematch prompt (game finished)
-      document.getElementById('rematch-accept').disabled = false;
-      document.getElementById('rematch-decline').disabled = false;
-      document.getElementById('rematch-status').style.display = 'none';
+      resetRematchPrompt();
     } else if (msg.type === 'rematch_opponent_accepted') {
-      document.getElementById('rematch-status').textContent = 'Opponent accepted! Starting rematch...';
+      // This fires when the OPPONENT accepted and we still haven't answered,
+      // so our buttons must stay live -- disabling them here meant whoever
+      // clicked second could never reply, and both players sat through the
+      // full 30s server timeout instead.
+      document.getElementById('rematch-status').textContent = 'Opponent wants a rematch — your call.';
       document.getElementById('rematch-status').style.display = 'block';
-      document.getElementById('rematch-accept').disabled = true;
-      document.getElementById('rematch-decline').disabled = true;
     } else if (msg.type === 'rematch_failed') {
       document.getElementById('rematch-status').textContent = msg.message;
       document.getElementById('rematch-status').style.display = 'block';
+      // Only the rematch itself is off the table; leaving must stay possible
+      // or this is a dead end with no way out of the screen.
       document.getElementById('rematch-accept').disabled = true;
-      document.getElementById('rematch-decline').disabled = true;
-    } else if (msg.type === 'game_start' && msg.isRematch) {
-      // New game started from rematch
-      yourIndex = msg.yourIndex;
-      myQueueId = null;
-      prevHandLengths = [0, 0];
-      document.getElementById('result-section').style.display = 'none';
-      document.getElementById('game-section').style.display = 'block';
-      document.getElementById('your-row').classList.add('active-hand');
-      document.getElementById('hit').disabled = false;
-      document.getElementById('stand').disabled = false;
-      renderGameState(msg.yourHand, msg.opponentVisibleCards, msg.yourBustLimit, msg.opponentBustLimit, [false, false]);
-      showStatus('Rematch started!');
+      document.getElementById('rematch-decline').disabled = false;
+    } else if (msg.type === 'opponent_disconnected') {
+      // Nothing handled this before, so a mid-hand quit by the opponent left
+      // this player staring at a live table that would never advance.
+      document.getElementById('your-row').classList.remove('active-hand');
+      document.getElementById('game-section').style.display = 'none';
+      document.getElementById('result-section').style.display = 'block';
+      document.getElementById('result-message').textContent =
+        msg.winner === yourIndex ? '🎉 Opponent left — you take the pot.' : 'Opponent left.';
+      // There is nobody to rematch with, so offer only the way out.
+      resetRematchPrompt();
+      document.getElementById('rematch-accept').style.display = 'none';
+      updateBalance();
     } else if (msg.type === 'balance_update') {
       Strubles.set(msg.balance);
       updateBalance();
@@ -503,7 +525,7 @@
       document.getElementById('rematch-status').textContent = 'Opponent declined the rematch.';
       document.getElementById('rematch-status').style.display = 'block';
       document.getElementById('rematch-accept').disabled = true;
-      document.getElementById('rematch-decline').disabled = true;
+      document.getElementById('rematch-decline').disabled = false;
     } else if (msg.type === 'ready_for_queue') {
       // Table fully closed server-side (rematch declined or timed out
       // with no response) -- previously nothing handled this message at
@@ -546,7 +568,9 @@
 
   document.getElementById('rematch-accept').addEventListener('click', () => {
     document.getElementById('rematch-accept').disabled = true;
-    document.getElementById('rematch-decline').disabled = true;
+    // Leaving stays available after accepting -- you could otherwise be stuck
+    // waiting out the opponent's full 30s with no way to back out.
+    document.getElementById('rematch-decline').disabled = false;
     document.getElementById('rematch-status').textContent = 'Waiting for opponent...';
     document.getElementById('rematch-status').style.display = 'block';
     ws?.send(JSON.stringify({ type: 'rematch_accept' }));
