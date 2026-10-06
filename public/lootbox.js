@@ -444,6 +444,60 @@
     return { ok: true, message: `Bought ${item.label}.`, item, price, applied };
   }
 
+  // --- Real Estate: buildings for sale, kept apart from the cosmetics above.
+  // Priced far above what the same building costs to win from a case on
+  // average (each is 1 of 11 drops, so a specific one takes many 2,000-Struble
+  // opens), by design: this is the guaranteed-but-expensive route, and a
+  // Strubles sink for players who have already got everything else. The
+  // cheapest tier is deliberately under the base 20,000 wallet cap so it is
+  // buyable from the start -- the Bank is in that tier, because raising the cap
+  // needs one, and a cap-gated purchase that gates the cap would be a deadlock.
+  const REAL_ESTATE_PRICE = {
+    mil_spec: 15000,
+    restricted: 30000,
+    classified: 65000,
+    covert: 110000,
+    exceedingly_rare: 200000,
+  };
+  const realEstatePrice = (item) => REAL_ESTATE_PRICE[item.tier] || 0;
+  const buildingsOwned = (key) => state.inv.buildings.filter((k) => k === key).length;
+
+  function getRealEstateListings() {
+    const I = window.CASE_ITEMS || {};
+    return Object.keys(I)
+      .filter((id) => !I[id].archived && I[id].type === 'building_unlock')
+      .map((id) => {
+        const item = I[id];
+        const owned = buildingsOwned(item.key || id);
+        return Object.assign({ id, price: realEstatePrice(item), count: owned, max: MAX_BUILDING_COPIES, maxed: owned >= MAX_BUILDING_COPIES }, item);
+      });
+  }
+
+  // Unlike buyItemDirect this never goes through applyItem(): that path turns a
+  // maxed-out building into a 10% case-cost refund, which is right for a case
+  // drop and wrong here -- you would be paid to be refused.
+  function buyBuilding(itemId) {
+    const I = window.CASE_ITEMS || {};
+    const item = I[itemId];
+    if (!item || item.archived || item.type !== 'building_unlock') {
+      return { ok: false, message: 'That is not for sale.' };
+    }
+    const key = item.key || itemId;
+    if (buildingsOwned(key) >= MAX_BUILDING_COPIES) {
+      return { ok: false, message: `You already own the maximum (${MAX_BUILDING_COPIES}) of those.` };
+    }
+    const price = realEstatePrice(item);
+    if (!Strubles.spend(price)) {
+      return { ok: false, message: `Not enough Strubles (need ${price.toLocaleString()}).` };
+    }
+    const inv = state.inv;
+    inv.buildings.push(key);
+    state.inv = inv;
+    dispatch('building:unlocked');
+    bumpStats((st) => { st.spent += price; });
+    return { ok: true, message: `Bought ${item.label.replace(/^Building: /, '')}.`, item, price };
+  }
+
   function pushHistory(entry) {
     const h = loadJSON(HISTORY_KEY, []);
     const list = Array.isArray(h) ? h : [];
@@ -565,6 +619,8 @@
     getFlags: () => state.flags,
     getUnlocks: () => state.unlocks,
     getShopListings,
+    getRealEstateListings,
+    buyBuilding,
     buyItemDirect,
     // Exposed for the odds table in the UI and for tests.
     oddsFor: (caseKey) => { const d = getCaseDef(caseKey); return d ? oddsFor(d) : null; },

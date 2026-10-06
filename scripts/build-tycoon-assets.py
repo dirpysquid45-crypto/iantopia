@@ -5,6 +5,8 @@ The source files are huge (up to 2500x2500 / 3.6 MB) and only ever shown at a
 few dozen pixels, so they are downscaled here rather than shipped as-is:
 
   public/tycoon/icons/<key>.png   128px menu/row icon for each building
+  public/tycoon/art/<key>.png     256px card art for the buildings that have no
+                                  existing /tycoon/*.png (crate reveal + shop)
   public/tycoon/road.jpg          256px seamless cobblestone texture
   public/tycoon/water.jpg         horizontal sheet of the animated water frames
 
@@ -19,7 +21,11 @@ from PIL import Image, ImageSequence
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'public', 'tycoon')
 ICON_DIR = os.path.join(OUT, 'icons')
+ART_DIR = os.path.join(OUT, 'art')
 ICON_PX = 128
+ART_PX = 256
+# Only the new buildings need card art; the original five keep their existing files.
+ART_KEYS = {'office_building', 'sweatshop', 'factory', 'coal_plant', 'nuclear_plant'}
 
 # key -> source file (relative to the repo root)
 ICONS = {
@@ -53,6 +59,10 @@ def build_icon(key, src):
     box = solid.getbbox()
     if box:
         im = im.crop(box)
+    if key in ART_KEYS:
+        big = im.copy()
+        big.thumbnail((ART_PX, ART_PX), Image.LANCZOS)
+        big.save(os.path.join(ART_DIR, key + '.png'), optimize=True)
     im.thumbnail((ICON_PX, ICON_PX), Image.LANCZOS)
     out = os.path.join(ICON_DIR, key + '.png')
     im.save(out, optimize=True)
@@ -87,6 +97,7 @@ def build_water():
 
 def main():
     os.makedirs(ICON_DIR, exist_ok=True)
+    os.makedirs(ART_DIR, exist_ok=True)
     print('building icons')
     for key, src in ICONS.items():
         build_icon(key, src)

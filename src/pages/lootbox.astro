@@ -440,6 +440,12 @@
     display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px;
   }
   .shop-card.owned{ opacity:.55; filter:grayscale(.5); }
+  /* Real Estate: a heavier divider and taller art so it reads as its own shop. */
+  .realestate-head{ margin:34px 0 14px; padding-top:18px; border-top:3px double var(--brass); text-align:center; }
+  .realestate-head h2{ margin:0 0 8px; font-size:13px; color:var(--brass); font-weight:400; letter-spacing:1px; }
+  .realestate-head p{ margin:0 auto; max-width:520px; font-size:8px; line-height:1.9; color:var(--muted); }
+  .shop-card.realestate .art{ height:92px; }
+  .shop-card .own-count{ font-size:7px; color:#6a5a3a; letter-spacing:.5px; }
   .shop-card .art{ width:100%; height:56px; display:flex; align-items:center; justify-content:center; font-size:32px; }
   .shop-card .art img{ max-width:100%; max-height:100%; object-fit:contain; }
   .shop-card .tier-tag{ font-size:7px; padding:2px 6px; border:1px solid; text-transform:uppercase; letter-spacing:.5px; }
@@ -541,8 +547,17 @@
          buyItemDirect() lootbox.js already exposes for this -- ported over
          rather than reimplemented. -->
     <section id="tavern-shop">
-      <p class="tavern-hint">No RNG here — pay a bit more, walk out with exactly what you came for. Buildings and the Alternate Ending aren't sold here on purpose.</p>
+      <p class="tavern-hint">No RNG here — pay a bit more, walk out with exactly what you came for. The Alternate Ending isn't sold here on purpose.</p>
       <div class="shop-grid" id="cosmetic-grid"></div>
+
+      <!-- Real Estate: the buildings for My Iantopia. Deliberately its own
+           section and its own price band: these cost many times what the same
+           building costs to win from the Iantopia Lootbox Basic. -->
+      <div class="realestate-head">
+        <h2>🏢 Real Estate</h2>
+        <p>Skip the crate for a building you actually want — at a serious markup. You start with none, and you can hold up to five of each.</p>
+      </div>
+      <div class="shop-grid" id="realestate-grid"></div>
     </section>
 
     <!-- Opening -->
@@ -837,7 +852,7 @@
       wingTitle.textContent = wing === 'tavern' ? 'The Tavern' : 'Iantopia Cases';
       tabCasino.classList.toggle('active', wing === 'casino');
       tabTavern.classList.toggle('active', wing === 'tavern');
-      if (wing === 'tavern') renderCosmetics();
+      if (wing === 'tavern') { renderCosmetics(); renderRealEstate(); }
       if (window.applyWingBackground) window.applyWingBackground(wing);
       if (window.applyWingMusic) window.applyWingMusic(wing);
     }
@@ -1129,7 +1144,44 @@
         });
       });
     }
-    window.addEventListener('inventory:changed', () => { if (wing === 'tavern') renderCosmetics(); });
+    // Buying a building changes inventory too, and the Real Estate cards show how
+    // many you hold, so both sections refresh together.
+    window.addEventListener('inventory:changed', () => { if (wing === 'tavern') { renderCosmetics(); renderRealEstate(); } });
+
+    // ---------- Tavern: Real Estate ----------
+    // Buildings for My Iantopia, sold at a steep markup in their own section --
+    // separate from the cosmetics above so the price jump is obvious. Same card
+    // markup as the cosmetics; the difference is a count of how many you own
+    // (buildings stack up to a per-type cap) and that a building is never
+    // "owned" for good, only "maxed".
+    const realEstateGrid = document.getElementById('realestate-grid');
+    function renderRealEstate(){
+      const listings = IantopiaCase.getRealEstateListings().sort((a, b) => a.price - b.price);
+      realEstateGrid.innerHTML = listings.map((item) => {
+        const rarity = RARITIES[item.tier] || { label: item.tier, color: '#ccc' };
+        const afford = Strubles.get() >= item.price;
+        const art = item.img ? `<img src="${item.img}" alt="${item.label}" loading="lazy">` : '🏢';
+        const name = item.label.replace(/^Building: /, '');
+        return `<div class="shop-card realestate${item.maxed ? ' owned' : ''}" data-id="${item.id}">
+          <div class="art">${art}</div>
+          <div class="tier-tag" style="color:${rarity.color};border-color:${rarity.color}">${rarity.label}</div>
+          <div class="name">${name}</div>
+          <div class="own-count">Own ${item.count}/${item.max}</div>
+          <div class="price">${item.maxed ? 'Maxed' : `${item.price.toLocaleString()} Strubles`}</div>
+          <button class="buy-btn${item.maxed || !afford ? ' disabled' : ''}" type="button" ${item.maxed ? 'disabled' : ''}>${item.maxed ? 'Maxed out' : (afford ? 'Buy' : 'Can\'t afford')}</button>
+        </div>`;
+      }).join('');
+
+      realEstateGrid.querySelectorAll('.buy-btn:not([disabled])').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const id = btn.closest('.shop-card').dataset.id;
+          const res = IantopiaCase.buyBuilding(id);
+          if (res.ok) { playRandom('chips-stack', 6); renderRealEstate(); syncBal(); }
+          else { const t = btn.textContent; btn.textContent = res.message.slice(0, 22); setTimeout(() => { btn.textContent = t; }, 1600); }
+        });
+      });
+    }
+    window.addEventListener('strubles:change', () => { if (wing === 'tavern') renderRealEstate(); });
 
     // ---------- Opening ----------
     function startOpen(caseKey){

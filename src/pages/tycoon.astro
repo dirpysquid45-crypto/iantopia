@@ -339,7 +339,7 @@
       <p style="font-size:10px; color:var(--muted); line-height:1.7; margin:0 0 14px;">Strubles earned past your wallet cap don't accrue — spend down below the cap, or raise it here.</p>
       <div id="bank-cap-breakdown"></div>
       <p id="bank-gate" style="display:none; font-size:9px; line-height:1.8; color:#ffb36b; margin:12px 0 0;">
-        🏦 Raising the wallet cap needs a completed Bank building. Paint 2×2 commercial zoning, then build one from the Build menu.
+        🏦 Raising the wallet cap needs a completed Bank building. Win one from the Lootbox or buy one in the Shop's Real Estate section, then zone 2×2 commercial land and build it.
       </p>
       <div class="bank-buy-row">
         <p id="bank-next-info"></p>
@@ -438,9 +438,8 @@
   const LAST_SEEN_KEY = 'tycoon_last_seen_v1';
   const INV_KEY = 'strubles_inventory_v1';
   const SLOTS_KEY = 'tycoon_slots_owned_v1';
-  const ORDER = window.TYCOON_BUILDING_ORDER || [];       // owned from lootboxes
-  const DIRECT = window.TYCOON_DIRECT_ORDER || [];        // built straight from Strubles
-  const ALL_KEYS = ORDER.concat(DIRECT);
+  const ORDER = window.TYCOON_BUILDING_ORDER || [];       // every building, rarity ascending
+  const ALL_KEYS = ORDER;
   const DEFS = window.TYCOON_BUILDINGS || {};
   const MAX_PER_TYPE = window.TYCOON_MAX_PER_TYPE || 5;
   const MAX_CONCURRENT = window.TYCOON_MAX_CONCURRENT_BUILDS || 3;
@@ -582,15 +581,15 @@
   const INDUSTRIAL_BONUS = 0.15; // adjacent industrial, at a mood cost
 
   // ---------- Inventory / counts ----------
-  // Lootbox buildings are "owned" copies from the inventory. Direct buildings
-  // need no case, so their allowance is just their per-type cap.
+  // You start with no buildings. Every one is an owned copy in the inventory,
+  // won from the Iantopia Lootbox Basic or bought in the Shop's Real Estate
+  // section; placing one uses a copy up.
   function ownedCounts() {
     const inv = loadJSON(INV_KEY, {});
     const list = Array.isArray(inv.buildings) ? inv.buildings : [];
     const counts = {};
     ORDER.forEach((k) => { counts[k] = 0; });
     list.forEach((k) => { if (counts[k] != null) counts[k]++; });
-    DIRECT.forEach((k) => { counts[k] = DEFS[k].maxBuilt || 1; });
     return counts;
   }
   function placedCounts(excludeId) {
@@ -1351,12 +1350,9 @@
     const f = foot(key), z = zoneOf(key);
     return `Needs ${f.w}×${f.h} <span class="zone-chip zone-${z}">${z}</span> zoning to build`;
   };
-  // Lootbox buildings are labelled by rarity; direct ones by category.
   function kindLabel(key, status) {
-    const d = DEFS[key], r = RARITY[d.tier];
-    return r
-      ? `<small style="color:${r.color || ''}">${r.label || ''} · ${status}</small>`
-      : `<small style="color:${d.categoryColor || ''}">${d.category || ''} · ${status}</small>`;
+    const r = RARITY[DEFS[key].tier] || {};
+    return `<small style="color:${r.color || ''}">${r.label || ''} · ${status}</small>`;
   }
   const modLine = (key) => {
     const m = DEFS[key].moodEffect || 0;
@@ -1394,18 +1390,16 @@
       placeList.appendChild(row);
     };
 
-    heading('From your lootboxes');
     const own = ORDER.filter((k) => avail[k] > 0);
     if (!own.length) {
       const empty = document.createElement('div');
       empty.className = 'picker-empty';
-      empty.textContent = "No unplaced lootbox buildings — open an Iantopia Lootbox Basic to win one.";
+      empty.innerHTML = "You don't own any unplaced buildings yet.<br>Win them from the <a href=\"/lootbox\" style=\"color:var(--gold)\">Iantopia Lootbox Basic</a>, or buy one in the Shop's Real Estate section.";
       placeList.appendChild(empty);
+    } else {
+      heading('Your buildings');
+      own.forEach((k) => addRow(k, `own ${owned[k]}/${MAX_PER_TYPE} · ${avail[k]} unplaced`, true));
     }
-    own.forEach((k) => addRow(k, `own ${owned[k]}/${MAX_PER_TYPE} · ${avail[k]} unplaced`, true));
-
-    heading('Build directly');
-    DIRECT.forEach((k) => addRow(k, avail[k] > 0 ? `${avail[k]} of ${owned[k]} left to build` : `max ${owned[k]} built`, avail[k] > 0));
     placeOverlay.classList.add('open');
   }
 
@@ -1660,7 +1654,7 @@
       const def = DEFS[key];
       const row = document.createElement('div');
       row.className = 'guide-row';
-      const status = def.direct ? `up to ${owned[key]} buildable` : `own ${owned[key]}/${MAX_PER_TYPE}`;
+      const status = `own ${owned[key]}/${MAX_PER_TYPE}`;
       row.innerHTML = `${iconImg(key)}<div class="row-info">${def.label} ${kindLabel(key, status)}<small>${metaLine(key)}</small><small>${zoneLine(key)}</small>${modLine(key)}${def.description ? `<small class="row-desc">${def.description}</small>` : ''}</div>`;
       list.appendChild(row);
     });
