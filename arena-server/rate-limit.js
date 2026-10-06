@@ -1,10 +1,13 @@
-// Rate limiting by IP and per-connection message rate
+// Rate limiting by IP and per-connection message rate.
 class RateLimit {
-  constructor() {
+  constructor(opts = {}) {
     this.ipConnections = new Map(); // ip -> count
     this.connectionMessageCount = new Map(); // sessionId -> {count, resetTime}
-    this.maxConnectionsPerIP = 5;
-    this.maxMessagesPerSec = 10;
+    // Households and phones on one NAT share an address, and every page that
+    // talks to the arena holds a connection, so this is deliberately more
+    // generous than a single player's needs.
+    this.maxConnectionsPerIP = opts.maxConnectionsPerIP || 12;
+    this.maxMessagesPerSec = opts.maxMessagesPerSec || 12;
     this.windowMs = 1000;
   }
 
@@ -25,6 +28,7 @@ class RateLimit {
     } else {
       state.count++;
       if (state.count > this.maxMessagesPerSec) {
+        this.connectionMessageCount.set(sessionId, state);
         return false;
       }
     }
@@ -39,6 +43,12 @@ class RateLimit {
     } else {
       this.ipConnections.delete(ip);
     }
+  }
+
+  // Per-session counters were never removed, so the map grew for the life of
+  // the process, one entry per connection ever made.
+  removeSession(sessionId) {
+    this.connectionMessageCount.delete(sessionId);
   }
 }
 

@@ -70,6 +70,11 @@
   button.action-btn:disabled { opacity:.5; cursor:not-allowed; animation:none; }
   .bet-section { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; }
   .bet-input { background:#000; border:2px solid var(--gold); color:var(--gold); padding:8px; font-family:inherit; font-size:11px; width:100%; margin-bottom:10px; }
+  .seg-btn { flex:1; background:#000; color:#9fb0cf; border:2px solid #555; padding:12px 6px; font-family:inherit; font-size:9px; min-height:44px; cursor:pointer; }
+  .seg-btn.on { background:var(--gold); color:#000; border-color:var(--gold); }
+  .seg-btn:disabled { opacity:.35; cursor:not-allowed; }
+  .lobby-row .tag { font-size:8px; padding:2px 6px; border:1px solid currentColor; margin-left:6px; }
+  .lobby-row .tag.free { color:#00ff6a; }
   .bet-btn { color:#000; background:var(--gold); border:2px solid #000; padding:8px 12px; font-size:10px; font-weight:700; width:100%; cursor:pointer; transition: background .2s, transform .1s; }
   .bet-btn:hover:not(:disabled) { background:#ffe766; }
   .bet-btn:active:not(:disabled) { transform: translateY(2px); }
@@ -149,10 +154,20 @@
       <div class="balance">Balance: <span id="balance">0</span> Strubles</div>
     </div>
 
+    <div id="net-banner" style="display:none; background:#7a5a10; color:#fff; font-size:9px; line-height:1.7; padding:8px 10px; text-align:center; margin-bottom:10px;"></div>
     <div id="bet-section" class="bet-section">
-      <div class="status">Enter your bet to open a lobby, or match an existing one below</div>
-      <input type="number" id="bet-input" class="bet-input" min="100" step="100" placeholder="Bet amount" />
-      <button id="find-match" class="bet-btn">Open Lobby</button>
+      <div class="status" id="who">Connecting…</div>
+      <div id="guest-name-row" style="display:none;"><input type="text" id="guest-name" class="bet-input" maxlength="20" placeholder="Your name (optional)" autocomplete="off" /></div>
+      <div id="stake-seg" style="display:flex; margin-bottom:10px;">
+        <button type="button" id="seg-friendly" class="seg-btn on">Friendly · free</button>
+        <button type="button" id="seg-stake" class="seg-btn">For Strubles</button>
+      </div>
+      <input type="number" id="bet-input" class="bet-input" min="100" step="100" inputmode="numeric" placeholder="Stake (Strubles)" style="display:none;" />
+      <button id="find-match" class="bet-btn">Open friendly lobby</button>
+      <div id="waiting-row" style="display:none;">
+        <div class="status" id="waiting-text">Waiting for an opponent…</div>
+        <button id="cancel-wait" class="bet-btn" style="background:#000;color:#ff7a7a;border-color:#ff7a7a;">Cancel</button>
+      </div>
       <div class="status" id="status-message"></div>
 
       <div id="lobby-list">
@@ -164,7 +179,7 @@
 
     <div id="game-section" class="table" style="display:none;">
       <section class="row">
-        <div class="label">Opponent</div>
+        <div class="label" id="opp-label">Opponent</div>
         <div class="hand" id="opponent-hand"></div>
         <div class="score-display" id="opponent-score"></div>
       </section>
@@ -228,6 +243,7 @@
   window.PAGE_FREE_TRACK_KEY = 'balatro';
 </script>
 <script is:inline src="/pickers.js?v=11"></script>
+<script is:inline src="/arena-client.js?v=1"></script>
 <script is:inline>
 (() => {
   const themeMusic = document.getElementById('theme-music');
@@ -263,8 +279,10 @@
     else themeMusic.pause();
   });
 
-  const WS_URL = window.location.protocol === 'https:' ? 'wss://iantopia.com/arena-ws/blackjack' : 'ws://localhost:4001';
-  let ws = null;
+  let inGame = false;
+  let stakeMode = false;
+  let oppName = 'Opponent';
+  let friendlyGame = true;
   let yourIndex = null;
   let myQueueId = null;
   let prevHandLengths = [0, 0];
@@ -349,55 +367,85 @@
     document.getElementById('status-message').textContent = msg;
   }
 
-  // Connect and authenticate as soon as we know the user's signed in --
-  // not on bet placement -- so the lobby list (which streams in over
-  // this same connection) is visible before they've entered a bet at
-  // all, letting them browse and match an existing lobby immediately.
-  async function connectAuth() {
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-    const user = CloudSync.currentUser;
-    if (!user) return;
-    const token = await user.getIdToken();
-    ws = new WebSocket(WS_URL);
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'auth', token }));
-    };
-    ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
-    ws.onerror = () => showStatus('Connection error');
-    ws.onclose = () => {
-      showStatus('Disconnected -- reconnecting...');
-      ws = null;
-      myQueueId = null;
-      setTimeout(connectAuth, 2000);
-    };
-  }
-  window.addEventListener('cloudsync:authchanged', (e) => {
-    if (e.detail.user) connectAuth();
+  // ---- connection: shared with Battleship (see /arena-client.js) ----
+  // Signed in -> your account, can stake Strubles. Not signed in -> a guest,
+  // friendly (0 Strubles) games only. The server enforces the same rule.
+  const arena = ArenaClient.create({
+    game: 'blackjack',
+    onMessage: (m) => handleMessage(m),
+    onState: (state) => {
+      const banner = document.getElementById('net-banner');
+      if (state === 'open') { banner.style.display = 'none'; refreshWho(); return; }
+      banner.style.display = 'block';
+      banner.textContent = state === 'replaced'
+        ? 'This game was opened in another tab. Close that tab, then reload this page.'
+        : (inGame ? 'Connection lost — reconnecting. Your game is being held for you…' : 'Connecting…');
+    },
+    canSwitchIdentity: () => !inGame && !myQueueId,
   });
-  if (window.CloudSync && CloudSync.isSignedIn()) connectAuth();
+  const esc = (t) => String(t == null ? '' : t).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+
+  function refreshWho() {
+    const me = arena.me;
+    if (arena.state !== 'open') { document.getElementById('who').textContent = 'Connecting…'; return; }
+    document.getElementById('guest-name-row').style.display = me.guest ? 'block' : 'none';
+    document.getElementById('who').innerHTML = me.guest
+      ? `Playing as <b>${esc(me.name)}</b> — a guest. Guests play friendly games (no Strubles). Sign in on the home page to play for Strubles.`
+      : `Signed in as <b>${esc(me.name)}</b>. Friendly games are free; stake games pay the winner.`;
+    document.getElementById('seg-stake').disabled = me.guest;
+    if (me.guest && stakeMode) setStakeMode(false);
+  }
+  function stakeValue() { return stakeMode ? (parseInt(document.getElementById('bet-input').value, 10) || 0) : 0; }
+  function syncOpenButton() {
+    const bet = stakeValue();
+    document.getElementById('find-match').textContent = !stakeMode ? 'Open friendly lobby' : (bet >= 100 ? `Open lobby · ${bet.toLocaleString()} Strubles` : 'Enter a stake (min 100)');
+  }
+  function setStakeMode(on) {
+    stakeMode = on;
+    document.getElementById('seg-friendly').classList.toggle('on', !on);
+    document.getElementById('seg-stake').classList.toggle('on', on);
+    document.getElementById('bet-input').style.display = on ? 'block' : 'none';
+    syncOpenButton();
+  }
+  document.getElementById('seg-friendly').addEventListener('click', () => setStakeMode(false));
+  document.getElementById('seg-stake').addEventListener('click', () => { if (!document.getElementById('seg-stake').disabled) setStakeMode(true); });
+  document.getElementById('bet-input').addEventListener('input', syncOpenButton);
+  const nameInput = document.getElementById('guest-name');
+  nameInput.value = ArenaClient.savedGuestName() || '';
+  let nameTimer = null;
+  nameInput.addEventListener('input', () => {
+    clearTimeout(nameTimer);
+    nameTimer = setTimeout(() => { ArenaClient.saveGuestName(nameInput.value.trim()); if (!inGame && !myQueueId) arena.reconnect(); }, 900);
+  });
+
+  function setQueued(on, text) {
+    document.getElementById('waiting-row').style.display = on ? 'block' : 'none';
+    document.getElementById('find-match').style.display = on ? 'none' : 'block';
+    document.getElementById('stake-seg').style.display = on ? 'none' : 'flex';
+    document.getElementById('bet-input').style.display = on || !stakeMode ? 'none' : 'block';
+    if (text) document.getElementById('waiting-text').textContent = text;
+    if (!on) myQueueId = null;
+  }
+  document.getElementById('cancel-wait').addEventListener('click', () => { arena.send({ type: 'leave_queue' }); setQueued(false); });
 
   document.getElementById('find-match').addEventListener('click', () => {
-    if (!window.CloudSync || !CloudSync.isSignedIn()) {
-      showStatus('Must be signed in');
-      return;
-    }
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      showStatus('Still connecting, try again in a moment...');
-      connectAuth();
-      return;
-    }
-    const bet = parseInt(document.getElementById('bet-input').value || 0);
-    if (!bet || bet < 100) {
-      showStatus('Bet must be at least 100');
-      return;
-    }
-    const balance = Strubles.get();
-    if (balance < bet) {
-      showStatus('Insufficient balance');
-      return;
-    }
-    ws.send(JSON.stringify({ type: 'join_queue', bet, gameType: 'blackjack' }));
+    if (!arena.isOpen()) { showStatus('Still connecting, try again in a moment...'); return; }
+    const bet = stakeValue();
+    if (stakeMode && bet < 100) { showStatus('A stake must be at least 100 Strubles.'); return; }
+    if (bet > Strubles.get()) { showStatus("You don't have that many Strubles."); return; }
+    showStatus('');
+    arena.send({ type: 'join_queue', bet, gameType: 'blackjack' });
   });
+
+  // Back to the lobby without leaving the page.
+  function toLobby() {
+    inGame = false; myQueueId = null; setQueued(false);
+    document.getElementById('net-banner').style.display = 'none';
+    document.getElementById('result-section').style.display = 'none';
+    document.getElementById('game-section').style.display = 'none';
+    document.getElementById('bet-section').style.display = 'block';
+    showStatus('');
+  }
 
   function renderLobbies(lobbies) {
     const container = document.getElementById('lobby-rows');
@@ -413,16 +461,18 @@
       const isOwn = lobby.queueId === myQueueId;
       const row = document.createElement('div');
       row.className = 'lobby-row' + (isOwn ? ' own' : '');
+      const stake = lobby.bet > 0;
       const betSpan = document.createElement('span');
       betSpan.className = 'lobby-bet';
-      betSpan.textContent = `${lobby.bet.toLocaleString()} Strubles`;
+      betSpan.innerHTML = `${esc(lobby.name || 'Player')}${lobby.guest ? ' <small style="color:#9fb0cf">(guest)</small>' : ''}<span class="tag ${stake ? '' : 'free'}">${stake ? lobby.bet.toLocaleString() + ' ⓢ' : 'FRIENDLY'}</span>`;
       row.appendChild(betSpan);
       if (!isOwn) {
         const btn = document.createElement('button');
-        btn.textContent = 'Match Bet';
+        btn.textContent = 'Join';
+        if (stake && arena.me.guest) { btn.disabled = true; btn.title = 'Sign in to play for Strubles'; }
         btn.addEventListener('click', () => {
-          if (!ws || ws.readyState !== WebSocket.OPEN) return;
-          ws.send(JSON.stringify({ type: 'match_bet', queueId: lobby.queueId }));
+          if (stake && Strubles.get() < lobby.bet) { showStatus("You don't have enough Strubles for that lobby."); return; }
+          arena.send({ type: 'match_bet', queueId: lobby.queueId });
         });
         row.appendChild(btn);
       }
@@ -445,13 +495,22 @@
 
   function handleMessage(msg) {
     if (msg.type === 'auth_ok') {
-      showStatus('Connected. Enter a bet to open a lobby, or match one below.');
+      refreshWho();
     } else if (msg.type === 'lobby_update') {
       renderLobbies(msg.lobbies);
     } else if (msg.type === 'status' && msg.status === 'queued') {
       myQueueId = msg.queueId;
-      showStatus('Waiting for opponent... (or someone can match your bet)');
+      setQueued(true, msg.bet > 0 ? `Waiting for an opponent at ${msg.bet.toLocaleString()} Strubles…` : 'Waiting for a friendly opponent…');
+    } else if (msg.type === 'opponent_away') {
+      const b = document.getElementById('net-banner'); b.style.display = 'block';
+      b.textContent = `${oppName} disconnected — holding the game for ${Math.round((msg.graceMs || 30000) / 1000)}s…`;
+    } else if (msg.type === 'opponent_back') {
+      document.getElementById('net-banner').style.display = 'none';
     } else if (msg.type === 'game_start') {
+      inGame = true; setQueued(false);
+      oppName = msg.opponentName || 'Opponent'; friendlyGame = !!msg.friendly;
+      document.getElementById('opp-label').textContent = oppName + (friendlyGame ? '' : '');
+      document.getElementById('net-banner').style.display = 'none';
       yourIndex = msg.yourIndex;
       myQueueId = null;
       prevHandLengths = [0, 0];
@@ -469,7 +528,13 @@
       document.getElementById('your-row').classList.add('active-hand');
       document.getElementById('hit').disabled = false;
       document.getElementById('stand').disabled = false;
-      renderGameState(msg.yourHand, msg.opponentVisibleCards, msg.yourBustLimit, msg.opponentBustLimit, [false, false]);
+      renderGameState(msg.yourHand, msg.opponentVisibleCards, msg.yourBustLimit, msg.opponentBustLimit, msg.done || [false, false]);
+      // Coming back to a hand already in progress: restore which side has stood.
+      if (msg.resync && msg.done) {
+        prevHandLengths = [msg.yourHand.length, 0];
+        document.getElementById('hit').disabled = !!msg.done[yourIndex];
+        document.getElementById('stand').disabled = !!msg.done[yourIndex];
+      }
       if (msg.isRematch) showStatus('Rematch started!');
     } else if (msg.type === 'game_update') {
       renderGameState(msg.yourHand, msg.opponentVisibleCards, null, null, msg.done);
@@ -481,7 +546,9 @@
       document.getElementById('your-row').classList.remove('active-hand');
       document.getElementById('game-section').style.display = 'none';
       document.getElementById('result-section').style.display = 'block';
-      const resultText = result.result === 'win' ? `🎉 You won ${result.payout} Strubles!` : result.result === 'push' ? `Tie! Got your bet back.` : `You lost.`;
+      const resultText = msg.friendly
+        ? (result.result === 'win' ? '🎉 You won the friendly game!' : result.result === 'push' ? 'Tie — friendly game.' : 'You lost the friendly game.')
+        : (result.result === 'win' ? `🎉 You won ${result.payout} Strubles!` : result.result === 'push' ? `Tie! Got your bet back.` : `You lost.`);
       document.getElementById('result-message').textContent = resultText;
       if (result.result === 'win') {
         showCelebration();
@@ -513,7 +580,7 @@
       document.getElementById('game-section').style.display = 'none';
       document.getElementById('result-section').style.display = 'block';
       document.getElementById('result-message').textContent =
-        msg.winner === yourIndex ? '🎉 Opponent left — you take the pot.' : 'Opponent left.';
+        msg.winner === yourIndex ? (friendlyGame ? '🎉 Opponent left — you win.' : '🎉 Opponent left — you take the pot.') : 'Opponent left.';
       // There is nobody to rematch with, so offer only the way out.
       resetRematchPrompt();
       document.getElementById('rematch-accept').style.display = 'none';
@@ -531,10 +598,7 @@
       // with no response) -- previously nothing handled this message at
       // all, so the UI stayed frozen on the result/rematch screen even
       // after the server had already torn the table down.
-      document.getElementById('result-section').style.display = 'none';
-      document.getElementById('game-section').style.display = 'none';
-      document.getElementById('bet-section').style.display = 'block';
-      myQueueId = null;
+      toLobby();
       showStatus('Enter a bet to open a lobby, or match one below.');
     } else if (msg.type === 'error') {
       showStatus(msg.message);
@@ -563,8 +627,8 @@
     document.getElementById('opponent-score').textContent = `Total: ${oppVal}${oppGoalText}`;
   }
 
-  document.getElementById('hit').addEventListener('click', () => ws?.send(JSON.stringify({ type: 'action', action: 'hit' })));
-  document.getElementById('stand').addEventListener('click', () => ws?.send(JSON.stringify({ type: 'action', action: 'stand' })));
+  document.getElementById('hit').addEventListener('click', () => arena.send({ type: 'action', action: 'hit' }));
+  document.getElementById('stand').addEventListener('click', () => arena.send({ type: 'action', action: 'stand' }));
 
   document.getElementById('rematch-accept').addEventListener('click', () => {
     document.getElementById('rematch-accept').disabled = true;
@@ -573,14 +637,16 @@
     document.getElementById('rematch-decline').disabled = false;
     document.getElementById('rematch-status').textContent = 'Waiting for opponent...';
     document.getElementById('rematch-status').style.display = 'block';
-    ws?.send(JSON.stringify({ type: 'rematch_accept' }));
+    arena.send({ type: 'rematch_accept' });
   });
 
   document.getElementById('rematch-decline').addEventListener('click', () => {
-    ws?.send(JSON.stringify({ type: 'rematch_decline' }));
-    location.href = '/arena';
+    arena.send({ type: 'rematch_decline' });
+    toLobby();
   });
 
+  setStakeMode(false);
+  arena.connect();
   updateBalance();
   window.addEventListener('strubles:change', updateBalance);
 

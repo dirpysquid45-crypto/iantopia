@@ -1,283 +1,296 @@
 /**
- * Battleship game logic (server-authoritative).
- * Manages single-table state, ship placement, targeting, and win detection.
+ * Battleship (server-authoritative).
  *
- * Mirrors blackjack.js's shape deliberately: this.players is the same
- * [playerA, playerB] array of full queue-entry objects ({userId,
- * sessionId, bet, ws}) that BlackjackGame uses, so manager.js's generic
- * disconnect/action-routing code works identically for both game types
- * with no special-casing.
+ * The server owns every fact about the game: where each fleet is, whose turn it
+ * is, and when someone has run out of time. Clients only ever receive what the
+ * player is entitled to see (their own fleet, and the results of their own
+ * shots) until the game ends, when both fleets are revealed.
  */
+const ArenaGame = require('./game-base');
 
 const SHIPS = [
   { name: 'Carrier', size: 5 },
   { name: 'Battleship', size: 4 },
   { name: 'Cruiser', size: 3 },
   { name: 'Submarine', size: 3 },
-  { name: 'Destroyer', size: 2 }
+  { name: 'Destroyer', size: 2 },
 ];
+const SIZE = 10;
+const WATER = 0, SHIP = 1, HIT = 2, MISS = 3;
 
-class BattleshipGame {
-  constructor(tableId, playerA, playerB, balanceManager) {
-    this.tableId = tableId;
-    this.players = [playerA, playerB];
-    this.bet = playerA.bet;
-    this.balanceManager = balanceManager;
-    this.rake = 0.05; // 5% rake, same as Blackjack
+const TIMING = {
+  setupMs: 150000, // time to place a fleet
+  turnMs: 40000,   // time to take a shot
+};
+// Two consecutive timed-out turns forfeits: otherwise an abandoned game would
+// sit there holding both players' stakes.
+const MAX_MISSED_TURNS = 2;
 
-    // Game state
-    this.state = 'setup'; // setup, battle, result
-    this.currentTurn = 0; // 0 = players[0], 1 = players[1]
-    this.playersReady = [false, false]; // track setup completion
+const emptyGrid = () => Array.from({ length: SIZE }, () => Array(SIZE).fill(WATER));
+const fullHealth = () => Object.fromEntries(SHIPS.map((s) => [s.name, s.size]));
 
-    // Grids: 10x10, 0=water, 1=ship, 2=hit, 3=miss
-    this.grids = [[], []];
+class BattleshipGame extends ArenaGame {
+  constructor(tableId, playerA, playerB, balanceManager, opts = {}) {
+    super(tableId, playerA, playerB, balanceManager, opts);
+    this.timing = Object.assign({}, TIMING, this.timing);
+    this.rake = 0.05;
+    this.resetForRematch();
+  }
+
+  resetForRematch() {
+    this.state = 'setup'; // setup -> battle -> result
+    this.currentTurn = 0;
+    this.playersReady = [false, false];
+    this.grids = [emptyGrid(), emptyGrid()];   // grids[i] = player i's own fleet
+    this.boards = [emptyGrid(), emptyGrid()];  // boards[i] = shots that have landed on player i
     this.shipPlacements = [null, null];
-    this.boards = [[], []]; // revealed boards (what opponent sees)
-    this.shipsHealth = [
-      { Carrier: 5, Battleship: 4, Cruiser: 3, Submarine: 3, Destroyer: 2 },
-      { Carrier: 5, Battleship: 4, Cruiser: 3, Submarine: 3, Destroyer: 2 }
-    ];
-
+    this.health = [fullHealth(), fullHealth()];
+    this.missed = [0, 0];
     this.winner = null;
-    this.result = null; // 'win', 'loss', 'draw'
+    this.setupTimer = null;
+    this.turnTimer = null;
+    this.setupDeadline = null;
+    this.turnDeadline = null;
   }
 
-  // Deducts both bets and notifies both players setup has begun. Called
-  // once by manager.js's startGame(), mirroring BlackjackGame.start().
-  async start() {
-    await this.balanceManager.deductBet(this.players[0].userId, this.bet);
-    await this.balanceManager.deductBet(this.players[1].userId, this.bet);
-
-    this.initGrids();
-
-    this.sendTo(0, { type: 'game_start', gameType: 'battleship', tableId: this.tableId, yourIndex: 0 });
-    this.sendTo(1, { type: 'game_start', gameType: 'battleship', tableId: this.tableId, yourIndex: 1 });
+  clearTimers() {
+    clearTimeout(this.setupTimer);
+    clearTimeout(this.turnTimer);
   }
 
-  // Initialize empty grids. Called exactly once from start() — NOT from
-  // placeShips(), which previously reset both players' grids on every
-  // call, wiping out whichever player had already placed their fleet.
-  initGrids() {
+  // ---- lifecycle ---------------------------------------------------------
+  async begin(isRematch = false) {
+    this.setupDeadline = Date.now() + this.timing.setupMs;
+    this.setupTimer = setTimeout(() => {
+      this.onSetupTimeout().catch((e) => console.error('[battleship] setup timeout failed:', e.message));
+    }, this.timing.setupMs);
     for (let i = 0; i < 2; i++) {
-      this.grids[i] = Array(10).fill(null).map(() => Array(10).fill(0));
-      this.boards[i] = Array(10).fill(null).map(() => Array(10).fill(0));
+      this.send(i, {
+        type: 'game_start', gameType: 'battleship', tableId: this.tableId, yourIndex: i,
+        opponentName: this.players[1 - i].name, friendly: this.friendly, bet: this.bet,
+        isRematch, setupMs: this.timing.setupMs,
+      });
     }
   }
 
-  // Place ships on grid (server-side validation)
-  placeShips(playerIndex, ships) {
-    if (this.playersReady[playerIndex]) {
-      return { valid: false, error: 'Already submitted' };
+  // ---- setup -------------------------------------------------------------
+  // Validates a whole fleet against a scratch grid and only commits if all of
+  // it is legal. It used to write each ship straight into the real grid as it
+  // went, so a fleet that failed on its last ship left the earlier ones behind
+  // as ghosts, and every later attempt then failed with "overlaps another ship".
+  static validateFleet(ships) {
+    if (!Array.isArray(ships) || ships.length !== SHIPS.length) {
+      return { valid: false, error: `Place all ${SHIPS.length} ships` };
     }
-
-    const grid = this.grids[playerIndex];
-
-    // Validate and place each ship
+    const scratch = emptyGrid();
+    const seen = new Set();
+    const normalised = [];
     for (const ship of ships) {
+      if (!ship || typeof ship !== 'object') return { valid: false, error: 'Invalid ship data' };
       const { name, x, y, horizontal } = ship;
-      const shipData = SHIPS.find(s => s.name === name);
-
-      if (!shipData) return { valid: false, error: `Invalid ship: ${name}` };
-
-      const cells = [];
-      for (let i = 0; i < shipData.size; i++) {
+      const def = SHIPS.find((s) => s.name === name);
+      if (!def) return { valid: false, error: `Unknown ship: ${String(name).slice(0, 20)}` };
+      if (seen.has(name)) return { valid: false, error: `${name} placed twice` };
+      seen.add(name);
+      if (!Number.isInteger(x) || !Number.isInteger(y) || typeof horizontal !== 'boolean') {
+        return { valid: false, error: 'Invalid ship data' };
+      }
+      for (let i = 0; i < def.size; i++) {
         const nx = horizontal ? x + i : x;
         const ny = horizontal ? y : y + i;
-
-        if (nx < 0 || nx > 9 || ny < 0 || ny > 9) {
-          return { valid: false, error: `${name} out of bounds` };
-        }
-
-        if (grid[ny][nx] !== 0) {
-          return { valid: false, error: `${name} overlaps with another ship` };
-        }
-
-        cells.push([nx, ny]);
+        if (nx < 0 || nx >= SIZE || ny < 0 || ny >= SIZE) return { valid: false, error: `${name} is out of bounds` };
+        if (scratch[ny][nx] !== WATER) return { valid: false, error: `${name} overlaps another ship` };
+        scratch[ny][nx] = SHIP;
       }
-
-      // Place ship
-      for (const [nx, ny] of cells) {
-        grid[ny][nx] = 1;
-      }
+      normalised.push({ name, x, y, horizontal });
     }
-
-    this.shipPlacements[playerIndex] = ships;
-    this.playersReady[playerIndex] = true;
-
-    // Both players ready → start battle
-    if (this.playersReady[0] && this.playersReady[1]) {
-      this.state = 'battle';
-    }
-
-    return { valid: true };
+    return { valid: true, grid: scratch, ships: normalised };
   }
 
-  // Fire at opponent's grid
-  fire(playerIndex, x, y) {
-    if (this.state !== 'battle') {
-      return { valid: false, error: 'Not in battle phase' };
+  submitFleet(i, ships) {
+    if (this.state !== 'setup') {
+      this.send(i, { type: 'placement_result', valid: false, error: 'Not in setup' });
+      return;
     }
-
-    if (this.currentTurn !== playerIndex) {
-      return { valid: false, error: 'Not your turn' };
+    if (this.playersReady[i]) {
+      this.send(i, { type: 'placement_result', valid: false, error: 'Already submitted' });
+      return;
     }
+    const res = BattleshipGame.validateFleet(ships);
+    if (!res.valid) {
+      this.send(i, { type: 'placement_result', valid: false, error: res.error });
+      return;
+    }
+    this.grids[i] = res.grid;
+    this.shipPlacements[i] = res.ships;
+    this.playersReady[i] = true;
+    this.send(i, { type: 'placement_result', valid: true });
+    this.send(1 - i, { type: 'opponent_ready' });
+    if (this.playersReady[0] && this.playersReady[1]) this.startBattle();
+  }
 
-    const opponentIndex = 1 - playerIndex;
-    const board = this.boards[opponentIndex];
-    const opponentGrid = this.grids[opponentIndex];
+  startBattle() {
+    clearTimeout(this.setupTimer);
+    this.state = 'battle';
+    // Coin flip, not "whoever opened the lobby": going first is an advantage.
+    this.currentTurn = Math.random() < 0.5 ? 0 : 1;
+    this.armTurnTimer();
+    this.broadcast({ type: 'battle_start', currentTurn: this.currentTurn, turnDeadline: this.turnDeadline, turnMs: this.timing.turnMs });
+  }
 
-    if (typeof x !== 'number' || typeof y !== 'number' || x < 0 || x > 9 || y < 0 || y > 9) {
+  async onSetupTimeout() {
+    if (this.state !== 'setup' || this.tableClosed) return;
+    const ready = this.playersReady;
+    if (!ready[0] && !ready[1]) {
+      // Nobody placed anything: nobody wins, so everyone gets their stake back.
+      await this.refundCharged();
+      this.broadcast({ type: 'game_voided', reason: 'Neither player finished placing ships in time.' });
+      this.close();
+      return;
+    }
+    await this.forfeitIndex(ready[0] ? 1 : 0, 'timeout');
+  }
+
+  // ---- battle ------------------------------------------------------------
+  armTurnTimer() {
+    clearTimeout(this.turnTimer);
+    this.turnDeadline = Date.now() + this.timing.turnMs;
+    this.turnTimer = setTimeout(() => {
+      this.onTurnTimeout().catch((e) => console.error('[battleship] turn timeout failed:', e.message));
+    }, this.timing.turnMs);
+  }
+
+  async onTurnTimeout() {
+    if (this.state !== 'battle' || this.tableClosed) return;
+    const i = this.currentTurn;
+    this.missed[i]++;
+    if (this.missed[i] >= MAX_MISSED_TURNS) {
+      await this.forfeitIndex(i, 'timeout');
+      return;
+    }
+    // Take a random shot on their behalf so the game keeps moving.
+    const open = [];
+    const radar = this.boards[1 - i];
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) if (radar[y][x] === WATER) open.push([x, y]);
+    if (!open.length) return;
+    const [x, y] = open[Math.floor(Math.random() * open.length)];
+    await this.takeShot(i, x, y, true);
+  }
+
+  fire(i, x, y) {
+    if (this.state !== 'battle') return { valid: false, error: 'Not in battle phase' };
+    if (this.currentTurn !== i) return { valid: false, error: 'Not your turn' };
+    if (!Number.isInteger(x) || !Number.isInteger(y) || x < 0 || x >= SIZE || y < 0 || y >= SIZE) {
       return { valid: false, error: 'Coordinates out of bounds' };
     }
+    const target = 1 - i;
+    const board = this.boards[target];
+    if (board[y][x] !== WATER) return { valid: false, error: 'Already targeted this square' };
 
-    if (board[y][x] !== 0) {
-      return { valid: false, error: 'Already targeted this square' };
-    }
-
-    // Resolve hit
-    const hit = opponentGrid[y][x] === 1;
-    board[y][x] = hit ? 2 : 3; // 2=hit, 3=miss
+    const hit = this.grids[target][y][x] === SHIP;
+    board[y][x] = hit ? HIT : MISS;
 
     let sunkShip = null;
     if (hit) {
-      // Damage ship
-      const ships = this.shipPlacements[opponentIndex];
-      for (const ship of ships) {
-        const { name } = SHIPS.find(s => s.name === ship.name);
-        const inShip = this.checkHitInShip(ship, x, y);
-        if (inShip) {
-          this.shipsHealth[opponentIndex][name]--;
-          if (this.shipsHealth[opponentIndex][name] === 0) {
-            sunkShip = name;
-          }
-          break;
-        }
-      }
+      const ship = this.shipPlacements[target].find((s) => this.cellInShip(s, x, y));
+      if (ship && --this.health[target][ship.name] === 0) sunkShip = ship.name;
     }
-
-    // Check win condition
-    const allSunk = Object.values(this.shipsHealth[opponentIndex]).every(h => h === 0);
-    if (allSunk) {
-      this.state = 'result';
-      this.winner = playerIndex;
-      this.result = playerIndex === 0 ? 'win' : 'loss';
-      return { valid: true, hit, sunkShip, gameOver: true, winner: playerIndex, x, y, shooterIndex: playerIndex };
-    }
-
-    this.currentTurn = 1 - this.currentTurn;
-    return { valid: true, hit, sunkShip, gameOver: false, x, y, shooterIndex: playerIndex };
+    const gameOver = Object.values(this.health[target]).every((h) => h === 0);
+    if (!gameOver) this.currentTurn = target;
+    return { valid: true, hit, sunkShip, gameOver, x, y, shooterIndex: i };
   }
 
-  checkHitInShip(ship, x, y) {
-    const { x: sx, y: sy, horizontal, name } = ship;
-    const size = SHIPS.find(s => s.name === name).size;
-
-    if (horizontal) {
-      return sy === y && x >= sx && x < sx + size;
-    } else {
-      return sx === x && y >= sy && y < sy + size;
-    }
+  cellInShip(ship, x, y) {
+    const size = SHIPS.find((s) => s.name === ship.name).size;
+    return ship.horizontal
+      ? ship.y === y && x >= ship.x && x < ship.x + size
+      : ship.x === x && y >= ship.y && y < ship.y + size;
   }
 
-  // Get state for client (obfuscate opponent's grid)
-  getState(playerIndex) {
-    const opponentIndex = 1 - playerIndex;
+  // One entry point for a shot, whether the player fired it or the clock did.
+  async takeShot(i, x, y, auto = false) {
+    const result = this.fire(i, x, y);
+    if (!result.valid) {
+      this.send(i, { type: 'error', message: result.error });
+      return;
+    }
+    if (!auto) this.missed[i] = 0;
+    const lastMove = { x: result.x, y: result.y, hit: result.hit, sunkShip: result.sunkShip, shooterIndex: i, auto };
+    if (!result.gameOver) this.armTurnTimer();
+    for (let p = 0; p < 2; p++) {
+      this.send(p, {
+        type: 'fire_result', state: this.state, currentTurn: this.currentTurn, lastMove,
+        yourHealth: { ...this.health[p] }, enemyHealth: { ...this.health[1 - p] },
+        turnDeadline: result.gameOver ? null : this.turnDeadline, turnMs: this.timing.turnMs,
+      });
+    }
+    if (result.gameOver) await this.finish(i, 'sunk');
+  }
+
+  async handleAction(sessionId, action, payload = {}) {
+    const i = this.indexOf(sessionId);
+    if (i === -1) return;
+    if (action === 'fire') await this.takeShot(i, payload.x, payload.y);
+  }
+
+  // ---- ending ------------------------------------------------------------
+  async finish(winnerIndex, reason, allowRematch = true) {
+    if (this.state === 'result') return; // a second ending can never pay twice
+    this.state = 'result';
+    this.winner = winnerIndex;
+    this.clearTimers();
+
+    const pot = this.bet * 2;
+    const raked = this.friendly ? 0 : Math.floor(pot * this.rake);
+    const payout = this.friendly ? 0 : pot - raked;
+    const results = [{ result: 'loss', payout: 0 }, { result: 'loss', payout: 0 }];
+    results[winnerIndex] = { result: 'win', payout };
+    if (payout > 0) {
+      try { this.pushBalance(winnerIndex, await this.balance.creditPayout(this.players[winnerIndex].userId, payout)); }
+      catch (e) { console.error('[battleship] payout failed:', e.message); }
+    }
+    // Both fleets are revealed now that nothing can be exploited with them, so
+    // the loser can see where the ships they never found were hiding.
+    this.broadcast({ type: 'game_result', results, reason, friendly: this.friendly, fleets: this.shipPlacements });
+    // A rematch needs two people. If one of them has left there is nobody to
+    // play, so the table closes instead of leaving the winner on a prompt that
+    // can only time out.
+    if (allowRematch) this.beginRematchWindow(); else this.close();
+  }
+
+  async forfeitIndex(i, reason = 'left') {
+    if (this.tableClosed || this.state === 'result') return;
+    const winner = 1 - i;
+    const leaving = reason === 'disconnect' || reason === 'left';
+    await this.finish(winner, reason, !leaving);
+    // Older clients only understand this message for "your opponent left".
+    if (leaving) this.send(winner, { type: 'opponent_disconnected', winner, reason });
+  }
+
+  // ---- reconnecting ------------------------------------------------------
+  view(i) {
+    const opp = 1 - i;
     return {
-      state: this.state,
-      playersReady: this.playersReady,
       currentTurn: this.currentTurn,
-      yourGrid: this.grids[playerIndex],
-      opponentBoard: this.boards[opponentIndex],
-      shipsHealth: this.shipsHealth[opponentIndex],
-      winner: this.winner,
-      result: this.result
+      yourShips: this.shipPlacements[i],
+      mine: this.boards[i],      // shots that have landed on me
+      radar: this.boards[opp],   // my shots at them
+      yourHealth: { ...this.health[i] },
+      enemyHealth: { ...this.health[opp] },
+      turnDeadline: this.turnDeadline,
+      turnMs: this.timing.turnMs,
     };
   }
 
-  // Routes a client action to the right handler and broadcasts the
-  // result. Mirrors BlackjackGame.handleAction(sessionId, action)'s
-  // signature, with an extra payload param for fire's x/y.
-  async handleAction(sessionId, action, payload = {}) {
-    const playerIndex = this.players.findIndex(p => p.sessionId === sessionId);
-    if (playerIndex === -1) return;
-
-    if (action === 'fire') {
-      const result = this.fire(playerIndex, payload.x, payload.y);
-      if (!result.valid) {
-        this.sendTo(playerIndex, { type: 'error', message: result.error });
-        return;
-      }
-
-      const lastMove = { x: result.x, y: result.y, hit: result.hit, sunkShip: result.sunkShip, shooterIndex: result.shooterIndex };
-      this.sendTo(0, { type: 'fire_result', ...this.getState(0), lastMove });
-      this.sendTo(1, { type: 'fire_result', ...this.getState(1), lastMove });
-
-      if (result.gameOver) {
-        await this.finish();
-      }
-    }
-  }
-
-  // Resolves payout for a completed game. Returns a results array
-  // indexed by player index, same shape BlackjackGame.resolve() uses.
-  async resolve() {
-    if (this.state !== 'result' || this.winner === null) return null;
-
-    const raked = Math.floor(this.bet * 2 * this.rake);
-    const payout = (this.bet * 2) - raked;
-
-    const results = [{ result: 'loss', payout: 0 }, { result: 'loss', payout: 0 }];
-    results[this.winner] = { result: 'win', payout };
-    await this.balanceManager.creditPayout(this.players[this.winner].userId, payout);
-
-    return results;
-  }
-
-  // Called once a fire() result reports gameOver: resolves payout,
-  // broadcasts game_result, then signals both clients they can requeue.
-  async finish() {
-    const results = await this.resolve();
-    if (!results) return;
-
-    this.broadcast({ type: 'game_result', results });
-
-    setTimeout(() => {
-      this.players[0].ws.send(JSON.stringify({ type: 'ready_for_queue' }));
-      this.players[1].ws.send(JSON.stringify({ type: 'ready_for_queue' }));
-    }, 3000);
-  }
-
-  // Handles a disconnect mid-game: the remaining player wins by
-  // forfeit. Guarded so a stray disconnect after the game has already
-  // finished can never trigger a second payout.
-  forfeit(sessionId) {
-    if (this.state === 'result') return;
-
-    const playerIndex = this.players.findIndex(p => p.sessionId === sessionId);
-    if (playerIndex === -1) return;
-
-    const otherIndex = 1 - playerIndex;
-    this.state = 'result';
-    this.winner = otherIndex;
-
-    const raked = Math.floor(this.bet * 2 * this.rake);
-    const payout = (this.bet * 2) - raked;
-    this.balanceManager.creditPayout(this.players[otherIndex].userId, payout);
-    this.broadcast({ type: 'opponent_disconnected', winner: otherIndex });
-  }
-
-  isFinished() {
-    return this.state === 'result';
-  }
-
-  sendTo(playerIndex, msg) {
-    this.players[playerIndex].ws.send(JSON.stringify(msg));
-  }
-
-  broadcast(msg) {
-    this.players[0].ws.send(JSON.stringify(msg));
-    this.players[1].ws.send(JSON.stringify(msg));
+  resync(i) {
+    this.send(i, {
+      type: 'resync', gameType: 'battleship', tableId: this.tableId, yourIndex: i,
+      opponentName: this.players[1 - i].name, friendly: this.friendly, bet: this.bet,
+      state: this.state, yourReady: this.playersReady[i], opponentReady: this.playersReady[1 - i],
+      setupMsLeft: Math.max(0, (this.setupDeadline || 0) - Date.now()), ...this.view(i),
+      turnMsLeft: this.state === 'battle' ? Math.max(0, (this.turnDeadline || 0) - Date.now()) : 0,
+      ...(this.state === 'result' ? { winner: this.winner, fleets: this.shipPlacements } : {}),
+    });
   }
 }
 

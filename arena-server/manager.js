@@ -2,231 +2,256 @@ const BlackjackGame = require('./blackjack');
 const { BattleshipGame } = require('./battleship');
 const BalanceManager = require('./balance');
 
+const GAME_TYPES = new Set(['blackjack', 'battleship']);
+const MAX_BET = 1000000;
+
 class Manager {
-  constructor(db, auth) {
+  constructor(db, auth, opts = {}) {
     this.db = db;
     this.auth = auth;
-    this.balance = new BalanceManager(db);
-    this.connections = new Map(); // sessionId -> ws
-    this.userSessions = new Map(); // userId -> Set of sessionIds
-    this.queue = []; // waiting players
-    this.tables = new Map(); // tableId -> game
+    this.opts = opts;                                // { timing } overrides, used by tests
+    this.balance = opts.balance || new BalanceManager(db);
+    this.connections = new Map(); // sessionId -> { userId, ws, guest, name }
+    this.queue = [];              // open lobbies
+    this.tables = new Map();      // tableId -> game
   }
 
-  registerConnection(userId, sessionId, ws) {
-    this.connections.set(sessionId, { userId, ws });
-    if (!this.userSessions.has(userId)) this.userSessions.set(userId, new Set());
-    this.userSessions.get(userId).add(sessionId);
-    // A freshly-connected client has missed every lobby_update broadcast
-    // that happened before it existed -- send it the current snapshot
-    // directly so the lobby list is populated immediately on connect,
-    // not just on the next change.
-    const lobbies = this.queue.map(p => ({ queueId: p.queueId, bet: p.bet, gameType: p.gameType }));
-    try { ws.send(JSON.stringify({ type: 'lobby_update', lobbies })); } catch {}
+  // ---- lookups -----------------------------------------------------------
+  tableBySession(sessionId) {
+    for (const game of this.tables.values()) {
+      if (!game.tableClosed && game.indexOf(sessionId) !== -1) return game;
+    }
+    return null;
+  }
+  tableByUser(userId) {
+    for (const game of this.tables.values()) {
+      if (!game.tableClosed && game.players.some((p) => p.userId === userId)) return game;
+    }
+    return null;
+  }
+  // One commitment per person. Without this a double-click (or a second tab)
+  // could open two lobbies, and the two could then be matched to each other.
+  isBusy(userId) {
+    return this.queue.some((q) => q.userId === userId) || !!this.tableByUser(userId);
+  }
+
+  sendTo(ws, msg) { try { if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg)); } catch {} }
+  fail(ws, message, code) { this.sendTo(ws, { type: 'error', message, code }); }
+
+  lobbyList() {
+    return this.queue.map((p) => ({
+      queueId: p.queueId, bet: p.bet, gameType: p.gameType, name: p.name, guest: !!p.guest, friendly: p.bet === 0,
+    }));
+  }
+  broadcastLobbies() {
+    const msg = JSON.stringify({ type: 'lobby_update', lobbies: this.lobbyList() });
+    for (const { ws } of this.connections.values()) {
+      try { if (ws.readyState === 1) ws.send(msg); } catch {}
+    }
+  }
+
+  // ---- connections -------------------------------------------------------
+  registerConnection(userId, sessionId, ws, info = {}) {
+    this.connections.set(sessionId, { userId, ws, guest: !!info.guest, name: info.name || 'Player' });
+
+    // Coming back to a game already in progress: this connection takes the seat
+    // over, whether or not the server has noticed the old socket die yet. A
+    // phone that lost signal reconnects before the old socket times out, and
+    // refusing it would strand them in a game they could not rejoin.
+    const game = this.tableByUser(userId);
+    if (game) {
+      const i = game.players.findIndex((p) => p.userId === userId);
+      const seat = game.players[i];
+      if (seat.sessionId !== sessionId) {
+        // Remember the OLD session and socket before reconnect() overwrites
+        // them: it mutates this same player object, so reading seat.sessionId
+        // afterwards gives the NEW id, and deleting that removed the player we
+        // had just registered. Every message they sent after reconnecting was
+        // then dropped silently.
+        const oldSession = seat.sessionId;
+        const oldWs = seat.ws;
+        game.reconnect(i, sessionId, ws);
+        if (oldWs && oldWs !== ws) { try { oldWs.close(4000, 'replaced'); } catch {} }
+        this.connections.delete(oldSession);
+      }
+    }
+    // A fresh client has missed every earlier lobby broadcast.
+    this.sendTo(ws, { type: 'lobby_update', lobbies: this.lobbyList() });
   }
 
   deregisterConnection(userId, sessionId) {
     this.connections.delete(sessionId);
-    if (this.userSessions.has(userId)) {
-      this.userSessions.get(userId).delete(sessionId);
-      if (this.userSessions.get(userId).size === 0) this.userSessions.delete(userId);
-    }
-    // If in queue, remove and let every other browsing player know that
-    // lobby is gone.
-    const wasQueued = this.queue.some(p => p.sessionId === sessionId);
-    this.queue = this.queue.filter(p => p.sessionId !== sessionId);
+    const wasQueued = this.queue.some((p) => p.sessionId === sessionId);
+    this.queue = this.queue.filter((p) => p.sessionId !== sessionId);
     if (wasQueued) this.broadcastLobbies();
-    // If in table, forfeit and remove it — guards against a later stray
-    // disconnect (either player, after the match already ended) finding
-    // the same table again and forfeiting a second time.
-    for (const [tableId, game] of this.tables) {
-      if (game.players.some(p => p.sessionId === sessionId)) {
-        game.forfeit(sessionId);
-        this.tables.delete(tableId);
-        break;
+    // A game in progress waits out a grace period for them to come back
+    // rather than forfeiting at once (see ArenaGame.disconnect).
+    const game = this.tableBySession(sessionId);
+    if (game) game.disconnect(sessionId);
+  }
+
+  // ---- messages ----------------------------------------------------------
+  async handleMessage(userId, sessionId, msg) {
+    const conn = this.connections.get(sessionId);
+    if (!conn || !msg || typeof msg.type !== 'string') return;
+    const ws = conn.ws;
+
+    switch (msg.type) {
+      case 'join_queue':
+        return this.joinQueue(userId, sessionId, msg.bet, msg.gameType || 'blackjack', ws);
+      case 'match_bet':
+        return this.matchBet(userId, sessionId, msg.queueId, ws);
+      case 'leave_queue':
+        return this.leaveQueue(sessionId);
+      case 'ping':
+        return this.sendTo(ws, { type: 'pong' });
+      case 'action': {
+        const game = this.tableBySession(sessionId);
+        if (game) await game.handleAction(sessionId, msg.action, { x: msg.x, y: msg.y });
+        return;
       }
+      case 'place_ships': {
+        const game = this.tableBySession(sessionId);
+        if (game instanceof BattleshipGame) game.submitFleet(game.indexOf(sessionId), msg.ships);
+        return;
+      }
+      case 'rematch_accept': {
+        const game = this.tableBySession(sessionId);
+        if (game) await game.handleRematchResponse(sessionId);
+        return;
+      }
+      case 'rematch_decline': {
+        const game = this.tableBySession(sessionId);
+        if (game) game.declineRematch(sessionId);
+        return;
+      }
+      case 'leave_game': {
+        const game = this.tableBySession(sessionId);
+        if (game) await game.forfeit(sessionId);
+        return;
+      }
+      default:
+        return;
     }
   }
 
-  async handleMessage(userId, sessionId, msg) {
-    const conn = this.connections.get(sessionId);
-    if (!conn) return;
-
-    if (msg.type === 'join_queue') {
-      await this.joinQueue(userId, sessionId, msg.bet, msg.gameType || 'blackjack', conn.ws);
-    } else if (msg.type === 'match_bet') {
-      await this.matchBet(userId, sessionId, msg.queueId, conn.ws);
-    } else if (msg.type === 'leave_queue') {
-      this.leaveQueue(sessionId);
-    } else if (msg.type === 'action') {
-      await this.handleGameAction(sessionId, msg.action, { x: msg.x, y: msg.y });
-    } else if (msg.type === 'place_ships') {
-      await this.handleShipPlacement(sessionId, msg.ships);
-    } else if (msg.type === 'rematch_accept') {
-      // Player accepted rematch; find their game and handle it
-      for (const game of this.tables.values()) {
-        if (game.players.some(p => p.sessionId === sessionId)) {
-          await game.handleRematchResponse(sessionId);
-          break;
-        }
-      }
-    } else if (msg.type === 'rematch_decline') {
-      for (const game of this.tables.values()) {
-        if (game.players.some(p => p.sessionId === sessionId)) {
-          game.declineRematch?.(sessionId);
-          break;
-        }
-      }
+  // ---- matchmaking -------------------------------------------------------
+  // Shared rules for opening or taking a lobby. Returns an error string, or null.
+  stakeError(conn, bet) {
+    if (conn.guest && bet > 0) {
+      return 'Sign in to play for Strubles. Guests can play friendly (0 Strubles) games.';
     }
+    return null;
   }
 
   async joinQueue(userId, sessionId, bet, gameType, ws) {
-    const balance = await this.balance.getBalance(userId);
-    if (balance < bet) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Insufficient balance' }));
+    const conn = this.connections.get(sessionId);
+    if (!conn) return;
+    if (!GAME_TYPES.has(gameType)) return this.fail(ws, 'Unknown game');
+    // The bet is validated here and again in BalanceManager. Before this check a
+    // negative bet was accepted (it passed `balance < bet`) and then "deducted"
+    // as a credit, which matched against itself or an accomplice minted money.
+    if (!Number.isSafeInteger(bet) || bet < 0 || bet > MAX_BET) return this.fail(ws, 'Invalid bet');
+    const stake = this.stakeError(conn, bet);
+    if (stake) return this.fail(ws, stake, 'guest_stake');
+
+    if (bet > 0) {
+      let balance;
+      try { balance = await this.balance.getBalance(userId); }
+      catch (e) { return this.fail(ws, 'Could not check your balance'); }
+      if (balance < bet) return this.fail(ws, 'Insufficient balance');
+    }
+
+    // Everything below is synchronous on purpose: the busy check and the push
+    // must not have an await between them, or two quick messages both pass.
+    if (!this.connections.has(sessionId)) return;
+    if (this.isBusy(userId)) return this.fail(ws, 'You already have an open lobby or a game in progress', 'busy');
+
+    const entry = {
+      queueId: Math.random().toString(36).slice(2, 10), userId, sessionId, bet, gameType, ws,
+      name: conn.name, guest: conn.guest,
+    };
+    // Match against ANY compatible waiting lobby, not just the first two in the
+    // queue: a mismatched pair at the front used to block everyone behind it.
+    const partner = this.queue.find((q) => q.bet === bet && q.gameType === gameType && q.userId !== userId);
+    if (partner) {
+      this.queue = this.queue.filter((q) => q !== partner);
+      this.sendTo(ws, { type: 'status', status: 'matched' });
+      this.broadcastLobbies();
+      this.launch(partner, entry);
       return;
     }
-    const queueId = Math.random().toString(36).substring(7);
-    this.queue.push({ queueId, userId, sessionId, bet, gameType, ws });
-    ws.send(JSON.stringify({ type: 'status', status: 'queued', queueId }));
+    this.queue.push(entry);
+    this.sendTo(ws, { type: 'status', status: 'queued', queueId: entry.queueId, bet });
     this.broadcastLobbies();
-    this.tryMatchmake();
   }
 
   leaveQueue(sessionId) {
-    const wasQueued = this.queue.some(p => p.sessionId === sessionId);
-    this.queue = this.queue.filter(p => p.sessionId !== sessionId);
+    const wasQueued = this.queue.some((p) => p.sessionId === sessionId);
+    this.queue = this.queue.filter((p) => p.sessionId !== sessionId);
     if (wasQueued) this.broadcastLobbies();
   }
 
-  // A player clicks "Match Bet" on someone else's open lobby, adopting
-  // that lobby's exact bet amount rather than needing to type the same
-  // number themselves and hope tryMatchmake's exact-equality check finds
-  // them -- this is the explicit, visible alternative to that silent
-  // auto-match, and the two coexist (typing the identical bet still
-  // auto-matches via tryMatchmake, same as before).
+  // Taking someone's open lobby, adopting its exact bet.
   async matchBet(userId, sessionId, queueId, ws) {
-    const idx = this.queue.findIndex(p => p.queueId === queueId);
-    if (idx === -1) {
-      ws.send(JSON.stringify({ type: 'error', message: 'That lobby is no longer available' }));
-      return;
+    const conn = this.connections.get(sessionId);
+    if (!conn) return;
+    let target = this.queue.find((p) => p.queueId === queueId);
+    if (!target) return this.fail(ws, 'That lobby is no longer available');
+    if (target.userId === userId) return this.fail(ws, "You can't match your own lobby");
+    const stake = this.stakeError(conn, target.bet);
+    if (stake) return this.fail(ws, stake, 'guest_stake');
+    if (target.bet > 0) {
+      let balance;
+      try { balance = await this.balance.getBalance(userId); }
+      catch (e) { return this.fail(ws, 'Could not check your balance'); }
+      if (balance < target.bet) return this.fail(ws, 'Insufficient balance');
     }
-    const target = this.queue[idx];
-    if (target.sessionId === sessionId) {
-      ws.send(JSON.stringify({ type: 'error', message: "You can't match your own lobby" }));
-      return;
-    }
-    const balance = await this.balance.getBalance(userId);
-    if (balance < target.bet) {
-      ws.send(JSON.stringify({ type: 'error', message: 'Insufficient balance' }));
-      return;
-    }
+    // The lobby may have been taken while we were awaiting the balance.
+    const idx = this.queue.findIndex((p) => p.queueId === queueId);
+    if (idx === -1) return this.fail(ws, 'That lobby is no longer available');
+    target = this.queue[idx];
+    if (!this.connections.has(sessionId)) return;
+    if (this.isBusy(userId)) return this.fail(ws, 'You already have an open lobby or a game in progress', 'busy');
     this.queue.splice(idx, 1);
     this.broadcastLobbies();
-    const challenger = { userId, sessionId, bet: target.bet, gameType: target.gameType, ws };
-    this.startGame(target, challenger).catch((e) => {
-      console.error('[startGame] Failed to start matched-bet game:', e.message);
-      const errMsg = JSON.stringify({ type: 'error', message: 'Failed to start match: ' + e.message });
-      try { target.ws.send(errMsg); } catch {}
-      try { challenger.ws.send(errMsg); } catch {}
+    this.launch(target, {
+      userId, sessionId, bet: target.bet, gameType: target.gameType, ws, name: conn.name, guest: conn.guest,
     });
   }
 
-  // Broadcasts the current open-lobby list to every connected, authed
-  // socket. Sent on every queue change (join, leave, matched either way)
-  // so a browsing player never has to guess whether a bet amount is
-  // actually available -- they see it, live, with a button to join it.
-  broadcastLobbies() {
-    const lobbies = this.queue.map(p => ({ queueId: p.queueId, bet: p.bet, gameType: p.gameType }));
-    const msg = JSON.stringify({ type: 'lobby_update', lobbies });
-    for (const { ws } of this.connections.values()) {
-      try { ws.send(msg); } catch {}
-    }
+  // startGame() is async and the callers aren't, so it must be .catch()'d: an
+  // unhandled rejection here would take the whole process (and every other
+  // match) down.
+  launch(a, b) {
+    this.startGame(a, b).catch((e) => {
+      console.error('[startGame] failed to start match:', e.message);
+      const msg = 'Failed to start match: ' + e.message;
+      this.fail(a.ws, msg);
+      this.fail(b.ws, msg);
+    });
   }
 
-  tryMatchmake() {
-    while (this.queue.length >= 2) {
-      const a = this.queue[0];
-      const b = this.queue[1];
-      if (a.bet === b.bet && a.gameType === b.gameType) {
-        const playerA = this.queue.shift();
-        const playerB = this.queue.shift();
-        this.broadcastLobbies();
-        // startGame() is async and this call is intentionally not
-        // awaited (tryMatchmake isn't async) -- so it MUST be
-        // .catch()'d here. Previously it wasn't: an error from
-        // balanceManager.deductBet() (e.g. a stale queue-time balance
-        // check followed by a real insufficient-balance failure at
-        // match time) became an unhandled promise rejection, which
-        // crashes the entire Node process by default -- disconnecting
-        // every player on the server, not just the two in this match.
-        this.startGame(playerA, playerB).catch((e) => {
-          console.error('[startGame] Failed to start match:', e.message);
-          const errMsg = JSON.stringify({ type: 'error', message: 'Failed to start match: ' + e.message });
-          try { playerA.ws.send(errMsg); } catch {}
-          try { playerB.ws.send(errMsg); } catch {}
-        });
-      } else {
-        break;
-      }
-    }
-  }
-
-  async startGame(playerA, playerB) {
-    const tableId = Math.random().toString(36).substring(7);
-    let game;
-
-    if (playerA.gameType === 'battleship') {
-      game = new BattleshipGame(tableId, playerA, playerB, this.balance);
-    } else {
-      game = new BlackjackGame(tableId, playerA, playerB, this.balance, this.db);
-    }
-
-    this.tables.set(tableId, game);
-    // Lets a game close its own table from inside an internal timer (the
-    // blackjack rematch auto-decline) where there's no incoming message
-    // for handleGameAction's own isFinished() check to piggyback on.
+  async startGame(a, b) {
+    const tableId = Math.random().toString(36).slice(2, 10);
+    const opts = { timing: this.opts.timing, db: this.db, makeDeck: this.opts.makeDeck };
+    const game = a.gameType === 'battleship'
+      ? new BattleshipGame(tableId, a, b, this.balance, opts)
+      : new BlackjackGame(tableId, a, b, this.balance, opts);
     game.closeTable = () => this.tables.delete(tableId);
+    this.tables.set(tableId, game);
     try {
-      await game.start();
+      await game.start(); // refunds anything already charged if it fails
     } catch (e) {
-      // Table was already registered above -- if start() fails partway
-      // (e.g. player A's bet deducted but player B's balance check
-      // fails), remove it so it doesn't linger as a broken, unplayable
-      // entry that a later disconnect could still match against.
-      this.tables.delete(tableId);
+      game.close();
       throw e;
     }
   }
 
-  async handleShipPlacement(sessionId, ships) {
-    for (const [tableId, game] of this.tables) {
-      if (game instanceof BattleshipGame) {
-        const playerIndex = game.players.findIndex(p => p.sessionId === sessionId);
-        if (playerIndex === -1) continue;
-
-        const result = game.placeShips(playerIndex, ships);
-        if (result.valid && game.state === 'battle') {
-          // Both players ready, start battle
-          game.players[0].ws.send(JSON.stringify({ type: 'battle_start', currentTurn: game.currentTurn }));
-          game.players[1].ws.send(JSON.stringify({ type: 'battle_start', currentTurn: game.currentTurn }));
-        }
-        game.sendTo(playerIndex, { type: 'placement_result', valid: result.valid, error: result.error });
-        break;
-      }
-    }
-  }
-
-  async handleGameAction(sessionId, action, payload = {}) {
-    for (const [tableId, game] of this.tables) {
-      if (game.players.some(p => p.sessionId === sessionId)) {
-        await game.handleAction(sessionId, action, payload);
-        if (game.isFinished()) {
-          this.tables.delete(tableId);
-        }
-        break;
-      }
-    }
+  shutdown() {
+    for (const game of this.tables.values()) game.close();
+    this.tables.clear();
+    this.queue = [];
   }
 }
 

@@ -5,7 +5,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Arena: Battleship</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
@@ -16,336 +16,296 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <style is:global>
-  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
-  * { box-sizing:border-box; cursor:none !important; }
-  html, body { margin:0; height:100%; }
-  /* overflow:hidden here used to mean "can't scroll on mobile" too --
-     once .phase-battle drops to one column under 1024px (see below),
-     both boards stack vertically and need real page scroll to reach the
-     second one, which a hard overflow:hidden on body made impossible. */
-  body { height:100dvh; display:flex; flex-direction:column; color:var(--ink); font-family: 'Press Start 2P', ui-monospace; cursor:none; background:#0f1115; background-image: url('/backgrounds/taiwan-strait.png'); background-size: cover; background-position: center; background-attachment: fixed; position:relative; overflow-x:hidden; overflow-y:auto; }
-  body::before { content:''; position:fixed; inset:0; z-index:-1; background:rgba(0,0,0,.5); pointer-events:none; }
-
-  main { flex:1; display:flex; flex-direction:column; padding:20px; max-width:1200px; margin:0 auto; width:100%; position:relative; z-index:1; }
-  .top-bar { display:flex; justify-content:space-between; margin-bottom:20px; align-items:center; }
-  .balance { font-size:11px; color:var(--gold); background:rgba(0,0,0,.5); padding:8px 12px; border:2px solid var(--gold); }
-  .title { font-size:18px; color:var(--gold); font-weight:700; text-shadow:0 0 10px rgba(255,215,0,.5); }
-
-  .back-link { position:fixed; top:20px; left:20px; color:var(--gold); text-decoration:none; border:2px solid #000; padding:6px 10px; background:#000; font-size:9px; font-weight:700; z-index:2; }
-
-  /* SETUP PHASE */
-  /* overflow was hidden on both this row and .grid-container below -- on
-     a laptop-height window (short viewport, wide-ish panel), the 10x10
-     grid's own rendered height could exceed the room actually left for
-     it after the header/controls/status text, and anything past that
-     line (often the Ready button and setup-status) was just clipped
-     with no way to reach it. overflow-y:auto turns that into "scrolls
-     to the rest" instead of "silently gone." */
-  .phase-setup { display:flex; gap:20px; flex:1; overflow-y:auto; }
-  .ship-palette { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; width:180px; overflow-y:auto; flex-shrink:0; }
-  .ship-item { background:rgba(255,215,0,.1); border:1px solid var(--gold); padding:8px; margin-bottom:8px; font-size:9px; color:var(--gold); cursor:pointer; border-radius:4px; }
-  .ship-item:hover { background:rgba(255,215,0,.2); }
-
-  .grid-container { flex:1; display:flex; flex-direction:column; background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; min-width:0; overflow-y:auto; }
-  /* The grid itself is 10 square cells (aspect-ratio:1 below), so its
-     rendered height always equals its rendered width -- on a wide
-     laptop window the flex:1 grid-container could hand it 700-800px of
-     width with nowhere near that much vertical room to show it in. This
-     caps it to whichever is tighter, viewport height or a sane max, and
-     centers it so it doesn't hug the left edge once capped. */
-  .grid { max-width:min(100%, 70vh); margin:0 auto; }
-  .grid-controls { display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
-  /* Same big, black-and-gold pixel-button treatment as #duck-btn on the
-     horse game -- these were previously tiny (8px text, 8-10px padding),
-     easy to miss and fiddly to hit on mobile. */
-  .grid-btn { background:#000; color:var(--gold); border:3px solid var(--gold); padding:16px 14px; font-size:13px; font-weight:700; letter-spacing:0.5px; cursor:pointer; border-radius:8px; flex:1; min-width:110px; touch-action:manipulation; transition:background 0.15s, color 0.15s; font-family:inherit; }
-  .grid { gap:1px; }
-  .grid-btn:hover { background:var(--gold); color:#000; }
-  #ready-btn { border-color:#00ff6a; color:#00ff6a; box-shadow:0 0 10px rgba(0,255,106,.3); }
-  #ready-btn:hover { background:#00ff6a; color:#000; }
-
-  .grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; }
-  .grid-cell { aspect-ratio:1; background:rgba(0,100,150,.3); border:1px solid rgba(255,215,0,.3); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:8px; position:relative; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
-  .grid-cell:hover { background:rgba(0,150,200,.4); }
-  .grid-cell.water { background:rgba(0,100,150,.2); }
-  .grid-cell.ship { background:rgba(100,100,100,.4); border-color:var(--gold); }
-  .grid-cell.preview { background:rgba(255,215,0,.3); animation:pulse 0.5s infinite; border-color:var(--gold); }
-  .grid-cell.preview-invalid { background:rgba(255,50,50,.4); animation:pulse 0.5s infinite; border-color:#ff3333; }
-  @keyframes pulse { 0%,100% { opacity:0.3; } 50% { opacity:0.7; } }
-  .grid-cell.preview-origin { border:2px solid var(--gold); }
-
-  .ship-sprite { background-size:contain; background-repeat:no-repeat; background-position:center; filter:drop-shadow(0 0 4px rgba(255,215,0,.4)); }
-  @keyframes shipPlace { 0% { transform:scale(0.8); opacity:0; } 100% { transform:scale(1); opacity:1; } }
-  .grid-cell.placing .ship-sprite { animation:shipPlace 0.3s ease-out; }
-  @keyframes hitFlash { 0%,100% { filter:brightness(1); } 50% { filter:brightness(1.5) drop-shadow(0 0 8px #ff0000); } }
-  .board-cell.hit { animation:hitFlash 0.4s; }
-  @keyframes missRipple { 0% { transform:scale(1); opacity:1; } 100% { transform:scale(1.3); opacity:0; } }
-  .board-cell.miss { animation:missRipple 0.5s ease-out; }
-
-  .grid-label-h { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; margin-bottom:5px; }
-  .grid-label-v { font-size:8px; color:var(--gold); font-weight:700; text-align:center; width:20px; }
-  .label-cell { text-align:center; font-size:8px; color:var(--gold); font-weight:700; }
-
-  .setup-status { font-size:10px; color:var(--muted); margin-top:10px; }
-
-  .edit-controls { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; justify-content:center; }
-  .edit-btn { background:#000; color:var(--gold); border:3px solid var(--gold); padding:14px 16px; font-size:12px; font-weight:700; cursor:pointer; border-radius:8px; min-width:90px; touch-action:manipulation; transition:background 0.15s, color 0.15s; font-family:inherit; }
-  .edit-btn:hover { background:var(--gold); color:#000; transform:scale(1.05); }
-  .edit-btn.confirm { border-color:#00ff6a; color:#00ff6a; }
-  .edit-btn.confirm:hover { background:#00ff6a; color:#000; }
-  .edit-btn.cancel { border-color:#ff5555; color:#ff5555; }
-  .edit-btn.cancel:hover { background:#ff5555; color:#000; }
-
-  .grid-cell.editing { background:rgba(100,200,255,.5); border-color:#00aaff; box-shadow:0 0 8px rgba(0,170,255,.6); }
-
-  #place-hint { flex:1 0 100%; text-align:center; font-size:10px; line-height:1.6; color:var(--gold); }
-
-  /* BATTLE PHASE */
-  .phase-battle { display:grid; grid-template-columns:1fr 1fr; gap:20px; flex:1; }
-  .battle-board { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:clamp(10px, 2vw, 20px); display:flex; flex-direction:column; }
-  @media (max-width:1024px) {
-    .phase-battle { grid-template-columns:1fr; gap:15px; }
+  :root { --bg:#0f1115; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; --good:#00ff6a; --bad:#ff5a5a; --water:rgba(0,95,150,.38); }
+  * { box-sizing:border-box; }
+  html, body { margin:0; }
+  [hidden] { display:none !important; }
+  body {
+    min-height:100dvh; color:var(--ink); font-family:'Press Start 2P', ui-monospace, monospace;
+    background:#0f1115 url('/backgrounds/taiwan-strait.png') center / cover fixed;
+    cursor:none; -webkit-tap-highlight-color:transparent;
   }
-  @media (max-width:1200px) {
-    .ship-palette { width:140px; padding:12px; }
-  }
+  body::before { content:''; position:fixed; inset:0; z-index:-1; background:rgba(0,0,0,.55); pointer-events:none; }
+  * { cursor:none !important; }
+  button { font-family:inherit; touch-action:manipulation; }
 
-  @media (max-width:768px) {
-    /* The back link is fixed to the top-left corner, which on a phone lands
-       directly on top of the title once that wraps to two lines. In the
-       flow it just sits above everything instead. */
-    .back-link { position:static; display:inline-block; margin:0 0 10px; }
-    .top-bar { flex-direction:column; align-items:flex-start; gap:8px; margin-bottom:12px; }
-    .title { font-size:14px; }
-    /* The setup column used to be a nested scroll container inside another
-       nested scroll container, with the page itself as a third. On a phone
-       that meant the controls below the board were clipped by whichever
-       box ran out of room first and were effectively unreachable. One
-       scroller -- the page -- fixes it: everything in here lays out at its
-       natural height and the document scrolls. */
-    .phase-setup { flex-direction:column; gap:12px; overflow:visible; flex:0 0 auto; }
-    .grid-container { overflow:visible; flex:0 0 auto; min-height:0; padding:12px; }
-    main { padding:8px 8px 96px; flex:0 0 auto; }
-    body { height:auto; min-height:100dvh; }
-    .ship-palette { width:100%; height:auto; max-height:none; overflow:visible; display:flex; gap:8px; padding:10px; flex-wrap:wrap; flex:0 0 auto; }
-    .ship-item { min-width:80px; margin-bottom:0; }
-    .grid-cell, .board-cell { font-size:7px; }
-    .grid { gap:1px; }
-    /* Buttons stay thumb-sized on a phone. A max-width:1200px rule used to
-       shrink these to 7px text with 6px padding, which covered every phone
-       and undid the whole point of the big pixel buttons. */
-    .grid-btn { font-size:11px; padding:14px 10px; min-width:90px; }
-    /* The aiming bar follows you down the page instead of sitting below a
-       board that is itself taller than the screen. As a wrapping flex row it
-       grew tall enough to push its own ✓/✕ off the bottom of the screen, so
-       on a phone it's a fixed 5-column grid: hint, one row of nudges, then
-       the two decisions. */
-    #place-controls, #edit-controls {
-      position:sticky; bottom:0; z-index:6;
-      display:grid; grid-template-columns:repeat(5, 1fr); gap:5px;
-      background:rgba(8,10,14,.97); border-top:2px solid var(--gold);
-      margin:10px -12px 0; padding:8px 10px calc(8px + env(safe-area-inset-bottom));
-    }
-    #place-controls .edit-btn, #edit-controls .edit-btn {
-      font-size:11px; padding:12px 2px; min-width:0; flex:none;
-    }
-    #place-hint { grid-column:1 / -1; font-size:9px; }
-    /* Needs the parent ID to outrank `#place-controls .edit-btn` above --
-       on its own this lost the cascade and the word rendered on top of the
-       glyph. The label is dropped here purely for width. */
-    #place-controls #place-rotate-btn, #edit-controls #edit-rotate-btn { font-size:0; }
-    #place-controls #place-rotate-btn::after,
-    #edit-controls #edit-rotate-btn::after { content:'⟳'; font-size:17px; }
-    #place-confirm-btn, #edit-confirm-btn { grid-column:1 / 4; }
-    #place-cancel-btn, #edit-cancel-btn { grid-column:4 / -1; }
+  /* ---------- top bar ---------- */
+  .topbar {
+    position:sticky; top:0; z-index:30; display:flex; align-items:center; gap:10px;
+    padding:max(8px, env(safe-area-inset-top)) 12px 8px; background:rgba(5,8,14,.9);
+    border-bottom:3px solid var(--gold);
   }
-  .board-title { font-size:12px; color:var(--gold); margin-bottom:10px; font-weight:700; }
-  /* Same fix as .grid above -- square cells mean rendered height always
-     matches rendered width, and two of these side by side on a wide
-     desktop window had no cap tying that back to the viewport. */
-  .board-grid { display:grid; grid-template-columns:repeat(10, 1fr); gap:2px; flex:1; max-width:min(100%, 55vh); margin:0 auto; }
-  .board-cell { aspect-ratio:1; background:rgba(0,100,150,.2); border:1px solid rgba(255,215,0,.3); cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
-  .board-cell:hover { background:rgba(0,150,200,.4); }
-  .board-cell.hit { background:#ff3333; border-color:#ff0000; }
-  .board-cell.miss { background:#3366ff; border-color:#0000ff; }
-  .board-cell.ship { background:rgba(100,100,100,.4); border-color:var(--gold); }
-  .board-cell.sunk { background:#aa0000; }
+  .topbar .back { color:var(--gold); text-decoration:none; font-size:9px; border:2px solid var(--gold); padding:8px 10px; background:#000; white-space:nowrap; }
+  .topbar .title { flex:1; text-align:center; color:var(--gold); font-size:clamp(10px,3.2vw,15px); text-shadow:0 0 10px rgba(255,215,0,.5); }
+  .chip { font-size:9px; color:var(--gold); border:2px solid var(--gold); padding:8px 10px; background:rgba(0,0,0,.6); white-space:nowrap; }
+  #now-playing { color:var(--gold); background:#000; border:2px solid var(--gold); padding:7px 10px; font-size:13px; }
 
-  .turn-indicator { font-size:10px; color:var(--muted); margin-top:10px; }
-  .turn-indicator.active { color:#00ff00; font-weight:700; }
+  .banner { position:sticky; top:50px; z-index:29; text-align:center; font-size:9px; line-height:1.7; padding:8px 10px; }
+  #conn-banner { background:#7a1d1d; color:#fff; }
+  #away-banner { background:#7a5a10; color:#fff; }
 
-  /* Hit/miss/sunk feedback -- a big jackpot-style flash so a shot's
-     outcome reads instantly instead of only the small cell-color change. */
-  .hit-banner { position:fixed; top:38%; left:50%; z-index:50; pointer-events:none; opacity:0; font-size:26px; font-weight:700; color:#ff3333; text-shadow:0 0 14px rgba(255,0,0,.8), 3px 3px 0 #000; white-space:nowrap; }
-  .hit-banner.show { animation:hitBannerPop 0.9s ease-out forwards; }
-  @keyframes hitBannerPop {
-    0% { opacity:0; transform:translate(-50%,-50%) scale(0.3); }
-    15% { opacity:1; transform:translate(-50%,-50%) scale(1.15); }
-    30% { opacity:1; transform:translate(-50%,-50%) scale(1); }
-    78% { opacity:1; transform:translate(-50%,-50%) scale(1); }
-    100% { opacity:0; transform:translate(-50%,-50%) scale(1); }
+  main { width:100%; max-width:640px; margin:0 auto; padding:14px 12px calc(120px + env(safe-area-inset-bottom)); }
+
+  /* ---------- shared bits ---------- */
+  .panel { background:rgba(0,0,0,.55); border:2px solid var(--gold); padding:16px; }
+  .btn { background:#000; color:var(--gold); border:3px solid var(--gold); padding:12px 14px; font-size:10px; font-weight:700; min-height:44px; letter-spacing:.5px; }
+  .btn:hover:not(:disabled) { background:var(--gold); color:#000; }
+  .btn:disabled { opacity:.35; }
+  .btn.go { border-color:var(--good); color:var(--good); box-shadow:0 0 10px rgba(0,255,106,.25); }
+  .btn.go:hover:not(:disabled) { background:var(--good); color:#000; }
+  .btn.no { border-color:var(--bad); color:var(--bad); }
+  .btn.no:hover:not(:disabled) { background:var(--bad); color:#000; }
+  .btn.solid { background:var(--gold); color:#000; }
+  .btn.solid:hover:not(:disabled) { background:#ffe766; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; }
+  .row > .btn { flex:1 1 90px; }
+  .hint { font-size:9px; line-height:1.9; color:var(--muted); text-align:center; margin:10px 0; min-height:18px; }
+  .hint.bad { color:var(--bad); }
+  .hint.good { color:var(--good); }
+  .statusbar { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:9px; line-height:1.7; padding:10px 12px; margin-bottom:12px; background:rgba(0,0,0,.6); border:2px solid rgba(255,215,0,.5); }
+  .statusbar b { color:var(--gold); }
+  #toast { position:fixed; left:50%; top:calc(64px + env(safe-area-inset-top)); transform:translateX(-50%); z-index:60; max-width:92vw; background:#000; color:#fff; border:2px solid var(--bad); padding:10px 14px; font-size:9px; line-height:1.7; text-align:center; pointer-events:none; }
+
+  /* ---------- lobby ---------- */
+  .lobby h2 { margin:0 0 8px; font-size:12px; color:var(--gold); }
+  .who { font-size:9px; line-height:1.9; color:var(--muted); margin-bottom:14px; }
+  .who b { color:#fff; }
+  .seg { display:flex; margin-bottom:12px; }
+  .seg button { flex:1; background:#000; color:var(--muted); border:2px solid #555; padding:12px 6px; font-size:9px; min-height:44px; }
+  .seg button.on { color:#000; background:var(--gold); border-color:var(--gold); }
+  .seg button:disabled { opacity:.35; }
+  .field { width:100%; background:#000; color:var(--gold); border:2px solid var(--gold); padding:12px; font-family:inherit; font-size:11px; margin-bottom:10px; min-height:44px; }
+  .field::placeholder { color:#887a33; }
+  .lobby-list h3 { margin:18px 0 8px; font-size:9px; color:var(--muted); font-weight:400; letter-spacing:1px; text-transform:uppercase; }
+  .lobby-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px; margin-bottom:6px; border:2px solid rgba(255,215,0,.3); background:rgba(255,215,0,.05); font-size:10px; line-height:1.6; }
+  .lobby-row .tag { font-size:8px; padding:2px 6px; border:1px solid currentColor; margin-left:6px; }
+  .lobby-row .tag.free { color:var(--good); }
+  .lobby-row .tag.stake { color:var(--gold); }
+  .lobby-row.own { border-color:var(--gold); }
+  .lobby-row .btn { flex:0 0 auto; padding:8px 12px; min-height:36px; }
+  .empty { font-size:9px; color:var(--muted); padding:8px 0; line-height:1.8; }
+  #waiting { text-align:center; }
+  #waiting .spin { display:inline-block; animation:bob 1s ease-in-out infinite; font-size:18px; }
+  @keyframes bob { 50% { transform:translateY(-5px); } }
+
+  /* ---------- THE BOARD ----------
+     One component for placing, aiming, the radar and your own fleet. It is an
+     11x11 grid (a label row and column plus the 10x10 sea) whose own width is
+     set once and whose height follows from aspect-ratio, so every cell is exactly
+     square at any size. The old boards sized the grid from a flex child and a vh
+     cap, which is why they looked right on one screen and wrong on another.
+     Width = the available column, capped at 520px, and capped again so that a
+     whole board always fits the window height with the controls visible. */
+  .board-wrap { width:100%; display:flex; justify-content:center; }
+  .board {
+    width:min(100%, 520px, max(260px, calc(100dvh - 300px)));
+    aspect-ratio:1 / 1; position:relative; display:grid;
+    grid-template-columns:repeat(11, 1fr); grid-template-rows:repeat(11, 1fr);
+    -webkit-user-select:none; user-select:none; touch-action:manipulation;
   }
-  .hit-banner.sunk { color:#ffd700; text-shadow:0 0 18px rgba(255,215,0,.9), 3px 3px 0 #000; font-size:32px; }
+  .cell { position:relative; min-width:0; min-height:0; border:1px solid rgba(255,215,0,.22); background:var(--water); }
+  .cell.lab { border:none; background:none; color:var(--gold); display:flex; align-items:center; justify-content:center; font-size:clamp(7px, 2.1vw, 11px); }
+  .board.live .cell:not(.lab):hover { background:rgba(0,170,230,.45); }
+  .cell.hit::after, .cell.miss::after { content:''; position:absolute; inset:18%; border-radius:50%; }
+  .cell.miss::after { inset:34%; background:#cfe8ff; box-shadow:0 0 6px rgba(200,230,255,.7); }
+  .cell.hit { background:rgba(120,0,0,.55); }
+  .cell.hit::after { background:radial-gradient(circle, #fff3a0 0 18%, #ff9a1f 30%, #e02020 62%, transparent 70%); animation:flicker .9s ease-in-out infinite alternate; }
+  @keyframes flicker { to { transform:scale(.88); opacity:.85; } }
+  .cell.last { outline:2px solid #fff; outline-offset:-2px; z-index:2; animation:pulse .8s ease-in-out infinite alternate; }
+  @keyframes pulse { to { outline-color:var(--gold); } }
+  .cell.target::before { content:''; position:absolute; inset:6%; z-index:3; border:2px solid var(--good); border-radius:50%;
+    background:linear-gradient(var(--good),var(--good)) center/2px 100% no-repeat, linear-gradient(var(--good),var(--good)) center/100% 2px no-repeat; box-shadow:0 0 8px var(--good); }
+
+  .ships { position:absolute; left:calc(100% / 11); top:calc(100% / 11); width:calc(100% * 10 / 11); height:calc(100% * 10 / 11); pointer-events:none; }
+  .ship { position:absolute; filter:drop-shadow(0 2px 3px rgba(0,0,0,.6)); }
+  .ship svg { width:100%; height:100%; display:block; }
+  .ship.ghost { opacity:.82; }
+  .ship.ghost.ok { filter:drop-shadow(0 0 5px var(--good)) saturate(1.3); }
+  .ship.ghost.bad { filter:drop-shadow(0 0 5px var(--bad)) hue-rotate(-40deg) saturate(2.4); }
+  .ship.enemy { filter:drop-shadow(0 0 4px var(--bad)) saturate(.6); opacity:.9; }
+  .ship.sunk svg { filter:brightness(.45) sepia(1) hue-rotate(-50deg) saturate(4); }
+
+  /* ---------- setup ---------- */
+  .tray { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; margin:14px 0 4px; }
+  .chip-ship { display:flex; flex-direction:column; align-items:center; gap:5px; padding:8px 8px 6px; min-width:58px; background:rgba(0,0,0,.55); border:2px solid #555; color:var(--muted); font-size:7px; min-height:44px; }
+  .chip-ship .pips { display:flex; gap:2px; }
+  .chip-ship .pips i { width:9px; height:9px; background:#667; display:block; }
+  .chip-ship.sel { border-color:var(--gold); color:var(--gold); }
+  .chip-ship.sel .pips i { background:var(--gold); }
+  .chip-ship.done { border-color:var(--good); color:var(--good); }
+  .chip-ship.done .pips i { background:var(--good); }
+  .aim-bar { position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex; flex-wrap:wrap; gap:8px; padding:8px 12px calc(10px + env(safe-area-inset-bottom)); background:rgba(5,8,14,.97); border-top:3px solid var(--gold); }
+  .aim-bar .btn { flex:1; }
+  .aim-bar .hintline { flex:1 0 100%; text-align:center; font-size:9px; line-height:1.6; color:var(--gold); min-height:14px; }
+  .aim-bar .hintline.bad { color:var(--bad); }
+
+  /* ---------- battle ---------- */
+  .turnbar { position:sticky; top:50px; z-index:25; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:12px; margin:0 0 14px; background:rgba(5,8,14,.95); border:3px solid #555; font-size:10px; line-height:1.6; }
+  .turnbar.mine { border-color:var(--good); color:var(--good); box-shadow:0 0 14px rgba(0,255,106,.3); }
+  .turnbar.theirs { border-color:#7a8fb0; color:#c9d6ee; }
+  .turnbar.over { border-color:var(--gold); color:var(--gold); }
+  .turnbar .time { font-size:12px; min-width:44px; text-align:right; }
+  .turnbar .time.low { color:var(--bad); animation:pulse2 .5s ease-in-out infinite alternate; }
+  @keyframes pulse2 { to { opacity:.4; } }
+  .block { margin-bottom:22px; }
+  .block h3 { margin:0 0 10px; font-size:10px; color:var(--gold); text-align:center; font-weight:400; letter-spacing:1px; }
+  .block h3 small { color:var(--muted); font-size:8px; margin-left:6px; }
+  .fleetline { display:flex; gap:5px 12px; flex-wrap:wrap; justify-content:center; margin-top:10px; font-size:7px; line-height:1.4; color:var(--muted); }
+  .fleetline span { display:inline-flex; align-items:center; gap:5px; }
+  .fleetline .pips { display:inline-flex; gap:1px; }
+  .fleetline .pips i { width:7px; height:7px; background:#7fb0d8; display:block; }
+  .fleetline .pips i.x { background:#e03030; }
+  .fleetline .dead { color:#ff7777; text-decoration:line-through; }
+  .firebar { position:fixed; left:0; right:0; bottom:0; z-index:40; display:flex; align-items:center; gap:10px; padding:10px 12px calc(10px + env(safe-area-inset-bottom)); background:rgba(5,8,14,.97); border-top:3px solid var(--gold); }
+  .firebar .lbl { flex:1; font-size:9px; line-height:1.7; color:var(--muted); }
+  .firebar .btn { flex:0 0 46%; padding:14px 10px; font-size:12px; }
+  #result-card { text-align:center; margin-bottom:16px; }
+  #result-card h2 { margin:0 0 8px; font-size:clamp(16px,5vw,24px); color:var(--gold); }
+  #result-card p { margin:6px 0; font-size:10px; line-height:1.8; }
+  #result-card .pay { color:var(--good); font-size:13px; }
+  #result-card .row { margin-top:14px; }
+
+  .hit-banner { position:fixed; top:36%; left:50%; z-index:70; pointer-events:none; opacity:0; font-size:clamp(20px,7vw,34px); font-weight:700; color:#ff3333; text-shadow:0 0 14px rgba(255,0,0,.8), 3px 3px 0 #000; white-space:nowrap; }
+  .hit-banner.show { animation:bannerPop .95s ease-out forwards; }
+  @keyframes bannerPop { 0% { opacity:0; transform:translate(-50%,-50%) scale(.3); } 15% { opacity:1; transform:translate(-50%,-50%) scale(1.15); } 30%, 78% { opacity:1; transform:translate(-50%,-50%) scale(1); } 100% { opacity:0; transform:translate(-50%,-50%) scale(1); } }
+  .hit-banner.sunk { color:var(--gold); text-shadow:0 0 18px rgba(255,215,0,.9), 3px 3px 0 #000; }
   .hit-banner.miss { color:#66ccff; text-shadow:0 0 14px rgba(100,200,255,.8), 3px 3px 0 #000; }
-
-  /* Explosion burst sprite -- same 8-frame horizontal sheet the horse
-     game's bat-collision explosion uses. */
-  .boom-sprite { position:fixed; z-index:40; pointer-events:none; background-image:url('/horse-game/explosion-sheet.png'); background-repeat:no-repeat; background-size:800% 100%; animation:boomFrames 0.5s steps(7) forwards; }
+  .boom-sprite { position:fixed; z-index:65; pointer-events:none; background:url('/horse-game/explosion-sheet.png') no-repeat; background-size:800% 100%; animation:boomFrames .5s steps(7) forwards; }
   @keyframes boomFrames { from { background-position:0% 0; } to { background-position:-700% 0; } }
 
-  /* RESULT PHASE */
-  .phase-result { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
-  .result-banner { background:rgba(0,0,0,.6); border:3px solid var(--gold); padding:30px; text-align:center; }
-  .result-text { font-size:16px; color:var(--gold); margin:0; }
-  .result-payout { font-size:14px; color:#00ff00; margin-top:10px; }
-  .result-button { background:var(--gold); color:#000; border:none; padding:10px 20px; font-size:11px; font-weight:700; cursor:pointer; margin-top:20px; border-radius:4px; }
-  .result-button:hover { background:#ffe766; }
-
-  /* Now Playing modal -- same structure/classes as every other page's
-     picker so Arena feels like one system with the rest of the site. */
-  .overlay{ position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:100; display:none; align-items:center; justify-content:center; padding:20px; }
-  .overlay.open{ display:flex; }
-  .modal{ width:min(360px,90vw); max-height:70vh; overflow-y:auto; background:#0a0a0a; border:3px solid var(--gold); padding:20px; box-shadow:0 0 20px rgba(255,215,0,.4); }
-  .modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; }
-  .modal-head h2{ margin:0; font-size:12px; color:var(--gold); font-weight:400; }
-  .btn{ color:var(--gold); text-decoration:none; border:3px solid var(--gold); padding:8px 12px; background:#000; font-size:9px; transition:background .2s, color .2s; cursor:none; font-family:inherit; letter-spacing:1px; text-transform:uppercase; }
-  .btn:hover{ background:var(--gold); color:#000; }
-  .picker-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:11px; }
+  /* ---------- music modal (same system as the other pages) ---------- */
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.85); z-index:100; display:none; align-items:center; justify-content:center; padding:20px; }
+  .overlay.open { display:flex; }
+  .modal { width:min(360px,90vw); max-height:70vh; overflow-y:auto; background:#0a0a0a; border:3px solid var(--gold); padding:20px; box-shadow:0 0 20px rgba(255,215,0,.4); }
+  .modal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:10px; }
+  .modal-head h2 { margin:0; font-size:12px; color:var(--gold); font-weight:400; }
+  .modal .btn { padding:8px 12px; min-height:0; font-size:9px; text-transform:uppercase; }
+  .picker-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,215,0,.2); color:var(--gold); font-size:11px; }
   .picker-row:last-child { border-bottom:none; }
-  .volume-row{ display:flex; align-items:center; gap:10px; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid rgba(255,215,0,0.3); }
-  .volume-row input[type="range"]{ flex:1; accent-color:var(--gold); cursor:none; touch-action:none; padding:14px 0; }
-  .volume-mute-btn{ all:unset; cursor:none; font-size:16px; padding:4px 8px; border:1px solid var(--gold); background:#000; }
-  #now-playing { position:fixed; bottom:20px; right:20px; z-index:20; color:var(--gold); background:#000; border:3px solid var(--gold); padding:10px 14px; font-size:14px; cursor:none; transition:background 0.2s; }
-  #now-playing:hover { background:var(--gold); color:#000; }
-  /* Has to come after the rule above, not in the earlier mobile block --
-     equal specificity means source order decides, so an override up there
-     silently lost and this button kept sitting on the sticky controls,
-     swallowing taps meant for the nudge buttons. */
-  @media (max-width:768px) {
-    #now-playing { bottom:auto; top:calc(6px + env(safe-area-inset-top)); right:6px; padding:6px 9px; font-size:12px; z-index:4; }
-  }
+  .volume-row { display:flex; align-items:center; gap:10px; margin-bottom:16px; padding-bottom:14px; border-bottom:1px solid rgba(255,215,0,.3); }
+  .volume-row input[type="range"] { flex:1; accent-color:var(--gold); touch-action:none; padding:14px 0; }
+  .volume-mute-btn { all:unset; font-size:16px; padding:4px 8px; border:1px solid var(--gold); background:#000; }
 
-  /* BET PHASE (lobby browsing) */
-  .phase-bet { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:20px; max-width:400px; margin:0 auto; }
-  .bet-input { background:#000; border:2px solid var(--gold); color:var(--gold); padding:8px; font-family:inherit; font-size:11px; width:100%; margin-bottom:10px; box-sizing:border-box; }
-  .bet-btn { color:#000; background:var(--gold); border:2px solid #000; padding:8px 12px; font-size:10px; font-weight:700; width:100%; cursor:pointer; }
-  .bet-btn:hover { background:#ffe766; }
-  .bet-status { font-size:9px; color:var(--muted); margin:10px 0; }
-  #lobby-list { margin-top:15px; }
-  #lobby-list-heading { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; }
-  .lobby-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 10px; border:2px solid rgba(255,215,0,.3); margin-bottom:6px; background:rgba(255,215,0,.05); }
-  .lobby-row .lobby-bet { font-size:11px; color:var(--gold); }
-  .lobby-row.own { border-color:rgba(255,215,0,.6); background:rgba(255,215,0,.1); }
-  .lobby-row.own .lobby-bet::after { content:' (yours — waiting)'; color:var(--muted); font-size:9px; }
-  .lobby-row button { color:#000; background:var(--gold); border:2px solid #000; padding:6px 10px; font-size:9px; font-weight:700; cursor:pointer; }
-  .lobby-row button:hover { background:#ffe766; }
-  #lobby-empty { font-size:9px; color:var(--muted); padding:8px 0; }
+  @media (max-width:520px) {
+    .topbar { gap:6px; padding-left:8px; padding-right:8px; }
+    .topbar .back { padding:8px; }
+    .chip { padding:8px 6px; }
+  }
 </style>
 </head>
 <body>
-  <a href="/arena" class="back-link">← Arena</a>
+  <!-- Shared gradients for the ship artwork (defined once; every ship svg refers to them). -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <linearGradient id="hullG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c3ccd6"/><stop offset=".5" stop-color="#8a97a5"/><stop offset="1" stop-color="#55616e"/></linearGradient>
+      <linearGradient id="deckG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dfe5eb"/><stop offset="1" stop-color="#a9b4c0"/></linearGradient>
+    </defs>
+  </svg>
+
+  <header class="topbar">
+    <a href="/arena" class="back">← Arena</a>
+    <div class="title">⚓ BATTLESHIP</div>
+    <div class="chip" id="balance-chip"><span id="balance">0</span> ⓢ</div>
+    <button id="now-playing" title="Music options" type="button">🎵</button>
+  </header>
+  <div class="banner" id="conn-banner" hidden></div>
+  <div class="banner" id="away-banner" hidden></div>
+  <div id="toast" hidden></div>
+
   <main>
-    <div class="top-bar">
-      <div class="title">⚓ Battleship 1v1</div>
-      <div class="balance">Balance: <span id="balance">0</span> Strubles</div>
+    <!-- ================= LOBBY ================= -->
+    <section id="phase-lobby" class="lobby">
+      <div class="panel" id="lobby-panel">
+        <h2>Find a match</h2>
+        <div class="who" id="who">Connecting…</div>
+
+        <div id="guest-name-row" hidden>
+          <input id="guest-name" class="field" maxlength="20" placeholder="Your name (optional)" autocomplete="off" />
+        </div>
+
+        <div class="seg" id="stake-seg">
+          <button type="button" id="seg-friendly" class="on">Friendly · free</button>
+          <button type="button" id="seg-stake">For Strubles</button>
+        </div>
+        <input id="stake-input" class="field" type="number" min="100" step="100" inputmode="numeric" placeholder="Stake (Strubles)" hidden />
+        <button class="btn solid" id="open-lobby" type="button" style="width:100%">Open friendly lobby</button>
+        <div class="hint" id="lobby-hint"></div>
+
+        <div id="waiting" hidden>
+          <div class="spin">⚓</div>
+          <div class="hint" id="waiting-text">Waiting for an opponent…</div>
+          <button class="btn no" id="cancel-wait" type="button">Cancel</button>
+        </div>
+
+        <div class="lobby-list">
+          <h3>Open lobbies</h3>
+          <div id="lobby-rows"></div>
+          <div class="empty" id="lobby-empty">Nobody is waiting yet. Open a lobby and the next person in joins you.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SETUP ================= -->
+    <section id="phase-setup" hidden>
+      <div class="statusbar">
+        <span>vs <b id="setup-opp">…</b><br><span id="setup-opp-state" style="color:var(--muted)"></span></span>
+        <span id="setup-timer" style="font-size:12px"></span>
+      </div>
+      <div class="board-wrap"><div class="board live" id="board-setup"></div></div>
+      <div class="tray" id="tray"></div>
+      <div class="hint" id="setup-hint"></div>
+      <div class="row" id="setup-actions">
+        <button class="btn" id="btn-random" type="button">🎲 Random</button>
+        <button class="btn" id="btn-clear" type="button">🗑 Clear</button>
+        <button class="btn go" id="btn-ready" type="button" disabled>✓ Ready</button>
+      </div>
+      <div style="text-align:center;margin-top:14px"><button class="btn no" id="btn-forfeit-setup" type="button" style="font-size:8px;min-height:34px;padding:8px 10px">🏳 Leave game</button></div>
+    </section>
+    <div class="aim-bar" id="aim-bar" hidden>
+      <div class="hintline" id="aim-hint"></div>
+      <button class="btn" id="aim-rotate" type="button">⟳ Rotate</button>
+      <button class="btn go" id="aim-place" type="button">✓ Place</button>
+      <button class="btn no" id="aim-cancel" type="button">✕</button>
     </div>
 
-    <!-- BET PHASE (lobby browsing) -->
-    <div id="phase-bet" class="phase-bet">
-      <div class="bet-status">Enter a bet to open a lobby, or match one below</div>
-      <input type="number" id="bet-input" class="bet-input" min="100" step="100" placeholder="Bet amount" />
-      <button id="find-match" class="bet-btn">Open Lobby</button>
-      <div class="bet-status" id="status-message"></div>
-
-      <div id="lobby-list">
-        <div id="lobby-list-heading">Open Lobbies</div>
-        <div id="lobby-rows"></div>
-        <div id="lobby-empty">No open lobbies yet — be the first to place a bet.</div>
-      </div>
-    </div>
-
-    <!-- SETUP PHASE -->
-    <div id="phase-setup" class="phase-setup" style="display:none;">
-      <div class="ship-palette">
-        <div style="font-size:10px; color:var(--gold); margin-bottom:10px;">Ships</div>
-        <div id="ship-list"></div>
-      </div>
-      <div class="grid-container">
-        <div class="grid-controls">
-          <button class="grid-btn" id="rotate-btn">Rotate (R)</button>
-          <button class="grid-btn" id="clear-btn">Clear All</button>
-          <button class="grid-btn" id="ready-btn">Ready!</button>
-        </div>
-        <div style="display:flex; gap:10px; margin-bottom:10px;">
-          <div class="grid-label-v" style="width:auto;"></div>
-          <div class="grid-label-h" id="grid-header"></div>
-        </div>
-        <div style="display:flex; gap:10px;">
-          <div id="grid-labels" style="display:flex; flex-direction:column; gap:2px;"></div>
-          <div class="grid" id="grid-placement"></div>
-        </div>
-        <div class="setup-status" id="setup-status">Place all ships to continue...</div>
-        <!-- Aiming a new ship. Tapping the board only moves the ghost; this
-             bar is the only thing that commits it, so a mis-tap on a phone
-             can't drop a ship somewhere you didn't mean. -->
-        <div class="edit-controls" id="place-controls" style="display:none;">
-          <div id="place-hint"></div>
-          <button class="edit-btn" id="place-rotate-btn">⟳ Rotate</button>
-          <button class="edit-btn" id="place-up-btn">↑</button>
-          <button class="edit-btn" id="place-down-btn">↓</button>
-          <button class="edit-btn" id="place-left-btn">←</button>
-          <button class="edit-btn" id="place-right-btn">→</button>
-          <button class="edit-btn confirm" id="place-confirm-btn">✓ Place</button>
-          <button class="edit-btn cancel" id="place-cancel-btn">✕ Cancel</button>
-        </div>
-        <div class="edit-controls" id="edit-controls" style="display:none;">
-          <button class="edit-btn" id="edit-rotate-btn">Rotate (R)</button>
-          <button class="edit-btn" id="edit-up-btn">↑ Up</button>
-          <button class="edit-btn" id="edit-down-btn">↓ Down</button>
-          <button class="edit-btn" id="edit-left-btn">← Left</button>
-          <button class="edit-btn" id="edit-right-btn">→ Right</button>
-          <button class="edit-btn confirm" id="edit-confirm-btn">✓ Confirm</button>
-          <button class="edit-btn cancel" id="edit-cancel-btn">✕ Cancel</button>
+    <!-- ================= BATTLE ================= -->
+    <section id="phase-battle" hidden>
+      <div class="turnbar" id="turnbar"><span id="turn-text">…</span><span class="time" id="turn-time"></span></div>
+      <div id="result-card" class="panel" hidden>
+        <h2 id="result-title"></h2>
+        <p id="result-sub"></p>
+        <p class="pay" id="result-pay"></p>
+        <p id="rematch-note" style="color:var(--muted)"></p>
+        <div class="row">
+          <button class="btn go" id="btn-rematch" type="button">↻ Rematch</button>
+          <button class="btn" id="btn-lobby" type="button">Back to lobby</button>
         </div>
       </div>
-    </div>
-
-    <!-- BATTLE PHASE -->
-    <div id="phase-battle" class="phase-battle" style="display:none;">
-      <div class="battle-board">
-        <div class="board-title">Your Fleet</div>
-        <div class="board-grid" id="grid-your"></div>
+      <div class="block">
+        <h3>ENEMY RADAR <small id="enemy-name"></small></h3>
+        <div class="board-wrap"><div class="board" id="board-enemy"></div></div>
+        <div class="fleetline" id="fleet-enemy"></div>
       </div>
-      <div class="battle-board">
-        <div class="board-title">Enemy Radar</div>
-        <div class="board-grid" id="grid-enemy"></div>
-        <div class="turn-indicator" id="turn-indicator">Waiting for opponent...</div>
+      <div class="block">
+        <h3>YOUR FLEET</h3>
+        <div class="board-wrap"><div class="board" id="board-mine"></div></div>
+        <div class="fleetline" id="fleet-mine"></div>
       </div>
-    </div>
-
-    <div class="hit-banner" id="hit-banner"></div>
-
-    <!-- RESULT PHASE -->
-    <div id="phase-result" class="phase-result" style="display:none;">
-      <div class="result-banner">
-        <p class="result-text" id="result-text">Victory!</p>
-        <p class="result-payout" id="result-payout">+5000 Strubles</p>
-        <button class="result-button" id="back-lobby-btn">Back to Lobby</button>
-      </div>
+      <div style="text-align:center"><button class="btn no" id="btn-forfeit-battle" type="button" style="font-size:8px;min-height:34px;padding:8px 10px">🏳 Forfeit</button></div>
+    </section>
+    <div class="firebar" id="firebar" hidden>
+      <div class="lbl" id="fire-label">Tap a square on the radar to aim</div>
+      <button class="btn go" id="btn-fire" type="button" disabled>🎯 FIRE</button>
     </div>
   </main>
 
-  <button id="now-playing" title="Music options">🎵</button>
+  <div class="hit-banner" id="hit-banner"></div>
 
-  <!-- Music Playlist Modal -->
   <div class="overlay" id="playlist-overlay">
     <div class="modal">
-      <div class="modal-head">
-        <h2>Now Playing</h2>
-        <button class="btn" id="playlist-close" type="button">Close</button>
-      </div>
+      <div class="modal-head"><h2>Now Playing</h2><button class="btn" id="playlist-close" type="button">Close</button></div>
       <div class="volume-row">
-        <button class="volume-mute-btn" id="mute-btn" aria-label="Toggle sound" title="Toggle sound">🔊</button>
+        <button class="volume-mute-btn" id="mute-btn" aria-label="Toggle sound" title="Toggle sound" type="button">🔊</button>
         <input type="range" id="volume-slider" min="0" max="100" value="50" aria-label="Music volume" />
       </div>
       <div id="playlist-list"></div>
@@ -361,902 +321,581 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script is:inline src="/cloud-sync.js?v=9"></script>
 <script is:inline src="/strubles.js?v=3"></script>
-<script is:inline src="/battleship-sprites.js"></script>
 <script is:inline src="/music-library.js?v=13"></script>
 <script is:inline src="/music-position.js?v=1"></script>
-<script is:inline>
-  // Koronba plays for free on Arena Battleship -- tactical intensity to match.
-  window.PAGE_FREE_TRACK_KEY = 'koronba';
-</script>
+<script is:inline>window.PAGE_FREE_TRACK_KEY = 'koronba';</script>
 <script is:inline src="/pickers.js?v=11"></script>
+<script is:inline src="/arena-client.js?v=1"></script>
 <script is:inline>
 (() => {
-  const themeMusic = document.getElementById('theme-music');
-  const VOLUME_KEY = 'music_volume_v1';
-  const volumeSlider = document.getElementById('volume-slider');
-  const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
-  themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.5;
-  volumeSlider.value = Math.round(themeMusic.volume * 100);
-  volumeSlider.addEventListener('input', () => {
-    themeMusic.volume = volumeSlider.value / 100;
-    localStorage.setItem(VOLUME_KEY, themeMusic.volume);
-  });
-
-  let audioEnabled = true;
-  function tryPlayTheme() {
-    if (!audioEnabled) return;
-    themeMusic.play().catch(() => {});
-  }
-  tryPlayTheme();
-  const unlockTheme = () => {
-    tryPlayTheme();
-    window.removeEventListener('pointerdown', unlockTheme);
-    window.removeEventListener('keydown', unlockTheme);
-  };
-  window.addEventListener('pointerdown', unlockTheme);
-  window.addEventListener('keydown', unlockTheme);
-
-  const muteBtn = document.getElementById('mute-btn');
-  muteBtn.addEventListener('click', () => {
-    audioEnabled = !audioEnabled;
-    muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
-    if (audioEnabled) tryPlayTheme();
-    else themeMusic.pause();
-  });
-
-  // Sound effects. hit/sink previously pointed at lootbox-win.mp3 and
-  // jackpot-win.mp3, neither of which exist in public/audio/sfx -- every
-  // hit and sunk ship played silently.
-  const SFX = {
-    place: new Audio('/audio/sfx/minesweeper-reveal.mp3'),
-    hit: new Audio('/audio/sfx/plane-explosion.mp3'),
-    miss: new Audio('/audio/sfx/minesweeper-unflag.mp3'),
-    sink: new Audio('/audio/sfx/hamood-jackpot.mp3')
-  };
-
-  Object.values(SFX).forEach(sfx => { sfx.volume = 0.6; });
-
-  const SHIP_TYPES = [
-    { name: 'Carrier', size: 5 },
-    { name: 'Battleship', size: 4 },
-    { name: 'Cruiser', size: 3 },
-    { name: 'Submarine', size: 3 },
-    { name: 'Destroyer', size: 2 }
+  const $ = (id) => document.getElementById(id);
+  const SIZE = 10;
+  const SHIPS = [
+    { name: 'Carrier', size: 5 }, { name: 'Battleship', size: 4 }, { name: 'Cruiser', size: 3 },
+    { name: 'Submarine', size: 3 }, { name: 'Destroyer', size: 2 },
   ];
+  const SIZE_OF = Object.fromEntries(SHIPS.map((s) => [s.name, s.size]));
 
-  const WS_URL = window.location.protocol === 'https:' ? 'wss://iantopia.com/arena-ws/battleship' : 'ws://localhost:4001';
-  let ws = null;
-  let phase = 'bet'; // bet, setup, battle, result
-  let grid = Array(10).fill(null).map(() => Array(10).fill(0));
-  let placedShips = [];
-  let selectedShip = null;
-  let horizontal = true;
-  let yourIndex = null;
-  let opponentGrid = Array(10).fill(null).map(() => Array(10).fill(0));
-  let myQueueId = null;
+  // ---------------------------------------------------------------- audio
+  const music = $('theme-music');
+  const savedVol = parseFloat(localStorage.getItem('music_volume_v1'));
+  music.volume = isFinite(savedVol) ? savedVol : 0.5;
+  $('volume-slider').value = Math.round(music.volume * 100);
+  $('volume-slider').addEventListener('input', (e) => { music.volume = e.target.value / 100; localStorage.setItem('music_volume_v1', music.volume); });
+  let audioOn = true;
+  const playMusic = () => { if (audioOn) music.play().catch(() => {}); };
+  playMusic();
+  const unlock = () => { playMusic(); removeEventListener('pointerdown', unlock); removeEventListener('keydown', unlock); };
+  addEventListener('pointerdown', unlock); addEventListener('keydown', unlock);
+  $('mute-btn').addEventListener('click', () => {
+    audioOn = !audioOn; $('mute-btn').textContent = audioOn ? '🔊' : '🔇';
+    if (audioOn) playMusic(); else music.pause();
+  });
+  const SFX = {
+    place: new Audio('/audio/sfx/minesweeper-reveal.mp3'), hit: new Audio('/audio/sfx/plane-explosion.mp3'),
+    miss: new Audio('/audio/sfx/minesweeper-unflag.mp3'), sink: new Audio('/audio/sfx/hamood-jackpot.mp3'),
+  };
+  Object.values(SFX).forEach((a) => { a.volume = 0.6; });
+  const sfx = (k) => { if (!audioOn) return; try { SFX[k].currentTime = 0; SFX[k].play().catch(() => {}); } catch {} };
 
-  function updateBalance() {
-    document.getElementById('balance').textContent = Strubles.get().toLocaleString();
+  // --------------------------------------------------------------- helpers
+  let toastTimer = null;
+  function toast(text, ms = 2600) {
+    const t = $('toast'); t.textContent = text; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, ms);
   }
+  const fmt = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  const inBoard = (x, y) => x >= 0 && y >= 0 && x < SIZE && y < SIZE;
+  const cellsOf = (s) => Array.from({ length: SIZE_OF[s.name] }, (_, i) => [s.horizontal ? s.x + i : s.x, s.horizontal ? s.y : s.y + i]);
+
+  // ----------------------------------------------------------- ship artwork
+  // Drawn as SVG so it is crisp at any board size. Built horizontally (bow on
+  // the right) and rotated for vertical placement.
+  function shipSVG(size, horizontal) {
+    const L = size * 10;
+    const hull = `M2.2 1.7H${L - 4.4}Q${L - .6} 3.1 ${L - .6} 5Q${L - .6} 6.9 ${L - 4.4} 8.3H2.2Q.7 8.3 .7 6.8V3.2Q.7 1.7 2.2 1.7Z`;
+    let d = `<path d="${hull}" fill="url(#hullG)" stroke="#2c3640" stroke-width=".5"/>`;
+    d += `<path d="M3 2.9H${L - 5.6}Q${L - 2} 3.8 ${L - 2} 5Q${L - 2} 6.2 ${L - 5.6} 7.1H3Z" fill="url(#deckG)" opacity=".9"/>`;
+    const turrets = size >= 4 ? [0.28, 0.5, 0.72] : size === 3 ? [0.32, 0.62] : [0.5];
+    turrets.forEach((f) => { const cx = (L * f).toFixed(1); d += `<circle cx="${cx}" cy="5" r="1.45" fill="#39434e" stroke="#1c232a" stroke-width=".3"/><rect x="${cx}" y="4.75" width="2.1" height=".5" fill="#1c232a"/>`; });
+    d += `<rect x="${(L * 0.42).toFixed(1)}" y="3.6" width="${Math.max(1.6, size * .5)}" height="2.8" rx=".5" fill="#eef2f6" stroke="#59646f" stroke-width=".3"/>`;
+    const g = horizontal ? d : `<g transform="translate(10 0) rotate(90)">${d}</g>`;
+    const vb = horizontal ? `0 0 ${L} 10` : `0 0 10 ${L}`;
+    return `<svg viewBox="${vb}" preserveAspectRatio="none" aria-hidden="true">${g}</svg>`;
+  }
+  function shipEl(s, cls) {
+    const size = SIZE_OF[s.name], el = document.createElement('div');
+    el.className = 'ship ' + (cls || '');
+    el.style.left = s.x * 10 + '%'; el.style.top = s.y * 10 + '%';
+    el.style.width = (s.horizontal ? size * 10 : 10) + '%'; el.style.height = (s.horizontal ? 10 : size * 10) + '%';
+    el.innerHTML = shipSVG(size, s.horizontal);
+    el.dataset.name = s.name;
+    return el;
+  }
+
+  // ----------------------------------------------------------------- board
+  function makeBoard(root) {
+    root.innerHTML = '';
+    const cells = Array.from({ length: SIZE }, () => Array(SIZE));
+    const frag = document.createDocumentFragment();
+    for (let r = 0; r <= SIZE; r++) {
+      for (let c = 0; c <= SIZE; c++) {
+        const d = document.createElement('div');
+        if (r === 0 || c === 0) {
+          d.className = 'cell lab';
+          d.textContent = r === 0 && c > 0 ? 'ABCDEFGHIJ'[c - 1] : (c === 0 && r > 0 ? String(r) : '');
+        } else {
+          d.className = 'cell'; d.dataset.x = c - 1; d.dataset.y = r - 1; cells[r - 1][c - 1] = d;
+        }
+        frag.appendChild(d);
+      }
+    }
+    root.appendChild(frag);
+    const layer = document.createElement('div'); layer.className = 'ships'; root.appendChild(layer);
+    return { root, cells, layer };
+  }
+  const boards = { setup: makeBoard($('board-setup')), enemy: makeBoard($('board-enemy')), mine: makeBoard($('board-mine')) };
+  const cellAt = (e) => { const c = e.target.closest && e.target.closest('.cell:not(.lab)'); return c ? [+c.dataset.x, +c.dataset.y] : null; };
+
+  // ---------------------------------------------------------------- state
+  const S = {
+    phase: 'lobby',          // lobby | setup | battle
+    me: -1, oppName: '', friendly: true, bet: 0,
+    queued: false, queueId: null,
+    // setup
+    placed: new Map(), selected: SHIPS[0].name, horizontal: true, aim: null, submitted: false, oppReady: false, setupEnds: 0,
+    // battle
+    radar: null, mineHits: null, myShips: [], yourHealth: null, enemyHealth: null,
+    turn: -1, turnEnds: 0, target: null, pending: false, last: null,
+    over: false, rematchSent: false,
+  };
+  const fullHealth = () => Object.fromEntries(SHIPS.map((s) => [s.name, s.size]));
+  const emptyGrid = () => Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
 
   function showPhase(p) {
-    document.getElementById('phase-bet').style.display = p === 'bet' ? 'block' : 'none';
-    document.getElementById('phase-setup').style.display = p === 'setup' ? 'flex' : 'none';
-    document.getElementById('phase-battle').style.display = p === 'battle' ? 'grid' : 'none';
-    document.getElementById('phase-result').style.display = p === 'result' ? 'flex' : 'none';
-    phase = p;
+    S.phase = p;
+    $('phase-lobby').hidden = p !== 'lobby';
+    $('phase-setup').hidden = p !== 'setup';
+    $('phase-battle').hidden = p !== 'battle';
+    $('firebar').hidden = !(p === 'battle' && !S.over);
+    if (p !== 'setup') $('aim-bar').hidden = true;
+    scrollTo({ top: 0 });
   }
 
-  function showStatus(msg) {
-    document.getElementById('status-message').textContent = msg;
-  }
-
-  function renderLobbies(lobbies) {
-    const container = document.getElementById('lobby-rows');
-    const empty = document.getElementById('lobby-empty');
-    const relevant = lobbies.filter(l => l.gameType === 'battleship');
-    container.innerHTML = '';
-    if (relevant.length === 0) {
-      empty.style.display = 'block';
-      return;
-    }
-    empty.style.display = 'none';
-    relevant.forEach((lobby) => {
-      const isOwn = lobby.queueId === myQueueId;
-      const row = document.createElement('div');
-      row.className = 'lobby-row' + (isOwn ? ' own' : '');
-      const betSpan = document.createElement('span');
-      betSpan.className = 'lobby-bet';
-      betSpan.textContent = `${lobby.bet.toLocaleString()} Strubles`;
-      row.appendChild(betSpan);
-      if (!isOwn) {
-        const btn = document.createElement('button');
-        btn.textContent = 'Match Bet';
-        btn.addEventListener('click', () => {
-          if (!ws || ws.readyState !== WebSocket.OPEN) return;
-          ws.send(JSON.stringify({ type: 'match_bet', queueId: lobby.queueId }));
-        });
-        row.appendChild(btn);
-      }
-      container.appendChild(row);
-    });
-  }
-
-  function initSetupPhase() {
-    showPhase('setup');
-    grid = Array(10).fill(null).map(() => Array(10).fill(0));
-    placedShips = [];
-    renderGridSetup();
-    renderShipPalette();
-  }
-
-  function renderShipPalette() {
-    const palette = document.getElementById('ship-list');
-    palette.innerHTML = SHIP_TYPES.map(ship =>
-      `<div class="ship-item" data-ship="${ship.name}" style="opacity:${placedShips.find(s => s.name === ship.name) ? 0.5 : 1}">${ship.name} (${ship.size})</div>`
-    ).join('');
-    document.querySelectorAll('.ship-item').forEach(el => {
-      el.addEventListener('click', () => selectShip(el.dataset.ship));
-    });
-  }
-
-  function selectShip(name) {
-    if (placedShips.find(s => s.name === name)) return;
-    selectedShip = name;
-    aimed = false;
-    previewX = null;
-    previewY = null;
-    exitEditMode(); // Ensure no edit state when selecting new ship
-    renderGridSetup();
-  }
-
-  // --- Two-step placement: aim, then commit. ---
-  let suppressNextClick = false;
-  let aimed = false;
-
-  // Keeps the whole ship on the board, so the ghost is never half off the
-  // edge and the arrows can't walk it out of bounds.
-  function clampPreview(x, y) {
-    const ship = SHIP_TYPES.find((s) => s.name === selectedShip);
-    if (!ship) return [x, y];
-    const maxX = horizontal ? 10 - ship.size : 9;
-    const maxY = horizontal ? 9 : 10 - ship.size;
-    return [Math.max(0, Math.min(maxX, x)), Math.max(0, Math.min(maxY, y))];
-  }
-
-  function setPreview(x, y) {
-    if (!selectedShip) return;
-    [previewX, previewY] = clampPreview(x, y);
-    renderGridSetup();
-  }
-
-  function nudgePreview(dx, dy) {
-    if (!selectedShip || previewX === null) return;
-    setPreview(previewX + dx, previewY + dy);
-  }
-
-  function cancelPlacement() {
-    selectedShip = null;
-    aimed = false;
-    previewX = previewY = null;
-    renderGridSetup();
-    renderShipPalette();
-  }
-
-  function commitPlacement() {
-    if (!selectedShip || previewX === null) return;
-    if (!canPlaceShip(previewX, previewY, selectedShip, horizontal)) return;
-    placeShip(previewX, previewY);
-    SFX.place.play();
-  }
-
-  // Shows the aiming bar and reports whether the current spot is legal, so
-  // the reason a placement won't commit is on screen rather than silent.
-  function updatePlaceControls() {
-    const bar = document.getElementById('place-controls');
-    if (!bar) return;
-    const aiming = !!selectedShip && previewX !== null && !editingShip;
-    bar.style.display = aiming ? '' : 'none';
-    if (!aiming) {
-      if (selectedShip && !editingShip) {
-        document.getElementById('setup-status').textContent =
-          `${selectedShip} is up — tap the board to aim it`;
-      }
-      return;
-    }
-    const ok = canPlaceShip(previewX, previewY, selectedShip, horizontal);
-    const confirm = document.getElementById('place-confirm-btn');
-    confirm.disabled = !ok;
-    confirm.style.opacity = ok ? '1' : '.4';
-    const msg = ok
-      ? `${selectedShip} — press ✓ Place to lock it in`
-      : `${selectedShip} won't fit there — move or rotate it`;
-    document.getElementById('setup-status').textContent = msg;
-    // Repeated inside the bar because on a phone the bar is pinned to the
-    // bottom and covers the status line underneath it.
-    const hint = document.getElementById('place-hint');
-    hint.textContent = msg;
-    hint.style.color = ok ? 'var(--gold)' : '#ff6b6b';
-  }
-
-  let previewX = null;
-  let previewY = null;
-  let editingShip = null; // { name, x, y, horizontal }
-  let editX = null;
-  let editY = null;
-
-  // Validation helpers
-  function validateGridState() {
-    // Ensure all placedShips have cells marked in grid
-    for (const ship of placedShips) {
-      const shipDef = SHIP_TYPES.find(s => s.name === ship.name);
-      if (ship.horizontal) {
-        for (let i = 0; i < shipDef.size; i++) {
-          if (!grid[ship.y][ship.x + i]) {
-            console.warn(`Grid inconsistency: ship ${ship.name} at (${ship.x},${ship.y}) missing grid marker at (${ship.x + i},${ship.y})`);
-            return false;
-          }
-        }
-      } else {
-        for (let i = 0; i < shipDef.size; i++) {
-          if (!grid[ship.y + i][ship.x]) {
-            console.warn(`Grid inconsistency: ship ${ship.name} at (${ship.x},${ship.y}) missing grid marker at (${ship.x},${ship.y + i})`);
-            return false;
-          }
-        }
-      }
-    }
-    return true;
-  }
-
-  function validateEditState() {
-    if (!editingShip) {
-      if (editX !== null || editY !== null) {
-        console.warn('Edit state inconsistency: editing coords without ship');
-        editX = null;
-        editY = null;
-      }
-      return true;
-    }
-    if (editX === null || editY === null) {
-      console.warn('Edit state inconsistency: ship without coords');
-      return false;
-    }
-    if (editX < 0 || editY < 0 || editX > 9 || editY > 9) {
-      console.warn(`Edit state out of bounds: (${editX},${editY})`);
-      return false;
-    }
-    return true;
-  }
-
-  function canPlaceShip(x, y, shipName, isHorizontal) {
-    const ship = SHIP_TYPES.find(s => s.name === shipName);
-    if (!ship) return false;
-    if (x < 0 || y < 0) return false;
-
-    if (isHorizontal) {
-      if (x + ship.size > 10) return false;
-      for (let i = 0; i < ship.size; i++) {
-        if (grid[y][x + i]) return false;
-      }
-    } else {
-      if (y + ship.size > 10) return false;
-      for (let i = 0; i < ship.size; i++) {
-        if (grid[y + i][x]) return false;
-      }
-    }
-    return true;
-  }
-
-  function enterEditMode(shipName) {
-    const ship = placedShips.find(s => s.name === shipName);
-    if (!ship) {
-      console.warn(`enterEditMode: ship ${shipName} not found in placedShips`);
-      return;
-    }
-    editingShip = { ...ship };
-    editX = ship.x;
-    editY = ship.y;
-    console.log(`[EDIT] Entered edit mode for ${shipName} at (${editX},${editY}) ${ship.horizontal ? 'H' : 'V'}`);
-    validateEditState();
-    renderGridSetup();
-  }
-
-  function exitEditMode() {
-    editingShip = null;
-    editX = null;
-    editY = null;
-    renderGridSetup();
-  }
-
-  function rotateEditingShip() {
-    if (!editingShip) return;
-    editingShip.horizontal = !editingShip.horizontal;
-    renderGridSetup();
-  }
-
-  function moveEditingShip(dx, dy) {
-    if (!editingShip) return;
-    const shipDef = SHIP_TYPES.find(s => s.name === editingShip.name);
-    const maxX = editingShip.horizontal ? 10 - shipDef.size : 10;
-    const maxY = editingShip.horizontal ? 10 : 10 - shipDef.size;
-    editX = Math.max(0, Math.min(maxX - 1, editX + dx));
-    editY = Math.max(0, Math.min(maxY - 1, editY + dy));
-    renderGridSetup();
-  }
-
-  // Direct click-to-reposition: an editing ship's anchor jumps straight to
-  // whichever cell was clicked (or hovered, see the grid cell's mousemove
-  // listener below), clamped the same way the arrow buttons already are.
-  // The arrow/keyboard controls stay as a precise fallback, but this is
-  // the primary way to move a ship -- point at where it should go.
-  function setEditPosition(x, y) {
-    if (!editingShip) return;
-    const shipDef = SHIP_TYPES.find(s => s.name === editingShip.name);
-    const maxX = editingShip.horizontal ? 10 - shipDef.size : 10;
-    const maxY = editingShip.horizontal ? 10 : 10 - shipDef.size;
-    editX = Math.max(0, Math.min(maxX - 1, x));
-    editY = Math.max(0, Math.min(maxY - 1, y));
-    renderGridSetup();
-  }
-
-  function confirmEdit() {
-    if (!editingShip || editX === null || editY === null) {
-      console.warn('confirmEdit: invalid state', { editingShip, editX, editY });
-      return;
-    }
-
-    const shipDef = SHIP_TYPES.find(s => s.name === editingShip.name);
-    if (!shipDef) {
-      console.warn(`confirmEdit: ship def not found for ${editingShip.name}`);
-      return;
-    }
-
-    console.log(`[EDIT] Confirming ${editingShip.name}: (${editingShip.x},${editingShip.y}) → (${editX},${editY}) ${editingShip.horizontal ? 'H' : 'V'}`);
-
-    // Clear old ship from grid BEFORE validating the new position -- the
-    // ship being edited is almost always still overlapping its own old
-    // footprint (any nudge by 1 cell, or any in-place rotation, shares
-    // every cell but one/all with where it already is), so validating
-    // against a grid that still has those old cells marked as occupied
-    // made canPlaceShip() reject the ship's own former squares as a
-    // collision with itself. Every edit was silently rejected as a
-    // result. Restore these same cells if the new placement turns out
-    // to be invalid.
-    const oldShip = placedShips.find(s => s.name === editingShip.name);
-    if (oldShip) {
-      if (oldShip.horizontal) {
-        for (let i = 0; i < shipDef.size; i++) {
-          grid[oldShip.y][oldShip.x + i] = 0;
-        }
-      } else {
-        for (let i = 0; i < shipDef.size; i++) {
-          grid[oldShip.y + i][oldShip.x] = 0;
-        }
-      }
-    }
-
-    if (!canPlaceShip(editX, editY, editingShip.name, editingShip.horizontal)) {
-      console.warn(`[EDIT] Placement invalid - rejected`);
-      // Put the old footprint back since we speculatively cleared it above.
-      if (oldShip) {
-        if (oldShip.horizontal) {
-          for (let i = 0; i < shipDef.size; i++) grid[oldShip.y][oldShip.x + i] = 1;
-        } else {
-          for (let i = 0; i < shipDef.size; i++) grid[oldShip.y + i][oldShip.x] = 1;
-        }
-      }
-      return; // Invalid placement, don't change anything
-    }
-
-    // Place ship at new position
-    if (editingShip.horizontal) {
-      for (let i = 0; i < shipDef.size; i++) {
-        grid[editY][editX + i] = 1;
-      }
-    } else {
-      for (let i = 0; i < shipDef.size; i++) {
-        grid[editY + i][editX] = 1;
-      }
-    }
-
-    // Update ship data
-    const shipIndex = placedShips.findIndex(s => s.name === editingShip.name);
-    if (shipIndex >= 0) {
-      placedShips[shipIndex] = {
-        name: editingShip.name,
-        x: editX,
-        y: editY,
-        horizontal: editingShip.horizontal
-      };
-      console.log(`[EDIT] Ship ${editingShip.name} confirmed at (${editX},${editY})`);
-    } else {
-      console.warn(`[EDIT] Ship ${editingShip.name} not found in placedShips to update`);
-    }
-
-    validateGridState();
-    exitEditMode();
-  }
-
-  function renderGridSetup() {
-    // Header
-    const header = document.getElementById('grid-header');
-    header.innerHTML = 'ABCDEFGHIJ'.split('').map(c => `<div class="label-cell">${c}</div>`).join('');
-
-    // Grid labels
-    const labels = document.getElementById('grid-labels');
-    labels.innerHTML = '1234567890'.split('').map((n, i) => `<div class="grid-label-v">${i+1}</div>`).join('');
-
-    // Grid cells
-    const gridEl = document.getElementById('grid-placement');
-    gridEl.innerHTML = '';
-    for (let y = 0; y < 10; y++) {
-      for (let x = 0; x < 10; x++) {
-        const cell = document.createElement('div');
-        cell.className = 'grid-cell';
-
-        // Show preview if ship is selected and cursor is hovering
-        if (selectedShip && previewX !== null && previewY !== null) {
-          const isInPreview = () => {
-            const ship = SHIP_TYPES.find(s => s.name === selectedShip);
-            if (horizontal) {
-              return y === previewY && x >= previewX && x < previewX + ship.size;
-            } else {
-              return x === previewX && y >= previewY && y < previewY + ship.size;
-            }
-          };
-
-          if (isInPreview()) {
-            const canPlace = canPlaceShip(previewX, previewY, selectedShip, horizontal);
-            cell.classList.add(canPlace ? 'preview' : 'preview-invalid');
-            if (x === previewX && y === previewY) {
-              cell.classList.add('preview-origin');
-            }
-          }
-        }
-
-        // Check if this is part of the editing ship (use editX/editY, not editingShip.x/y)
-        let isEditingCell = false;
-        if (editingShip && editX !== null && editY !== null) {
-          const shipDef = SHIP_TYPES.find(s => s.name === editingShip.name);
-          if (editingShip.horizontal) {
-            isEditingCell = editY === y && x >= editX && x < editX + shipDef.size;
-          } else {
-            isEditingCell = editX === x && y >= editY && y < editY + shipDef.size;
-          }
-        }
-
-        if (grid[y][x] || isEditingCell) {
-          cell.classList.add('ship', 'placing');
-          if (isEditingCell) cell.classList.add('editing');
-
-          // Find which ship occupies this cell and render it
-          for (const ship of placedShips) {
-            const shipDef = SHIP_TYPES.find(s => s.name === ship.name);
-            let occupies = false;
-            if (ship.horizontal) {
-              occupies = ship.y === y && x >= ship.x && x < ship.x + shipDef.size;
-            } else {
-              occupies = ship.x === x && y >= ship.y && y < ship.y + shipDef.size;
-            }
-            if (occupies && x === ship.x && y === ship.y) {
-              // Only render sprite at ship's origin
-              const sprite = document.createElement('div');
-              sprite.className = 'ship-sprite';
-              applyShipSprite(sprite, ship.name, ship.horizontal);
-              sprite.style.position = 'absolute';
-              sprite.style.opacity = isEditingCell ? '1' : '0.8';
-              cell.style.position = 'relative';
-              cell.appendChild(sprite);
-              // Make placed ships clickable to enter edit mode (unless already editing)
-              if (!editingShip) {
-                cell.style.cursor = 'pointer';
-                cell.addEventListener('click', (e) => { e.stopPropagation(); enterEditMode(ship.name); });
-              }
-              break;
-            }
-          }
-        }
-
-        cell.dataset.x = x;
-        cell.dataset.y = y;
-        // Hover keeps previewing on a mouse, but only until you've actually
-        // aimed — after that the ghost stays put so the ✓ button refers to
-        // a fixed spot rather than wherever the pointer drifted.
-        cell.addEventListener('mousemove', () => {
-          if (editingShip) {
-            setEditPosition(x, y);
-          } else if (selectedShip && !aimed) {
-            setPreview(x, y);
-          }
-        });
-        cell.addEventListener('mouseleave', () => {
-          if (selectedShip && !aimed) {
-            previewX = null;
-            previewY = null;
-            renderGridSetup();
-          }
-        });
-        // Touch has no hover, so the first tap is what reveals the ghost.
-        // It also suppresses the synthetic click that follows, otherwise
-        // that click would immediately commit the placement the tap was
-        // only meant to aim.
-        cell.addEventListener('touchstart', () => {
-          if (editingShip) { setEditPosition(x, y); suppressNextClick = true; return; }
-          if (!selectedShip) return;
-          aimed = true;
-          setPreview(x, y);
-          suppressNextClick = true;
-        }, { passive: true });
-
-        cell.addEventListener('click', () => {
-          if (suppressNextClick) { suppressNextClick = false; return; }
-          if (editingShip) {
-            setEditPosition(x, y);
-            return;
-          }
-          if (!selectedShip) return;
-          // Clicking the aimed origin again commits — keeps the mouse flow
-          // to two quick clicks while the ✓ button stays the explicit path.
-          if (aimed && previewX === x && previewY === y) commitPlacement();
-          else { aimed = true; setPreview(x, y); }
-        });
-        gridEl.appendChild(cell);
-      }
-    }
-    updatePlaceControls();
-  }
-
-  function placeShip(x, y) {
-    if (!selectedShip) return;
-    const ship = SHIP_TYPES.find(s => s.name === selectedShip);
-    const cells = [];
-
-    if (horizontal) {
-      if (x + ship.size > 10) {
-        console.warn(`placeShip: ${selectedShip} would exceed grid width at x=${x}`);
-        return;
-      }
-      for (let i = 0; i < ship.size; i++) {
-        if (grid[y][x + i]) {
-          console.warn(`placeShip: ${selectedShip} collision at (${x + i},${y})`);
-          return;
-        }
-        cells.push([x + i, y]);
-      }
-    } else {
-      if (y + ship.size > 10) {
-        console.warn(`placeShip: ${selectedShip} would exceed grid height at y=${y}`);
-        return;
-      }
-      for (let i = 0; i < ship.size; i++) {
-        if (grid[y + i][x]) {
-          console.warn(`placeShip: ${selectedShip} collision at (${x},${y + i})`);
-          return;
-        }
-        cells.push([x, y + i]);
-      }
-    }
-
-    for (const [nx, ny] of cells) {
-      grid[ny][nx] = 1;
-    }
-    placedShips.push({ name: selectedShip, x, y, horizontal });
-    console.log(`[PLACE] ${selectedShip} placed at (${x},${y}) ${horizontal ? 'H' : 'V'}`);
-    selectedShip = null;
-    aimed = false;
-    previewX = previewY = null;
-    validateGridState();
-
-    // Hand over the next unplaced ship automatically — going back to the
-    // palette between every ship is a lot of hunting on a phone.
-    const next = SHIP_TYPES.find((s) => !placedShips.find((p) => p.name === s.name));
-    if (next) selectShip(next.name);
-
-    renderGridSetup();
-    renderShipPalette();
-
-    if (placedShips.length === 5) {
-      document.getElementById('setup-status').textContent = 'All ships placed! Press Ready! to proceed.';
-      console.log('[SETUP] All 5 ships placed successfully');
-    }
-  }
-
-  function readyForBattle() {
-    if (placedShips.length !== 5) return;
-    const ships = placedShips.map(s => ({
-      name: s.name,
-      x: s.x,
-      y: s.y,
-      horizontal: s.horizontal
-    }));
-    ws.send(JSON.stringify({ type: 'place_ships', ships }));
-  }
-
-  function rotatePlacement() {
-    horizontal = !horizontal;
-    // Rotating near an edge can push the ship off the board, so re-clamp.
-    if (selectedShip && previewX !== null) [previewX, previewY] = clampPreview(previewX, previewY);
-    renderGridSetup();
-  }
-  document.getElementById('rotate-btn').addEventListener('click', rotatePlacement);
-
-  document.getElementById('place-rotate-btn').addEventListener('click', rotatePlacement);
-  document.getElementById('place-up-btn').addEventListener('click', () => nudgePreview(0, -1));
-  document.getElementById('place-down-btn').addEventListener('click', () => nudgePreview(0, 1));
-  document.getElementById('place-left-btn').addEventListener('click', () => nudgePreview(-1, 0));
-  document.getElementById('place-right-btn').addEventListener('click', () => nudgePreview(1, 0));
-  document.getElementById('place-confirm-btn').addEventListener('click', commitPlacement);
-  document.getElementById('place-cancel-btn').addEventListener('click', cancelPlacement);
-
-  document.getElementById('clear-btn').addEventListener('click', () => {
-    grid = Array(10).fill(null).map(() => Array(10).fill(0));
-    placedShips = [];
-    selectedShip = null;
-    renderGridSetup();
-    renderShipPalette();
-    document.getElementById('setup-status').textContent = 'Place all ships to continue...';
+  // ------------------------------------------------------------------ net
+  const arena = ArenaClient.create({
+    game: 'battleship',
+    onMessage: onMsg,
+    onState: onConn,
+    canSwitchIdentity: () => S.phase === 'lobby' && !S.queued,
   });
 
-  document.getElementById('ready-btn').addEventListener('click', readyForBattle);
-  document.getElementById('back-lobby-btn').addEventListener('click', () => location.href = '/arena');
-
-  // Edit mode controls
-  document.getElementById('edit-rotate-btn').addEventListener('click', rotateEditingShip);
-  document.getElementById('edit-up-btn').addEventListener('click', () => moveEditingShip(0, -1));
-  document.getElementById('edit-down-btn').addEventListener('click', () => moveEditingShip(0, 1));
-  document.getElementById('edit-left-btn').addEventListener('click', () => moveEditingShip(-1, 0));
-  document.getElementById('edit-right-btn').addEventListener('click', () => moveEditingShip(1, 0));
-  document.getElementById('edit-confirm-btn').addEventListener('click', confirmEdit);
-  document.getElementById('edit-cancel-btn').addEventListener('click', exitEditMode);
-
-  // Update edit controls visibility when entering/exiting edit mode
-  function updateEditControlsVisibility() {
-    document.getElementById('edit-controls').style.display = editingShip ? '' : 'none';
-  }
-
-  // Hook into enterEditMode and exitEditMode
-  const origEnterEditMode = enterEditMode;
-  enterEditMode = function(shipName) {
-    origEnterEditMode(shipName);
-    updateEditControlsVisibility();
-  };
-
-  const origExitEditMode = exitEditMode;
-  exitEditMode = function() {
-    origExitEditMode();
-    updateEditControlsVisibility();
-  };
-
-  // Keyboard controls for edit mode
-  document.addEventListener('keydown', (e) => {
-    if (!editingShip) return;
-    if (e.key.toLowerCase() === 'r') {
-      e.preventDefault();
-      rotateEditingShip();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      moveEditingShip(0, -1);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      moveEditingShip(0, 1);
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      moveEditingShip(-1, 0);
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      moveEditingShip(1, 0);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      confirmEdit();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      exitEditMode();
-    }
-  });
-
-  // Rotate on main setup phase (not editing) with R key
-  document.addEventListener('keydown', (e) => {
-    if (editingShip || selectedShip === null) return;
-    if (e.key.toLowerCase() === 'r') { e.preventDefault(); rotatePlacement(); }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); nudgePreview(0, -1); }
-    else if (e.key === 'ArrowDown') { e.preventDefault(); nudgePreview(0, 1); }
-    else if (e.key === 'ArrowLeft') { e.preventDefault(); nudgePreview(-1, 0); }
-    else if (e.key === 'ArrowRight') { e.preventDefault(); nudgePreview(1, 0); }
-    else if (e.key === 'Enter') { e.preventDefault(); commitPlacement(); }
-    else if (e.key === 'Escape') { e.preventDefault(); cancelPlacement(); }
-  });
-
-  // Connect and authenticate as soon as we know the user's signed in --
-  // not on bet placement -- so the lobby list (which streams in over
-  // this same connection) is visible before they've entered a bet at
-  // all, letting them browse and match an existing lobby immediately.
-  function connectAuth() {
-    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-    const user = CloudSync.currentUser;
-    if (!user) return;
-    user.getIdToken().then(token => {
-      ws = new WebSocket(WS_URL);
-      ws.onopen = () => {
-        ws.send(JSON.stringify({ type: 'auth', token }));
-      };
-      ws.onmessage = (event) => handleMessage(JSON.parse(event.data));
-      ws.onerror = () => console.error('WS error');
-      ws.onclose = () => {
-        showStatus('Disconnected -- reconnecting...');
-        ws = null;
-        myQueueId = null;
-        setTimeout(connectAuth, 2000);
-      };
-    });
-  }
-  window.addEventListener('cloudsync:authchanged', (e) => {
-    if (e.detail.user) connectAuth();
-  });
-  if (window.CloudSync && CloudSync.isSignedIn()) connectAuth();
-
-  document.getElementById('find-match').addEventListener('click', () => {
-    if (!window.CloudSync || !CloudSync.isSignedIn()) {
-      showStatus('Must be signed in');
-      return;
-    }
-    if (!ws || ws.readyState !== WebSocket.OPEN) {
-      showStatus('Still connecting, try again in a moment...');
-      connectAuth();
-      return;
-    }
-    const bet = parseInt(document.getElementById('bet-input').value || 0);
-    if (!bet || bet < 100) {
-      showStatus('Bet must be at least 100');
-      return;
-    }
-    if (Strubles.get() < bet) {
-      showStatus('Insufficient balance');
-      return;
-    }
-    ws.send(JSON.stringify({ type: 'join_queue', bet, gameType: 'battleship' }));
-  });
-
-  function handleMessage(msg) {
-    if (msg.type === 'auth_ok') {
-      showStatus('Connected. Enter a bet to open a lobby, or match one below.');
-    } else if (msg.type === 'lobby_update') {
-      renderLobbies(msg.lobbies);
-    } else if (msg.type === 'status' && msg.status === 'queued') {
-      myQueueId = msg.queueId;
-      showStatus('Waiting for opponent... (or someone can match your bet)');
-    } else if (msg.type === 'game_start') {
-      // Matched: this is when setup (ship placement) actually begins.
-      yourIndex = msg.yourIndex;
-      myQueueId = null;
-      initSetupPhase();
-    } else if (msg.type === 'error') {
-      showStatus(msg.message);
-    } else if (msg.type === 'placement_result') {
-      if (!msg.valid) alert('Placement error: ' + msg.error);
-    } else if (msg.type === 'battle_start') {
-      showPhase('battle');
-      updateBattleDisplay();
-      updateTurnIndicator(msg.currentTurn);
-    } else if (msg.type === 'fire_result') {
-      applyFireResult(msg);
-    } else if (msg.type === 'game_result') {
-      showGameResult(msg.results);
-    } else if (msg.type === 'opponent_disconnected') {
-      showPhase('result');
-      document.getElementById('result-text').textContent = msg.winner === yourIndex ? 'Opponent disconnected -- you win!' : 'Disconnected -- opponent wins.';
-      document.getElementById('result-payout').textContent = '';
-      updateBalance();
+  function onConn(state) {
+    const b = $('conn-banner');
+    if (state === 'open') { b.hidden = true; refreshWho(); return; }
+    if (state === 'replaced') { b.hidden = false; b.textContent = 'This game was opened in another tab. Close that tab, then reload this page.'; return; }
+    if (state === 'connecting' || state === 'closed') {
+      b.hidden = false; b.textContent = S.phase === 'lobby' ? 'Connecting…' : 'Connection lost — reconnecting. Your game is being held for you…';
     }
   }
 
-  function updateTurnIndicator(currentTurn) {
-    const el = document.getElementById('turn-indicator');
-    const yourTurn = currentTurn === yourIndex;
-    el.textContent = yourTurn ? 'Your turn -- fire!' : "Opponent's turn...";
-    el.classList.toggle('active', yourTurn);
-  }
-
-  function applyFireResult(msg) {
-    const { lastMove } = msg;
-    // The shooter's own view marks the cell on the enemy radar grid;
-    // the receiving player marks the same cell on their own fleet grid.
-    const targetGridId = lastMove.shooterIndex === yourIndex ? 'grid-enemy' : 'grid-your';
-    const cell = document.querySelector(`#${targetGridId} [data-x="${lastMove.x}"][data-y="${lastMove.y}"]`);
-    if (cell) {
-      cell.classList.add(lastMove.hit ? 'hit' : 'miss');
-      if (lastMove.sunkShip) cell.classList.add('sunk');
-    }
-    if (lastMove.hit) {
-      spawnExplosion(cell);
-      SFX[lastMove.sunkShip ? 'sink' : 'hit'].play();
-      showHitBanner(lastMove.sunkShip ? `${lastMove.sunkShip} SUNK!` : 'HIT!', lastMove.sunkShip ? 'sunk' : null);
-    } else {
-      SFX.miss.play();
-      showHitBanner('MISS', 'miss');
-    }
-
-    updateTurnIndicator(msg.currentTurn);
-  }
-
-  function showHitBanner(text, variant) {
-    const el = document.getElementById('hit-banner');
-    el.classList.remove('show', 'sunk', 'miss');
-    void el.offsetWidth; // restart the animation if a previous one is still fading
-    el.textContent = text;
-    if (variant) el.classList.add(variant);
-    el.classList.add('show');
-  }
-
-  const EXPLOSION_FRAME_W = 224, EXPLOSION_FRAME_H = 254;
-  function spawnExplosion(cell) {
-    if (!cell) return;
-    const rect = cell.getBoundingClientRect();
-    const size = Math.max(rect.width, rect.height) * 2.4;
-    const h = size * (EXPLOSION_FRAME_H / EXPLOSION_FRAME_W);
-    const boom = document.createElement('div');
-    boom.className = 'boom-sprite';
-    boom.style.width = size + 'px';
-    boom.style.height = h + 'px';
-    boom.style.left = (rect.left + rect.width / 2 - size / 2) + 'px';
-    boom.style.top = (rect.top + rect.height / 2 - h / 2) + 'px';
-    document.body.appendChild(boom);
-    setTimeout(() => boom.remove(), 560);
-  }
-
-  function showGameResult(results) {
-    showPhase('result');
-    if (!results) return;
-    const mine = results[yourIndex];
-    const resultText = document.getElementById('result-text');
-    const resultPayout = document.getElementById('result-payout');
-    resultText.textContent = mine.result === 'win' ? 'Victory!' : 'Defeat.';
-    resultPayout.textContent = mine.payout > 0 ? `+${mine.payout.toLocaleString()} Strubles` : '';
+  // ---------------------------------------------------------------- lobby
+  let stakeMode = false;
+  function refreshWho() {
+    const me = arena.me;
+    if (arena.state !== 'open') { $('who').textContent = 'Connecting…'; return; }
+    $('guest-name-row').hidden = !me.guest;
+    $('who').innerHTML = me.guest
+      ? `Playing as <b>${esc(me.name)}</b> — a guest. Guests play <b>friendly</b> games (no Strubles). Sign in on the home page to play for Strubles.`
+      : `Signed in as <b>${esc(me.name)}</b>. Friendly games are free; stake games pay the winner.`;
+    $('seg-stake').disabled = me.guest;
+    $('seg-stake').title = me.guest ? 'Sign in to play for Strubles' : '';
+    if (me.guest && stakeMode) setStakeMode(false);
+    $('balance-chip').hidden = me.guest;
     updateBalance();
   }
+  function esc(s) { return String(s == null ? '' : s).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c])); }
+  function updateBalance() { try { $('balance').textContent = Strubles.get().toLocaleString(); } catch {} }
+  addEventListener('strubles:change', updateBalance);
 
-  function updateBattleDisplay() {
-    const yourGrid = document.getElementById('grid-your');
-    const enemyGrid = document.getElementById('grid-enemy');
+  function setStakeMode(on) {
+    stakeMode = on;
+    $('seg-friendly').classList.toggle('on', !on); $('seg-stake').classList.toggle('on', on);
+    $('stake-input').hidden = !on;
+    syncOpenButton();
+  }
+  function stakeValue() { return stakeMode ? parseInt($('stake-input').value, 10) || 0 : 0; }
+  function syncOpenButton() {
+    const bet = stakeValue();
+    $('open-lobby').textContent = !stakeMode ? 'Open friendly lobby' : (bet >= 100 ? `Open lobby · ${bet.toLocaleString()} Strubles` : 'Enter a stake (min 100)');
+  }
+  $('seg-friendly').addEventListener('click', () => setStakeMode(false));
+  $('seg-stake').addEventListener('click', () => { if (!$('seg-stake').disabled) setStakeMode(true); });
+  $('stake-input').addEventListener('input', syncOpenButton);
 
-    for (let y = 0; y < 10; y++) {
-      for (let x = 0; x < 10; x++) {
-        const cell = document.createElement('div');
-        cell.className = 'board-cell';
-        cell.dataset.x = x;
-        cell.dataset.y = y;
-        cell.addEventListener('click', () => fireAt(x, y));
-        enemyGrid.appendChild(cell);
+  let nameTimer = null;
+  $('guest-name').value = ArenaClient.savedGuestName() || '';
+  $('guest-name').addEventListener('input', () => {
+    clearTimeout(nameTimer);
+    nameTimer = setTimeout(() => { // applies on the next connection, so reconnect now (never mid-game)
+      ArenaClient.saveGuestName($('guest-name').value.trim());
+      if (S.phase === 'lobby' && !S.queued) arena.reconnect();
+    }, 900);
+  });
+
+  $('open-lobby').addEventListener('click', () => {
+    if (!arena.isOpen()) { setHint('lobby-hint', 'Still connecting — one moment…', 'bad'); return; }
+    const bet = stakeValue();
+    if (stakeMode && (bet < 100)) { setHint('lobby-hint', 'A stake must be at least 100 Strubles.', 'bad'); return; }
+    if (bet > Strubles.get()) { setHint('lobby-hint', "You don't have that many Strubles.", 'bad'); return; }
+    setHint('lobby-hint', '');
+    arena.send({ type: 'join_queue', bet, gameType: 'battleship' });
+  });
+  $('cancel-wait').addEventListener('click', () => { arena.send({ type: 'leave_queue' }); setQueued(false); });
+  function setHint(id, text, cls) { const h = $(id); h.textContent = text || ''; h.className = 'hint' + (cls ? ' ' + cls : ''); }
+
+  function setQueued(on, text) {
+    S.queued = on;
+    $('waiting').hidden = !on; $('open-lobby').hidden = on; $('stake-seg').hidden = on;
+    $('stake-input').hidden = on || !stakeMode;
+    if (text) $('waiting-text').textContent = text;
+  }
+
+  function renderLobbies(list) {
+    const rows = $('lobby-rows'); rows.innerHTML = '';
+    const mine = list.filter((l) => l.gameType === 'battleship');
+    $('lobby-empty').hidden = mine.length > 0;
+    mine.forEach((l) => {
+      const own = l.queueId === S.queueId;
+      const row = document.createElement('div'); row.className = 'lobby-row' + (own ? ' own' : '');
+      const stake = l.bet > 0;
+      row.innerHTML = `<span>${esc(l.name)}${l.guest ? ' <small style="color:#9fb0cf">(guest)</small>' : ''}<span class="tag ${stake ? 'stake' : 'free'}">${stake ? l.bet.toLocaleString() + ' ⓢ' : 'FRIENDLY'}</span></span>`;
+      if (own) { const s = document.createElement('small'); s.style.color = '#9fb0cf'; s.textContent = 'yours'; row.appendChild(s); }
+      else {
+        const b = document.createElement('button'); b.className = 'btn go'; b.type = 'button'; b.textContent = 'Join';
+        const blocked = stake && arena.me.guest;
+        if (blocked) { b.disabled = true; b.title = 'Sign in to play for Strubles'; }
+        b.addEventListener('click', () => {
+          if (stake && Strubles.get() < l.bet) { toast("You don't have enough Strubles for that lobby."); return; }
+          arena.send({ type: 'match_bet', queueId: l.queueId });
+        });
+        row.appendChild(b);
       }
+      rows.appendChild(row);
+    });
+  }
+
+  // ---------------------------------------------------------------- setup
+  function occupied(skipName) {
+    const m = new Map();
+    S.placed.forEach((s, n) => { if (n !== skipName) cellsOf(s).forEach(([x, y]) => m.set(x + ',' + y, n)); });
+    return m;
+  }
+  function fits(name, x, y, h, skipName) {
+    const occ = occupied(skipName);
+    const s = { name, x, y, horizontal: h };
+    return cellsOf(s).every(([cx, cy]) => inBoard(cx, cy) && !occ.has(cx + ',' + cy));
+  }
+  function clampAim(x, y) {
+    const size = SIZE_OF[S.selected];
+    return [Math.max(0, Math.min(S.horizontal ? SIZE - size : SIZE - 1, x)), Math.max(0, Math.min(S.horizontal ? SIZE - 1 : SIZE - size, y))];
+  }
+  function nextUnplaced() { const n = SHIPS.find((s) => !S.placed.has(s.name)); return n ? n.name : null; }
+
+  function renderSetup() {
+    const b = boards.setup;
+    b.layer.innerHTML = '';
+    S.placed.forEach((s) => b.layer.appendChild(shipEl(s, '')));
+    if (S.selected && S.aim && !S.submitted) {
+      const ok = fits(S.selected, S.aim.x, S.aim.y, S.horizontal);
+      b.layer.appendChild(shipEl({ name: S.selected, x: S.aim.x, y: S.aim.y, horizontal: S.horizontal }, 'ghost ' + (ok ? 'ok' : 'bad')));
     }
+    $('tray').innerHTML = SHIPS.map((s) => {
+      const cls = S.placed.has(s.name) ? 'done' : (S.selected === s.name ? 'sel' : '');
+      return `<button type="button" class="chip-ship ${cls}" data-ship="${s.name}"${S.submitted ? ' disabled' : ''}>${s.name}<span class="pips">${'<i></i>'.repeat(s.size)}</span></button>`;
+    }).join('');
+    const all = S.placed.size === SHIPS.length;
+    $('btn-ready').disabled = !all || S.submitted;
+    $('btn-random').disabled = $('btn-clear').disabled = S.submitted;
+    const aiming = !!(S.selected && S.aim) && !S.submitted;
+    $('aim-bar').hidden = !aiming;
+    if (aiming) {
+      const ok = fits(S.selected, S.aim.x, S.aim.y, S.horizontal);
+      $('aim-place').disabled = !ok;
+      const hl = $('aim-hint'); hl.textContent = ok ? `${S.selected} — press ✓ Place` : `${S.selected} won't fit there`; hl.className = 'hintline' + (ok ? '' : ' bad');
+    }
+    let hint;
+    if (S.submitted) hint = S.oppReady ? 'Starting…' : `Fleet locked in. Waiting for ${S.oppName} to finish placing…`;
+    else if (all) hint = 'All ships placed. Tap a ship to move it, or press Ready.';
+    else if (aiming) hint = '';
+    else hint = S.selected ? `Tap the sea to position your ${S.selected} (${SIZE_OF[S.selected]} squares).` : 'Pick a ship below.';
+    setHint('setup-hint', hint, S.submitted ? 'good' : '');
+    $('setup-opp-state').textContent = S.submitted ? '' : (S.oppReady ? '✔ opponent is ready' : 'opponent is placing…');
+  }
 
-    for (let y = 0; y < 10; y++) {
-      for (let x = 0; x < 10; x++) {
-        const cell = document.createElement('div');
-        cell.className = 'board-cell';
-        if (grid[y][x]) cell.classList.add('ship');
-        yourGrid.appendChild(cell);
+  boards.setup.root.addEventListener('click', (e) => {
+    if (S.submitted) return;
+    const pos = cellAt(e); if (!pos) return;
+    const [x, y] = pos;
+    // Tapping a placed ship picks it up so it can be moved. This replaces a
+    // separate "edit mode" with its own arrow buttons.
+    const owner = occupied().get(x + ',' + y);
+    if (owner) {
+      const s = S.placed.get(owner);
+      S.placed.delete(owner); S.selected = owner; S.horizontal = s.horizontal; S.aim = { x: s.x, y: s.y };
+      renderSetup(); return;
+    }
+    if (!S.selected) S.selected = nextUnplaced();
+    if (!S.selected) return;
+    const [ax, ay] = clampAim(x, y);
+    // Aiming at the spot you are already aiming at confirms it. With a mouse the
+    // hover has already put the ghost there, so one click places; on a phone the
+    // first tap aims and a second tap (or the Place button) confirms.
+    if (S.aim && S.aim.x === ax && S.aim.y === ay && fits(S.selected, ax, ay, S.horizontal)) { commitAim(); return; }
+    S.aim = { x: ax, y: ay };
+    renderSetup();
+  });
+  boards.setup.root.addEventListener('mousemove', (e) => {
+    if (S.submitted || !S.selected) return;
+    if (matchMedia('(hover: none)').matches) return;     // touch: aim by tapping only
+    const pos = cellAt(e); if (!pos) return;
+    const [ax, ay] = clampAim(pos[0], pos[1]);
+    if (S.aim && S.aim.x === ax && S.aim.y === ay) return;
+    S.aim = { x: ax, y: ay }; renderSetup();
+  });
+  $('tray').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ship]'); if (!b || S.submitted) return;
+    const name = b.dataset.ship;
+    if (S.placed.has(name)) { const s = S.placed.get(name); S.placed.delete(name); S.selected = name; S.horizontal = s.horizontal; S.aim = { x: s.x, y: s.y }; }
+    else { S.selected = name; S.aim = null; }
+    renderSetup();
+  });
+  function commitAim() {
+    if (!S.selected || !S.aim || !fits(S.selected, S.aim.x, S.aim.y, S.horizontal)) return;
+    S.placed.set(S.selected, { name: S.selected, x: S.aim.x, y: S.aim.y, horizontal: S.horizontal });
+    sfx('place');
+    S.aim = null; S.selected = nextUnplaced();
+    renderSetup();
+  }
+  function rotateAim() {
+    if (!S.selected) return;
+    S.horizontal = !S.horizontal;
+    if (S.aim) { const [ax, ay] = clampAim(S.aim.x, S.aim.y); S.aim = { x: ax, y: ay }; }
+    renderSetup();
+  }
+  $('aim-place').addEventListener('click', commitAim);
+  $('aim-rotate').addEventListener('click', rotateAim);
+  $('aim-cancel').addEventListener('click', () => { S.aim = null; renderSetup(); });
+  $('btn-clear').addEventListener('click', () => { S.placed.clear(); S.selected = SHIPS[0].name; S.aim = null; renderSetup(); });
+
+  function randomFleet() {
+    for (let attempt = 0; attempt < 200; attempt++) {
+      const out = new Map(), occ = new Set(); let ok = true;
+      for (const { name, size } of SHIPS) {
+        let placed = false;
+        for (let t = 0; t < 120 && !placed; t++) {
+          const h = Math.random() < .5;
+          const x = Math.floor(Math.random() * (h ? SIZE - size + 1 : SIZE)), y = Math.floor(Math.random() * (h ? SIZE : SIZE - size + 1));
+          const cs = cellsOf({ name, x, y, horizontal: h });
+          if (cs.some(([cx, cy]) => occ.has(cx + ',' + cy))) continue;
+          cs.forEach(([cx, cy]) => occ.add(cx + ',' + cy)); out.set(name, { name, x, y, horizontal: h }); placed = true;
+        }
+        if (!placed) { ok = false; break; }
       }
+      if (ok) return out;
+    }
+    return new Map();
+  }
+  $('btn-random').addEventListener('click', () => { S.placed = randomFleet(); S.selected = null; S.aim = null; sfx('place'); renderSetup(); });
+
+  $('btn-ready').addEventListener('click', () => {
+    if (S.placed.size !== SHIPS.length || S.submitted) return;
+    S.submitted = true; S.aim = null;
+    arena.send({ type: 'place_ships', ships: SHIPS.map((s) => S.placed.get(s.name)) });
+    renderSetup();
+  });
+  addEventListener('keydown', (e) => {
+    if (S.phase === 'setup' && !S.submitted) {
+      if (e.key === 'r' || e.key === 'R') { e.preventDefault(); rotateAim(); }
+      else if (e.key === 'Enter') { e.preventDefault(); commitAim(); }
+      else if (e.key === 'Escape') { S.aim = null; renderSetup(); }
+      else if (S.aim && e.key.startsWith('Arrow')) {
+        e.preventDefault();
+        const [ax, ay] = clampAim(S.aim.x + (e.key === 'ArrowRight') - (e.key === 'ArrowLeft'), S.aim.y + (e.key === 'ArrowDown') - (e.key === 'ArrowUp'));
+        S.aim = { x: ax, y: ay }; renderSetup();
+      }
+    } else if (S.phase === 'battle' && !S.over && e.key === 'Enter') { e.preventDefault(); fire(); }
+  });
+
+  function enterSetup(msg) {
+    S.me = msg.yourIndex; S.oppName = msg.opponentName || 'Opponent'; S.friendly = !!msg.friendly; S.bet = msg.bet || 0;
+    S.placed = new Map(); S.selected = SHIPS[0].name; S.horizontal = true; S.aim = null; S.submitted = false; S.oppReady = false;
+    S.over = false; S.rematchSent = false; S.radar = emptyGrid(); S.mineHits = emptyGrid(); S.myShips = []; S.target = null; S.pending = false; S.last = null;
+    S.yourHealth = fullHealth(); S.enemyHealth = fullHealth();
+    S.setupEnds = Date.now() + (msg.setupMs || 150000);
+    setQueued(false); $('away-banner').hidden = true;
+    $('setup-opp').textContent = S.oppName;
+    showPhase('setup'); renderSetup();
+  }
+
+  // --------------------------------------------------------------- battle
+  function paintBoards() {
+    for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+      const e = boards.enemy.cells[y][x], m = boards.mine.cells[y][x];
+      const rv = S.radar[y][x], mv = S.mineHits[y][x];
+      e.className = 'cell' + (rv === 2 ? ' hit' : rv === 3 ? ' miss' : '');
+      m.className = 'cell' + (mv === 2 ? ' hit' : mv === 3 ? ' miss' : '');
+      if (S.target && S.target.x === x && S.target.y === y && !S.over) e.classList.add('target');
+      if (S.last && S.last.mine === false && S.last.x === x && S.last.y === y) e.classList.add('last');
+      if (S.last && S.last.mine === true && S.last.x === x && S.last.y === y) m.classList.add('last');
+    }
+    boards.enemy.root.classList.toggle('live', !S.over && S.turn === S.me);
+  }
+  function paintFleet() {
+    boards.mine.layer.innerHTML = '';
+    S.myShips.forEach((s) => boards.mine.layer.appendChild(shipEl(s, S.yourHealth && S.yourHealth[s.name] === 0 ? 'sunk' : '')));
+    const line = (health) => SHIPS.map((s) => {
+      const left = health ? health[s.name] : s.size;
+      return `<span class="${left === 0 ? 'dead' : ''}">${s.name}<span class="pips">${Array.from({ length: s.size }, (_, i) => `<i class="${i >= left ? 'x' : ''}"></i>`).join('')}</span></span>`;
+    }).join('');
+    $('fleet-enemy').innerHTML = line(S.enemyHealth);
+    $('fleet-mine').innerHTML = line(S.yourHealth);
+  }
+  function renderTurn() {
+    const bar = $('turnbar'), mine = S.turn === S.me;
+    if (S.over) { bar.className = 'turnbar over'; $('turn-text').textContent = 'Game over'; $('turn-time').textContent = ''; return; }
+    bar.className = 'turnbar ' + (mine ? 'mine' : 'theirs');
+    $('turn-text').textContent = mine ? 'YOUR TURN — fire!' : `${S.oppName}'s turn…`;
+    const canFire = mine && !S.pending;
+    $('btn-fire').disabled = !(canFire && S.target);
+    $('fire-label').textContent = !mine ? `Waiting for ${S.oppName}…` : (S.target ? `Target: ${'ABCDEFGHIJ'[S.target.x]}${S.target.y + 1}` : 'Tap a square on the radar to aim');
+  }
+  function enterBattle(msg) {
+    $('enemy-name').textContent = S.oppName;
+    S.turn = msg.currentTurn; S.turnEnds = Date.now() + (msg.turnMs || 40000); S.target = null; S.pending = false;
+    if (!S.myShips.length) S.myShips = SHIPS.map((s) => S.placed.get(s.name)).filter(Boolean);
+    $('result-card').hidden = true; S.over = false;
+    showPhase('battle'); paintFleet(); paintBoards(); renderTurn();
+  }
+
+  boards.enemy.root.addEventListener('click', (e) => {
+    if (S.phase !== 'battle' || S.over) return;
+    const pos = cellAt(e); if (!pos) return;
+    if (S.turn !== S.me) { toast(`It's ${S.oppName}'s turn.`, 1400); return; }
+    const [x, y] = pos;
+    if (S.radar[y][x] !== 0) { toast('You already fired there.', 1400); return; }
+    if (S.target && S.target.x === x && S.target.y === y) { fire(); return; }   // second tap fires
+    S.target = { x, y }; paintBoards(); renderTurn();
+  });
+  function fire() {
+    if (!S.target || S.pending || S.turn !== S.me || S.over) return;
+    S.pending = true;
+    if (!arena.send({ type: 'action', action: 'fire', x: S.target.x, y: S.target.y })) { S.pending = false; toast('Not connected yet — try again.'); }
+    renderTurn();
+  }
+  $('btn-fire').addEventListener('click', fire);
+
+  function onFire(msg) {
+    const lm = msg.lastMove, mineShot = lm.shooterIndex === S.me;
+    (mineShot ? S.radar : S.mineHits)[lm.y][lm.x] = lm.hit ? 2 : 3;
+    S.last = { x: lm.x, y: lm.y, mine: !mineShot };
+    S.yourHealth = msg.yourHealth; S.enemyHealth = msg.enemyHealth;
+    S.turn = msg.currentTurn; S.turnEnds = Date.now() + (msg.turnMs || 40000);
+    if (mineShot) { S.pending = false; S.target = null; }
+    paintFleet(); paintBoards(); renderTurn();
+    const cell = (mineShot ? boards.enemy : boards.mine).cells[lm.y][lm.x];
+    const who = mineShot ? '' : (lm.auto ? 'AUTO · ' : '');
+    if (lm.hit) { boom(cell); sfx(lm.sunkShip ? 'sink' : 'hit'); banner(lm.sunkShip ? `${mineShot ? '' : 'YOUR '}${lm.sunkShip.toUpperCase()} SUNK!` : (mineShot ? 'HIT!' : 'YOU WERE HIT!'), lm.sunkShip ? 'sunk' : ''); }
+    else { sfx('miss'); banner(mineShot ? 'MISS' : who + 'THEY MISSED', 'miss'); }
+    if (mineShot && lm.auto) toast('You ran out of time — a shot was taken for you.');
+  }
+  function banner(text, variant) {
+    const el = $('hit-banner'); el.className = 'hit-banner'; void el.offsetWidth;
+    el.textContent = text; if (variant) el.classList.add(variant); el.classList.add('show');
+  }
+  function boom(cell) {
+    if (!cell) return;
+    const r = cell.getBoundingClientRect(), size = Math.max(r.width, r.height) * 2.6, h = size * (254 / 224);
+    const b = document.createElement('div'); b.className = 'boom-sprite';
+    b.style.cssText = `width:${size}px;height:${h}px;left:${r.left + r.width / 2 - size / 2}px;top:${r.top + r.height / 2 - h / 2}px`;
+    document.body.appendChild(b); setTimeout(() => b.remove(), 560);
+  }
+
+  // --------------------------------------------------------------- result
+  function onResult(msg) {
+    S.over = true; S.pending = false; S.target = null;
+    const mine = msg.results[S.me], won = mine.result === 'win';
+    if (msg.fleets && msg.fleets[1 - S.me]) {            // reveal where the enemy fleet was hiding
+      boards.enemy.layer.innerHTML = '';
+      msg.fleets[1 - S.me].forEach((s) => boards.enemy.layer.appendChild(shipEl(s, 'enemy')));
+    }
+    $('turn-time').textContent = '';
+    const reason = msg.reason;
+    $('result-title').textContent = won ? (S.friendly ? '🏆 VICTORY!' : '🏆 VICTORY!') : '💥 DEFEAT';
+    $('result-title').style.color = won ? '#00ff6a' : '#ff7a7a';
+    $('result-sub').textContent = reason === 'left' || reason === 'disconnect' ? (won ? `${S.oppName} left the game.` : 'You left the game.')
+      : reason === 'timeout' ? (won ? `${S.oppName} ran out of time.` : 'You ran out of time.')
+      : won ? `You sank ${S.oppName}'s whole fleet.` : `${S.oppName} sank your whole fleet.`;
+    $('result-pay').textContent = msg.friendly ? 'Friendly game — no Strubles at stake.' : (won && mine.payout > 0 ? `+${mine.payout.toLocaleString()} Strubles` : (won ? '' : `−${S.bet.toLocaleString()} Strubles`));
+    $('rematch-note').textContent = ''; $('btn-rematch').disabled = true; $('btn-rematch').textContent = '↻ Rematch';
+    $('result-card').hidden = false; $('firebar').hidden = true;
+    showPhaseKeep(); renderTurn(); paintBoards();
+    scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function showPhaseKeep() { $('phase-battle').hidden = false; $('phase-setup').hidden = true; $('phase-lobby').hidden = true; S.phase = 'battle'; $('firebar').hidden = true; }
+
+  $('btn-rematch').addEventListener('click', () => {
+    if (S.rematchSent) return;
+    S.rematchSent = true; arena.send({ type: 'rematch_accept' });
+    $('btn-rematch').disabled = true; $('btn-rematch').textContent = 'Waiting…';
+  });
+  $('btn-lobby').addEventListener('click', () => { arena.send({ type: 'rematch_decline' }); toLobby(); });
+  function toLobby(msg) {
+    S.over = false; S.queued = false; S.queueId = null; setQueued(false); $('away-banner').hidden = true;
+    showPhase('lobby'); setHint('lobby-hint', msg || '');
+  }
+  function forfeit() {
+    if (!confirm('Leave this game? You will lose it.')) return;
+    arena.send({ type: 'leave_game' });
+  }
+  $('btn-forfeit-setup').addEventListener('click', forfeit);
+  $('btn-forfeit-battle').addEventListener('click', forfeit);
+
+  // ---------------------------------------------------------- resync (resume)
+  function onResync(m) {
+    S.me = m.yourIndex; S.oppName = m.opponentName || 'Opponent'; S.friendly = !!m.friendly; S.bet = m.bet || 0;
+    S.myShips = m.yourShips || []; S.yourHealth = m.yourHealth; S.enemyHealth = m.enemyHealth;
+    S.radar = m.radar || emptyGrid(); S.mineHits = m.mine || emptyGrid(); S.last = null; S.target = null; S.pending = false; S.over = false;
+    $('setup-opp').textContent = S.oppName; $('enemy-name').textContent = S.oppName; setQueued(false);
+    if (m.state === 'setup') {
+      S.placed = new Map((m.yourShips || []).map((s) => [s.name, s]));
+      S.submitted = !!m.yourReady; S.oppReady = !!m.opponentReady; S.selected = S.submitted ? null : nextUnplaced(); S.aim = null;
+      S.setupEnds = Date.now() + (m.setupMsLeft || 0);
+      showPhase('setup'); renderSetup();
+    } else if (m.state === 'battle') {
+      S.turn = m.currentTurn; S.turnEnds = Date.now() + (m.turnMsLeft || m.turnMs || 40000);
+      $('result-card').hidden = true; showPhase('battle'); paintFleet(); paintBoards(); renderTurn();
+    } else {
+      S.turn = -1; showPhase('battle'); paintFleet(); paintBoards();
+    }
+    toast('Reconnected — back in your game.', 2200);
+  }
+
+  // ------------------------------------------------------------ message hub
+  function onMsg(m) {
+    switch (m.type) {
+      case 'auth_ok': refreshWho(); break;
+      case 'lobby_update': renderLobbies(m.lobbies || []); break;
+      case 'status':
+        if (m.status === 'queued') { S.queueId = m.queueId; setQueued(true, m.bet > 0 ? `Waiting for an opponent at ${m.bet.toLocaleString()} Strubles…` : 'Waiting for a friendly opponent…'); }
+        break;
+      case 'game_start': enterSetup(m); break;
+      case 'resync': onResync(m); break;
+      case 'placement_result':
+        if (!m.valid) { S.submitted = false; renderSetup(); toast('Fleet rejected: ' + m.error); }
+        break;
+      case 'opponent_ready': S.oppReady = true; if (S.phase === 'setup') renderSetup(); break;
+      case 'battle_start': enterBattle(m); break;
+      case 'fire_result': onFire(m); break;
+      case 'game_result': onResult(m); break;
+      case 'show_rematch_prompt': if (S.over) { $('btn-rematch').disabled = false; } break;
+      case 'rematch_opponent_accepted': $('rematch-note').textContent = `${S.oppName} wants a rematch!`; break;
+      case 'rematch_declined': $('rematch-note').textContent = `${S.oppName} left.`; $('btn-rematch').disabled = true; break;
+      case 'rematch_failed': $('rematch-note').textContent = m.message || 'Rematch failed.'; $('btn-rematch').disabled = true; break;
+      case 'ready_for_queue': if (S.over) { $('btn-rematch').disabled = true; $('rematch-note').textContent ||= 'The table has closed.'; } break;
+      case 'game_voided': toLobby(m.reason || 'The game was cancelled. Any stake was returned.'); break;
+      case 'opponent_away': $('away-banner').hidden = false; $('away-banner').textContent = `${S.oppName} disconnected — holding the game for ${Math.round((m.graceMs || 30000) / 1000)}s…`; break;
+      case 'opponent_back': $('away-banner').hidden = true; toast(`${S.oppName} is back.`, 1800); break;
+      case 'balance_update': try { Strubles.set(m.balance); } catch {} updateBalance(); break;
+      case 'error':
+        if (m.code === 'guest_stake') { toast(m.message); setStakeMode(false); }
+        else if (m.code === 'busy') toast('You already have a lobby or game open.');
+        else { toast(m.message || 'Something went wrong.'); }
+        S.pending = false; if (S.phase === 'battle') renderTurn();
+        break;
     }
   }
 
-  function fireAt(x, y) {
-    // Actual hit/miss/turn feedback arrives asynchronously via
-    // fire_result once the server resolves the shot -- see
-    // applyFireResult(). Guard client-side against an obviously invalid
-    // click (already-targeted cell, not your turn) so a click can't fire
-    // twice while waiting on the round trip; the server re-validates
-    // regardless.
-    const cell = document.querySelector(`#grid-enemy [data-x="${x}"][data-y="${y}"]`);
-    if (cell && (cell.classList.contains('hit') || cell.classList.contains('miss'))) return;
-    ws.send(JSON.stringify({ type: 'action', action: 'fire', x, y }));
-  }
+  // ----------------------------------------------------------- clock + init
+  setInterval(() => {
+    if (S.phase === 'setup' && !S.submitted && !$('phase-setup').hidden) {
+      $('setup-timer').textContent = fmt(S.setupEnds - Date.now());
+      $('setup-timer').style.color = S.setupEnds - Date.now() < 20000 ? '#ff5a5a' : '#ffd700';
+    } else if (S.phase === 'setup') $('setup-timer').textContent = '';
+    if (S.phase === 'battle' && !S.over) {
+      const left = S.turnEnds - Date.now(), el = $('turn-time');
+      el.textContent = fmt(left); el.classList.toggle('low', left < 10000);
+    }
+  }, 250);
 
-  showPhase('bet');
+  setStakeMode(false);
+  showPhase('lobby');
   updateBalance();
-  window.addEventListener('strubles:change', updateBalance);
+  arena.connect();
+  if (window.initPickers) setTimeout(window.initPickers, 100);
 
-  if (window.initPickers) { setTimeout(window.initPickers, 100); }
+  // handle for automated tests
+  window.BattleshipTest = { state: S, arena };
 })();
 </script>
 </body>
