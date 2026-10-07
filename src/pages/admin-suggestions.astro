@@ -24,6 +24,8 @@
     table { border-collapse:collapse; width:100%; min-width:640px; }
     th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
     th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; position:sticky; top:0; background:var(--panel); }
+    #csv-panel { margin-bottom:14px; }
+    #csv-text { width:100%; height:220px; resize:vertical; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:10px; font:12px/1.5 ui-monospace, Menlo, monospace; white-space:pre; overflow:auto; }
     td.text { white-space:pre-wrap; word-break:break-word; min-width:280px; }
     td.when, td.who, td.page { white-space:nowrap; color:var(--muted); }
     td.who { color:var(--ink); }
@@ -39,8 +41,16 @@
     <button id="signin" hidden>Sign in with Google</button>
     <button id="refresh" class="alt" disabled>Refresh</button>
     <button id="download" disabled>Download .xlsx</button>
+    <button id="csv-toggle" class="alt" disabled>Raw CSV</button>
     <span id="status">Connecting…</span>
   </div>
+  <section id="csv-panel" hidden>
+    <div class="bar">
+      <button id="csv-copy" class="alt">Copy CSV</button>
+      <button id="csv-download" class="alt">Download .csv</button>
+    </div>
+    <textarea id="csv-text" readonly spellcheck="false" aria-label="Raw CSV"></textarea>
+  </section>
   <div class="wrap">
     <table>
       <thead><tr><th>Received</th><th>From</th><th>Suggestion</th><th>Page</th></tr></thead>
@@ -60,6 +70,14 @@
   const $ = (id) => document.getElementById(id);
   let rows = [];
   const setStatus = (t, bad) => { $('status').textContent = t; $('status').className = bad ? 'bad' : ''; };
+  // RFC 4180: quote every field, double any quotes inside, so commas, quotes
+  // and line breaks in a suggestion cannot break a row.
+  const csvCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  function toCsv() {
+    const head = ['Received', 'From', 'Suggestion', 'Page', 'User ID', 'Doc ID'];
+    const lines = rows.map((r) => [r.createdAt, r.displayName, r.text, r.page, r.uid, r.id].map(csvCell).join(','));
+    return [head.map(csvCell).join(','), ...lines].join('\r\n');
+  }
   const fmt = (iso) => iso ? new Date(iso).toLocaleString() : '';
 
   function render() {
@@ -92,6 +110,8 @@
         render();
         $('refresh').disabled = false;
         $('download').disabled = !rows.length;
+        $('csv-toggle').disabled = !rows.length;
+        if (!$('csv-panel').hidden) $('csv-text').value = toCsv();
         setStatus(rows.length + ' suggestion' + (rows.length === 1 ? '' : 's') + ' · updated ' + new Date().toLocaleTimeString());
       } else if (msg.type === 'error') {
         setStatus(msg.code === 'forbidden' ? 'This account is not an admin.' : msg.message, true);
@@ -109,6 +129,26 @@
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Suggestions');
     XLSX.writeFile(wb, 'iantopia-suggestions-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  });
+
+  $('csv-toggle').addEventListener('click', () => {
+    const panel = $('csv-panel');
+    panel.hidden = !panel.hidden;
+    if (!panel.hidden) $('csv-text').value = toCsv();
+  });
+  $('csv-copy').addEventListener('click', async () => {
+    const t = $('csv-text');
+    try { await navigator.clipboard.writeText(t.value); setStatus('CSV copied.'); }
+    catch { t.select(); document.execCommand('copy'); setStatus('CSV copied.'); }
+  });
+  $('csv-download').addEventListener('click', () => {
+    // BOM so Excel reads UTF-8 (emoji, accents) correctly.
+    const blob = new Blob(['\ufeff' + toCsv()], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'iantopia-suggestions-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
 
   arena.connect();
