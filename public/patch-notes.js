@@ -11,6 +11,7 @@ window.PATCH_NOTES = [
     date: "2026-10-07",
     title: "My Iantopia: Food & Living Villagers",
     changes: [
+      "Undo button (or Ctrl/Cmd+Z) for My Iantopia: reverses your last 30 zoning, road, build, move and remove actions, and puts the Strubles back too.",
       "Zoning is now drag-to-fill: pick a zone, drag a box across the map and see the price before you let go. Roads are still drawn freehand.",
       "Refunds: erasing zoning pays back what you paid for those tiles, and removing a building refunds its permit. Tiles under a building are left alone.",
       "Removing any building rarer than Mil-Spec (Common) now asks \"Are you sure?\" first.",

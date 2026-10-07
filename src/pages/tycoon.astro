@@ -99,6 +99,9 @@
     touch-action:manipulation;
   }
   .cta:hover { background:var(--gold); color:#000; }
+  .cta:disabled, .bar-btn:disabled { opacity:.4; pointer-events:none; }
+  #toast { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:6; display:none; max-width:92%; background:#000; color:var(--gold); border:2px solid var(--gold); padding:8px 12px; font-size:9px; line-height:1.6; text-align:center; pointer-events:none; }
+  #toast.bad { color:#ff6b6b; border-color:#ff6b6b; }
   .cta.primary { background:var(--gold); color:#000; border-color:#000; }
   .cta.primary:hover { background:#ffe766; }
 
@@ -257,6 +260,7 @@
     <div id="cta-row">
       <button id="build-btn" class="cta primary" type="button">🏗️ Build</button>
       <button id="zoning-btn" class="cta" type="button">🗺️ Zoning</button>
+      <button id="undo-btn" class="cta" type="button" disabled>↩ Undo</button>
       <button id="bank-btn" class="cta" type="button">🏦 Bank</button>
       <button id="guide-btn" class="cta" type="button">📖 Guide</button>
       <button id="recenter-btn" class="cta" type="button">🎯 Center</button>
@@ -265,8 +269,10 @@
     </div>
 
     <div id="game-stage">
+      <div id="toast" role="status"></div>
       <div id="brush-bar">
         <span id="brush-bar-text"></span>
+        <button class="bar-btn" id="brush-undo" type="button" disabled>↩ Undo</button>
         <button class="bar-btn no" id="brush-done" type="button">✕ Done</button>
       </div>
       <div id="place-bar">
@@ -1479,7 +1485,20 @@
       camCY -= dy / cam.zoom;
       clampCam();
     });
-    const endStroke = () => { strokeBasis = null; flushSave(); if (brushMode) setBrushLabel(); };
+    const endStroke = () => {
+      strokeBasis = null; flushSave();
+      if (strokeLog && strokeLog.tiles.length) {
+        const log = strokeLog;
+        pushUndo(`road (${log.tiles.length} tile${log.tiles.length === 1 ? '' : 's'})`, () => {
+          const err = reverseMoney(log.spent);
+          if (err) return err;
+          restoreTiles(log.tiles.slice().reverse());
+          return null;
+        });
+      }
+      strokeLog = null;
+      if (brushMode) setBrushLabel();
+    };
     this.input.on('pointerupoutside', () => { rectDrag = null; drawGhost(); endStroke(); });
     this.input.on('pointerup', (p) => {
       try { handleUp(p); } finally { endStroke(); }
@@ -1655,7 +1674,18 @@
     if (placementIssue(key, tx, ty, moveId)) return;
     if (moveId != null) {
       const b = village.b.find((s) => s.id === moveId);
-      if (b) { b.x = tx; b.y = ty; }
+      if (b) {
+        const ox = b.x, oy = b.y;
+        b.x = tx; b.y = ty;
+        pushUndo(`move ${DEFS[b.key].label}`, () => {
+          const cur = bById.get(moveId);
+          if (!cur) return 'That building is gone';
+          if (!canPlace(cur.key, ox, oy, moveId)) return 'Its old spot is no longer free';
+          cur.x = ox; cur.y = oy;
+          onBuildingsChanged();
+          return null;
+        });
+      }
     } else {
       const def = DEFS[key];
       if (availableCounts()[key] <= 0) { alert(`You can't build any more of those.`); return; }
@@ -1664,6 +1694,14 @@
         return;
       }
       const now = Date.now();
+      const newId = village.nextId;
+      pushUndo(`place ${def.label}`, () => {
+        const cur = bById.get(newId);
+        if (!cur) return 'That building is gone';
+        village.b = village.b.filter((x) => x.id !== newId);
+        onBuildingsChanged();
+        return reverseMoney(Number.isFinite(cur.paid) ? cur.paid : def.cost);
+      });
       village.b.push({
         id: village.nextId++, key, x: tx, y: ty,
         status: 'building', startedAt: now,
@@ -1695,6 +1733,71 @@
   // listener both did, which wiped the message the instant a tap finished, so
   // it never actually appeared.
   let brushMsgActive = false;
+  // ---------- Undo ----------
+  // Each zoning stroke, placement, move and removal logs exactly what it
+  // changed and what it cost, newest last. Undoing restores only that (never a
+  // whole-village snapshot, which would roll back every building's earnings
+  // and pay them twice). Money moves back too: a purchase is refunded, and a
+  // refund that was received has to be paid back (blocked if you can't).
+  // Session-only: a reload starts with an empty history.
+  const UNDO_MAX = 30;
+  const undoStack = [];
+  let toastTimer = null;
+  function toast(text, bad) {
+    const el = $('toast');
+    el.textContent = text;
+    el.classList.toggle('bad', !!bad);
+    el.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.style.display = 'none'; }, 2000);
+  }
+  function refreshUndoUi() {
+    const top = undoStack[undoStack.length - 1];
+    ['undo-btn', 'brush-undo'].forEach((id) => {
+      const b = $(id);
+      b.disabled = !top;
+      b.title = top ? 'Undo: ' + top.label + ' (Ctrl/Cmd+Z)' : 'Nothing to undo';
+    });
+  }
+  function pushUndo(label, run) {
+    undoStack.push({ label, run });
+    if (undoStack.length > UNDO_MAX) undoStack.shift();
+    refreshUndoUi();
+  }
+  // Puts back money spent (spent > 0), or pays back a refund that was received
+  // (spent < 0). Returns an error string if a refund can't be repaid.
+  function reverseMoney(spent) {
+    if (spent > 0) { try { Strubles.add(spent); } catch {} return null; }
+    if (spent < 0 && !Strubles.spend(-spent)) return `Need ${(-spent).toLocaleString()} Strubles to undo that`;
+    return null;
+  }
+  function doUndo() {
+    const entry = undoStack[undoStack.length - 1];
+    if (!entry) { toast('Nothing to undo'); return; }
+    if (placing) stopPlacing();
+    const err = entry.run();
+    if (err) { toast(err, true); return; }      // stays on the stack so you can retry
+    undoStack.pop();
+    saveVillage();
+    refresh();
+    refreshUndoUi();
+    toast('Undid: ' + entry.label);
+  }
+  // Tiles as they were: [x, y, type, paid]
+  const tileSnapshot = (x, y) => [x, y, getTileType(x, y), village.paid[x + '_' + y]];
+  function restoreTiles(snaps) {
+    snaps.forEach(([x, y, type, paid]) => { setTileType(x, y, type); setPaid(x, y, paid || 0); });
+  }
+  $('undo-btn').addEventListener('click', doUndo);
+  $('brush-undo').addEventListener('click', doUndo);
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+      if (/^(input|textarea|select)$/i.test((e.target && e.target.tagName) || '')) return;
+      e.preventDefault();
+      doUndo();
+    }
+  });
+
   function brushMsg(text, bad) {
     const el = $('brush-bar-text');
     el.textContent = text;
@@ -1728,6 +1831,7 @@
     if (amount > 0) village.paid[k] = amount; else delete village.paid[k];
   };
 
+  let strokeLog = null;   // road tiles laid since the pointer went down: one undo step
   // Single road tile (freehand). Replacing a zone refunds that zone's price.
   function paintRoadTile(tx, ty) {
     if (brushMode !== 'road' || tx < 0 || ty < 0 || tx >= MAP || ty >= MAP) return;
@@ -1739,6 +1843,8 @@
     const net = cost - refund;
     if (net > 0 && !Strubles.spend(net)) { brushMsg(`Need ${net.toLocaleString()} Strubles`, true); return; }
     if (net < 0) Strubles.add(-net);
+    if (!strokeLog) strokeLog = { tiles: [], spent: 0 };
+    strokeLog.tiles.push(tileSnapshot(tx, ty)); strokeLog.spent += net;
     setTileType(tx, ty, 'road');
     setPaid(tx, ty, cost);
     saveVillage(true); refresh();
@@ -1796,7 +1902,16 @@
     }
     if (plan.net > 0 && !Strubles.spend(plan.net)) { brushMsg(`Need ${plan.net.toLocaleString()} Strubles`, true); return; }
     if (plan.net < 0) Strubles.add(-plan.net);
+    const before = plan.changes.map(([x, y]) => tileSnapshot(x, y));
     plan.changes.forEach(([x, y, type, paid]) => { setTileType(x, y, type); setPaid(x, y, paid); });
+    const n = plan.changes.length;
+    const net = plan.net;
+    pushUndo(`${mode === 'erase' ? 'erase' : BRUSH_LABEL[mode].toLowerCase()} (${n} tile${n === 1 ? '' : 's'})`, () => {
+      const err = reverseMoney(net);
+      if (err) return err;
+      restoreTiles(before);
+      return null;
+    });
     saveVillage();
     brushMsg(plan.net < 0 ? `Refunded ${(-plan.net).toLocaleString()} Strubles` : describePlan(mode, plan));
   }
@@ -1946,8 +2061,24 @@
       const ok = confirm(`Remove your ${def.label}?\n\nIt is a ${rar} building. You get ${refund.toLocaleString()} Strubles back and the building returns to your inventory, but you will need to zone and build it all over again.`);
       if (!ok) return;
     }
+    const copy = JSON.parse(JSON.stringify(s));
+    const removedAt = Date.now();
     village.b = village.b.filter((x) => x.id !== manageId);
     if (refund > 0) { try { Strubles.add(refund); } catch {} }
+    pushUndo(`remove ${def.label}`, () => {
+      if (village.b.length >= slotCap()) return 'No free building slot to put it back';
+      if (placementIssue(copy.key, copy.x, copy.y)) return 'Its old spot is no longer free';
+      const err = reverseMoney(-refund);
+      if (err) return err;
+      // Time did not stop while it was gone: keep construction progress where
+      // it was, and don't pay production for the gap.
+      const now = Date.now(), gap = now - removedAt;
+      if (copy.status === 'building') { copy.startedAt += gap; copy.completesAt += gap; }
+      else { copy.lastProductionAt = now; copy.lastTaxAt = now; }
+      village.b.push(copy);
+      onBuildingsChanged();
+      return null;
+    });
     onBuildingsChanged();
     saveVillage();
     closeManage();
@@ -1979,7 +2110,7 @@
       <div class="guide-row" style="align-items:flex-start;">
         <div class="row-icon">↩️</div>
         <div class="row-info"><b>Drag to zone, refunds on removal.</b>
-          <small>Pick a zone and drag a box across the map to fill an area; the price is shown before you let go. Erasing a zone, or removing a building, pays back what you paid. Removing anything above Mil-Spec asks you to confirm first.</small></div>
+          <small>Pick a zone and drag a box across the map to fill an area; the price is shown before you let go. Erasing a zone, or removing a building, pays back what you paid. Removing anything above Mil-Spec asks you to confirm first. Made a mistake? ↩ Undo (or Ctrl/Cmd+Z) reverses your last 30 zoning, road, build, move and remove actions, money included.</small></div>
       </div>
       <div class="guide-row" style="align-items:flex-start;">
         <div class="row-icon">🛣️</div>
