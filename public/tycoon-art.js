@@ -207,6 +207,62 @@ window.TycoonArt = (function () {
       rect(g, '#d94a3a', ox + 17, oy - 1, 3, 2);
     },
 
+    // ---- 2x2, agricultural -------------------------------------------------
+    farm(g, ox, oy) {
+      rect(g, '#10140f', ox + 1, oy + 28, 31, 4, 0.4);
+      vgrad(g, ox, oy + 12, 32, 20, '#8a6a3a', '#5e4524');             // tilled soil
+      for (let r = 0; r < 4; r++) {                                      // crop rows
+        const y = oy + 18 + r * 3;
+        rect(g, '#3f7d2c', ox + 2, y, 28, 1);
+        for (let c = 0; c < 14; c++) rect(g, rnd(c, r, 7) > 0.5 ? '#79c04a' : '#5ea83a', ox + 2 + c * 2, y - 1, 1, 1);
+        rect(g, '#4a3418', ox + 2, y + 1, 28, 1, 0.55);
+      }
+      vgrad(g, ox + 3, oy + 3, 12, 10, '#c23a30', '#7c1f1a');          // barn
+      rect(g, '#f2e6d4', ox + 7, oy + 8, 4, 5);                          // barn door
+      rect(g, '#7c1f1a', ox + 8, oy + 8, 1, 5);
+      for (let i = 0; i < 6; i++) rect(g, '#e9d9c4', ox + 2 + i * 2, oy + 2 - Math.abs(i - 2.5) | 0, 2, 1); // roof edge
+      rect(g, '#5a2a12', ox + 2, oy + 1, 14, 2);
+      vgrad(g, ox + 19, oy + 2, 5, 11, '#d6d2c4', '#8d897c');          // silo
+      rect(g, '#9aa5af', ox + 19, oy, 5, 3);
+      rect(g, '#f0e2a0', ox + 27, oy + 13, 1, 4);                       // scarecrow
+      rect(g, '#f0e2a0', ox + 26, oy + 14, 3, 1);
+      rect(g, '#b5651d', ox + 26, oy + 12, 3, 1);
+      for (let i = 0; i < 8; i++) rect(g, '#7a5a30', ox + i * 4, oy + 30, 1, 2); // fence
+      rect(g, '#7a5a30', ox, oy + 30, 31, 1);
+    },
+
+    // ---- 2x2, commercial: grocery ------------------------------------------
+    grocery_store(g, ox, oy) {
+      rect(g, '#0b1118', ox + 2, oy + 28, 29, 4, 0.45);
+      vgrad(g, ox + 2, oy + 9, 28, 20, '#f2e9d6', '#cfc2a6');          // cream wall
+      hgrad(g, ox + 2, oy + 9, 4, 20, '#ffffff', '#f2e9d6', 0.6);
+      vgrad(g, ox + 1, oy + 5, 30, 5, '#2f9a55', '#1b5e33');          // sign band
+      for (let i = 0; i < 5; i++) rect(g, '#ffe9a8', ox + 5 + i * 5, oy + 7, 3, 2); // lettering
+      for (let i = 0; i < 10; i++) {                                    // striped awning
+        rect(g, i % 2 ? '#ffffff' : '#d9473a', ox + 2 + i * 3, oy + 10, 3, 4);
+        rect(g, '#00000030', ox + 2 + i * 3, oy + 14, 3, 1, 0.3);
+      }
+      vgrad(g, ox + 4, oy + 16, 11, 9, '#8fc8ec', '#3e6f94');         // window
+      rect(g, '#6bbd5b', ox + 5, oy + 22, 3, 2); rect(g, '#e8793a', ox + 8, oy + 22, 3, 2); rect(g, '#d9473a', ox + 11, oy + 22, 3, 2); // produce
+      vgrad(g, ox + 18, oy + 16, 8, 12, '#2b3d50', '#101b27');        // glass door
+      rect(g, '#b8e6ff', ox + 19, oy + 17, 3, 10, 0.6);
+      rect(g, '#7a5c26', ox + 22, oy + 22, 1, 2);
+      rect(g, '#9a968a', ox + 1, oy + 28, 30, 2);
+      rect(g, '#7c8791', ox + 25, oy + 2, 4, 3);                       // roof vent
+    },
+
+    // ---- 2x1, commercial: 7-Eleven ------------------------------------------
+    seven_eleven(g, ox, oy) {
+      rect(g, '#0b1118', ox + 1, oy + 14, 30, 2, 0.45);
+      vgrad(g, ox + 1, oy + 3, 30, 12, '#ffffff', '#d8dde3');
+      rect(g, '#f0792a', ox + 1, oy + 3, 30, 2);
+      rect(g, '#2a9a4a', ox + 1, oy + 5, 30, 2);
+      rect(g, '#d63a30', ox + 1, oy + 7, 30, 1);
+      vgrad(g, ox + 3, oy + 9, 14, 5, '#8fc8ec', '#3e6f94');
+      vgrad(g, ox + 20, oy + 9, 7, 6, '#2b3d50', '#101b27');
+      rect(g, '#ffe9a8', ox + 21, oy + 10, 5, 4, 0.5);
+    },
+
     office_building(g, ox, oy) {
       rect(g, '#0b1118', ox + 4, oy + 5, 26, 27, 0.45);
       vgrad(g, ox + 4, oy + 4, 24, 27, '#58a0d2', '#183a5e');         // glass curtain wall
@@ -448,6 +504,7 @@ window.TycoonArt = (function () {
     residential: { fill: '#2f6fd0', edge: '#bfe0ff' },
     commercial:  { fill: '#e08a1f', edge: '#ffe2b0' },
     industrial:  { fill: '#7b3fa0', edge: '#e5c8ff' },
+    agricultural: { fill: '#9aa32a', edge: '#eef5b0' },
   };
 
   // Composes grass, zones and roads onto `o.canvas`. Call redraw() whenever a
@@ -501,6 +558,11 @@ window.TycoonArt = (function () {
         ctx.fillStyle = '#fff1d6'; ctx.fillRect(ox + 14, oy + 24, 36, 22);
         for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#ffffff' : '#e05a3a'; ctx.fillRect(ox + 14 + i * 6, oy + 16, 6, 9); }
         ctx.fillStyle = '#7a4a12'; ctx.fillRect(ox + 28, oy + 33, 8, 13);
+      } else if (type === 'agricultural') {
+        ctx.fillStyle = '#f1f0b8';
+        for (let i = 0; i < 4; i++) { ctx.fillRect(ox + 14, oy + 16 + i * 8, 36, 3); }
+        ctx.fillStyle = '#7a8a1f';
+        for (let i = 0; i < 4; i++) for (let j = 0; j < 6; j++) ctx.fillRect(ox + 16 + j * 6, oy + 13 + i * 8, 2, 3);
       } else if (type === 'industrial') {
         ctx.fillStyle = '#e8d6f6'; ctx.fillRect(ox + 14, oy + 30, 36, 16);
         ctx.fillStyle = '#c9a8e6';

@@ -186,7 +186,7 @@
   .row-img { width:44px; height:44px; object-fit:contain; flex-shrink:0; }
   .row-img.pix { image-rendering:pixelated; }
   .zone-chip { display:inline-block; padding:0 5px; border:1px solid currentColor; border-radius:2px; text-transform:uppercase; font-size:7px; letter-spacing:.5px; }
-  .zone-residential { color:#7db6ff; } .zone-commercial { color:#ffb457; } .zone-industrial { color:#c99bf0; }
+  .zone-residential { color:#7db6ff; } .zone-commercial { color:#ffb457; } .zone-industrial { color:#c99bf0; } .zone-agricultural { color:#c9d65a; }
 
   .guide-row {
     display:flex; align-items:center; gap:10px; padding:10px 0;
@@ -246,6 +246,8 @@
       <span>Building: <b id="stat-building">0/3</b></span>
       <span>On a road: <b id="stat-road">0/0</b></span>
       <span>Mood: <b id="stat-mood">50%</b></span>
+      <span>People: <b id="stat-pop">0</b></span>
+      <span>Food: <b id="stat-food">—</b></span>
       <span>Upkeep: <b id="stat-upkeep">0</b>/day</span>
     </div>
 
@@ -405,9 +407,9 @@
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/background-library.js?v=13"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
-<script is:inline src="/case-data.js?v=19"></script>
-<script is:inline src="/tycoon-buildings.js?v=9"></script>
-<script is:inline src="/tycoon-art.js?v=1"></script>
+<script is:inline src="/case-data.js?v=20"></script>
+<script is:inline src="/tycoon-buildings.js?v=10"></script>
+<script is:inline src="/tycoon-art.js?v=2"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/tycoon-bank.js?v=1"></script>
 <script is:inline src="/strubles.js?v=3"></script>
@@ -465,8 +467,9 @@
   function expandCostForSlot(n) { return n <= 0 ? 0 : Math.round((EXPAND_BASE_COST * Math.pow(EXPAND_GROWTH, n - 1)) / 10) * 10; }
 
   // Village state: { v:2, nextId, b:[...buildings], tiles:{tx_ty: type} }
-  // tiles map: "x_y" -> "residential"/"commercial"/"industrial"/"road"/"water"
-  function freshVillage() { return { v: 2, nextId: 1, b: [], tiles: {} }; }
+  // tiles map: "x_y" -> "residential"/"commercial"/"industrial"/"agricultural"/"road"/"water"
+  // paid map:  "x_y" -> Strubles paid for that tile (refunded when it is erased or replaced)
+  function freshVillage() { return { v: 2, nextId: 1, b: [], tiles: {}, paid: {} }; }
 
   // First load after the rework: carry the old one-row skyline's buildings
   // over (same construction progress, same keys) into a row on the new map
@@ -493,6 +496,8 @@
       // Saves from before roads/zones existed have no `tiles` map at all, and
       // the first paint would throw on it.
       if (!raw.tiles || typeof raw.tiles !== 'object') raw.tiles = {};
+      // What each tile cost when it was painted, so erasing it can refund the same.
+      if (!raw.paid || typeof raw.paid !== 'object') raw.paid = {};
       if (!Number.isFinite(raw.nextId)) raw.nextId = raw.b.reduce((m, s) => Math.max(m, s.id || 0), 0) + 1;
       return raw;
     }
@@ -519,8 +524,8 @@
   // Hot paths (every villager every frame, every road/zone check) read typed
   // arrays instead of the string-keyed save format: no key concatenation, no
   // allocation, O(1). village.tiles stays the persisted form; these mirror it.
-  const TILE_NAMES = [null, 'residential', 'commercial', 'industrial', 'road', 'water'];
-  const TILE_ID = { residential: 1, commercial: 2, industrial: 3, road: 4, water: 5 };
+  const TILE_NAMES = [null, 'residential', 'commercial', 'industrial', 'road', 'water', 'agricultural'];
+  const TILE_ID = { residential: 1, commercial: 2, industrial: 3, road: 4, water: 5, agricultural: 6 };
   const tileGrid = new Uint8Array(MAP * MAP);   // TILE_ID, 0 = bare grass
   const occGrid = new Int32Array(MAP * MAP);    // id of the building covering the tile, 0 = none
   const bById = new Map();
@@ -565,8 +570,8 @@
   // district stays a real spend whether you have 500 or 500,000. Each type has
   // a floor (what a broke player pays) and a share of your balance per tile;
   // the price is whichever is higher. Water and erasing are always free.
-  const TILE_BASE = { residential: 50, commercial: 50, industrial: 50, road: 100 };
-  const TILE_RATE = { residential: 0.004, commercial: 0.004, industrial: 0.004, road: 0.008 };
+  const TILE_BASE = { residential: 50, commercial: 50, industrial: 50, agricultural: 30, road: 100 };
+  const TILE_RATE = { residential: 0.004, commercial: 0.004, industrial: 0.004, agricultural: 0.0025, road: 0.008 };
   // Fixed for the length of one drag (see the pointerdown handler), so a
   // stroke is priced as a whole instead of getting cheaper tile by tile as
   // your balance drops underneath it.
@@ -754,6 +759,30 @@
     return c;
   }
 
+  // ---------- People, capacity and food ----------
+  // Every residential building houses `housing` residents; every building has a
+  // `capacity` of people who can be inside it at once. Farms grow food and
+  // groceries / 7-Elevens distribute it: residents are fed only as far as
+  // BOTH can reach them (and both need a road).
+  const FOOD_PER_PERSON = 1;
+  const MAX_VILLAGERS = 40;                      // sprites drawn at once, a performance ceiling
+  const housingOf = (s) => (s.status === 'complete' && DEFS[s.key] && DEFS[s.key].housing) || 0;
+  const housingTotal = () => village.b.reduce((a, s) => a + housingOf(s), 0);
+  const capacityOf = (key) => (DEFS[key] && DEFS[key].capacity) || 0;
+  function foodStats() {
+    let supply = 0, dist = 0;
+    village.b.forEach((s) => {
+      if (s.status !== 'complete') return;
+      const d = DEFS[s.key];
+      if (!d || !(d.food || d.distribution) || !isRoadConnected(s)) return;
+      supply += d.food || 0; dist += d.distribution || 0;
+    });
+    const pop = housingTotal();
+    const demand = pop * FOOD_PER_PERSON;
+    const fed = Math.min(supply, dist);
+    return { pop, demand, supply, dist, fed, satisfaction: demand > 0 ? Math.min(1, fed / demand) : 1 };
+  }
+
   // Village mood, derived entirely from the layout — it is a readout of the
   // player's decisions, not an independent simulation.
   function computeMood() {
@@ -766,6 +795,9 @@
     const zoned = countZones('residential') + countZones('commercial') + ind;
     if (zoned > 0) m -= 25 * (ind / zoned);
     if (countZones('water') > 0) m += 8;
+    // Hungry residents are unhappy residents; a fully fed village gets a small lift.
+    const fs = foodStats();
+    if (fs.demand > 0) m += fs.satisfaction >= 1 ? 4 : -12 * (1 - fs.satisfaction);
     // Each building's own footprint on the village: a coal plant is a smell, a
     // bank is reassuring. See `moodEffect` in tycoon-buildings.js.
     done.forEach((s) => { m += (DEFS[s.key] && DEFS[s.key].moodEffect) || 0; });
@@ -837,13 +869,22 @@
   let ghostImg = null;
   let waterClock = 0, waterFrame = 0;
 
-  // The bank has real cover art. The pixel art is baked first so there is never
+  // Buildings flagged `cover` (the bank, the 7-Eleven) have real cover art. The pixel art is baked first so there is never
   // a blank frame; once the picture arrives it is drawn over the same canvas
   // (scaled to the footprint, sitting on the ground line) and the texture refreshed.
-  function paintCover(canvas, tex, src) {
+  // Cover buildings are baked at COVER_RES x the pixel-art size with smooth
+  // filtering, so a photographic picture stays sharp instead of being squeezed
+  // into a 32px canvas; their sprites are scaled back down by the same factor.
+  const COVER_RES = 4;
+  const coverScale = (key) => (DEFS[key] && DEFS[key].cover ? 1 / COVER_RES : 1);
+  function paintCover(canvas, tex, small, src) {
+    const ctx = canvas.getContext('2d');
+    // Until the picture arrives, show the pixel art scaled up so there is never a blank frame.
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(small, 0, 0, canvas.width, canvas.height);
+    tex.refresh();
     const img = new Image();
     img.onload = () => {
-      const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
@@ -863,9 +904,16 @@
     const tk = 'bld_' + key;
     if (!scene.textures.exists(tk)) {
       const f = foot(key);
-      const canvas = TycoonArt.bake(key, f.w, f.h);
-      const tex = scene.textures.addCanvas(tk, canvas);
-      if (key === 'bank') paintCover(canvas, tex, DEFS[key].img);
+      const small = TycoonArt.bake(key, f.w, f.h);
+      if (DEFS[key].cover) {
+        const big = document.createElement('canvas');
+        big.width = small.width * COVER_RES; big.height = small.height * COVER_RES;
+        const tex = scene.textures.addCanvas(tk, big);
+        tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+        paintCover(big, tex, small, DEFS[key].img);
+      } else {
+        scene.textures.addCanvas(tk, small);
+      }
     }
     return tk;
   }
@@ -880,7 +928,10 @@
   let mood = 50;
   const WALK = 1.3; // tiles per second
 
-  const villagerCap = () => Math.min(24, village.b.filter((s) => s.status === 'complete').length * 3);
+  const villagerCap = () => Math.min(MAX_VILLAGERS, housingTotal());
+  let simT = 0;                                  // simulation seconds, drives dwell times
+  const insideCount = (id) => { let n = 0; for (const v of villagers) if (v.inside === id) n++; return n; };
+  const homeCount = (id) => { let n = 0; for (const v of villagers) if (v.home === id) n++; return n; };
   const walkable = (tx, ty) =>
     tx >= 0 && ty >= 0 && tx < MAP && ty < MAP &&
     occGrid[ty * MAP + tx] === 0 && tileGrid[ty * MAP + tx] !== TILE_ID.water;
@@ -899,7 +950,7 @@
   // How attractive a tile is to wander onto. Deliberately mild — it only
   // tilts the odds of a random heading, so they still drift about sporadically
   // instead of marching along streets.
-  const ZONES = { residential: 1, commercial: 1, industrial: 1 };
+  const ZONES = { residential: 1, commercial: 1, industrial: 1, agricultural: 1 };
   function tileAppeal(tx, ty) {
     const t = getTileType(tx, ty);
     if (t === 'road') return 3.0;
@@ -956,14 +1007,99 @@
     return options[options.length - 1];
   }
 
-  function spawnVillager() {
-    let sx = 0, sy = 0, ok = false;
-    for (let i = 0; i < 16 && !ok; i++) {
-      sx = Math.random() * MAP; sy = Math.random() * MAP;
-      ok = canStand(sx, sy);
+  // ---- Getting around: shortest path over walkable tiles, roads preferred ----
+  // The map is 16x16, so a plain Dijkstra over 256 nodes is instant and is only
+  // run when a villager sets off on a trip (every several seconds each).
+  const stepCost = (i) => (tileGrid[i] === TILE_ID.road ? 1 : 2.2);
+  function findPath(sx, sy, goals) {
+    const N = MAP * MAP;
+    const start = sy * MAP + sx;
+    if (!walkable(sx, sy)) return null;
+    const dist = new Float32Array(N).fill(Infinity), prev = new Int16Array(N).fill(-1), done = new Uint8Array(N);
+    dist[start] = 0;
+    for (;;) {
+      let u = -1, best = Infinity;
+      for (let i = 0; i < N; i++) if (!done[i] && dist[i] < best) { best = dist[i]; u = i; }
+      if (u < 0) return null;
+      if (goals.has(u)) {
+        const path = [];
+        for (let c = u; c !== -1; c = prev[c]) path.push(c);
+        return path.reverse();                       // starts on the villager's own tile
+      }
+      done[u] = 1;
+      const ux = u % MAP, uy = (u / MAP) | 0;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const nx = ux + dx, ny = uy + dy;
+        if (!walkable(nx, ny)) continue;
+        const n = ny * MAP + nx;
+        if (done[n]) continue;
+        const d = dist[u] + stepCost(n);
+        if (d < dist[n]) { dist[n] = d; prev[n] = u; }
+      }
     }
-    if (!ok) return;
-    const v = { x: sx, y: sy, vx: 0, vy: 0, pause: 0 };
+  }
+
+  // The doorstep: any walkable tile edge-adjacent to the building.
+  function entranceTiles(s) {
+    const f = foot(s.key), out = [];
+    const add = (x, y) => { if (walkable(x, y)) out.push({ x, y }); };
+    for (let x = s.x; x < s.x + f.w; x++) { add(x, s.y - 1); add(x, s.y + f.h); }
+    for (let y = s.y; y < s.y + f.h; y++) { add(s.x - 1, y); add(s.x + f.w, y); }
+    return out;
+  }
+
+  // Where a villager would like to go next, weighted by what it is: home is a
+  // regular stop, shops and food are popular, work is steady. Full buildings
+  // (at capacity) are not options.
+  function chooseDestination(v) {
+    const opts = [];
+    let total = 0;
+    village.b.forEach((s) => {
+      if (s.status !== 'complete' || s.id === v.lastVisited) return;
+      const d = DEFS[s.key], cap = capacityOf(s.key);
+      if (!cap || insideCount(s.id) >= cap) return;
+      let w = 1.5;
+      if (s.id === v.home) w = 2.2;
+      else if (d.housing) w = 0.3;                       // other people's homes: rarely
+      else if (d.distribution) w = 3;
+      else if (d.zone === 'commercial') w = 2.5;
+      else if (d.zone === 'industrial') w = 1.8;
+      opts.push({ s, w }); total += w;
+    });
+    if (!opts.length) return null;
+    let r = Math.random() * total;
+    for (const o of opts) { r -= o.w; if (r <= 0) return o.s; }
+    return opts[opts.length - 1].s;
+  }
+
+  function startTrip(v) {
+    const s = chooseDestination(v);
+    if (!s) return false;
+    const goals = new Set(entranceTiles(s).map((t) => t.y * MAP + t.x));
+    if (!goals.size) return false;
+    const path = findPath(Math.floor(v.x), Math.floor(v.y), goals);
+    if (!path) return false;
+    v.trip = { id: s.id, path, i: 0 };
+    return true;
+  }
+
+  // Which home a new resident takes: any finished residential building that
+  // still has a free bed.
+  function freeHome() {
+    for (const s of village.b) {
+      const h = housingOf(s);
+      if (h && homeCount(s.id) < h) return s;
+    }
+    return null;
+  }
+
+  function spawnVillager() {
+    const home = freeHome();
+    if (!home) return;
+    const door = entranceTiles(home);
+    if (!door.length) return;
+    const t = door[Math.floor(Math.random() * door.length)];
+    const v = { x: t.x + 0.5, y: t.y + 0.5, vx: 0, vy: 0, pause: 0.2, home: home.id, inside: null, until: 0, trip: null, tripCool: 2 + Math.random() * 5, lastVisited: null };
     const h = pickHeading(v);
     v.vx = h.cx; v.vy = h.cy;
     villagers.push(v);
@@ -975,7 +1111,9 @@
   function relocateVillagers() {
     for (let i = villagers.length - 1; i >= 0; i--) {
       const v = villagers[i];
-      if (canStand(v.x, v.y)) continue;
+      if (v.inside && !bById.get(v.inside)) v.inside = null;     // their building was removed: they step out
+      if (v.trip && !bById.get(v.trip.id)) v.trip = null;
+      if (v.inside || canStand(v.x, v.y)) continue;
       let found = null;
       search:
       for (let r = 1; r <= 8; r++) {
@@ -985,18 +1123,68 @@
           if (canStand(x, y)) { found = { x, y }; break search; }
         }
       }
-      if (found) { v.x = found.x; v.y = found.y; v.pause = 0.3; }
+      if (found) { v.x = found.x; v.y = found.y; v.pause = 0.3; v.trip = null; }
       else villagers.splice(i, 1);
     }
   }
 
+  let spawnClock = 0;
   function stepVillagers(dt) {
+    simT += dt;
     const want = villagerCap();
-    if (villagers.length < want) spawnVillager();
-    while (villagers.length > want) villagers.pop();
+    // A home that is gone (or not finished) no longer houses anyone.
+    villagers.forEach((v) => {
+      if (v.home && !housingOf(bById.get(v.home) || {})) v.home = null;
+      if (!v.home && Math.random() < dt) { const h = freeHome(); if (h) v.home = h.id; }
+    });
+    spawnClock += dt;
+    if (villagers.length < want && spawnClock > 0.8) { spawnClock = 0; spawnVillager(); }
+    while (villagers.length > want) {
+      // Homeless first, then whoever is last; people inside leave with them.
+      let idx = villagers.findIndex((v) => !v.home);
+      if (idx < 0) idx = villagers.length - 1;
+      villagers.splice(idx, 1);
+    }
 
     villagers.forEach((v) => {
+      // Inside a building: nothing moves until the stay is over, then they come
+      // back out at the door.
+      if (v.inside) {
+        if (simT >= v.until) { v.lastVisited = v.inside; v.inside = null; v.pause = 0.25; v.tripCool = 3 + Math.random() * 6; }
+        return;
+      }
       if (v.pause > 0) { v.pause -= dt; return; }
+
+      // On a trip: follow the path tile by tile, then go in.
+      if (v.trip) {
+        const t = v.trip;
+        const target = bById.get(t.id);
+        if (!target) { v.trip = null; return; }
+        const wp = t.path[t.i];
+        const wx = (wp % MAP) + 0.5, wy = ((wp / MAP) | 0) + 0.5;
+        if (!walkable(wp % MAP, (wp / MAP) | 0)) { v.trip = null; return; }   // the way was blocked
+        const dx = wx - v.x, dy = wy - v.y, d = Math.hypot(dx, dy);
+        const step = WALK * 1.15 * dt;
+        if (d <= step) {
+          v.x = wx; v.y = wy;
+          t.i++;
+          if (t.i >= t.path.length) {
+            v.trip = null;
+            if (insideCount(target.id) < capacityOf(target.key)) {
+              v.inside = target.id;
+              v.until = simT + (target.id === v.home ? 8 + Math.random() * 12 : 4 + Math.random() * 8);
+            } else v.pause = 0.4;   // it filled up while they walked: turn away
+          }
+        } else { v.x += (dx / d) * step; v.y += (dy / d) * step; v.vx = dx / d; v.vy = dy / d; }
+        return;
+      }
+
+      // Otherwise wander, and every so often decide to go somewhere.
+      v.tripCool -= dt;
+      if (v.tripCool <= 0) {
+        v.tripCool = 5 + Math.random() * 9;
+        if (startTrip(v)) return;
+      }
       // Roads are the nice place to be, so walking one is slower (lingering).
       const onRoad = getTileType(Math.floor(v.x), Math.floor(v.y)) === 'road';
       const speed = WALK * (onRoad ? 0.7 : 1);
@@ -1028,6 +1216,7 @@
     villagerG.clear();
     const coat = mood > 66 ? '#3f6fa8' : mood > 33 ? '#6b5a3f' : '#3a3a3a';
     villagers.forEach((v) => {
+      if (v.inside) return;                        // indoors: not on the map
       const px = Math.round(v.x * T), py = Math.round(v.y * T);
       rect(villagerG, '#000000', px - 1, py + 4, 3, 1, 0.3);
       rect(villagerG, '#d9a877', px - 1, py - 2, 3, 3);
@@ -1079,7 +1268,7 @@
 
       let sp = bSprites.get(s.id);
       if (!sp) {
-        sp = scene.add.image(0, 0, ensureBaked(s.key)).setOrigin(0, 0);
+        sp = scene.add.image(0, 0, ensureBaked(s.key)).setOrigin(0, 0).setScale(coverScale(s.key));
         bSprites.set(s.id, sp);
       }
       sp.setPosition(ox, oy - TycoonArt.PAD_TOP);
@@ -1150,14 +1339,34 @@
     $('stat-road').textContent = onRoadCount + '/' + doneCount;
     $('stat-road').style.color = doneCount && onRoadCount < doneCount ? '#ff6b6b' : '';
     $('stat-mood').textContent = Math.round(mood) + '%';
+    const fs = foodStats();
+    $('stat-pop').textContent = fs.pop;
+    $('stat-food').textContent = fs.demand ? `${Math.floor(fs.fed)}/${fs.demand}` : '—';
+    $('stat-food').style.color = fs.demand && fs.satisfaction < 1 ? '#ff6b6b' : '';
     $('stat-upkeep').textContent = Math.floor(totalUpkeep);
     syncBalance();
     maybePushLeaderboardScore(totalProduction - (totalUpkeep / 1440));
   }
 
+  const BOX_COLOR = { residential: '#2f6fd0', commercial: '#e08a1f', industrial: '#7b3fa0', agricultural: '#9aa32a', water: '#2b7fd4', erase: '#ff4444' };
   function drawGhost() {
     ghostG.clear();
     gridG.clear();
+    if (rectDrag && brushMode) {
+      // Faint grid so the box snaps visibly to tiles, then the box itself.
+      gridG.lineStyle(1, 0xffffff, 0.14);
+      for (let i = 0; i <= MAP; i++) {
+        gridG.lineBetween(i * T, 0, i * T, MAP * T);
+        gridG.lineBetween(0, i * T, MAP * T, i * T);
+      }
+      const plan = planRect(brushMode, rectDrag);
+      const col = BOX_COLOR[brushMode] || '#ffffff';
+      rect(ghostG, col, plan.x0 * T, plan.y0 * T, plan.w * T, plan.h * T, 0.38);
+      ghostG.lineStyle(1.5, hex(col), 1);
+      ghostG.strokeRect(plan.x0 * T + 0.5, plan.y0 * T + 0.5, plan.w * T - 1, plan.h * T - 1);
+      ghostG.setDepth(61);
+      return;
+    }
     if (!placing) { if (ghostImg) ghostImg.setVisible(false); return; }
     // Faint tile grid while aiming.
     gridG.lineStyle(1, 0xffffff, 0.14);
@@ -1171,7 +1380,7 @@
     const ok = issue === null;
     const ox = placing.tx * T, oy = placing.ty * T;
     if (!ghostImg) ghostImg = scene.add.image(0, 0, ensureBaked(placing.key)).setOrigin(0, 0).setDepth(60);
-    ghostImg.setTexture(ensureBaked(placing.key));
+    ghostImg.setTexture(ensureBaked(placing.key)).setScale(coverScale(placing.key));
     ghostImg.setPosition(ox, oy - TycoonArt.PAD_TOP).setAlpha(ok ? 0.85 : 0.4).setVisible(true);
     ghostG.setDepth(61);
     rect(ghostG, ok ? '#00ff6a' : '#ff3b3b', ox, oy, f.w * T, f.h * T, ok ? 0.2 : 0.45);
@@ -1233,6 +1442,11 @@
       down = { x: p.x, y: p.y, t: performance.now(), moved: false };
       // Price the whole stroke off the balance at the moment it starts.
       if (brushMode && brushMode !== 'erase') { try { strokeBasis = Strubles.get(); } catch { strokeBasis = null; } }
+      if (brushMode && RECT_BRUSHES.has(brushMode) && !placing && !this.input.pointer2.isDown) {
+        const t = tileFromPointer(p);
+        rectDrag = { x0: clampTile(t.tx), y0: clampTile(t.ty), x1: clampTile(t.tx), y1: clampTile(t.ty) };
+        updateRect(t.tx, t.ty);
+      }
     });
     this.input.on('pointermove', (p) => {
       if (!p.isDown || !down) return;
@@ -1241,9 +1455,11 @@
       if (brushMode && !this.input.pointer2.isDown) {
         down.moved = true;
         const t = tileFromPointer(p);
-        paintTile(t.tx, t.ty);
+        if (RECT_BRUSHES.has(brushMode)) updateRect(t.tx, t.ty);
+        else paintRoadTile(t.tx, t.ty);
         return;
       }
+      if (rectDrag) { rectDrag = null; drawGhost(); } // a second finger turns it into a pinch
       const p1 = this.input.pointer1, p2 = this.input.pointer2;
       if (p1.isDown && p2.isDown) {
         // Pinch zoom
@@ -1262,18 +1478,26 @@
       clampCam();
     });
     const endStroke = () => { strokeBasis = null; flushSave(); if (brushMode) setBrushLabel(); };
-    this.input.on('pointerupoutside', endStroke);
+    this.input.on('pointerupoutside', () => { rectDrag = null; drawGhost(); endStroke(); });
     this.input.on('pointerup', (p) => {
       try { handleUp(p); } finally { endStroke(); }
     });
     const handleUp = (p) => {
+      if (rectDrag) {
+        // Let go: apply the box (a plain tap is a one-tile box).
+        const r = rectDrag;
+        rectDrag = null; down = null;
+        commitRect(r);
+        refresh();
+        return;
+      }
       if (!down) return;
       const wasTap = !down.moved && performance.now() - down.t < 600;
       down = null;
       if (!wasTap) return;
       const { tx, ty } = tileFromPointer(p);
       if (placing) { aimGhost(tx, ty); return; }
-      if (brushMode) { paintTile(tx, ty); return; }
+      if (brushMode) { paintRoadTile(tx, ty); return; }
       const b = buildingAt(tx, ty);
       selectedId = b ? b.id : null;
       refresh();
@@ -1443,6 +1667,7 @@
         status: 'building', startedAt: now,
         completesAt: now + def.buildMinutes * 60000,
         lastProductionAt: now,
+        paid: def.cost,           // permit paid, refunded if the building is removed
       });
     }
     onBuildingsChanged();
@@ -1460,7 +1685,7 @@
   // and water may not go under a building. ---
   const BRUSH_LABEL = {
     residential: 'Residential', commercial: 'Commercial', industrial: 'Industrial',
-    road: 'Road', water: 'Water', erase: 'Erase',
+    agricultural: 'Farmland', road: 'Road', water: 'Water', erase: 'Erase',
   };
   let brushMsgTimer = null;
   // While a refusal ("Need 400 Strubles", "Can't go under a building") is
@@ -1476,41 +1701,107 @@
     clearTimeout(brushMsgTimer);
     brushMsgTimer = setTimeout(() => { brushMsgActive = false; setBrushLabel(); }, 1600);
   }
+  // Zones, water and the eraser are dragged out as a box (see rectDrag below);
+  // a road is laid freehand, tile by tile, because roads are lines.
+  const RECT_BRUSHES = new Set(['residential', 'commercial', 'industrial', 'agricultural', 'water', 'erase']);
   function setBrushLabel() {
     if (!brushMode || brushMsgActive) return;
     const cost = tileCost(brushMode);
     const el = $('brush-bar-text');
     el.classList.remove('bad');
-    el.textContent = brushMode === 'erase'
-      ? 'Erase — drag to clear tiles (no refund)'
-      : `${BRUSH_LABEL[brushMode]} — ${cost ? cost.toLocaleString() + ' each' : 'free'}, drag to paint`;
+    if (brushMode === 'erase') el.textContent = 'Erase — drag a box over tiles to clear them. You get back what you paid.';
+    else if (brushMode === 'road') el.textContent = `Road — ${cost.toLocaleString()} each, drag to lay a road`;
+    else el.textContent = `${BRUSH_LABEL[brushMode]} — ${cost ? cost.toLocaleString() + ' per tile' : 'free'}, drag a box to fill an area`;
   }
 
-  function paintTile(tx, ty) {
-    if (!brushMode || tx < 0 || ty < 0 || tx >= MAP || ty >= MAP) return;
+  // What a painted tile cost, so erasing or replacing it can pay it back. Tiles
+  // painted before this was tracked refund the base price.
+  function refundForTile(x, y, type) {
+    if (!TILE_BASE[type]) return 0;
+    const v = village.paid && village.paid[x + '_' + y];
+    return Number.isFinite(v) ? v : TILE_BASE[type];
+  }
+  const setPaid = (x, y, amount) => {
+    const k = x + '_' + y;
+    if (amount > 0) village.paid[k] = amount; else delete village.paid[k];
+  };
+
+  // Single road tile (freehand). Replacing a zone refunds that zone's price.
+  function paintRoadTile(tx, ty) {
+    if (brushMode !== 'road' || tx < 0 || ty < 0 || tx >= MAP || ty >= MAP) return;
     const existing = getTileType(tx, ty);
-    if (brushMode === 'erase') {
-      if (!existing) return;
-      setTileType(tx, ty, null);
-      saveVillage(true); refresh();
-      return;
-    }
-    if (existing === brushMode) return;
-    if (occGrid[ty * MAP + tx] && (brushMode === 'road' || brushMode === 'water')) {
-      brushMsg("Can't go under a building", true);
-      return;
-    }
-    const cost = tileCost(brushMode);
-    if (cost > 0 && !Strubles.spend(cost)) {
-      brushMsg(`Need ${cost.toLocaleString()} Strubles`, true);
-      return;
-    }
-    setTileType(tx, ty, brushMode);
+    if (existing === 'road') return;
+    if (occGrid[ty * MAP + tx]) { brushMsg("Can't go under a building", true); return; }
+    const cost = tileCost('road');
+    const refund = existing ? refundForTile(tx, ty, existing) : 0;
+    const net = cost - refund;
+    if (net > 0 && !Strubles.spend(net)) { brushMsg(`Need ${net.toLocaleString()} Strubles`, true); return; }
+    if (net < 0) Strubles.add(-net);
+    setTileType(tx, ty, 'road');
+    setPaid(tx, ty, cost);
     saveVillage(true); refresh();
+  }
+
+  // The box being dragged out: corners in tile coordinates, or null.
+  let rectDrag = null;
+  const clampTile = (v) => Math.max(0, Math.min(MAP - 1, v));
+
+  // Works out what a box would do before it does it: the tiles that change,
+  // what it costs, what comes back, and how many sit under a building (those
+  // are never touched -- the zone beneath a building is what lets it stand).
+  function planRect(mode, r) {
+    const x0 = Math.min(r.x0, r.x1), x1 = Math.max(r.x0, r.x1);
+    const y0 = Math.min(r.y0, r.y1), y1 = Math.max(r.y0, r.y1);
+    const unit = (mode === 'erase' || mode === 'water') ? 0 : tileCost(mode);
+    const plan = { changes: [], cost: 0, refund: 0, blocked: 0, w: x1 - x0 + 1, h: y1 - y0 + 1, x0, y0, x1, y1 };
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const cur = getTileType(x, y);
+        if (mode === 'erase' ? !cur : cur === mode) continue;
+        if (occGrid[y * MAP + x]) { plan.blocked++; continue; }
+        if (cur) plan.refund += refundForTile(x, y, cur);
+        if (mode === 'erase') plan.changes.push([x, y, null, 0]);
+        else { plan.cost += unit; plan.changes.push([x, y, mode, unit]); }
+      }
+    }
+    plan.net = plan.cost - plan.refund;
+    return plan;
+  }
+  function describePlan(mode, plan) {
+    const money = plan.net > 0 ? `${plan.net.toLocaleString()} Strubles`
+      : plan.net < 0 ? `refund ${(-plan.net).toLocaleString()}` : 'free';
+    const n = plan.changes.length;
+    const extra = plan.blocked ? ` · ${plan.blocked} under buildings skipped` : '';
+    return `${BRUSH_LABEL[mode]} — ${plan.w}×${plan.h} box · ${n} tile${n === 1 ? '' : 's'} · ${money}${extra}`;
+  }
+  function updateRect(tx, ty) {
+    if (!rectDrag) return;
+    rectDrag.x1 = clampTile(tx); rectDrag.y1 = clampTile(ty);
+    const plan = planRect(brushMode, rectDrag);
+    const el = $('brush-bar-text');
+    el.classList.toggle('bad', plan.net > 0 && plan.net > Strubles.get());
+    el.textContent = describePlan(brushMode, plan);
+    brushMsgActive = false;
+    drawGhost();
+  }
+  function commitRect(r) {
+    const mode = brushMode;
+    if (!mode || !r) return;
+    const plan = planRect(mode, r);
+    if (!plan.changes.length) {
+      if (plan.blocked) brushMsg("Can't change tiles under a building", true);
+      return;
+    }
+    if (plan.net > 0 && !Strubles.spend(plan.net)) { brushMsg(`Need ${plan.net.toLocaleString()} Strubles`, true); return; }
+    if (plan.net < 0) Strubles.add(-plan.net);
+    plan.changes.forEach(([x, y, type, paid]) => { setTileType(x, y, type); setPaid(x, y, paid); });
+    saveVillage();
+    brushMsg(plan.net < 0 ? `Refunded ${(-plan.net).toLocaleString()} Strubles` : describePlan(mode, plan));
   }
 
   function setBrush(mode) {
     brushMode = mode;
+    rectDrag = null;
     document.querySelectorAll('[data-brush]').forEach((b) => {
       b.style.opacity = (mode && b.dataset.brush === mode) ? '0.55' : '1';
     });
@@ -1531,7 +1822,9 @@
       { brush: 'residential', icon: '🏘️', name: 'Residential',
         blurb: 'Homes. Shabby Apartments, Generic Buildings and Pagodas can only be built on residential zoning.' },
       { brush: 'commercial', icon: '🏬', name: 'Commercial',
-        blurb: 'Shops and offices. Skyscrapers, Taipei 101, Banks and Office Buildings can only be built on commercial zoning.' },
+        blurb: 'Shops and offices. Skyscrapers, Taipei 101, Banks, Office Buildings, Grocery Stores and 7-Elevens can only be built on commercial zoning.' },
+      { brush: 'agricultural', icon: '🌾', name: 'Farmland',
+        blurb: 'Farms can only be built on farmland. They grow the food your residents eat; a Grocery Store or 7-Eleven then has to carry it to them.' },
       { brush: 'industrial', icon: '🏭', name: 'Industrial',
         blurb: 'Sweatshops, Factories and Power Plants can only be built on industrial zoning. It adds +15% to any building it touches, but drags village mood down — and mood scales all production from 0.75x to 1.15x.' },
     ]},
@@ -1539,7 +1832,7 @@
       { brush: 'water', icon: '💧', name: 'Water',
         blurb: 'Scenery. Lifts mood a little, and permanently blocks building on that tile until erased.' },
       { brush: 'erase', icon: '🧽', name: 'Erase',
-        blurb: 'Clears any painted tile. No refund.' },
+        blurb: 'Drag a box to clear painted tiles. You get back what you paid for them. Tiles under a building are left alone.' },
     ]},
   ];
 
@@ -1556,7 +1849,7 @@
         const row = document.createElement('div');
         row.className = 'picker-row';
         row.innerHTML = `<div class="row-icon">${r.icon}</div><div class="row-info">${r.name}
-          <small style="color:var(--gold)">${r.brush === 'erase' || !cost ? 'free' : cost.toLocaleString() + ' Strubles per tile · scales with your balance'}</small>
+          <small style="color:var(--gold)">${r.brush === 'erase' ? 'refunds what you paid' : !cost ? 'free' : cost.toLocaleString() + ' Strubles per tile · scales with your balance'}</small>
           <small class="row-desc">${r.blurb}</small></div>`;
         row.addEventListener('click', () => {
           $('zoning-overlay').classList.remove('open');
@@ -1604,7 +1897,7 @@
     const dailyUpkeep = def.cost * (def.upkeepPct || 0);
     $('manage-title').textContent = def.label;
     const statusLine = s.status === 'building'
-      ? 'Under construction — removing forfeits progress, no refund.'
+      ? 'Under construction — removing it loses the progress but refunds the permit.'
       : isRoadConnected(s) ? `Producing +${def.production}/min.` : 'No road touching it — not producing. Lay a road alongside.';
     let upkeepLine = '';
     if (s.status === 'complete') {
@@ -1613,8 +1906,20 @@
         : `<small>Upkeep ${Math.floor(dailyUpkeep)}/day, auto-paid from balance.</small>`;
     }
     $('manage-info').innerHTML = `<div class="guide-row">${iconImg(s.key)}<div class="row-info">${def.label} ${kindLabel(s.key, `${foot(s.key).w}×${foot(s.key).h} tiles`)}<small>${statusLine}</small>${upkeepLine}${modLine(s.key)}${def.description ? `<small class="row-desc">${def.description}</small>` : ''}</div></div>`;
+    $('manage-info').innerHTML += peopleInfo(s, def);
     $('manage-bank').style.display = def.special === 'bank' && s.status === 'complete' ? '' : 'none';
     manageOverlay.classList.add('open');
+  }
+  // Residents / who is inside, and food, for the manage panel.
+  function peopleInfo(s, def) {
+    if (s.status !== 'complete') return '';
+    const bits = [];
+    if (def.housing) bits.push(`Residents ${homeCount(s.id)}/${def.housing} · inside now ${insideCount(s.id)}`);
+    else if (def.capacity) bits.push(`Inside now ${insideCount(s.id)}/${def.capacity}`);
+    const road = isRoadConnected(s);
+    if (def.food) bits.push(`Grows ${def.food} food/min${road ? '' : ' — needs a road to deliver'}`);
+    if (def.distribution) bits.push(`Distributes up to ${def.distribution} food/min${road ? '' : ' — needs a road'}`);
+    return bits.length ? `<div class="guide-row"><div class="row-info">${bits.map((b) => `<small>${b}</small>`).join('')}</div></div>` : '';
   }
   function closeManage() {
     manageOverlay.classList.remove('open');
@@ -1630,8 +1935,20 @@
     placing.tx = s.x; placing.ty = s.y;
     refresh();
   });
+  // Mil-Spec is this game's Common tier. Anything rarer asks first, because
+  // getting another one back means another crate or a Real Estate purchase.
   $('manage-remove').addEventListener('click', () => {
+    const s = bById.get(manageId);
+    if (!s) return;
+    const def = DEFS[s.key];
+    const refund = Number.isFinite(s.paid) ? s.paid : def.cost;
+    if (def.tier && def.tier !== 'mil_spec') {
+      const rar = (RARITY[def.tier] || {}).label || def.tier;
+      const ok = confirm(`Remove your ${def.label}?\n\nIt is a ${rar} building. You get ${refund.toLocaleString()} Strubles back and the building returns to your inventory, but you will need to zone and build it all over again.`);
+      if (!ok) return;
+    }
     village.b = village.b.filter((x) => x.id !== manageId);
+    if (refund > 0) { try { Strubles.add(refund); } catch {} }
     onBuildingsChanged();
     saveVillage();
     closeManage();
@@ -1654,6 +1971,16 @@
         <div class="row-icon">🗺️</div>
         <div class="row-info"><b>Zone first, then build.</b>
           <small>Every building must be built on the zoning it belongs to, and its whole footprint has to be painted with it before you can place it — Taipei 101 needs 3×3 commercial, a Pagoda 2×2 residential. Zones cost ${tileCost('residential').toLocaleString()} a tile right now, scaling with your balance. Once a building stands, the colour underneath disappears.</small></div>
+      </div>
+      <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">🌾</div>
+        <div class="row-info"><b>People and food.</b>
+          <small>Residential buildings house residents; every building has a capacity for how many people can be inside at once. Villagers walk the roads to shops, work and home, and step inside while they are there. Each resident eats 1 food a minute: Farms grow it and Grocery Stores and 7-Elevens carry it to your residents, so you need both (and roads). A fed village is happier; a hungry one drags every building's output down through mood.</small></div>
+      </div>
+      <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">↩️</div>
+        <div class="row-info"><b>Drag to zone, refunds on removal.</b>
+          <small>Pick a zone and drag a box across the map to fill an area; the price is shown before you let go. Erasing a zone, or removing a building, pays back what you paid. Removing anything above Mil-Spec asks you to confirm first.</small></div>
       </div>
       <div class="guide-row" style="align-items:flex-start;">
         <div class="row-icon">🛣️</div>
@@ -1821,6 +2148,9 @@
   };
 
   if (window.initPickers) setTimeout(window.initPickers, 100);
+
+  // Test hook for the browser suites; only exists in dev mode.
+  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost };
 })();
 </script>
 </body>

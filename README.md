@@ -69,39 +69,44 @@ Serves `dist/` locally on `http://localhost:4321`.
 
 ```text
 iantopia/
-├── src/
-│   ├── pages/
-│   │   ├── index.astro           # Homepage (draggable items, music/bg/cursor pickers)
-│   │   ├── blackjack.astro       # Blackjack game
-│   │   ├── lootbox.astro         # Case opening UI + reveal animation
-│   │   ├── never.astro           # "Is Iantopia Done Yet?" joke page
-│   │   └── alternate-ending.astro # Unlockable secret page
-│   ├── components/               # Astro components (minimal use; mostly inline scripts)
-│   └── layouts/                  # Global layout wrapper
-├── public/
-│   ├── case-data.js              # Loot pool + case definitions + rarity tiers
-│   ├── lootbox.js                # Rolling engine (tier → rarity → item)
-│   ├── desktop-items.js          # Drag-and-drop + multi-select logic
-│   ├── cursor.js                 # Canvas custom cursor renderer
-│   ├── cursor-library.js         # Cursor definitions (image + emoji)
-│   ├── music-library.js          # Unlockable music tracks
-│   ├── music-position.js         # Resumes a track's playback position across page loads
-│   ├── background-library.js     # Unlockable video/image backgrounds
-│   ├── strubles.js               # Currency getter/setter (localStorage)
-│   ├── pickers.js                # Shared music/background/cursor picker UI (blackjack, alternate-ending)
-│   ├── cloud-sync.js             # Google Sign-In + Firestore progress sync
-│   ├── assets/
-│   │   ├── items/                # Collectible item PNGs (sock, panda, license, shelf, blind box, etc.)
-│   │   ├── badges/               # Badge PNGs (trophy, etc.)
-│   │   ├── decorations/          # Decoration art (display shelf, blind box — now real loot, not static)
-│   │   ├── icons/                # UI icons (Google logo, etc.)
-│   │   └── casino/               # Card, chip, table graphics
-│   ├── audio/
-│   │   └── sfx/                  # Click sound effects (hamood, etc.)
-│   ├── video/                    # Background video GIFs + MP4s
-│   └── cursors/                  # Cursor PNG files
+├── src/pages/                    # One .astro file per route
+│   ├── index.astro               # Homepage (draggable items, pickers, suggestion box)
+│   ├── tycoon.astro              # My Iantopia: the village builder (Phaser 4)
+│   ├── lootbox.astro             # Case opening, shop, Real Estate
+│   ├── blackjack.astro, minesweeper.astro, horse-web-game.astro, ...   # Single-player games
+│   ├── arena.astro               # Multiplayer hub
+│   ├── arena-blackjack.astro, arena-battleship.astro                   # Multiplayer games
+│   ├── suggestions.astro         # Public suggestions forum
+│   └── admin-suggestions.astro   # Admin inbox (post / archive / delete, Excel + CSV export)
+├── public/                       # Served as-is. Shared scripts load with plain <script> tags
+│   ├── case-data.js, lootbox.js  # Loot pool, cases, rolling engine, shop
+│   ├── strubles.js, cloud-sync.js, tycoon-bank.js   # Currency, Google sign-in + Firestore sync, wallet cap
+│   ├── tycoon-buildings.js       # Every building's stats: the one source of truth
+│   ├── tycoon-art.js             # Pixel art + terrain painting for My Iantopia
+│   ├── arena-client.js           # Shared multiplayer connection layer (guest + signed-in)
+│   ├── blackjack-engine.js       # Shared by the browser and the arena server
+│   ├── patch-notes.js            # Changelog shown on the homepage
+│   ├── tycoon/                   # Web-size building art, icons and terrain (generated)
+│   └── assets/, audio/, video/, backgrounds/, cursors/, horse-game/, ...
+├── arena-server/                 # Node WebSocket server for multiplayer (Docker on Qasim)
+│   ├── core.js, server.js        # Testable server core / production entry
+│   ├── manager.js, game-base.js  # Matchmaking and the shared game lifecycle
+│   ├── blackjack.js, battleship.js, balance.js, rate-limit.js
+│   └── test/                     # `npm test` in this folder; fake Firestore, no network
+├── art-source/                   # Large original art, kept out of the deployed site
+│   └── tycoon/                   # Source PNGs (not committed); see scripts/build-tycoon-assets.py
+├── scripts/                      # Build helpers (build-tycoon-assets.py)
+├── news-pipeline/                # Python news digest (cron on Qasim)
+├── admin-scripts/                # One-off Firestore maintenance scripts
 └── youtube-transcript-app/       # Separate webapp (Astro + FastAPI)
 ```
+
+### Working on My Iantopia art
+
+The big originals live in `art-source/tycoon/` (not committed). After changing one,
+run `python3 scripts/build-tycoon-assets.py` (needs Pillow) to regenerate the small
+web versions in `public/tycoon/`. Farm and Grocery Store are drawn in code
+(`public/tycoon-art.js`); their card images were rendered from that art.
 
 ## Key Systems
 

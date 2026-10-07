@@ -1,6 +1,6 @@
-# Arena Server (Iantopia WebSocket Blackjack 1v1)
+# Arena Server (Iantopia WebSocket multiplayer)
 
-A Node.js WebSocket server for real-time multiplayer Blackjack 1v1 on iantopia.com.
+A Node.js WebSocket server for real-time 1v1 Blackjack and Battleship on iantopia.com, plus the suggestion box. Signed-in players can play for Strubles; guests can play friendly (0 Strubles) games.
 
 ## Setup
 
@@ -43,48 +43,57 @@ Server listens on `ws://localhost:4001` in dev.
 
 ## API
 
-### Auth Flow
+### Auth
 ```
-Client → {type: 'auth', token: <firebase-id-token>}
-Server → {type: 'auth_ok', sessionId: <id>}
+Client → {type: 'auth', token: <firebase-id-token>}     // signed in: stakes allowed
+Client → {type: 'auth_guest', guestId, name}             // guest: friendly games only
+Server → {type: 'auth_ok', sessionId, guest, name}
 ```
 
-### Gameplay
+### Matchmaking and play (both games)
 ```
-Client → {type: 'join_queue', bet: <number>}
-Server → {type: 'status', status: 'queued'}
-Server → {type: 'game_start', hands: [...]}
-Client → {type: 'action', action: 'hit' | 'stand'}
-Server → {type: 'game_update', hands: [...], done: [...]}
-Server → {type: 'game_result', results: [...], hands: [...]}
-Server → {type: 'balance_update', balance: <number>}
+Client → {type: 'join_queue', bet: <0..1,000,000>, gameType: 'blackjack' | 'battleship'}   // bet 0 = friendly
+Client → {type: 'match_bet', queueId}                    // take someone's open lobby
+Server → {type: 'game_start', ...}   {type: 'game_update' | 'fire_result' | ...}
+Server → {type: 'game_result', results, ...}   {type: 'balance_update', balance}
 ```
+Blackjack never sends the opponent's cards before the hand is settled, only how many they hold.
+
+### Suggestions
+```
+Client → {type: 'suggest', text, page}                   // signed in, 10s cooldown
+Admin  → {type: 'suggestions_list'}  {type: 'suggestion_set', id, status, hideName}  {type: 'suggestion_delete', id}
+Anyone → {type: 'suggestions_public'}                    // only posted ones, no uid
+```
+Admins are the accounts in `ADMIN_EMAILS` / `ADMIN_UIDS` (see `docker-compose.prod.yml`).
 
 ## Rate Limiting
 
-- Max 5 concurrent WebSocket connections per IP
-- Max 10 messages/sec per connection
-- Exceeding limits drops the message (no response sent)
+- Per-IP connection cap and per-connection message rate (see `rate-limit.js`; real client IP comes from `X-Real-IP` behind nginx)
+- Exceeding a limit gets a `rate_limited` error or a closed socket
 
 ## Modules
 
-- `server.js` — WebSocket listener, auth, connection/message routing
-- `manager.js` — Queue + table lifecycle, matchmaking
-- `blackjack.js` — Single-table game logic (uses `public/blackjack-engine.js`)
-- `balance.js` — Firestore-authoritative balance/payout (never trusts client)
-- `rate-limit.js` — Per-IP and per-connection rate limiting
+- `server.js` — production entry: wires Firebase to `core.js`
+- `core.js` — WebSocket listener, auth, heartbeat, per-connection message ordering (testable)
+- `manager.js` — queue, tables, reconnection, suggestions
+- `game-base.js` — shared stake handling, disconnect grace, rematch window
+- `blackjack.js`, `battleship.js` — the games
+- `balance.js` — Firestore-authoritative balances: transactional deduct / payout / refund
+- `rate-limit.js` — per-IP and per-connection limits
 
 ## Testing
 
 ```bash
-# From repo root
-node arena-server/server.js &
-# In another terminal, run a local WebSocket test client
+cd arena-server && npm test
 ```
+
+Runs against an in-memory fake Firestore and fake auth (`test/fakes.js`), so it needs no
+network or credentials. `node test/dev-server.js` starts the same fake-backed server on
+port 4001 for browser testing.
 
 ## Architecture Notes
 
-- **Server-authoritative**: All balance changes read/write directly to Firestore via `firebase-admin`; client balance updates are broadcast-only
-- **Shared engine**: `public/blackjack-engine.js` is required by both browser and server for deck/hand logic
-- **Isolated container**: runs separately from main nginx/Astro stack, bound to localhost-only, non-root user
-- **No external deps beyond ws + firebase-admin**: minimal surface area for security
+- **Server-authoritative**: stakes, payouts (5% rake on staked games) and refunds are Firestore transactions; clients only display
+- **Shared engine**: `public/blackjack-engine.js` is used by both the browser and the server
+- **Isolated container**: runs separately from the main nginx/Astro stack, bound to localhost, non-root user
