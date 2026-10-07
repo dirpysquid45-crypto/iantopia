@@ -141,6 +141,8 @@ window.CASE_ITEMS = {
     description: 'Burns the old way. Big, dependable output, and a haze over everything within sight of it.' },
   bld_711:        { label: 'Building: 7-Eleven',            tier: 'restricted',       img: '/tycoon/art/seven_eleven.png',    type: 'building_unlock', key: 'seven_eleven',
     description: "Open all night, every night. Keeps your residents fed, and the slushie machine never breaks." },
+  bld_park:       { label: 'Building: Park',                tier: 'mil_spec',         img: '/tycoon/art/park.png',            type: 'building_unlock', key: 'park',
+    description: 'A winding path, a big old tree and a bench with a view. Villagers pour in at noon and at 6 pm, and a happy village works harder.' },
   bld_nuclear:    { label: 'Building: Nuclear Plant',       tier: 'exceedingly_rare', img: '/tycoon/art/nuclear_plant.png',   type: 'building_unlock', key: 'nuclear_plant',
     description: 'The most output of anything you can build. The neighbours are supportive in public.' },
 };
@@ -236,14 +238,14 @@ window.CASES = {
     // on its own anymore.
     cost: 2000,
     emoji: '🏗️',
-    blurb: 'Drops one of twelve buildings for My Iantopia — you start with none. Taipei 101 and the Nuclear Plant are 1.5% each, and owning Pagodas nudges every future pull further from Common.',
+    blurb: 'Drops one of thirteen buildings for My Iantopia — you start with none. Taipei 101 and the Nuclear Plant are 1.5% each, and owning Pagodas nudges every future pull further from Common.',
     // Rarity tiers reused as the building rarity odds specified for this
     // case specifically, mapped onto the shared mil_spec..exceedingly_rare
     // scale rather than inventing a parallel one. Taipei 101 is prestige-tier
     // rarity; the others climb toward it in proportion.
     // Odds are per TIER, and a tier's chance is split evenly between the
     // buildings in it, so each building's own chance is tier / count:
-    //   mil_spec 46 / 3 (Shabby, Office, Bank)               = 15.3% each
+    //   mil_spec 46 / 4 (Shabby, Office, Bank, Park)         = 11.5% each
     //   restricted 26 / 3 (Generic, Sweatshop, 7-Eleven)     =  8.7% each
     //   classified 18 / 2 (Pagoda, Factory)        =  9%   each
     //   covert 7 / 2 (Skyscraper, Coal Plant)      =  3.5% each
@@ -261,7 +263,7 @@ window.CASES = {
     // see lootbox.js's oddsFor(), which checks this flag rather than
     // hardcoding this case's key.
     pagodaBuff: true,
-    items: ['bld_shabby', 'bld_office', 'bld_bank', 'bld_generic', 'bld_sweatshop', 'bld_711', 'bld_pagoda', 'bld_factory', 'bld_skyscraper', 'bld_coal', 'bld_taipei101', 'bld_nuclear'],
+    items: ['bld_shabby', 'bld_office', 'bld_bank', 'bld_park', 'bld_generic', 'bld_sweatshop', 'bld_711', 'bld_pagoda', 'bld_factory', 'bld_skyscraper', 'bld_coal', 'bld_taipei101', 'bld_nuclear'],
   },
 };
 

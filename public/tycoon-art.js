@@ -207,6 +207,22 @@ window.TycoonArt = (function () {
       rect(g, '#d94a3a', ox + 17, oy - 1, 3, 2);
     },
 
+    // ---- 3x3, residential: park (shown until the cover picture loads) ----------
+    park(g, ox, oy) {
+      vgrad(g, ox, oy + 6, 48, 42, '#5fae4a', '#3f8a35');              // lawn
+      for (let i = 0; i < 18; i++) rect(g, '#7cc660', ox + 2 + ((i * 11) % 44), oy + 8 + ((i * 7) % 38), 2, 1);
+      for (let r = 0; r < 20; r++) {                                    // winding path
+        const x = ox + 6 + Math.round(8 * Math.sin(r / 3.2)) + r;
+        rect(g, '#cfd8d6', x, oy + 46 - r * 2, 7, 2);
+        rect(g, '#9aa6a4', x, oy + 46 - r * 2, 1, 2);
+      }
+      rect(g, '#6b4a22', ox + 35, oy + 18, 3, 12);                      // tree
+      vgrad(g, ox + 26, oy + 2, 21, 18, '#4fa23a', '#2d6f27');
+      rect(g, '#7cc660', ox + 30, oy + 4, 8, 3, 0.8);
+      rect(g, '#8a5a2a', ox + 38, oy + 38, 9, 2);                       // bench
+      rect(g, '#5a3a18', ox + 38, oy + 40, 1, 3); rect(g, '#5a3a18', ox + 46, oy + 40, 1, 3);
+    },
+
     // ---- 2x1, commercial: 7-Eleven ------------------------------------------
     seven_eleven(g, ox, oy) {
       rect(g, '#0b1118', ox + 1, oy + 14, 30, 2, 0.45);

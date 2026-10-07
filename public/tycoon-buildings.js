@@ -125,6 +125,20 @@ window.TYCOON_BUILDINGS = {
     production: 3, buildMinutes: 30, cost: 600, upkeepPct: 0.04,
     moodEffect: 1,
   },
+  park: {
+    label: 'Park',
+    tier: 'mil_spec',
+    img: '/tycoon/art/park.png',
+    icon: '/tycoon/icons/park.png',
+    cover: true,         // drawn on the map from the picture
+    open: true,          // villagers walk around inside it instead of vanishing indoors
+    leisure: true,       // villagers flock here at lunch and in the evening
+    w: 3, h: 3, zone: 'residential',
+    capacity: 24,
+    description: 'A winding path, a big old tree and a bench with a view. Earns nothing, but villagers love it — they pour in at noon and at 6 pm, and a happy village works harder.',
+    production: 0, buildMinutes: 20, cost: 600, upkeepPct: 0.02,
+    moodEffect: 3,
+  },
   office_building: {
     capacity: 8,       // people who can be inside at once
     tier: 'mil_spec',
@@ -184,7 +198,7 @@ window.TYCOON_BUILDINGS = {
 
 // Rarity-ascending order — drives grid picker ordering and the case's item list.
 window.TYCOON_BUILDING_ORDER = [
-  'shabby_apartment', 'office_building', 'bank',          // mil_spec
+  'shabby_apartment', 'office_building', 'bank', 'park',  // mil_spec
   'generic_building', 'sweatshop', 'seven_eleven',        // restricted
   'pagoda', 'factory',                                    // classified
   'generic_skyscraper', 'coal_plant',                     // covert

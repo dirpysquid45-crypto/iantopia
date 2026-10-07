@@ -11,6 +11,9 @@ window.PATCH_NOTES = [
     date: "2026-10-07",
     title: "My Iantopia: Food & Living Villagers",
     changes: [
+      "New building: the Park (3×3 residential zoning, drops from the Iantopia Lootbox Basic and is sold in Real Estate). Villagers walk around inside it, and time spent there makes them happy: a pink heart over their head and a boost to village mood.",
+      "Villagers now keep a daily routine on the village clock (a day lasts 8 real minutes, shown in the stats bar). Around 12 pm and 6 pm they drop what they are doing and flock to the park.",
+      "New villager looks: girls in pink, and villagers in green and white shirts.",
       "Undo button (or Ctrl/Cmd+Z) for My Iantopia: reverses your last 30 zoning, road, build, move and remove actions, and puts the Strubles back too.",
       "Zoning is now drag-to-fill: pick a zone, drag a box across the map and see the price before you let go. Roads are still drawn freehand.",
       "Refunds: erasing zoning pays back what you paid for those tiles, and removing a building refunds its permit. Tiles under a building are left alone.",

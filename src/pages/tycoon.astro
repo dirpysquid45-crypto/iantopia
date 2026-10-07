@@ -248,6 +248,7 @@
       <span>Buildings: <b id="stat-placed">0/5</b></span>
       <span>Building: <b id="stat-building">0/3</b></span>
       <span>On a road: <b id="stat-road">0/0</b></span>
+      <span>Time: <b id="stat-time">9:00 AM</b></span>
       <span>Mood: <b id="stat-mood">50%</b></span>
       <span>People: <b id="stat-pop">0</b></span>
       <span>Food: <b id="stat-food">—</b></span>
@@ -413,9 +414,9 @@
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/background-library.js?v=13"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
-<script is:inline src="/case-data.js?v=21"></script>
-<script is:inline src="/tycoon-buildings.js?v=11"></script>
-<script is:inline src="/tycoon-art.js?v=3"></script>
+<script is:inline src="/case-data.js?v=22"></script>
+<script is:inline src="/tycoon-buildings.js?v=12"></script>
+<script is:inline src="/tycoon-art.js?v=4"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/tycoon-bank.js?v=1"></script>
 <script is:inline src="/strubles.js?v=3"></script>
@@ -538,6 +539,7 @@
   const TILE_ID = { residential: 1, commercial: 2, industrial: 3, road: 4, water: 5 };
   const tileGrid = new Uint8Array(MAP * MAP);   // TILE_ID, 0 = bare grass
   const occGrid = new Int32Array(MAP * MAP);    // id of the building covering the tile, 0 = none
+  const openGrid = new Uint8Array(MAP * MAP);   // 1 where that building is `open` ground (a park): walkable
   const bById = new Map();
   let terrainDirty = true;                      // ground layer needs recomposing
   let waterDirty = true;                        // water tile set changed
@@ -557,13 +559,17 @@
   // has to be recomposed.
   function onBuildingsChanged() {
     occGrid.fill(0);
+    openGrid.fill(0);
     bById.clear();
     village.b.forEach((s) => {
       bById.set(s.id, s);
       const f = foot(s.key);
       for (let y = s.y; y < s.y + f.h; y++) {
         for (let x = s.x; x < s.x + f.w; x++) {
-          if (x >= 0 && y >= 0 && x < MAP && y < MAP) occGrid[y * MAP + x] = s.id;
+          if (x >= 0 && y >= 0 && x < MAP && y < MAP) {
+            occGrid[y * MAP + x] = s.id;
+            if (DEFS[s.key] && DEFS[s.key].open) openGrid[y * MAP + x] = 1;
+          }
         }
       }
     });
@@ -747,6 +753,8 @@
     return false;
   }
   const isRoadConnected = (s) => touchesTile(s, 'road');
+  // A building that earns nothing (a park) has no business needing a road.
+  const roadOk = (s) => !(DEFS[s.key] && DEFS[s.key].production > 0) || isRoadConnected(s);
 
   // Fraction of the footprint standing on the zone this building belongs to.
   // New placements are always 1 (zoning is required to build); only buildings
@@ -773,6 +781,32 @@
   // Every residential building houses `housing` residents; every building has a
   // `capacity` of people who can be inside it at once. 7-Elevens supply food
   // (they need a road touching them); residents are fed as far as it reaches.
+  // ---------- Time of day ----------
+  // The village keeps its own accelerated clock: a day lasts 8 real minutes, so
+  // lunch and the evening come round often enough to actually be seen. It is a
+  // pure function of the wall clock, so it carries on while the page is closed
+  // and agrees across reloads. Park hours are when villagers drop everything
+  // and head for a park.
+  const DAY_REAL_MS = 8 * 60 * 1000;
+  const PARK_HOURS = [12, 18];                    // noon and 6 pm
+  const PARK_WINDOW = 1.5;                        // hours either side where the pull fades in and out
+  let clockShiftMs = 0;                           // test hook only
+  const gameHour = () => ((((Date.now() + clockShiftMs) % DAY_REAL_MS) / DAY_REAL_MS) * 24);
+  // 0 outside park hours, rising to 1 at the hour itself.
+  function parkPull(h) {
+    let best = 0;
+    for (const ph of PARK_HOURS) {
+      let d = Math.abs(h - ph); if (d > 12) d = 24 - d;
+      best = Math.max(best, Math.max(0, 1 - d / PARK_WINDOW));
+    }
+    return best;
+  }
+  function fmtClock(h) {
+    const hh = Math.floor(h) % 24, mm = Math.floor((h % 1) * 60);
+    return `${((hh + 11) % 12) + 1}:${String(mm).padStart(2, '0')} ${hh < 12 ? 'AM' : 'PM'}`;
+  }
+  let parkJoy = 0;                                // 0..1: how happy the villagers are from time in parks
+
   const FOOD_PER_PERSON = 1;
   const MAX_VILLAGERS = 40;                      // sprites drawn at once, a performance ceiling
   const housingOf = (s) => (s.status === 'complete' && DEFS[s.key] && DEFS[s.key].housing) || 0;
@@ -797,12 +831,14 @@
     const done = village.b.filter((s) => s.status === 'complete');
     if (!done.length) return 50;
     let m = 50;
-    m += 30 * (done.filter(isRoadConnected).length / done.length);
+    m += 30 * (done.filter(roadOk).length / done.length);
     m += 20 * (done.reduce((a, s) => a + zoneMatch(s), 0) / done.length);
     const ind = countZones('industrial');
     const zoned = countZones('residential') + countZones('commercial') + ind;
     if (zoned > 0) m -= 25 * (ind / zoned);
     if (countZones('water') > 0) m += 8;
+    // Time spent in a park lifts everyone, up to +8 when the whole village is out enjoying them.
+    if (done.some((s) => DEFS[s.key] && DEFS[s.key].leisure)) m += 8 * parkJoy;
     // Hungry residents are unhappy residents; a fully fed village gets a small lift.
     const fs = foodStats();
     if (fs.demand > 0) m += fs.satisfaction >= 1 ? 4 : -12 * (1 - fs.satisfaction);
@@ -942,7 +978,7 @@
   const homeCount = (id) => { let n = 0; for (const v of villagers) if (v.home === id) n++; return n; };
   const walkable = (tx, ty) =>
     tx >= 0 && ty >= 0 && tx < MAP && ty < MAP &&
-    occGrid[ty * MAP + tx] === 0 && tileGrid[ty * MAP + tx] !== TILE_ID.water;
+    (occGrid[ty * MAP + tx] === 0 || openGrid[ty * MAP + tx] === 1) && tileGrid[ty * MAP + tx] !== TILE_ID.water;
 
   // A villager has width, so standing is judged on the corners of a small
   // footprint rather than the single centre point. Checking only the centre
@@ -1056,20 +1092,28 @@
     return out;
   }
 
+  function footprintTiles(s) {
+    const f = foot(s.key), out = [];
+    for (let y = s.y; y < s.y + f.h; y++) for (let x = s.x; x < s.x + f.w; x++) if (walkable(x, y)) out.push({ x, y });
+    return out;
+  }
+
   // Where a villager would like to go next, weighted by what it is: home is a
   // regular stop, shops and food are popular, work is steady. Full buildings
   // (at capacity) are not options.
   function chooseDestination(v) {
+    const pull = parkPull(gameHour());
     const opts = [];
     let total = 0;
     village.b.forEach((s) => {
-      if (s.status !== 'complete' || s.id === v.lastVisited) return;
+      if (s.status !== 'complete' || (s.id === v.lastVisited && !(DEFS[s.key].leisure && pull > 0.3))) return;
       const d = DEFS[s.key], cap = capacityOf(s.key);
       if (!cap || insideCount(s.id) >= cap) return;
       let w = 1.5;
-      if (s.id === v.home) w = 2.2;
+      if (d.leisure) w = 0.7 + 25 * pull;                // a park: a pleasant detour, and the only place to be at park hour
+      else if (s.id === v.home) w = 2.2 * (1 - 0.8 * pull);
       else if (d.housing) w = 0.3;                       // other people's homes: rarely
-      else if (d.food) w = 3;
+      else if (d.food) w = 3 * (1 - 0.7 * pull);
       else if (d.zone === 'commercial') w = 2.5;
       else if (d.zone === 'industrial') w = 1.8;
       opts.push({ s, w }); total += w;
@@ -1080,10 +1124,27 @@
     return opts[opts.length - 1].s;
   }
 
+  const parks = () => village.b.filter((s) => s.status === 'complete' && DEFS[s.key] && DEFS[s.key].leisure);
+  // Head for the nearest park that still has room.
+  function startParkTrip(v) {
+    const open = parks().filter((s) => insideCount(s.id) < capacityOf(s.key));
+    if (!open.length) return false;
+    let best = null;
+    for (const s of open) {
+      const goals = new Set(footprintTiles(s).map((t) => t.y * MAP + t.x));
+      if (!goals.size) continue;
+      const path = findPath(Math.floor(v.x), Math.floor(v.y), goals);
+      if (path && (!best || path.length < best.path.length)) best = { s, path };
+    }
+    if (!best) return false;
+    v.trip = { id: best.s.id, path: best.path, i: 0 };
+    return true;
+  }
+
   function startTrip(v) {
     const s = chooseDestination(v);
     if (!s) return false;
-    const goals = new Set(entranceTiles(s).map((t) => t.y * MAP + t.x));
+    const goals = new Set((DEFS[s.key].open ? footprintTiles(s) : entranceTiles(s)).map((t) => t.y * MAP + t.x));
     if (!goals.size) return false;
     const path = findPath(Math.floor(v.x), Math.floor(v.y), goals);
     if (!path) return false;
@@ -1101,13 +1162,20 @@
     return null;
   }
 
+  // Looks: the original villager (coat follows village mood), a girl in pink, and
+  // someone in a green and white shirt. Mixed roughly evenly.
+  function pickKind() {
+    const r = Math.random();
+    return r < 0.34 ? 'plain' : r < 0.67 ? 'girl' : 'striped';
+  }
+
   function spawnVillager() {
     const home = freeHome();
     if (!home) return;
     const door = entranceTiles(home);
     if (!door.length) return;
     const t = door[Math.floor(Math.random() * door.length)];
-    const v = { x: t.x + 0.5, y: t.y + 0.5, vx: 0, vy: 0, pause: 0.2, home: home.id, inside: null, until: 0, trip: null, tripCool: 2 + Math.random() * 5, lastVisited: null };
+    const v = { x: t.x + 0.5, y: t.y + 0.5, vx: 0, vy: 0, pause: 0.2, home: home.id, inside: null, until: 0, trip: null, tripCool: 2 + Math.random() * 5, lastVisited: null, kind: pickKind() };
     const h = pickHeading(v);
     v.vx = h.cx; v.vy = h.cy;
     villagers.push(v);
@@ -1154,11 +1222,34 @@
       villagers.splice(idx, 1);
     }
 
+    // Happiness from park time: it builds while someone is in a park and fades slowly after.
+    let joySum = 0;
+    villagers.forEach((v) => {
+      const bld = v.inside ? bById.get(v.inside) : null;
+      const inPark = !!(bld && DEFS[bld.key].leisure);
+      v.joy = Math.max(0, Math.min(1, (v.joy || 0) + (inPark ? dt * 0.12 : -dt * 0.008)));
+      joySum += v.joy;
+    });
+    parkJoy = villagers.length ? joySum / villagers.length : 0;
+
     villagers.forEach((v) => {
       // Inside a building: nothing moves until the stay is over, then they come
       // back out at the door.
       if (v.inside) {
-        if (simT >= v.until) { v.lastVisited = v.inside; v.inside = null; v.pause = 0.25; v.tripCool = 3 + Math.random() * 6; }
+        const bld = bById.get(v.inside);
+        const open = !!(bld && DEFS[bld.key].open);
+        if (simT >= v.until) { v.lastVisited = v.inside; v.inside = null; v.pause = 0.25; v.tripCool = 3 + Math.random() * 6; v.stroll = null; return; }
+        if (open) {
+          // Wander slowly inside the park's footprint, pausing now and then.
+          if (v.pause > 0) { v.pause -= dt; return; }
+          const f = foot(bld.key);
+          if (!v.stroll) v.stroll = { x: bld.x + 0.35 + Math.random() * (f.w - 0.7), y: bld.y + 0.35 + Math.random() * (f.h - 0.7) };
+          const dx = v.stroll.x - v.x, dy = v.stroll.y - v.y, d = Math.hypot(dx, dy), step = WALK * 0.45 * dt;
+          if (d <= step) { v.x = v.stroll.x; v.y = v.stroll.y; v.stroll = null; v.pause = 0.6 + Math.random() * 2.2; }
+          else { v.x += (dx / d) * step; v.y += (dy / d) * step; }
+        } else if (parkPull(gameHour()) > 0.5 && v.until - simT > 3 && parks().length) {
+          v.until = simT + Math.random() * 2.5;   // park hour: wrap up and head out
+        }
         return;
       }
       if (v.pause > 0) { v.pause -= dt; return; }
@@ -1180,7 +1271,11 @@
             v.trip = null;
             if (insideCount(target.id) < capacityOf(target.key)) {
               v.inside = target.id;
-              v.until = simT + (target.id === v.home ? 8 + Math.random() * 12 : 4 + Math.random() * 8);
+              if (DEFS[target.key].open) {
+                // A park: stay out in the open, strolling about, for a good while.
+                v.until = simT + 10 + Math.random() * 14;
+                v.stroll = null; v.pause = 0;
+              } else v.until = simT + (target.id === v.home ? 8 + Math.random() * 12 : 4 + Math.random() * 8);
             } else v.pause = 0.4;   // it filled up while they walked: turn away
           }
         } else { v.x += (dx / d) * step; v.y += (dy / d) * step; v.vx = dx / d; v.vy = dy / d; }
@@ -1188,9 +1283,11 @@
       }
 
       // Otherwise wander, and every so often decide to go somewhere.
-      v.tripCool -= dt;
+      const pull = parks().length ? parkPull(gameHour()) : 0;
+      v.tripCool -= dt * (1 + 5 * pull);              // at park hour the urge to set off comes six times as often
       if (v.tripCool <= 0) {
         v.tripCool = 5 + Math.random() * 9;
+        if (pull > 0.3 && Math.random() < 0.55 + 0.4 * pull && startParkTrip(v)) return;
         if (startTrip(v)) return;
       }
       // Roads are the nice place to be, so walking one is slower (lingering).
@@ -1224,11 +1321,31 @@
     villagerG.clear();
     const coat = mood > 66 ? '#3f6fa8' : mood > 33 ? '#6b5a3f' : '#3a3a3a';
     villagers.forEach((v) => {
-      if (v.inside) return;                        // indoors: not on the map
+      if (v.inside) {                              // indoors: not on the map, unless it is open ground
+        const b = bById.get(v.inside);
+        if (!(b && DEFS[b.key].open)) return;
+      }
       const px = Math.round(v.x * T), py = Math.round(v.y * T);
       rect(villagerG, '#000000', px - 1, py + 4, 3, 1, 0.3);
-      rect(villagerG, '#d9a877', px - 1, py - 2, 3, 3);
-      rect(villagerG, coat, px - 1, py + 1, 3, 2);
+      if (v.kind === 'girl') {
+        rect(villagerG, '#d9a877', px - 1, py - 2, 3, 3);              // face
+        rect(villagerG, '#5a3a22', px - 1, py - 3, 3, 1);              // hair on top
+        rect(villagerG, '#5a3a22', px - 2, py - 2, 1, 3);              // and down both sides
+        rect(villagerG, '#5a3a22', px + 2, py - 2, 1, 3);
+        rect(villagerG, '#ff7fb5', px - 1, py + 1, 3, 2);              // pink top
+        rect(villagerG, '#ff9fc9', px - 2, py + 3, 5, 1);              // flared skirt
+      } else if (v.kind === 'striped') {
+        rect(villagerG, '#d9a877', px - 1, py - 2, 3, 3);
+        rect(villagerG, '#3b2a1a', px - 1, py - 3, 3, 1);              // short dark hair
+        rect(villagerG, '#2f9e55', px - 1, py + 1, 3, 1);              // green and white stripes
+        rect(villagerG, '#f4f4f4', px - 1, py + 2, 3, 1);
+        rect(villagerG, '#f4f4f4', px, py + 1, 1, 1);
+        rect(villagerG, '#2f9e55', px, py + 2, 1, 1);
+      } else {
+        rect(villagerG, '#d9a877', px - 1, py - 2, 3, 3);
+        rect(villagerG, coat, px - 1, py + 1, 3, 2);
+      }
+      if (v.joy > 0.45) { rect(villagerG, '#ff3d7f', px - 1, py - 6, 1, 1); rect(villagerG, '#ff3d7f', px + 1, py - 6, 1, 1); rect(villagerG, '#ff3d7f', px - 1, py - 5, 3, 1); rect(villagerG, '#ff3d7f', px, py - 4, 1, 1); }
     });
   }
 
@@ -1296,7 +1413,7 @@
         sp.setVisible(!moving);
         totalProduction += productionFor(s, mood);
         totalUpkeep += def.cost * (def.upkeepPct || 0);
-        const connected = isRoadConnected(s);
+        const connected = roadOk(s);
         if (connected) onRoadCount++;
         if (!moving) {
           if (s.taxDebt > 0) {
@@ -1533,6 +1650,7 @@
 
   // Phaser's own render loop. Only villagers animate here; village state is
   // never touched, so this can run every frame without saving anything.
+  let clockAcc = 1000;
   function update(time, delta) {
     if (!villagerG) return;
 
@@ -1561,6 +1679,14 @@
       }
     }
 
+    clockAcc += delta;
+    if (clockAcc > 500) {
+      clockAcc = 0;
+      const h = gameHour(), pull = parkPull(h);
+      const el = $('stat-time');
+      el.textContent = fmtClock(h) + (pull > 0.3 && parks().length ? ' · park hour' : '');
+      el.style.color = pull > 0.3 ? '#8be08b' : '';
+    }
     stepVillagers(Math.min(0.05, delta / 1000));
     drawVillagers();
   }
@@ -2013,6 +2139,7 @@
     $('manage-title').textContent = def.label;
     const statusLine = s.status === 'building'
       ? 'Under construction — removing it loses the progress but refunds the permit.'
+      : def.leisure ? 'A public park. It earns nothing, but visits here lift village mood — most of all around 12 pm and 6 pm.'
       : isRoadConnected(s) ? `Producing +${def.production}/min.` : 'No road touching it — not producing. Lay a road alongside.';
     let upkeepLine = '';
     if (s.status === 'complete') {
@@ -2029,7 +2156,8 @@
   function peopleInfo(s, def) {
     if (s.status !== 'complete') return '';
     const bits = [];
-    if (def.housing) bits.push(`Residents ${homeCount(s.id)}/${def.housing} · inside now ${insideCount(s.id)}`);
+    if (def.leisure) bits.push(`In the park now ${insideCount(s.id)}/${def.capacity} · villager happiness ${Math.round(parkJoy * 100)}%`);
+    else if (def.housing) bits.push(`Residents ${homeCount(s.id)}/${def.housing} · inside now ${insideCount(s.id)}`);
     else if (def.capacity) bits.push(`Inside now ${insideCount(s.id)}/${def.capacity}`);
     const road = isRoadConnected(s);
     if (def.food) bits.push(`Feeds up to ${def.food} residents${road ? '' : ' — needs a road touching it'}`);
@@ -2106,6 +2234,11 @@
         <div class="row-icon">🌾</div>
         <div class="row-info"><b>People and food.</b>
           <small>Residential buildings house residents; every building has a capacity for how many people can be inside at once. Villagers walk the roads to shops, work and home, and step inside while they are there. Each resident eats 1 food a minute. A 7-Eleven (with a road touching it) keeps 20 residents fed. A fed village is happier; a hungry one drags every building's output down through mood.</small></div>
+      </div>
+      <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">🌳</div>
+        <div class="row-info"><b>Parks and the time of day.</b>
+          <small>The village has its own clock (a day lasts 8 real minutes, shown in the stats bar). Around 12 pm and 6 pm villagers drop what they are doing and head for a park, where they wander about in the open. Time spent in a park makes villagers happy (a pink heart), and a happy village earns more through mood. A park needs 3×3 residential zoning and earns nothing itself.</small></div>
       </div>
       <div class="guide-row" style="align-items:flex-start;">
         <div class="row-icon">↩️</div>
@@ -2280,7 +2413,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // Test hook for the browser suites; only exists in dev mode.
-  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost };
+  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; } };
 })();
 </script>
 </body>
