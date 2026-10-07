@@ -9,13 +9,13 @@
 window.PATCH_NOTES = [
   {
     date: "2026-10-07",
-    title: "My Iantopia: Food, Farms & Living Villagers",
+    title: "My Iantopia: Food & Living Villagers",
     changes: [
       "Zoning is now drag-to-fill: pick a zone, drag a box across the map and see the price before you let go. Roads are still drawn freehand.",
       "Refunds: erasing zoning pays back what you paid for those tiles, and removing a building refunds its permit. Tiles under a building are left alone.",
       "Removing any building rarer than Mil-Spec (Common) now asks \"Are you sure?\" first.",
-      "Three new buildings: the Farm (needs the new Farmland zone), the Grocery Store and the 7-Eleven. They drop from the Iantopia Lootbox Basic and are sold in Real Estate.",
-      "Food: every resident eats 1 food a minute. Farms grow it, and Grocery Stores and 7-Elevens carry it to your residents (all need a road). A hungry village loses mood; a fed one gains a little.",
+      "New building: the 7-Eleven. It drops from the Iantopia Lootbox Basic and is sold in Real Estate.",
+      "Food: every resident eats 1 food a minute. A 7-Eleven (with a road touching it) keeps 20 residents fed. A hungry village loses mood; a fed one gains a little.",
       "Villagers now live in residential buildings, which have resident limits, and every building has a capacity. They walk the roads to shops, work and home and step inside while they are there. Tap a building to see who is inside.",
       "New People and Food readouts in the village stats bar.",
     ],

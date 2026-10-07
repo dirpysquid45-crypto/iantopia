@@ -186,7 +186,7 @@
   .row-img { width:44px; height:44px; object-fit:contain; flex-shrink:0; }
   .row-img.pix { image-rendering:pixelated; }
   .zone-chip { display:inline-block; padding:0 5px; border:1px solid currentColor; border-radius:2px; text-transform:uppercase; font-size:7px; letter-spacing:.5px; }
-  .zone-residential { color:#7db6ff; } .zone-commercial { color:#ffb457; } .zone-industrial { color:#c99bf0; } .zone-agricultural { color:#c9d65a; }
+  .zone-residential { color:#7db6ff; } .zone-commercial { color:#ffb457; } .zone-industrial { color:#c99bf0; }
 
   .guide-row {
     display:flex; align-items:center; gap:10px; padding:10px 0;
@@ -407,9 +407,9 @@
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/background-library.js?v=13"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
-<script is:inline src="/case-data.js?v=20"></script>
-<script is:inline src="/tycoon-buildings.js?v=10"></script>
-<script is:inline src="/tycoon-art.js?v=2"></script>
+<script is:inline src="/case-data.js?v=21"></script>
+<script is:inline src="/tycoon-buildings.js?v=11"></script>
+<script is:inline src="/tycoon-art.js?v=3"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/tycoon-bank.js?v=1"></script>
 <script is:inline src="/strubles.js?v=3"></script>
@@ -467,7 +467,7 @@
   function expandCostForSlot(n) { return n <= 0 ? 0 : Math.round((EXPAND_BASE_COST * Math.pow(EXPAND_GROWTH, n - 1)) / 10) * 10; }
 
   // Village state: { v:2, nextId, b:[...buildings], tiles:{tx_ty: type} }
-  // tiles map: "x_y" -> "residential"/"commercial"/"industrial"/"agricultural"/"road"/"water"
+  // tiles map: "x_y" -> "residential"/"commercial"/"industrial"/"road"/"water"
   // paid map:  "x_y" -> Strubles paid for that tile (refunded when it is erased or replaced)
   function freshVillage() { return { v: 2, nextId: 1, b: [], tiles: {}, paid: {} }; }
 
@@ -490,6 +490,7 @@
     return v;
   }
 
+  const TILE_ID_KNOWN = new Set(['residential', 'commercial', 'industrial', 'road', 'water']);
   function loadVillage() {
     const raw = loadJSON(VILLAGE_KEY, null);
     if (raw && raw.v === 2 && Array.isArray(raw.b)) {
@@ -498,6 +499,9 @@
       if (!raw.tiles || typeof raw.tiles !== 'object') raw.tiles = {};
       // What each tile cost when it was painted, so erasing it can refund the same.
       if (!raw.paid || typeof raw.paid !== 'object') raw.paid = {};
+      // Farms, Grocery Stores and Farmland were removed: drop any left in a save.
+      raw.b = raw.b.filter((s) => s && DEFS[s.key]);
+      for (const k of Object.keys(raw.tiles)) if (!TILE_ID_KNOWN.has(raw.tiles[k])) { delete raw.tiles[k]; delete raw.paid[k]; }
       if (!Number.isFinite(raw.nextId)) raw.nextId = raw.b.reduce((m, s) => Math.max(m, s.id || 0), 0) + 1;
       return raw;
     }
@@ -524,8 +528,8 @@
   // Hot paths (every villager every frame, every road/zone check) read typed
   // arrays instead of the string-keyed save format: no key concatenation, no
   // allocation, O(1). village.tiles stays the persisted form; these mirror it.
-  const TILE_NAMES = [null, 'residential', 'commercial', 'industrial', 'road', 'water', 'agricultural'];
-  const TILE_ID = { residential: 1, commercial: 2, industrial: 3, road: 4, water: 5, agricultural: 6 };
+  const TILE_NAMES = [null, 'residential', 'commercial', 'industrial', 'road', 'water'];
+  const TILE_ID = { residential: 1, commercial: 2, industrial: 3, road: 4, water: 5 };
   const tileGrid = new Uint8Array(MAP * MAP);   // TILE_ID, 0 = bare grass
   const occGrid = new Int32Array(MAP * MAP);    // id of the building covering the tile, 0 = none
   const bById = new Map();
@@ -570,8 +574,8 @@
   // district stays a real spend whether you have 500 or 500,000. Each type has
   // a floor (what a broke player pays) and a share of your balance per tile;
   // the price is whichever is higher. Water and erasing are always free.
-  const TILE_BASE = { residential: 50, commercial: 50, industrial: 50, agricultural: 30, road: 100 };
-  const TILE_RATE = { residential: 0.004, commercial: 0.004, industrial: 0.004, agricultural: 0.0025, road: 0.008 };
+  const TILE_BASE = { residential: 50, commercial: 50, industrial: 50, road: 100 };
+  const TILE_RATE = { residential: 0.004, commercial: 0.004, industrial: 0.004, road: 0.008 };
   // Fixed for the length of one drag (see the pointerdown handler), so a
   // stroke is priced as a whole instead of getting cheaper tile by tile as
   // your balance drops underneath it.
@@ -761,26 +765,24 @@
 
   // ---------- People, capacity and food ----------
   // Every residential building houses `housing` residents; every building has a
-  // `capacity` of people who can be inside it at once. Farms grow food and
-  // groceries / 7-Elevens distribute it: residents are fed only as far as
-  // BOTH can reach them (and both need a road).
+  // `capacity` of people who can be inside it at once. 7-Elevens supply food
+  // (they need a road touching them); residents are fed as far as it reaches.
   const FOOD_PER_PERSON = 1;
   const MAX_VILLAGERS = 40;                      // sprites drawn at once, a performance ceiling
   const housingOf = (s) => (s.status === 'complete' && DEFS[s.key] && DEFS[s.key].housing) || 0;
   const housingTotal = () => village.b.reduce((a, s) => a + housingOf(s), 0);
   const capacityOf = (key) => (DEFS[key] && DEFS[key].capacity) || 0;
   function foodStats() {
-    let supply = 0, dist = 0;
+    let supply = 0;
     village.b.forEach((s) => {
       if (s.status !== 'complete') return;
       const d = DEFS[s.key];
-      if (!d || !(d.food || d.distribution) || !isRoadConnected(s)) return;
-      supply += d.food || 0; dist += d.distribution || 0;
+      if (d && d.food && isRoadConnected(s)) supply += d.food;
     });
     const pop = housingTotal();
     const demand = pop * FOOD_PER_PERSON;
-    const fed = Math.min(supply, dist);
-    return { pop, demand, supply, dist, fed, satisfaction: demand > 0 ? Math.min(1, fed / demand) : 1 };
+    const fed = Math.min(supply, demand);
+    return { pop, demand, supply, fed, satisfaction: demand > 0 ? Math.min(1, supply / demand) : 1 };
   }
 
   // Village mood, derived entirely from the layout — it is a readout of the
@@ -950,7 +952,7 @@
   // How attractive a tile is to wander onto. Deliberately mild — it only
   // tilts the odds of a random heading, so they still drift about sporadically
   // instead of marching along streets.
-  const ZONES = { residential: 1, commercial: 1, industrial: 1, agricultural: 1 };
+  const ZONES = { residential: 1, commercial: 1, industrial: 1 };
   function tileAppeal(tx, ty) {
     const t = getTileType(tx, ty);
     if (t === 'road') return 3.0;
@@ -1061,7 +1063,7 @@
       let w = 1.5;
       if (s.id === v.home) w = 2.2;
       else if (d.housing) w = 0.3;                       // other people's homes: rarely
-      else if (d.distribution) w = 3;
+      else if (d.food) w = 3;
       else if (d.zone === 'commercial') w = 2.5;
       else if (d.zone === 'industrial') w = 1.8;
       opts.push({ s, w }); total += w;
@@ -1348,7 +1350,7 @@
     maybePushLeaderboardScore(totalProduction - (totalUpkeep / 1440));
   }
 
-  const BOX_COLOR = { residential: '#2f6fd0', commercial: '#e08a1f', industrial: '#7b3fa0', agricultural: '#9aa32a', water: '#2b7fd4', erase: '#ff4444' };
+  const BOX_COLOR = { residential: '#2f6fd0', commercial: '#e08a1f', industrial: '#7b3fa0', water: '#2b7fd4', erase: '#ff4444' };
   function drawGhost() {
     ghostG.clear();
     gridG.clear();
@@ -1685,7 +1687,7 @@
   // and water may not go under a building. ---
   const BRUSH_LABEL = {
     residential: 'Residential', commercial: 'Commercial', industrial: 'Industrial',
-    agricultural: 'Farmland', road: 'Road', water: 'Water', erase: 'Erase',
+    road: 'Road', water: 'Water', erase: 'Erase',
   };
   let brushMsgTimer = null;
   // While a refusal ("Need 400 Strubles", "Can't go under a building") is
@@ -1703,7 +1705,7 @@
   }
   // Zones, water and the eraser are dragged out as a box (see rectDrag below);
   // a road is laid freehand, tile by tile, because roads are lines.
-  const RECT_BRUSHES = new Set(['residential', 'commercial', 'industrial', 'agricultural', 'water', 'erase']);
+  const RECT_BRUSHES = new Set(['residential', 'commercial', 'industrial', 'water', 'erase']);
   function setBrushLabel() {
     if (!brushMode || brushMsgActive) return;
     const cost = tileCost(brushMode);
@@ -1822,9 +1824,7 @@
       { brush: 'residential', icon: '🏘️', name: 'Residential',
         blurb: 'Homes. Shabby Apartments, Generic Buildings and Pagodas can only be built on residential zoning.' },
       { brush: 'commercial', icon: '🏬', name: 'Commercial',
-        blurb: 'Shops and offices. Skyscrapers, Taipei 101, Banks, Office Buildings, Grocery Stores and 7-Elevens can only be built on commercial zoning.' },
-      { brush: 'agricultural', icon: '🌾', name: 'Farmland',
-        blurb: 'Farms can only be built on farmland. They grow the food your residents eat; a Grocery Store or 7-Eleven then has to carry it to them.' },
+        blurb: 'Shops and offices. Skyscrapers, Taipei 101, Banks, Office Buildings and 7-Elevens can only be built on commercial zoning.' },
       { brush: 'industrial', icon: '🏭', name: 'Industrial',
         blurb: 'Sweatshops, Factories and Power Plants can only be built on industrial zoning. It adds +15% to any building it touches, but drags village mood down — and mood scales all production from 0.75x to 1.15x.' },
     ]},
@@ -1917,8 +1917,7 @@
     if (def.housing) bits.push(`Residents ${homeCount(s.id)}/${def.housing} · inside now ${insideCount(s.id)}`);
     else if (def.capacity) bits.push(`Inside now ${insideCount(s.id)}/${def.capacity}`);
     const road = isRoadConnected(s);
-    if (def.food) bits.push(`Grows ${def.food} food/min${road ? '' : ' — needs a road to deliver'}`);
-    if (def.distribution) bits.push(`Distributes up to ${def.distribution} food/min${road ? '' : ' — needs a road'}`);
+    if (def.food) bits.push(`Feeds up to ${def.food} residents${road ? '' : ' — needs a road touching it'}`);
     return bits.length ? `<div class="guide-row"><div class="row-info">${bits.map((b) => `<small>${b}</small>`).join('')}</div></div>` : '';
   }
   function closeManage() {
@@ -1975,7 +1974,7 @@
       <div class="guide-row" style="align-items:flex-start;">
         <div class="row-icon">🌾</div>
         <div class="row-info"><b>People and food.</b>
-          <small>Residential buildings house residents; every building has a capacity for how many people can be inside at once. Villagers walk the roads to shops, work and home, and step inside while they are there. Each resident eats 1 food a minute: Farms grow it and Grocery Stores and 7-Elevens carry it to your residents, so you need both (and roads). A fed village is happier; a hungry one drags every building's output down through mood.</small></div>
+          <small>Residential buildings house residents; every building has a capacity for how many people can be inside at once. Villagers walk the roads to shops, work and home, and step inside while they are there. Each resident eats 1 food a minute. A 7-Eleven (with a road touching it) keeps 20 residents fed. A fed village is happier; a hungry one drags every building's output down through mood.</small></div>
       </div>
       <div class="guide-row" style="align-items:flex-start;">
         <div class="row-icon">↩️</div>

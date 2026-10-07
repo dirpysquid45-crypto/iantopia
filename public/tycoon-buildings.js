@@ -112,30 +112,6 @@ window.TYCOON_BUILDINGS = {
     production: 3, buildMinutes: 90, cost: 3000, upkeepPct: 0.03,
     moodEffect: 3,
   },
-  farm: {
-    label: 'Farm',
-    tier: 'mil_spec',
-    img: '/tycoon/art/farm.png',
-    icon: '/tycoon/icons/farm.png',
-    w: 2, h: 2, zone: 'agricultural',
-    capacity: 6,
-    food: 12,            // food/min grown (needs a road); feeds residents once a store distributes it
-    description: 'Neat rows, a red barn and a scarecrow of questionable loyalty. Grows the food your residents eat — it needs a Grocery Store or 7-Eleven to reach them.',
-    production: 2, buildMinutes: 30, cost: 300, upkeepPct: 0.03,
-    moodEffect: 1,
-  },
-  grocery_store: {
-    label: 'Grocery Store',
-    tier: 'restricted',
-    img: '/tycoon/art/grocery_store.png',
-    icon: '/tycoon/icons/grocery_store.png',
-    w: 2, h: 2, zone: 'commercial',
-    capacity: 12,
-    distribution: 24,    // food/min it can get from the farms to your residents
-    description: 'Fresh produce, loud trolleys and a very long queue on Saturdays. Moves up to 24 food a minute from your farms to your residents.',
-    production: 3, buildMinutes: 45, cost: 900, upkeepPct: 0.04,
-    moodEffect: 2,
-  },
   seven_eleven: {
     label: '7-Eleven',
     tier: 'restricted',
@@ -144,8 +120,8 @@ window.TYCOON_BUILDINGS = {
     icon: '/tycoon/icons/seven_eleven.png',
     w: 2, h: 1, zone: 'commercial',
     capacity: 6,
-    distribution: 10,    // smaller than a grocery store, but cheap and always open
-    description: "Open all night, every night. Doesn't move much food (10 a minute), but it's cheap, it's everywhere, and the slushie machine never breaks.",
+    food: 20,            // food/min it supplies to residents (needs a road); feeds 20 people
+    description: "Open all night, every night. It keeps up to 20 residents fed (needs a road), and the slushie machine never breaks.",
     production: 3, buildMinutes: 30, cost: 600, upkeepPct: 0.04,
     moodEffect: 1,
   },
@@ -208,8 +184,8 @@ window.TYCOON_BUILDINGS = {
 
 // Rarity-ascending order — drives grid picker ordering and the case's item list.
 window.TYCOON_BUILDING_ORDER = [
-  'shabby_apartment', 'office_building', 'bank', 'farm',  // mil_spec
-  'generic_building', 'sweatshop', 'grocery_store', 'seven_eleven', // restricted
+  'shabby_apartment', 'office_building', 'bank',          // mil_spec
+  'generic_building', 'sweatshop', 'seven_eleven',        // restricted
   'pagoda', 'factory',                                    // classified
   'generic_skyscraper', 'coal_plant',                     // covert
   'taipei_101', 'nuclear_plant',                          // exceedingly_rare

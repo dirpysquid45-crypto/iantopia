@@ -105,8 +105,7 @@ iantopia/
 
 The big originals live in `art-source/tycoon/` (not committed). After changing one,
 run `python3 scripts/build-tycoon-assets.py` (needs Pillow) to regenerate the small
-web versions in `public/tycoon/`. Farm and Grocery Store are drawn in code
-(`public/tycoon-art.js`); their card images were rendered from that art.
+web versions in `public/tycoon/`.
 
 ## Key Systems
 
