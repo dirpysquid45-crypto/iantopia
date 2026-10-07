@@ -21,7 +21,12 @@ class FakeDb {
       async set(data, opts) { db.write(path, data, opts); },
     };
   }
-  collection(name) { return { doc: (id) => this.ref(`${name}/${id}`) }; }
+  collection(name) {
+    return {
+      doc: (id) => this.ref(`${name}/${id}`),
+      add: async (data) => { const id = 'auto' + Math.random().toString(36).slice(2, 8); await this.ref(`${name}/${id}`).set(data); return { id }; },
+    };
+  }
   write(path, data, opts) {
     if (this.failNextSets > 0) { this.failNextSets--; throw new Error('simulated write failure'); }
     if (this.failAtWrite !== null && --this.failAtWrite === 0) { this.failAtWrite = null; throw new Error('simulated write failure'); }

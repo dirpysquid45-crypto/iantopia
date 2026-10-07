@@ -8,6 +8,22 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: "2026-10-06",
+    title: "My Iantopia, Real Estate & Arena Overhaul",
+    changes: [
+      "Tycoon is now 🏘️ My Iantopia: a top-down village builder. Paint zoning (residential, commercial, industrial), lay roads and water, then build on matching land. Zoning clears once something is built on it.",
+      "11 buildings, all unlocked from the Lootbox: the original five plus the Bank, Office Building, Sweatshop, Factory, Coal Plant and Nuclear Plant, each with real artwork. Taipei 101 needs 3×3 commercial land and the Pagoda 2×2 residential.",
+      "New Real Estate section in the Shop sells buildings at a steep markup. Village slots are far cheaper, and the Bank is now a physical building with its own cover art. Taipei 101 is much rarer than before and every building's drop odds were rebalanced.",
+      "Villagers wander along roads, avoid water, and zoning prices scale with your Strubles. The village also got faster rendering, richer pixel art, autotiled roads and fewer buttons.",
+      "Battleship rebuilt: boards are stacked vertically and sized to fit any laptop or phone, ships are drawn crisply, the turn bar and Fire button stay on screen, and placement on mobile is tap, Rotate, Place.",
+      "Friendly games! Set the stake to 0 Strubles in Blackjack or Battleship for a friendly match: nothing is won or lost, and guests can play without signing up. Staked games still need an account.",
+      "Blackjack: your opponent's cards now stay face down until the hand is settled, then both hands flip and the totals are shown. The server no longer sends their cards at all, so they cannot be peeked at.",
+      "Arena reliability: dropped connections resume the game in place for 30 seconds, turns and hands are timed so nobody can stall a match, and rematch and back-to-lobby buttons work again. Winners are paid (minus a 5% rake) and losers charged exactly once, to the right accounts. A negative-bet exploit and self-matching were closed.",
+      "Suggestion box on the home page (💡 Suggest), now styled like the other small buttons and working on phones. Suggestions are sent through the server, so they actually arrive.",
+      "Horse Game scores now have their own leaderboard.",
+    ],
+  },
+  {
     date: "2026-10-01",
     title: "Horse Game Phase 2 & Arena Expansion",
     changes: [

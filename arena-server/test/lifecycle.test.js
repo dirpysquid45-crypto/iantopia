@@ -127,7 +127,7 @@ test('blackjack resumes mid-hand with the same cards', async () => {
   const again = await b2.waitFor('game_start');
   assert.equal(again.resync, true);
   assert.deepEqual(again.yourHand, before.yourHand, 'the same cards, not a re-deal');
-  assert.deepEqual(again.opponentVisibleCards, before.opponentVisibleCards);
+  assert.equal(again.opponentCardCount, before.opponentCardCount);
   assert.equal(again.yourIndex, before.yourIndex);
 });
 

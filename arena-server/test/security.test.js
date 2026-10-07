@@ -217,3 +217,24 @@ test('hidden information: nothing sent before the game ends reveals the opponent
   // the opponent's fleet appears only in the final reveal
   assert.equal(a.has((m) => m.type === 'resync' || m.type === 'game_result'), false);
 });
+
+test('blackjack: the opponent hand never appears in traffic before the result', async () => {
+  const { fixedDeck } = require('./helpers');
+  const t = await startServer({ makeDeck: () => fixedDeck(['K♠', '9♦'], ['Q♣', '7♥']), timing: { handMs: 5000 } });
+  const a = await asGuest(t.url, 'Ann', 'aaaaaaaaaaaaaaaa'), b = await asGuest(t.url, 'Ben', 'bbbbbbbbbbbbbbbb');
+  await pair(a, b, 'blackjack', 0);
+  a.send({ type: 'action', action: 'hit' });
+  await a.waitFor('game_update');
+  const gs = a.last('game_start');
+  const opp = gs.yourIndex === 0 ? 'Q♣' : 'K♠'; // a card only the opponent holds
+  for (const m of a.log.filter((m) => m.type !== 'game_result')) {
+    const json = JSON.stringify(m);
+    assert.ok(!('opponentVisibleCards' in m) && !('opponentBustLimit' in m), 'no opponent card fields: ' + m.type);
+    assert.equal(typeof (m.opponentCardCount ?? 0), 'number');
+    assert.ok(!json.includes('"opponentHand"'));
+  }
+  assert.equal(gs.opponentCardCount, 2);
+  a.send({ type: 'action', action: 'stand' }); b.send({ type: 'action', action: 'stand' });
+  const res = await a.waitFor('game_result');
+  assert.ok(res.hands && res.hands.length === 2, 'revealed once settled');
+});

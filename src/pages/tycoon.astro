@@ -837,6 +837,24 @@
   let ghostImg = null;
   let waterClock = 0, waterFrame = 0;
 
+  // The bank has real cover art. The pixel art is baked first so there is never
+  // a blank frame; once the picture arrives it is drawn over the same canvas
+  // (scaled to the footprint, sitting on the ground line) and the texture refreshed.
+  function paintCover(canvas, tex, src) {
+    const img = new Image();
+    img.onload = () => {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      const k = Math.min(canvas.width / img.width, canvas.height / img.height);
+      const w = img.width * k, h = img.height * k;
+      ctx.drawImage(img, (canvas.width - w) / 2, canvas.height - h, w, h);
+      tex.refresh();
+    };
+    img.src = src;
+  }
+
   // Bakes a building's art to a texture the first time it is needed, then
   // reuses it forever. The art code issues hundreds of 1px fillRects (that's
   // what the gradients are), and drawing them live every refresh was the
@@ -845,7 +863,9 @@
     const tk = 'bld_' + key;
     if (!scene.textures.exists(tk)) {
       const f = foot(key);
-      scene.textures.addCanvas(tk, TycoonArt.bake(key, f.w, f.h));
+      const canvas = TycoonArt.bake(key, f.w, f.h);
+      const tex = scene.textures.addCanvas(tk, canvas);
+      if (key === 'bank') paintCover(canvas, tex, DEFS[key].img);
     }
     return tk;
   }

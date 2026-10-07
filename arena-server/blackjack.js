@@ -40,16 +40,15 @@ class BlackjackGame extends ArenaGame {
 
   clearTimers() { clearTimeout(this.handTimer); }
 
-  // Per-player view of a round in progress. A player sees all of their own hand
-  // but only the first two cards of the opponent's, so neither can read the
-  // other's current total.
+  // Per-player view of a round in progress. A player sees their own hand and only
+  // HOW MANY cards the opponent holds: no faces and no bust limit, so nothing in
+  // the traffic reveals the opponent's hand. Hands are revealed in game_result.
   startMessage(i, isRematch, resync = false) {
     return {
       type: 'game_start', gameType: 'blackjack', tableId: this.tableId,
       yourHand: this.hands[i],
-      opponentVisibleCards: this.hands[1 - i].slice(0, 2),
+      opponentCardCount: this.hands[1 - i].length,
       yourBustLimit: Engine.getBustLimit(this.hands[i]),
-      opponentBustLimit: Engine.getBustLimit(this.hands[1 - i]),
       yourIndex: i, opponentName: this.players[1 - i].name,
       friendly: this.friendly, bet: this.bet, done: this.done,
       handDeadline: this.handDeadline, isRematch, resync,
@@ -85,7 +84,7 @@ class BlackjackGame extends ArenaGame {
     for (let i = 0; i < 2; i++) {
       this.send(i, {
         type: 'game_update', yourHand: this.hands[i],
-        opponentVisibleCards: this.hands[1 - i].slice(0, 2), done: this.done,
+        opponentCardCount: this.hands[1 - i].length, done: this.done,
       });
     }
   }
@@ -162,7 +161,7 @@ class BlackjackGame extends ArenaGame {
 
   resync(i) {
     if (this.roundOver && this.lastResult) {
-      this.send(i, this.lastResult);
+      this.send(i, Object.assign({}, this.lastResult, { yourIndex: i }));
       this.send(i, { type: 'show_rematch_prompt' });
       if (this.rematchAccepted[1 - i]) this.send(i, { type: 'rematch_opponent_accepted' });
       return;

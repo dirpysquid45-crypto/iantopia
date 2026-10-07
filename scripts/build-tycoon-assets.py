@@ -25,7 +25,7 @@ ART_DIR = os.path.join(OUT, 'art')
 ICON_PX = 128
 ART_PX = 256
 # Only the new buildings need card art; the original five keep their existing files.
-ART_KEYS = {'office_building', 'sweatshop', 'factory', 'coal_plant', 'nuclear_plant'}
+ART_KEYS = {'bank', 'office_building', 'sweatshop', 'factory', 'coal_plant', 'nuclear_plant'}
 
 # key -> source file (relative to the repo root)
 ICONS = {
@@ -34,6 +34,7 @@ ICONS = {
     'pagoda':             'public/tycoon/pagoda.png',
     'generic_skyscraper': 'public/tycoon/skyscraper.png',
     'taipei_101':         'public/tycoon/taipei-101.png',
+    'bank':               'bank.png',
     'office_building':    'Office Building.png',
     'sweatshop':          'Sweatshop.png',
     'factory':            'Factory.png',

@@ -105,6 +105,8 @@ class Manager {
         return this.leaveQueue(sessionId);
       case 'ping':
         return this.sendTo(ws, { type: 'pong' });
+      case 'suggest':
+        return this.suggest(userId, conn, msg);
       case 'action': {
         const game = this.tableBySession(sessionId);
         if (game) await game.handleAction(sessionId, msg.action, { x: msg.x, y: msg.y });
@@ -132,6 +134,31 @@ class Manager {
       }
       default:
         return;
+    }
+  }
+
+  // The site's suggestion box. Written here with the Admin SDK so it works
+  // without any Firestore client rules for the `suggestions` collection.
+  async suggest(userId, conn, msg) {
+    const reply = (ok, message) => this.sendTo(conn.ws, { type: 'suggest_result', ok, message });
+    if (conn.guest) return reply(false, 'Sign in first so I know who to credit.');
+    const text = typeof msg.text === 'string' ? msg.text.trim().slice(0, 1000) : '';
+    if (!text) return reply(false, 'Write something first.');
+    const now = Date.now();
+    this.lastSuggest = this.lastSuggest || new Map();
+    if (now - (this.lastSuggest.get(userId) || 0) < 10000) return reply(false, 'Slow down — try again in a few seconds.');
+    this.lastSuggest.set(userId, now);
+    try {
+      await this.db.collection('suggestions').add({
+        text, uid: userId, displayName: conn.name,
+        page: typeof msg.page === 'string' ? msg.page.slice(0, 100) : '',
+        createdAt: new Date(),
+      });
+      reply(true, 'Sent — thank you!');
+    } catch (e) {
+      console.error('[suggest] write failed:', e.message);
+      this.lastSuggest.delete(userId);
+      reply(false, 'Could not send. Please try again.');
     }
   }
 

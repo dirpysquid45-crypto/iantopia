@@ -41,6 +41,7 @@
   .card-slot { width:64px; height:96px; border:3px solid #000; background:rgba(0,0,0,0.3); padding:8px; display:flex; align-items:center; justify-content:center; }
   .card-slot.red { border-color:#8b1e2b; }
   .card-img { width:48px; height:48px; image-rendering:pixelated; image-rendering:crisp-edges; }
+  .card-slot.card-back { background:repeating-linear-gradient(45deg,#2b3f6b 0 6px,#1d2b4d 6px 12px); border-color:#c9a227; }
   .card-slot.deal-in { animation: cardDealIn 0.3s ease-out; }
   @keyframes cardDealIn {
     0%   { transform: translateX(-40px) rotateY(90deg); opacity:0; }
@@ -195,7 +196,7 @@
       </section>
     </div>
 
-    <div id="result-section" style="display:none; text-align:center;">
+    <div id="result-section" style="display:none; text-align:center; padding-bottom:90px;">
       <div style="font-size:14px; color:var(--gold); margin:20px 0;" id="result-message"></div>
       <div id="rematch-prompt" style="margin:20px 0;">
         <p style="color:var(--muted); font-size:12px; margin:10px 0;">Play another round?</p>
@@ -528,7 +529,7 @@
       document.getElementById('your-row').classList.add('active-hand');
       document.getElementById('hit').disabled = false;
       document.getElementById('stand').disabled = false;
-      renderGameState(msg.yourHand, msg.opponentVisibleCards, msg.yourBustLimit, msg.opponentBustLimit, msg.done || [false, false]);
+      renderGameState(msg.yourHand, msg.opponentCardCount, msg.yourBustLimit, msg.done || [false, false]);
       // Coming back to a hand already in progress: restore which side has stood.
       if (msg.resync && msg.done) {
         prevHandLengths = [msg.yourHand.length, 0];
@@ -537,14 +538,19 @@
       }
       if (msg.isRematch) showStatus('Rematch started!');
     } else if (msg.type === 'game_update') {
-      renderGameState(msg.yourHand, msg.opponentVisibleCards, null, null, msg.done);
+      renderGameState(msg.yourHand, msg.opponentCardCount, null, msg.done);
       const youDone = !!(msg.done && msg.done[yourIndex]);
       document.getElementById('hit').disabled = youDone;
       document.getElementById('stand').disabled = youDone;
     } else if (msg.type === 'game_result') {
+      if (typeof msg.yourIndex === 'number') yourIndex = msg.yourIndex;
       const result = msg.results[yourIndex];
       document.getElementById('your-row').classList.remove('active-hand');
-      document.getElementById('game-section').style.display = 'none';
+      // Keep the table up so both hands can be compared once they are revealed.
+      document.getElementById('game-section').style.display = 'block';
+      document.getElementById('hit').disabled = true;
+      document.getElementById('stand').disabled = true;
+      if (msg.hands) revealHands(msg.hands);
       document.getElementById('result-section').style.display = 'block';
       const resultText = msg.friendly
         ? (result.result === 'win' ? '🎉 You won the friendly game!' : result.result === 'push' ? 'Tie — friendly game.' : 'You lost the friendly game.')
@@ -605,26 +611,43 @@
     }
   }
 
-  function renderGameState(yourHand, opponentVisibleCards, yourBustLimit, opponentBustLimit, doneFlags) {
-    // Render your full hand
-    renderHand(yourHand, document.getElementById('your-hand'), prevHandLengths[0]);
-    // Render only opponent's visible cards (first 2)
-    renderHand(opponentVisibleCards, document.getElementById('opponent-hand'), 0);
-    prevHandLengths[0] = yourHand.length;
+  // The opponent's cards stay face down until the hand is settled; only their
+  // count and whether they have stood are known (the server sends nothing more).
+  function renderBacks(count, el, prevCount) {
+    el.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+      const slot = document.createElement('div');
+      slot.className = 'card-slot card-back' + (i >= prevCount ? ' deal-in' : '');
+      slot.setAttribute('aria-label', 'Hidden card');
+      el.appendChild(slot);
+    }
+  }
 
-    // Show goal card status if present
+  function renderGameState(yourHand, opponentCount, yourBustLimit, doneFlags) {
+    renderHand(yourHand, document.getElementById('your-hand'), prevHandLengths[0]);
+    renderBacks(opponentCount, document.getElementById('opponent-hand'), prevHandLengths[1] || 0);
+    prevHandLengths[0] = yourHand.length;
+    prevHandLengths[1] = opponentCount;
+
     const Engine = window.BlackjackEngine;
     const yourVal = Engine ? Engine.handValue(yourHand) : '';
-    const oppVal = Engine ? Engine.handValue(opponentVisibleCards) : '';
     const yourGoalText = Engine && Engine.hasGoalCard(yourHand) ? ' 🎯' : '';
-    const oppGoalText = opponentVisibleCards && opponentVisibleCards.some(c => c.isGoalCard) ? ' 🎯' : '';
-
-    // Show bust limits (21 or 31 if goal card present)
     const yourLimit = yourBustLimit || (Engine ? Engine.getBustLimit(yourHand) : 21);
-    const oppLimit = opponentBustLimit || 21; // Don't know opponent's limit until game ends
-
     document.getElementById('your-score').textContent = `Total: ${yourVal}${yourGoalText} (bust at ${yourLimit}+)`;
-    document.getElementById('opponent-score').textContent = `Total: ${oppVal}${oppGoalText}`;
+    const oppDone = !!(doneFlags && doneFlags[1 - yourIndex]);
+    document.getElementById('opponent-score').textContent =
+      `${opponentCount} cards · ${oppDone ? 'Standing' : 'Thinking…'}`;
+  }
+
+  // Settled: flip the opponent's cards and show both totals.
+  function revealHands(hands) {
+    const Engine = window.BlackjackEngine;
+    const mine = hands[yourIndex], theirs = hands[1 - yourIndex];
+    renderHand(mine, document.getElementById('your-hand'), mine.length);
+    renderHand(theirs, document.getElementById('opponent-hand'), 0);
+    const fmt = (h) => `Total: ${Engine ? Engine.handValue(h) : ''}${Engine && Engine.hasGoalCard(h) ? ' 🎯' : ''}${Engine && Engine.isBust(h) ? ' — BUST' : ''}`;
+    document.getElementById('your-score').textContent = fmt(mine);
+    document.getElementById('opponent-score').textContent = fmt(theirs);
   }
 
   document.getElementById('hit').addEventListener('click', () => arena.send({ type: 'action', action: 'hit' }));
