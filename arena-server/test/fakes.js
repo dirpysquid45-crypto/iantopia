@@ -22,8 +22,19 @@ class FakeDb {
     };
   }
   collection(name) {
+    const db = this;
     return {
       doc: (id) => this.ref(`${name}/${id}`),
+      orderBy: (field, dir) => ({
+        limit: (n) => ({
+          get: async () => {
+            const rows = [...db.docs.entries()].filter(([k]) => k.startsWith(name + '/'))
+              .map(([k, v]) => ({ id: k.slice(name.length + 1), data: () => clone(v) }));
+            rows.sort((a, b) => (new Date(a.data()[field]) - new Date(b.data()[field])) * (dir === 'desc' ? -1 : 1));
+            return { docs: rows.slice(0, n) };
+          },
+        }),
+      }),
       add: async (data) => { const id = 'auto' + Math.random().toString(36).slice(2, 8); await this.ref(`${name}/${id}`).set(data); return { id }; },
     };
   }
@@ -62,7 +73,7 @@ const FakeAuth = {
   async verifyIdToken(token) {
     const m = /^tok:([^:]+)(?::(.*))?$/.exec(String(token));
     if (!m) throw new Error('bad token');
-    return { uid: m[1], name: m[2] };
+    return { uid: m[1], name: m[2], email: m[1].includes('@') ? m[1] : undefined, email_verified: true };
   },
 };
 

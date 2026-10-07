@@ -52,7 +52,7 @@ class Manager {
 
   // ---- connections -------------------------------------------------------
   registerConnection(userId, sessionId, ws, info = {}) {
-    this.connections.set(sessionId, { userId, ws, guest: !!info.guest, name: info.name || 'Player' });
+    this.connections.set(sessionId, { userId, ws, guest: !!info.guest, name: info.name || 'Player', admin: !!info.admin });
 
     // Coming back to a game already in progress: this connection takes the seat
     // over, whether or not the server has noticed the old socket die yet. A
@@ -107,6 +107,8 @@ class Manager {
         return this.sendTo(ws, { type: 'pong' });
       case 'suggest':
         return this.suggest(userId, conn, msg);
+      case 'suggestions_list':
+        return this.listSuggestions(conn);
       case 'action': {
         const game = this.tableBySession(sessionId);
         if (game) await game.handleAction(sessionId, msg.action, { x: msg.x, y: msg.y });
@@ -159,6 +161,24 @@ class Manager {
       console.error('[suggest] write failed:', e.message);
       this.lastSuggest.delete(userId);
       reply(false, 'Could not send. Please try again.');
+    }
+  }
+
+  // The dev's inbox: newest first, admins only (checked against the verified
+  // token at login, never against anything the client says).
+  async listSuggestions(conn) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    try {
+      const snap = await this.db.collection('suggestions').orderBy('createdAt', 'desc').limit(5000).get();
+      const rows = snap.docs.map((d) => {
+        const v = d.data();
+        const t = v.createdAt && v.createdAt.toDate ? v.createdAt.toDate() : v.createdAt;
+        return { id: d.id, text: v.text || '', displayName: v.displayName || '', uid: v.uid || '', page: v.page || '', createdAt: t ? new Date(t).toISOString() : '' };
+      });
+      this.sendTo(conn.ws, { type: 'suggestions', rows });
+    } catch (e) {
+      console.error('[suggest] list failed:', e.message);
+      this.fail(conn.ws, 'Could not load suggestions', 'list_failed');
     }
   }
 

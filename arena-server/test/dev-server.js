@@ -11,7 +11,7 @@ const { FakeDb, FakeAuth } = require('./fakes');
 const PORT = Number(process.env.PORT || 4001);
 const db = new FakeDb();
 const timing = process.env.ARENA_TIMING ? JSON.parse(process.env.ARENA_TIMING) : undefined;
-const server = createServer({ port: PORT, db, auth: FakeAuth, timing, quiet: !process.env.VERBOSE });
+const server = createServer({ port: PORT, db, auth: FakeAuth, timing, quiet: !process.env.VERBOSE, admins: { uids: ['tester'], emails: [] } });
 
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');

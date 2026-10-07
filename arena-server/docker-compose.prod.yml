@@ -16,6 +16,10 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4001
+      # Who can open /admin-suggestions (comma lists; a .env file can override).
+      # An email only counts if Google has verified it.
+      - ADMIN_EMAILS=${ADMIN_EMAILS:-dirpysquid45@gmail.com}
+      - ADMIN_UIDS=${ADMIN_UIDS:-}
     deploy:
       resources:
         limits:

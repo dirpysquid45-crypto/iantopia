@@ -1,0 +1,118 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Suggestion Inbox</title>
+  <style>
+    :root { --bg:#0d1119; --panel:#151b28; --line:#2a3245; --ink:#e9eef9; --muted:#8c97ad; --gold:#ffd700; --bad:#ff8080; --ok:#6ddc8b; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui, sans-serif; padding:calc(16px + env(safe-area-inset-top)) 16px 40px; }
+    main { max-width:1100px; margin:0 auto; }
+    h1 { margin:0 0 4px; font-size:20px; color:var(--gold); }
+    .sub { color:var(--muted); margin:0 0 16px; }
+    .bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+    button { background:var(--gold); color:#000; border:0; border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; }
+    button.alt { background:var(--panel); color:var(--ink); border:1px solid var(--line); }
+    button:disabled { opacity:.45; cursor:default; }
+    #status { color:var(--muted); }
+    #status.bad { color:var(--bad); }
+    .wrap { overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
+    table { border-collapse:collapse; width:100%; min-width:640px; }
+    th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; position:sticky; top:0; background:var(--panel); }
+    td.text { white-space:pre-wrap; word-break:break-word; min-width:280px; }
+    td.when, td.who, td.page { white-space:nowrap; color:var(--muted); }
+    td.who { color:var(--ink); }
+    tr:last-child td { border-bottom:0; }
+    @media (max-width:640px) { body { padding-left:12px; padding-right:12px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Suggestion Inbox</h1>
+  <p class="sub">Newest first. Only accounts listed in the server's admin settings can open this.</p>
+  <div class="bar">
+    <button id="signin" hidden>Sign in with Google</button>
+    <button id="refresh" class="alt" disabled>Refresh</button>
+    <button id="download" disabled>Download .xlsx</button>
+    <span id="status">Connecting…</span>
+  </div>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>Received</th><th>From</th><th>Suggestion</th><th>Page</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="4" style="color:var(--muted)">Nothing loaded yet.</td></tr></tbody>
+    </table>
+  </div>
+</main>
+
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/cloud-sync.js?v=9"></script>
+<script is:inline src="/arena-client.js?v=1"></script>
+<script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script is:inline>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  let rows = [];
+  const setStatus = (t, bad) => { $('status').textContent = t; $('status').className = bad ? 'bad' : ''; };
+  const fmt = (iso) => iso ? new Date(iso).toLocaleString() : '';
+
+  function render() {
+    const body = $('rows');
+    body.innerHTML = '';
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">No suggestions yet.</td></tr>';
+      return;
+    }
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      [['when', fmt(r.createdAt)], ['who', r.displayName], ['text', r.text], ['page', r.page]].forEach(([cls, val]) => {
+        const td = document.createElement('td'); td.className = cls; td.textContent = val; tr.appendChild(td);
+      });
+      body.appendChild(tr);
+    }
+  }
+
+  const arena = ArenaClient.create({
+    game: 'suggest',
+    onState: (st) => { if (st === 'closed') setStatus('Disconnected — retrying…', true); },
+    onMessage: (msg) => {
+      if (msg.type === 'auth_ok') {
+        $('signin').hidden = !msg.guest;
+        if (msg.guest) { setStatus('Sign in to continue.'); return; }
+        setStatus('Loading…');
+        arena.send({ type: 'suggestions_list' });
+      } else if (msg.type === 'suggestions') {
+        rows = msg.rows;
+        render();
+        $('refresh').disabled = false;
+        $('download').disabled = !rows.length;
+        setStatus(rows.length + ' suggestion' + (rows.length === 1 ? '' : 's') + ' · updated ' + new Date().toLocaleTimeString());
+      } else if (msg.type === 'error') {
+        setStatus(msg.code === 'forbidden' ? 'This account is not an admin.' : msg.message, true);
+      }
+    },
+  });
+
+  $('signin').addEventListener('click', () => window.CloudSync && CloudSync.signIn());
+  $('refresh').addEventListener('click', () => { setStatus('Loading…'); arena.send({ type: 'suggestions_list' }); });
+  $('download').addEventListener('click', () => {
+    if (!window.XLSX) { setStatus('Spreadsheet library did not load. Check your connection.', true); return; }
+    const data = rows.map((r) => ({ Received: fmt(r.createdAt), From: r.displayName, Suggestion: r.text, Page: r.page, 'User ID': r.uid }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [{ wch: 20 }, { wch: 18 }, { wch: 80 }, { wch: 16 }, { wch: 30 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Suggestions');
+    XLSX.writeFile(wb, 'iantopia-suggestions-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  });
+
+  arena.connect();
+})();
+</script>
+</body>
+</html>

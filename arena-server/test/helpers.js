@@ -13,7 +13,7 @@ async function startServer(opts = {}) {
   const db = opts.db || new FakeDb();
   const server = createServer({
     port: 0, host: '127.0.0.1', db, auth: FakeAuth, quiet: true,
-    timing: Object.assign({}, FAST, opts.timing), authTimeoutMs: opts.authTimeoutMs || 10000,
+    timing: Object.assign({}, FAST, opts.timing), authTimeoutMs: opts.authTimeoutMs || 10000, admins: opts.admins || { uids: [], emails: [] },
     rate: opts.rate || { maxMessagesPerSec: 10000, maxConnectionsPerIP: 10000 }, heartbeatMs: opts.heartbeatMs || 60000, makeDeck: opts.makeDeck,
   });
   await new Promise((r) => (server.wss.address() ? r() : server.wss.on('listening', r)));

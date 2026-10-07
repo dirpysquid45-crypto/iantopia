@@ -29,11 +29,24 @@ function cleanName(raw, fallback) {
   return s || fallback;
 }
 
+// Who may read the suggestion inbox: ADMIN_UIDS / ADMIN_EMAILS (comma lists).
+function adminsFromEnv(env) {
+  const list = (v) => String(v || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+  return { uids: list(env.ADMIN_UIDS), emails: list(env.ADMIN_EMAILS) };
+}
+function isAdminToken(decoded, admins) {
+  if (!decoded || !admins) return false;
+  if (admins.uids.includes(String(decoded.uid).toLowerCase())) return true;
+  // An email only counts if Google has verified it.
+  return !!decoded.email && decoded.email_verified !== false && admins.emails.includes(String(decoded.email).toLowerCase());
+}
+
 function createServer(options = {}) {
   const {
     port = 4001, host, db, auth, timing, rate, quiet = false, makeDeck,
-    authTimeoutMs = 10000, heartbeatMs = 25000,
+    authTimeoutMs = 10000, heartbeatMs = 25000, admins,
   } = options;
+  const adminList = admins || adminsFromEnv(process.env);
   const log = quiet ? () => {} : (...a) => console.log(...a);
 
   const wss = new WebSocket.Server({ port, host, clientTracking: false, maxPayload: 16 * 1024 });
@@ -88,7 +101,7 @@ function createServer(options = {}) {
         sessionId = Math.random().toString(36).slice(2, 12);
         const name = cleanName(decoded.name || (decoded.email ? decoded.email.split('@')[0] : ''), 'Player');
         ws.send(JSON.stringify({ type: 'auth_ok', sessionId, guest: false, name }));
-        manager.registerConnection(userId, sessionId, ws, { guest: false, name });
+        manager.registerConnection(userId, sessionId, ws, { guest: false, name, admin: isAdminToken(decoded, adminList) });
       } catch (e) {
         log('[auth] token verification failed:', e.message);
         ws.close(1008, 'Invalid token');
