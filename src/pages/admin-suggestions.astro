@@ -7,7 +7,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
   <title>Suggestion Inbox</title>
-  <style>
+  <style is:global>
     :root { --bg:#0d1119; --panel:#151b28; --line:#2a3245; --ink:#e9eef9; --muted:#8c97ad; --gold:#ffd700; --bad:#ff8080; --ok:#6ddc8b; }
     * { box-sizing:border-box; }
     body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui, sans-serif; padding:calc(16px + env(safe-area-inset-top)) 16px 40px; }
@@ -20,23 +20,30 @@
     button:disabled { opacity:.45; cursor:default; }
     #status { color:var(--muted); }
     #status.bad { color:var(--bad); }
-    .wrap { overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:var(--panel); }
-    table { border-collapse:collapse; width:100%; min-width:640px; }
-    th, td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
-    th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; position:sticky; top:0; background:var(--panel); }
-    #csv-panel { margin-bottom:14px; }
-    #csv-text { width:100%; height:220px; resize:vertical; background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:10px; padding:10px; font:12px/1.5 ui-monospace, Menlo, monospace; white-space:pre; overflow:auto; }
-    td.text { white-space:pre-wrap; word-break:break-word; min-width:280px; }
-    td.when, td.who, td.page { white-space:nowrap; color:var(--muted); }
-    td.who { color:var(--ink); }
-    tr:last-child td { border-bottom:0; }
+    .tabs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+    .tab { background:var(--panel); color:var(--muted); border:1px solid var(--line); }
+    .tab[aria-selected="true"] { background:var(--gold); color:#000; border-color:var(--gold); }
+    .tab .n { opacity:.75; font-weight:600; margin-left:4px; }
+    #feed { display:flex; flex-direction:column; gap:10px; max-height:calc(100dvh - 260px); min-height:240px; overflow-y:auto; padding:2px 4px 2px 0; overscroll-behavior:contain; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+    .card.gone { opacity:.4; pointer-events:none; }
+    .meta { display:flex; flex-wrap:wrap; gap:4px 10px; align-items:baseline; color:var(--muted); font-size:12px; margin-bottom:6px; }
+    .meta .who { color:var(--ink); font-weight:700; font-size:14px; }
+    .meta .pill { border:1px solid var(--line); border-radius:99px; padding:1px 8px; }
+    .meta .pill.public { color:var(--ok); border-color:var(--ok); }
+    .body { white-space:pre-wrap; word-break:break-word; margin:0 0 10px; }
+    .acts { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    .acts button { padding:7px 12px; font-size:13px; }
+    .acts .danger { background:transparent; color:var(--bad); border:1px solid var(--bad); }
+    .acts label { color:var(--muted); font-size:12px; display:flex; gap:5px; align-items:center; }
+    .empty { color:var(--muted); padding:22px; text-align:center; border:1px dashed var(--line); border-radius:12px; }
     @media (max-width:640px) { body { padding-left:12px; padding-right:12px; } }
   </style>
 </head>
 <body>
 <main>
   <h1>Suggestion Inbox</h1>
-  <p class="sub">Newest first. Only accounts listed in the server's admin settings can open this.</p>
+  <p class="sub">Inbox is private. <b>Post</b> publishes to <a href="/suggestions" style="color:var(--gold)">the public forum</a>, <b>Archive</b> moves it to the Excel backlog, <b>Delete</b> removes it for good.</p>
   <div class="bar">
     <button id="signin" hidden>Sign in with Google</button>
     <button id="refresh" class="alt" disabled>Refresh</button>
@@ -51,12 +58,12 @@
     </div>
     <textarea id="csv-text" readonly spellcheck="false" aria-label="Raw CSV"></textarea>
   </section>
-  <div class="wrap">
-    <table>
-      <thead><tr><th>Received</th><th>From</th><th>Suggestion</th><th>Page</th></tr></thead>
-      <tbody id="rows"><tr><td colspan="4" style="color:var(--muted)">Nothing loaded yet.</td></tr></tbody>
-    </table>
+  <div class="tabs" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-tab="new">Inbox<span class="n" id="n-new"></span></button>
+    <button class="tab" role="tab" data-tab="public">Public<span class="n" id="n-public"></span></button>
+    <button class="tab" role="tab" data-tab="archived">Archive<span class="n" id="n-archived"></span></button>
   </div>
+  <div id="feed" tabindex="0" aria-live="polite"></div>
 </main>
 
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
@@ -74,27 +81,86 @@
   // and line breaks in a suggestion cannot break a row.
   const csvCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
   function toCsv() {
-    const head = ['Received', 'From', 'Suggestion', 'Page', 'User ID', 'Doc ID'];
-    const lines = rows.map((r) => [r.createdAt, r.displayName, r.text, r.page, r.uid, r.id].map(csvCell).join(','));
+    const head = ['Status', 'Received', 'From', 'Suggestion', 'Page', 'User ID', 'Doc ID'];
+    const lines = rows.map((r) => [r.status, r.createdAt, r.displayName, r.text, r.page, r.uid, r.id].map(csvCell).join(','));
     return [head.map(csvCell).join(','), ...lines].join('\r\n');
   }
+  const refreshCsv = () => { if (!$('csv-panel').hidden) $('csv-text').value = toCsv(); };
   const fmt = (iso) => iso ? new Date(iso).toLocaleString() : '';
 
-  function render() {
-    const body = $('rows');
-    body.innerHTML = '';
-    if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">No suggestions yet.</td></tr>';
-      return;
-    }
-    for (const r of rows) {
-      const tr = document.createElement('tr');
-      [['when', fmt(r.createdAt)], ['who', r.displayName], ['text', r.text], ['page', r.page]].forEach(([cls, val]) => {
-        const td = document.createElement('td'); td.className = cls; td.textContent = val; tr.appendChild(td);
-      });
-      body.appendChild(tr);
-    }
+  let tab = 'new';
+  const LABEL = { new: 'Inbox', public: 'Public', archived: 'Archive' };
+
+  function counts() {
+    const c = { new: 0, public: 0, archived: 0 };
+    rows.forEach((r) => { c[r.status]++; });
+    for (const k in c) $('n-' + k).textContent = '(' + c[k] + ')';
   }
+
+  function button(label, cls, onClick) {
+    const b = document.createElement('button');
+    b.textContent = label; if (cls) b.className = cls; b.addEventListener('click', onClick);
+    return b;
+  }
+
+  function card(r) {
+    const el = document.createElement('article');
+    el.className = 'card'; el.dataset.id = r.id;
+    const meta = document.createElement('div'); meta.className = 'meta';
+    const who = document.createElement('span'); who.className = 'who'; who.textContent = r.displayName || 'Anonymous';
+    const when = document.createElement('span'); when.textContent = fmt(r.createdAt);
+    const pg = document.createElement('span'); pg.textContent = r.page;
+    meta.append(who, when, pg);
+    if (r.status === 'public') {
+      const pill = document.createElement('span'); pill.className = 'pill public';
+      pill.textContent = r.hideName ? 'Posted · name hidden' : 'Posted'; meta.append(pill);
+    }
+    const body = document.createElement('p'); body.className = 'body'; body.textContent = r.text;
+    const acts = document.createElement('div'); acts.className = 'acts';
+    let hide = null;
+    if (r.status !== 'public') {
+      const lab = document.createElement('label');
+      hide = document.createElement('input'); hide.type = 'checkbox';
+      lab.append(hide, 'Hide name');
+      acts.append(button('Post publicly', '', () => act(el, { type: 'suggestion_set', id: r.id, status: 'public', hideName: hide.checked })), lab);
+    } else {
+      acts.append(button('Take down', 'alt', () => act(el, { type: 'suggestion_set', id: r.id, status: 'new' })));
+    }
+    if (r.status !== 'archived') acts.append(button('Archive', 'alt', () => act(el, { type: 'suggestion_set', id: r.id, status: 'archived' })));
+    else acts.append(button('Restore to inbox', 'alt', () => act(el, { type: 'suggestion_set', id: r.id, status: 'new' })));
+    acts.append(button('Delete', 'danger', () => {
+      if (confirm('Delete this suggestion permanently? This cannot be undone.')) act(el, { type: 'suggestion_delete', id: r.id });
+    }));
+    el.append(meta, body, acts);
+    return el;
+  }
+
+  // Sent, then the card dims until the server confirms (or errors and it recovers).
+  function act(el, msg) {
+    el.classList.add('gone');
+    if (!arena.send(msg)) { el.classList.remove('gone'); setStatus('Not connected — try again.', true); }
+  }
+
+  function render() {
+    counts();
+    document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === tab)));
+    const feed = $('feed');
+    const keep = feed.scrollTop;
+    feed.innerHTML = '';
+    const shown = rows.filter((r) => r.status === tab);
+    if (!shown.length) {
+      const e = document.createElement('div'); e.className = 'empty';
+      e.textContent = tab === 'new' ? 'Inbox is empty.' : 'Nothing in ' + LABEL[tab] + ' yet.';
+      feed.append(e); return;
+    }
+    shown.forEach((r) => feed.append(card(r)));
+    feed.scrollTop = keep;
+  }
+
+  $('tabs').addEventListener('click', (e) => {
+    const t = e.target.closest('.tab'); if (!t) return;
+    tab = t.dataset.tab; render(); $('feed').scrollTop = 0;
+  });
 
   const arena = ArenaClient.create({
     game: 'suggest',
@@ -111,10 +177,19 @@
         $('refresh').disabled = false;
         $('download').disabled = !rows.length;
         $('csv-toggle').disabled = !rows.length;
-        if (!$('csv-panel').hidden) $('csv-text').value = toCsv();
+        refreshCsv();
         setStatus(rows.length + ' suggestion' + (rows.length === 1 ? '' : 's') + ' · updated ' + new Date().toLocaleTimeString());
+      } else if (msg.type === 'suggestion_updated') {
+        const r = rows.find((x) => x.id === msg.id);
+        if (r) { r.status = msg.status; r.hideName = msg.hideName; r.postedAt = msg.postedAt; }
+        render(); refreshCsv();
+        setStatus(msg.status === 'public' ? 'Posted to the public forum.' : msg.status === 'archived' ? 'Archived to the Excel backlog.' : 'Moved to the inbox.');
+      } else if (msg.type === 'suggestion_deleted') {
+        rows = rows.filter((x) => x.id !== msg.id);
+        render(); refreshCsv(); setStatus('Deleted.');
       } else if (msg.type === 'error') {
         setStatus(msg.code === 'forbidden' ? 'This account is not an admin.' : msg.message, true);
+        document.querySelectorAll('.card.gone').forEach((c) => c.classList.remove('gone'));
       }
     },
   });
@@ -123,11 +198,15 @@
   $('refresh').addEventListener('click', () => { setStatus('Loading…'); arena.send({ type: 'suggestions_list' }); });
   $('download').addEventListener('click', () => {
     if (!window.XLSX) { setStatus('Spreadsheet library did not load. Check your connection.', true); return; }
-    const data = rows.map((r) => ({ Received: fmt(r.createdAt), From: r.displayName, Suggestion: r.text, Page: r.page, 'User ID': r.uid }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    ws['!cols'] = [{ wch: 20 }, { wch: 18 }, { wch: 80 }, { wch: 16 }, { wch: 30 }];
+    // One sheet per place a suggestion can be: Inbox, Public and Archive (the backlog).
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Suggestions');
+    for (const [key, name] of [['archived', 'Archive'], ['new', 'Inbox'], ['public', 'Public']]) {
+      const data = rows.filter((r) => r.status === key)
+        .map((r) => ({ Received: fmt(r.createdAt), From: r.displayName, Suggestion: r.text, Page: r.page, 'User ID': r.uid }));
+      const ws = XLSX.utils.json_to_sheet(data, { header: ['Received', 'From', 'Suggestion', 'Page', 'User ID'] });
+      ws['!cols'] = [{ wch: 20 }, { wch: 18 }, { wch: 80 }, { wch: 16 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, ws, name);
+    }
     XLSX.writeFile(wb, 'iantopia-suggestions-' + new Date().toISOString().slice(0, 10) + '.xlsx');
   });
 

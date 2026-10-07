@@ -4,6 +4,7 @@ const BalanceManager = require('./balance');
 
 const GAME_TYPES = new Set(['blackjack', 'battleship']);
 const MAX_BET = 1000000;
+const SUGGESTION_STATUSES = new Set(['new', 'public', 'archived']);
 
 class Manager {
   constructor(db, auth, opts = {}) {
@@ -109,6 +110,12 @@ class Manager {
         return this.suggest(userId, conn, msg);
       case 'suggestions_list':
         return this.listSuggestions(conn);
+      case 'suggestion_set':
+        return this.setSuggestion(conn, msg);
+      case 'suggestion_delete':
+        return this.deleteSuggestion(conn, msg);
+      case 'suggestions_public':
+        return this.publicSuggestions(conn);
       case 'action': {
         const game = this.tableBySession(sessionId);
         if (game) await game.handleAction(sessionId, msg.action, { x: msg.x, y: msg.y });
@@ -154,7 +161,7 @@ class Manager {
       await this.db.collection('suggestions').add({
         text, uid: userId, displayName: conn.name,
         page: typeof msg.page === 'string' ? msg.page.slice(0, 100) : '',
-        createdAt: new Date(),
+        createdAt: new Date(), status: 'new',
       });
       reply(true, 'Sent — thank you!');
     } catch (e) {
@@ -173,11 +180,66 @@ class Manager {
       const rows = snap.docs.map((d) => {
         const v = d.data();
         const t = v.createdAt && v.createdAt.toDate ? v.createdAt.toDate() : v.createdAt;
-        return { id: d.id, text: v.text || '', displayName: v.displayName || '', uid: v.uid || '', page: v.page || '', createdAt: t ? new Date(t).toISOString() : '' };
+        const posted = v.postedAt && v.postedAt.toDate ? v.postedAt.toDate() : v.postedAt;
+        return {
+          id: d.id, text: v.text || '', displayName: v.displayName || '', uid: v.uid || '', page: v.page || '',
+          createdAt: t ? new Date(t).toISOString() : '',
+          status: SUGGESTION_STATUSES.has(v.status) ? v.status : 'new', // older docs have no status
+          hideName: !!v.hideName, postedAt: posted ? new Date(posted).toISOString() : '',
+        };
       });
       this.sendTo(conn.ws, { type: 'suggestions', rows });
     } catch (e) {
       console.error('[suggest] list failed:', e.message);
+      this.fail(conn.ws, 'Could not load suggestions', 'list_failed');
+    }
+  }
+
+  // Moves a suggestion between the private inbox ('new'), the public forum
+  // ('public') and the Excel backlog ('archived'). Admins only.
+  async setSuggestion(conn, msg) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    const id = typeof msg.id === 'string' && /^[A-Za-z0-9]{1,40}$/.test(msg.id) ? msg.id : null;
+    if (!id || !SUGGESTION_STATUSES.has(msg.status)) return this.fail(conn.ws, 'Bad request', 'bad_request');
+    try {
+      const ref = this.db.collection('suggestions').doc(id);
+      if (!(await ref.get()).exists) return this.fail(conn.ws, 'That suggestion no longer exists', 'missing');
+      const update = { status: msg.status };
+      if (msg.status === 'public') { update.postedAt = new Date(); update.hideName = !!msg.hideName; }
+      await ref.set(update, { merge: true });
+      this.sendTo(conn.ws, { type: 'suggestion_updated', id, status: msg.status, hideName: !!update.hideName, postedAt: update.postedAt ? update.postedAt.toISOString() : '' });
+    } catch (e) {
+      console.error('[suggest] update failed:', e.message);
+      this.fail(conn.ws, 'Could not update that suggestion', 'update_failed');
+    }
+  }
+
+  async deleteSuggestion(conn, msg) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    const id = typeof msg.id === 'string' && /^[A-Za-z0-9]{1,40}$/.test(msg.id) ? msg.id : null;
+    if (!id) return this.fail(conn.ws, 'Bad request', 'bad_request');
+    try {
+      await this.db.collection('suggestions').doc(id).delete();
+      this.sendTo(conn.ws, { type: 'suggestion_deleted', id });
+    } catch (e) {
+      console.error('[suggest] delete failed:', e.message);
+      this.fail(conn.ws, 'Could not delete that suggestion', 'delete_failed');
+    }
+  }
+
+  // What the public forum shows: only posted suggestions, and never the uid.
+  async publicSuggestions(conn) {
+    try {
+      const snap = await this.db.collection('suggestions').where('status', '==', 'public').limit(500).get();
+      const rows = snap.docs.map((d) => {
+        const v = d.data();
+        const at = (x) => (x && x.toDate ? x.toDate() : x);
+        const posted = at(v.postedAt) || at(v.createdAt);
+        return { id: d.id, text: v.text || '', name: v.hideName ? 'Anonymous' : (v.displayName || 'Anonymous'), postedAt: posted ? new Date(posted).toISOString() : '' };
+      }).sort((a, b) => (a.postedAt < b.postedAt ? 1 : -1));
+      this.sendTo(conn.ws, { type: 'suggestions_public', rows });
+    } catch (e) {
+      console.error('[suggest] public list failed:', e.message);
       this.fail(conn.ws, 'Could not load suggestions', 'list_failed');
     }
   }

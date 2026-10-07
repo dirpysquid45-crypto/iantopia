@@ -1,0 +1,67 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Suggestions Forum</title>
+  <style is:global>
+    :root { --bg:#0d1119; --panel:#151b28; --line:#2a3245; --ink:#e9eef9; --muted:#8c97ad; --gold:#ffd700; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui, sans-serif; padding:calc(16px + env(safe-area-inset-top)) 16px 40px; }
+    main { max-width:720px; margin:0 auto; }
+    a { color:var(--gold); }
+    h1 { margin:6px 0 4px; font-size:22px; color:var(--gold); }
+    .sub { color:var(--muted); margin:0 0 18px; }
+    #feed { display:flex; flex-direction:column; gap:12px; }
+    .post { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+    .meta { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; color:var(--muted); font-size:12px; margin-bottom:6px; }
+    .meta b { color:var(--ink); font-size:14px; }
+    .text { margin:0; white-space:pre-wrap; word-break:break-word; }
+    .empty { color:var(--muted); text-align:center; padding:30px; border:1px dashed var(--line); border-radius:12px; }
+  </style>
+</head>
+<body>
+<main>
+  <p><a href="/">← Iantopia</a></p>
+  <h1>Suggestions Forum</h1>
+  <p class="sub">Ideas from players that made it onto the board. Send yours with the 💡 Suggest button on the home page.</p>
+  <div id="feed"><div class="empty">Loading…</div></div>
+</main>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/cloud-sync.js?v=9"></script>
+<script is:inline src="/arena-client.js?v=1"></script>
+<script is:inline>
+(function () {
+  const feed = document.getElementById('feed');
+  function show(rows) {
+    feed.innerHTML = '';
+    if (!rows.length) { feed.innerHTML = '<div class="empty">Nothing posted yet.</div>'; return; }
+    for (const r of rows) {
+      const el = document.createElement('article'); el.className = 'post';
+      const meta = document.createElement('div'); meta.className = 'meta';
+      const who = document.createElement('b'); who.textContent = r.name;
+      const when = document.createElement('span'); when.textContent = r.postedAt ? new Date(r.postedAt).toLocaleDateString() : '';
+      meta.append(who, when);
+      const t = document.createElement('p'); t.className = 'text'; t.textContent = r.text;
+      el.append(meta, t); feed.append(el);
+    }
+  }
+  const arena = ArenaClient.create({
+    game: 'suggest',
+    // A guest connection is enough to read; no sign-in needed.
+    canSwitchIdentity: () => false,
+    onMessage: (msg) => {
+      if (msg.type === 'auth_ok') arena.send({ type: 'suggestions_public' });
+      else if (msg.type === 'suggestions_public') show(msg.rows);
+      else if (msg.type === 'error') feed.innerHTML = '<div class="empty">Could not load suggestions. Try again later.</div>';
+    },
+  });
+  arena.connect();
+})();
+</script>
+</body>
+</html>

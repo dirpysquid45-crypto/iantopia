@@ -20,6 +20,7 @@ window.PATCH_NOTES = [
       "Blackjack: your opponent's cards now stay face down until the hand is settled, then both hands flip and the totals are shown. The server no longer sends their cards at all, so they cannot be peeked at.",
       "Arena reliability: dropped connections resume the game in place for 30 seconds, turns and hands are timed so nobody can stall a match, and rematch and back-to-lobby buttons work again. Winners are paid (minus a 5% rake) and losers charged exactly once, to the right accounts. A negative-bet exploit and self-matching were closed.",
       "Suggestion box on the home page (💡 Suggest), now styled like the other small buttons and working on phones. Suggestions are sent through the server, so they actually arrive.",
+      "New Suggestions Forum (/suggestions): ideas that get posted from the suggestion box show up there for everyone to read.",
       "Horse Game scores now have their own leaderboard.",
     ],
   },

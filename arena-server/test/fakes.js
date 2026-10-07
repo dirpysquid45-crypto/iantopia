@@ -19,12 +19,21 @@ class FakeDb {
         return { exists: has, data: () => clone(db.docs.get(path)) };
       },
       async set(data, opts) { db.write(path, data, opts); },
+      async delete() { db.docs.delete(path); },
     };
   }
   collection(name) {
     const db = this;
     return {
       doc: (id) => this.ref(`${name}/${id}`),
+      where: (field, op, val) => ({
+        limit: (n) => ({
+          get: async () => ({
+            docs: [...db.docs.entries()].filter(([k, v]) => k.startsWith(name + '/') && v[field] === val)
+              .map(([k, v]) => ({ id: k.slice(name.length + 1), data: () => clone(v) })).slice(0, n),
+          }),
+        }),
+      }),
       orderBy: (field, dir) => ({
         limit: (n) => ({
           get: async () => {

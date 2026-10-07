@@ -54,3 +54,60 @@ test('only an admin can read the inbox, newest first', async () => {
   y.send({ type: 'suggestions_list' });
   assert.equal((await y.waitFor('error')).code, 'forbidden');
 });
+
+test('admin can post, archive and delete; the public sees only posted ones, without uids', async () => {
+  const t = await startServer({ admins: { uids: ['boss'], emails: [] } });
+  const u = await asUser(t.url, 'alice', 'Alice');
+  for (const text of ['one', 'two', 'three']) {
+    u.clear(); u.send({ type: 'suggest', text }); await u.waitFor('suggest_result');
+    await new Promise((r) => setTimeout(r, 15));
+    // cooldown is per user; clear it so the test can send several
+    t.manager.lastSuggest.clear();
+  }
+  const boss = await asUser(t.url, 'boss', 'Boss');
+  boss.send({ type: 'suggestions_list' });
+  const { rows } = await boss.waitFor('suggestions');
+  assert.equal(rows.length, 3);
+  assert.ok(rows.every((r) => r.status === 'new'));
+  const byText = Object.fromEntries(rows.map((r) => [r.text, r.id]));
+
+  // Post one (name shown), post another (name hidden), archive the third.
+  boss.send({ type: 'suggestion_set', id: byText.one, status: 'public' });
+  assert.equal((await boss.waitFor('suggestion_updated')).status, 'public');
+  boss.clear();
+  boss.send({ type: 'suggestion_set', id: byText.two, status: 'public', hideName: true });
+  await boss.waitFor('suggestion_updated');
+  boss.clear();
+  boss.send({ type: 'suggestion_set', id: byText.three, status: 'archived' });
+  await boss.waitFor('suggestion_updated');
+
+  const guest = await asGuest(t.url, 'Gus');
+  guest.send({ type: 'suggestions_public' });
+  const pub = await guest.waitFor('suggestions_public');
+  assert.deepEqual(pub.rows.map((r) => r.text).sort(), ['one', 'two']);
+  assert.equal(pub.rows.find((r) => r.text === 'one').name, 'Alice');
+  assert.equal(pub.rows.find((r) => r.text === 'two').name, 'Anonymous');
+  assert.ok(pub.rows.every((r) => !('uid' in r) && !('status' in r)), 'no private fields leak');
+
+  // Non-admins cannot change anything; bad input is refused.
+  guest.clear();
+  guest.send({ type: 'suggestion_set', id: byText.three, status: 'public' });
+  assert.equal((await guest.waitFor('error')).code, 'forbidden');
+  guest.clear();
+  guest.send({ type: 'suggestion_delete', id: byText.three });
+  assert.equal((await guest.waitFor('error')).code, 'forbidden');
+  boss.clear();
+  boss.send({ type: 'suggestion_set', id: byText.one, status: 'bogus' });
+  assert.equal((await boss.waitFor('error')).code, 'bad_request');
+  boss.clear();
+  boss.send({ type: 'suggestion_set', id: 'doesnotexist', status: 'public' });
+  assert.equal((await boss.waitFor('error')).code, 'missing');
+
+  // Delete removes it for good.
+  boss.clear();
+  boss.send({ type: 'suggestion_delete', id: byText.two });
+  await boss.waitFor('suggestion_deleted');
+  guest.clear();
+  guest.send({ type: 'suggestions_public' });
+  assert.deepEqual((await guest.waitFor('suggestions_public')).rows.map((r) => r.text), ['one']);
+});
