@@ -147,6 +147,34 @@ window.CASE_ITEMS = {
     description: 'The most output of anything you can build. The neighbours are supportive in public.' },
 };
 
+// ---------- Collectibles ----------
+// Display versions of the My Iantopia buildings and terrain, plus a few
+// oddities (drinks, a very tuff bear). Unlike the building_unlock items above (which hand you a building to
+// PLACE in the village), these are ordinary collectibles: own one, and it can be
+// dragged around the homepage like any other toy. They are flagged `glow` so they
+// shimmer in the shop, the reel and the inventory, and `collectible` so the shop
+// sells them directly. Each building's collectible shares its tier with the
+// building itself.
+(function addCollectibles() {
+  const I = window.CASE_ITEMS;
+  Object.keys(I).filter((id) => id.startsWith('bld_')).forEach((id) => {
+    const b = I[id];
+    const name = b.label.replace(/^Building: /, '');
+    I['col_' + id.slice(4)] = {
+      label: name + ' (Collectible)', tier: b.tier, img: b.img,
+      type: 'item', draggable: true, glow: true, collectible: true, size: 120,
+    };
+  });
+  Object.assign(I, {
+    col_grass:   { label: 'Grass Tile',        tier: 'mil_spec',   img: '/assets/collectibles/grass-tile.png',  type: 'item', draggable: true, glow: true, collectible: true, size: 96 },
+    col_road:    { label: 'Cobblestone Road Tile', tier: 'mil_spec', img: '/assets/collectibles/road-tile.png', type: 'item', draggable: true, glow: true, collectible: true, size: 96 },
+    col_water:   { label: 'Water Tile',        tier: 'restricted', img: '/assets/collectibles/water-tile.png',  type: 'item', draggable: true, glow: true, collectible: true, size: 96 },
+    col_smirnoff: { label: 'Smirnoff Ice',     tier: 'mil_spec',   img: '/assets/items/smirnoff-ice.png',       type: 'item', draggable: true, glow: true, collectible: true, size: 70 },
+    col_tuffbear: { label: 'Tuff Ahh Bear',    tier: 'classified', img: '/assets/items/tuff-ahh-bear.png',      type: 'item', draggable: true, glow: true, collectible: true, size: 110 },
+    col_modelo:  { label: 'Modelo Negra',      tier: 'restricted', img: '/assets/items/modelo-negra.png',       type: 'item', draggable: true, glow: true, collectible: true, size: 90 },
+  });
+})();
+
 // Paths an `unlock_page` item may grant. A path only belongs here once the page
 // is a real built route — the engine refuses anything not listed, so an item can
 // never hand out a dead link. Add the route in the same change that adds the page.

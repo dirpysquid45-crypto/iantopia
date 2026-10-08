@@ -176,6 +176,11 @@
         el.alt = def.label;
         el.title = def.label;
         el.className = 'desktop-item' + (def.pixelated ? ' pixel-art' : '');
+        if (def.glow) {
+          // Collectibles carry a soft glow in their rarity colour.
+          const c = ((window.CASE_RARITIES || {})[def.tier] || {}).color || '#ffd700';
+          el.style.filter = `drop-shadow(0 0 4px ${c}) drop-shadow(0 0 10px ${c})`;
+        }
         if (def.size) {
           // Custom footprint (e.g. the shelf) — width fixed, height follows
           // the image's natural aspect ratio instead of being forced square.

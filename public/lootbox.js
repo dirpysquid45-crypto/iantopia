@@ -416,10 +416,13 @@
     return SHOP_PRICE[item.tier] || 0;
   }
 
+  // Cosmetics, plus the glowing display collectibles (building / terrain / drink figures).
+  const isShopItem = (item) => SHOP_TYPES.includes(item.type) || (item.type === 'item' && !!item.collectible);
+
   function getShopListings() {
     const I = window.CASE_ITEMS || {};
     return Object.keys(I)
-      .filter((id) => !I[id].archived && SHOP_TYPES.includes(I[id].type))
+      .filter((id) => !I[id].archived && isShopItem(I[id]))
       .map((id) => {
         const item = I[id];
         return Object.assign({ id, price: shopPrice(item), owned: isOwned(id, item) }, item);
@@ -429,7 +432,7 @@
   function buyItemDirect(itemId) {
     const I = window.CASE_ITEMS || {};
     const item = I[itemId];
-    if (!item || item.archived || !SHOP_TYPES.includes(item.type)) {
+    if (!item || item.archived || !isShopItem(item)) {
       return { ok: false, message: 'That item is not for sale.' };
     }
     if (isOwned(itemId, item)) {

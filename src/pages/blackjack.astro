@@ -494,12 +494,13 @@
      Previously only index.astro loaded this at all, so anything spent/won
      on blackjack/lootbox/minesweeper never synced, and returning to home
      would pull the stale pre-visit cloud snapshot right over it. -->
-<script is:inline src="/cloud-sync.js?v=9"></script>
+<script is:inline src="/game-stats.js?v=1"></script>
+<script is:inline src="/cloud-sync.js?v=10"></script>
 <script is:inline src="/music-library.js?v=13"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/background-library.js?v=13"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
-<script is:inline src="/case-data.js?v=22"></script>
+<script is:inline src="/case-data.js?v=23"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/tycoon-bank.js?v=1"></script>
 <script is:inline src="/strubles.js?v=3"></script>
@@ -775,6 +776,7 @@
     else if (result === 'blackjack') payout = Math.floor(bet * 2.5);
     else if (result === 'push') payout = bet;
     if (payout) Strubles.add(payout);
+    try { GameStats.record('blackjack', result === 'push' ? 'push' : 'win', { net: payout - bet }); } catch {}
     syncBalance();
     if (result === 'win' || result === 'blackjack') playRandomSound('chips-stack', 6);
   }
@@ -974,10 +976,12 @@
       const bet = handBets[i];
       const tag = hasSplit ? `H${i + 1}: ` : '';
       if (pv > 21) {
+        try { GameStats.record('blackjack', 'loss', { net: -bet }); } catch {}
         messages.push(`${tag}Bust 💀`);
       } else if (dv > 21) {
         settle('win', bet); anyWin = true; messages.push(`${tag}Dealer busts — Win 🎉`);
       } else if (dv > pv) {
+        try { GameStats.record('blackjack', 'loss', { net: -bet }); } catch {}
         messages.push(`${tag}Dealer wins 😔`);
       } else if (dv < pv) {
         settle('win', bet); anyWin = true; messages.push(`${tag}Win 🎉`);

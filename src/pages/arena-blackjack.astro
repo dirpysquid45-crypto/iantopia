@@ -233,7 +233,8 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script is:inline src="/cloud-sync.js?v=9"></script>
+<script is:inline src="/game-stats.js?v=1"></script>
+<script is:inline src="/cloud-sync.js?v=10"></script>
 <script is:inline src="/tycoon-bank.js?v=1"></script>
 <script is:inline src="/strubles.js?v=3"></script>
 <script is:inline src="/blackjack-engine.js?v=2"></script>
@@ -284,6 +285,8 @@
   let stakeMode = false;
   let oppName = 'Opponent';
   let friendlyGame = true;
+  let resultCounted = false;   // a resync re-sends the result; count each hand once
+  let currentBetAmount = 0;
   let yourIndex = null;
   let myQueueId = null;
   let prevHandLengths = [0, 0];
@@ -510,6 +513,8 @@
     } else if (msg.type === 'game_start') {
       inGame = true; setQueued(false);
       oppName = msg.opponentName || 'Opponent'; friendlyGame = !!msg.friendly;
+      currentBetAmount = msg.bet || 0;
+      if (!msg.resync) resultCounted = false;
       document.getElementById('opp-label').textContent = oppName + (friendlyGame ? '' : '');
       document.getElementById('net-banner').style.display = 'none';
       yourIndex = msg.yourIndex;
@@ -545,6 +550,13 @@
     } else if (msg.type === 'game_result') {
       if (typeof msg.yourIndex === 'number') yourIndex = msg.yourIndex;
       const result = msg.results[yourIndex];
+      if (!resultCounted) {
+        resultCounted = true;
+        try {
+          GameStats.record('arena_blackjack', result.result === 'win' ? 'win' : result.result === 'push' ? 'push' : 'loss',
+            { friendly: !!msg.friendly, net: msg.friendly ? 0 : (result.payout || 0) - (currentBetAmount || 0) });
+        } catch {}
+      }
       document.getElementById('your-row').classList.remove('active-hand');
       // Keep the table up so both hands can be compared once they are revealed.
       document.getElementById('game-section').style.display = 'block';

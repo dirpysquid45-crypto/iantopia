@@ -79,11 +79,13 @@
     width:min(560px, 92vw);
     text-align:center;
     animation:creditRoll 52s linear infinite;
+    touch-action:pan-y;
     text-shadow:0 2px 10px #000, 0 0 22px #000;
   }
+  #credits:hover, #credits:active{ animation-play-state:paused; }
   @keyframes creditRoll{
     0%   { transform:translateY(0); }
-    100% { transform:translateY(-190%); }
+    100% { transform:translateY(calc(-100% - 100vh)); }
   }
   .cr-title{
     font-size:clamp(34px,7vw,62px); font-weight:900; color:#ffe600;
@@ -246,12 +248,13 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <!-- Headless here (no account UI on this page) — see blackjack.astro for
      why every page needs this now, not just home. -->
-<script is:inline src="/cloud-sync.js?v=9"></script>
+<script is:inline src="/game-stats.js?v=1"></script>
+<script is:inline src="/cloud-sync.js?v=10"></script>
 <script is:inline src="/music-library.js?v=13"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/background-library.js?v=13"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
-<script is:inline src="/case-data.js?v=22"></script>
+<script is:inline src="/case-data.js?v=23"></script>
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/tycoon-bank.js?v=1"></script>
 <script is:inline src="/strubles.js?v=3"></script>
@@ -306,13 +309,86 @@
   const coverts = stats.byTier.covert || 0;
   const best = stats.best ? stats.best.label : 'nothing worth mentioning';
 
+  // Everything below reads what the site has been quietly keeping for this player:
+  // GameStats (games + page visits), the wallet, the village and the inventory.
+  const gs = (window.GameStats && GameStats.load()) || { games: {}, visits: {}, firstSeen: 0 };
+  const game = (name) => Object.assign({ played: 0, won: 0, lost: 0, pushed: 0, net: 0, best: 0, total: 0, friendly: 0 }, gs.games[name] || {});
+  const signed = (v) => (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toLocaleString();
+  const pct = (g) => (g.won + g.lost ? Math.round((g.won / (g.won + g.lost)) * 100) + '%' : '—');
+  const wallet = (() => { try { return Strubles.get(); } catch { return 0; } })();
+  const cap = (() => { try { return window.TycoonBank ? TycoonBank.currentCap() : null; } catch { return null; } })();
+  const village = load('tycoon_village_v2', { b: [] });
+  const built = (village.b || []).filter((x) => x.status === 'complete').length;
+  const horseBest = Number(localStorage.getItem('horse_game_best_v1') || 0);
+
+  // A table game: played / won / lost / tied, win rate and Strubles won or lost.
+  function tableStats(name, opts) {
+    const g = game(name);
+    const out = [row('PLAYED', n(g.played)), row('WON', n(g.won), g.won ? 'rare' : 'v'), row('LOST', n(g.lost))];
+    if (opts && opts.ties) out.push(row('TIED', n(g.pushed)));
+    out.push(row('WIN RATE', pct(g)));
+    if (opts && opts.friendly) out.push(row('FRIENDLY GAMES', n(g.friendly)));
+    if (!opts || opts.money !== false) out.push(row('STRUBLES WON / LOST', signed(g.net)));
+    return out;
+  }
+
+  // Traffic: every page on the site, most-visited first, then any others seen.
+  const PAGES = {
+    '/': 'IANTOPIA (HOME)', '/blackjack': 'BLACKJACK', '/minesweeper': 'MINESWEEPER', '/horse-web-game': 'HORSE GAME',
+    '/arena': 'ARENA LOBBY', '/arena-blackjack': 'ARENA BLACKJACK', '/arena-battleship': 'ARENA BATTLESHIP',
+    '/tycoon': 'MY IANTOPIA', '/lootbox': 'LOOTBOX AND SHOP', '/inventory': 'INVENTORY', '/leaderboard': 'LEADERBOARD',
+    '/news': 'NEWS', '/never': 'IS IANTOPIA DONE', '/suggestions': 'SUGGESTIONS FORUM', '/alternate-ending': 'THE ENDING',
+  };
+  const visits = gs.visits || {};
+  const paths = Object.keys(PAGES).concat(Object.keys(visits).filter((p) => !PAGES[p]));
+  paths.sort((a, b) => (visits[b] || 0) - (visits[a] || 0));
+  const totalVisits = Object.values(visits).reduce((a, v) => a + v, 0);
+  const firstSeen = gs.firstSeen ? new Date(gs.firstSeen).toLocaleDateString() : 'today';
+
   document.getElementById('credits').innerHTML = `
     <div class="cr-title">IANTOPIA</div>
     <div class="cr-sub">an unfinished production</div>
 
-    <div class="cr-head">Your Run</div>
+    <div class="cr-head">Your Wallet</div>
     <div class="cr-rows">${[
+      row('CURRENT STRUBLES', n(wallet), 'rare'),
+      row('WALLET CAP', cap == null ? '—' : n(cap)),
       row('TIME ELAPSED', elapsed()),
+    ].join('\n')}</div>
+
+    <div class="cr-head">Blackjack</div>
+    <div class="cr-rows">${tableStats('blackjack', { ties: true }).join('\n')}</div>
+
+    <div class="cr-head">Minesweeper</div>
+    <div class="cr-rows">${[
+      row('BOARDS PLAYED', n(game('minesweeper').played)),
+      row('CLEARED', n(game('minesweeper').won), game('minesweeper').won ? 'rare' : 'v'),
+      row('EXPLODED', n(game('minesweeper').lost)),
+      row('STRUBLES WON / LOST', signed(game('minesweeper').net)),
+    ].join('\n')}</div>
+
+    <div class="cr-head">Horse Game</div>
+    <div class="cr-rows">${[
+      row('RUNS', n(game('horse').played)),
+      row('BEST RUN', n(Math.max(horseBest, game('horse').best)) + ' cleared', 'rare'),
+      row('OBSTACLES CLEARED', n(game('horse').total)),
+      row('STRUBLES EARNED', n(game('horse').net)),
+    ].join('\n')}</div>
+
+    <div class="cr-head">Dual Mode: Arena Blackjack</div>
+    <div class="cr-rows">${tableStats('arena_blackjack', { ties: true, friendly: true }).join('\n')}</div>
+
+    <div class="cr-head">Dual Mode: Arena Battleship</div>
+    <div class="cr-rows">${tableStats('arena_battleship', { friendly: true }).join('\n')}</div>
+
+    <div class="cr-head">Dual Mode: Total</div>
+    <div class="cr-rows">${[
+      row('GAMES WON', n(game('arena_blackjack').won + game('arena_battleship').won), 'rare'),
+      row('GAMES PLAYED', n(game('arena_blackjack').played + game('arena_battleship').played)),
+    ].join('\n')}</div>
+
+    <div class="cr-head">Lootbox</div>
+    <div class="cr-rows">${[
       row('CASES OPENED', n(stats.opened)),
       row('STRUBLES BURNED', n(stats.spent)),
       row('REFUNDED ON DUPES', n(stats.refunded)),
@@ -320,6 +396,14 @@
       row('COVERTS', n(coverts)),
       row('GOLDS', n(golds), 'rare'),
       row('RAREST PULL', best, 'rare'),
+    ].join('\n')}</div>
+
+    <div class="cr-head">My Iantopia</div>
+    <div class="cr-rows">${[
+      row('BUILDINGS STANDING', n(built)),
+      row('BUILDINGS PLACED', n((village.b || []).length)),
+      row('BUILDINGS OWNED', n(count('buildings'))),
+      row('BANK LEVEL', n(Number(localStorage.getItem('tycoon_bank_level_v1') || 0))),
     ].join('\n')}</div>
 
     <div class="cr-head">Collection</div>
@@ -330,15 +414,33 @@
       row('TRINKETS', n(count('items') + count('badges'))),
     ].join('\n')}</div>
 
+    <div class="cr-head">Traffic (your visits)</div>
+    <div class="cr-rows">${[
+      row('FIRST VISIT', firstSeen),
+      row('TOTAL PAGE VISITS', n(totalVisits), 'rare'),
+      ...paths.map((p) => row(PAGES[p] || p.toUpperCase(), n(visits[p] || 0))),
+    ].join('\n')}</div>
+
     <div class="cr-head">Crew</div>
     <div class="cr-rows">${[
-      row('DIRECTED BY', 'Ian'),
+      row('MAIN DEV', 'Ian Solano'),
+      row('ASSISTANT DEVELOPMENT', 'George Saade'),
+      row('LEAD PRODUCER', 'Chris Dayton'),
+      row('HEAD OF TREASURY', 'Ian Struble'),
       row('CURRENCY BY', 'Strubles'),
       row('FINISHED BY', 'nobody'),
     ].join('\n')}</div>
 
     <div class="cr-end">THE END<small>(it is not the end)</small></div>
   `;
+
+  // The roll's speed is set from its length, so a long list scrolls at a readable
+  // pace instead of flying past. Hover or hold to pause it.
+  (function paceCredits() {
+    const el = document.getElementById('credits');
+    const px = el.scrollHeight + window.innerHeight;
+    el.style.animationDuration = Math.max(52, Math.round(px / 38)) + 's';
+  })();
 
   // --- Theme music (background loop, tied to the mute control) -----------
   // This page had the "Music options" button and full playlist UI wired up

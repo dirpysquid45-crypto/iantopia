@@ -85,6 +85,7 @@ iantopia/
 │   ├── tycoon-art.js             # Pixel art + terrain painting for My Iantopia
 │   ├── arena-client.js           # Shared multiplayer connection layer (guest + signed-in)
 │   ├── blackjack-engine.js       # Shared by the browser and the arena server
+│   ├── game-stats.js             # Per-player stats ledger (games, page visits), read by the credits
 │   ├── patch-notes.js            # Changelog shown on the homepage
 │   ├── tycoon/                   # Web-size building art, icons and terrain (generated)
 │   └── assets/, audio/, video/, backgrounds/, cursors/, horse-game/, ...
@@ -94,8 +95,9 @@ iantopia/
 │   ├── blackjack.js, battleship.js, balance.js, rate-limit.js
 │   └── test/                     # `npm test` in this folder; fake Firestore, no network
 ├── art-source/                   # Large original art, kept out of the deployed site
-│   └── tycoon/                   # Source PNGs (not committed); see scripts/build-tycoon-assets.py
-├── scripts/                      # Build helpers (build-tycoon-assets.py)
+│   ├── tycoon/                   # Source PNGs (not committed); see scripts/build-tycoon-assets.py
+│   └── collectibles/             # Drinks and the bear; see scripts/build-collectibles.py
+├── scripts/                      # Build helpers (build-tycoon-assets.py, build-collectibles.py)
 ├── news-pipeline/                # Python news digest (cron on Qasim)
 ├── admin-scripts/                # One-off Firestore maintenance scripts
 └── youtube-transcript-app/       # Separate webapp (Astro + FastAPI)

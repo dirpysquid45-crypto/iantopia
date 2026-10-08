@@ -281,7 +281,8 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script is:inline src="/cloud-sync.js?v=9"></script>
+<script is:inline src="/game-stats.js?v=1"></script>
+<script is:inline src="/cloud-sync.js?v=10"></script>
 <script is:inline src="/tycoon-bank.js?v=1"></script>
 <script is:inline src="/strubles.js?v=3"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
@@ -735,6 +736,7 @@
     shake = 0.25;
     if (horse.invincible) { horse.invincible = false; powerupTimer = 0; powerupAudio.pause(); }
     deathReason = reason || 'Wiped Out!';
+    try { GameStats.record('horse', 'run', { score: cleared, net: earned }); } catch {}
     if (cleared > best) {
       best = cleared;
       localStorage.setItem(BEST_KEY, String(best));

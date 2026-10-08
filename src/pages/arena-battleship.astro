@@ -319,7 +319,8 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script is:inline src="/cloud-sync.js?v=9"></script>
+<script is:inline src="/game-stats.js?v=1"></script>
+<script is:inline src="/cloud-sync.js?v=10"></script>
 <script is:inline src="/strubles.js?v=3"></script>
 <script is:inline src="/music-library.js?v=13"></script>
 <script is:inline src="/music-position.js?v=1"></script>
@@ -783,8 +784,15 @@
 
   // --------------------------------------------------------------- result
   function onResult(msg) {
+    const firstResult = !S.over;                 // a resync re-sends the result; count the game once
     S.over = true; S.pending = false; S.target = null;
     const mine = msg.results[S.me], won = mine.result === 'win';
+    if (firstResult) {
+      try {
+        GameStats.record('arena_battleship', won ? 'win' : 'loss',
+          { friendly: !!msg.friendly, net: msg.friendly ? 0 : (mine.payout || 0) - (S.bet || 0) });
+      } catch {}
+    }
     if (msg.fleets && msg.fleets[1 - S.me]) {            // reveal where the enemy fleet was hiding
       boards.enemy.layer.innerHTML = '';
       msg.fleets[1 - S.me].forEach((s) => boards.enemy.layer.appendChild(shipEl(s, 'enemy')));

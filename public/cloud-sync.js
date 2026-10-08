@@ -38,6 +38,7 @@
     'strubles_cases_v1',
     'strubles_case_history_v1',
     'strubles_case_stats_v1',
+    'iantopia_stats_v1',
     'strubles_unlocks_v1',
     'strubles_flags_v1',
     'strubles_last_daily_utc_v1',
@@ -84,7 +85,7 @@
     // no guarantee of finishing before the page actually tears down). This
     // is the real cause behind "I picked X, left, came back, it reset."
     'active-background:changed', 'active-track:changed', 'desktop-items:changed',
-    'tycoon:changed', 'building:unlocked',
+    'tycoon:changed', 'building:unlocked', 'stats:changed',
   ];
 
   // Firebase persists the signed-in session, so onAuthStateChanged fires on
@@ -146,6 +147,10 @@
     // this browser's localStorage yet, so scanning local keys alone would
     // silently never pull it down.
     const remoteKeys = Object.keys(data).filter(isSyncKey);
+    // The stats ledger is merged (every counter keeps its larger value) rather
+    // than overwritten, so visits and games played on this device are never lost.
+    const STATS = 'iantopia_stats_v1';
+    if (data[STATS] != null && window.GameStats) data[STATS] = window.GameStats.mergeJSON(local[STATS], data[STATS]);
     const changed = remoteKeys.some((key) => data[key] !== local[key]);
     // onAuthStateChanged re-fires on every page load for a persisted
     // session, not just right after sign-in — without this check we'd
