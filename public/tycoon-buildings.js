@@ -12,7 +12,7 @@ window.TYCOON_BUILDINGS = {
     label: 'Shabby Apartment',
     tier: 'mil_spec',
     img: '/tycoon/shabby-apartment.png',
-    icon: '/tycoon/icons/shabby_apartment.png',
+    icon: '/tycoon/icons/shabby_apartment.png?v=2',
     w: 1, h: 1, zone: 'residential',
     description: "A run-down walk-up that's seen better decades. Barely pays rent, but it's honest work.",
     production: 1,       // Strubles/min once complete
@@ -26,7 +26,7 @@ window.TYCOON_BUILDINGS = {
     label: 'Generic Building',
     tier: 'restricted',
     img: '/tycoon/generic-building.png',
-    icon: '/tycoon/icons/generic_building.png',
+    icon: '/tycoon/icons/generic_building.png?v=2',
     w: 2, h: 1, zone: 'residential',
     description: 'A perfectly ordinary mid-rise. Nobody remembers its name, but the tenants pay on time.',
     // The source art is proportionally wide — contain letterboxed it to
@@ -44,7 +44,7 @@ window.TYCOON_BUILDINGS = {
     label: 'Pagoda',
     tier: 'classified',
     img: '/tycoon/pagoda.png',
-    icon: '/tycoon/icons/pagoda.png',
+    icon: '/tycoon/icons/pagoda.png?v=2',
     w: 2, h: 2, zone: 'residential',
     description: "An ornate tower channeling old-world prosperity. Owning one quietly improves your luck on every Iantopia Lootbox Basic you open afterward.",
     production: 5,
@@ -58,7 +58,7 @@ window.TYCOON_BUILDINGS = {
     label: 'Generic Skyscraper',
     tier: 'covert',
     img: '/tycoon/skyscraper.png',
-    icon: '/tycoon/icons/generic_skyscraper.png',
+    icon: '/tycoon/icons/generic_skyscraper.png?v=2',
     w: 2, h: 2, zone: 'commercial',
     description: 'A gleaming corporate tower. Excellent return on investment, brutal commute for everyone inside.',
     skyscraper: true,
@@ -75,7 +75,7 @@ window.TYCOON_BUILDINGS = {
     label: 'Taipei 101',
     tier: 'exceedingly_rare',
     img: '/tycoon/taipei-101.png',
-    icon: '/tycoon/icons/taipei_101.png',
+    icon: '/tycoon/icons/taipei_101.png?v=2',
     w: 3, h: 3, zone: 'commercial',
     description: 'The crown jewel of the skyline. Owning one is basically bragging rights with a paycheck attached.',
     // Was 20/min -- at up to 5 copies (MAX_PER_TYPE) that's 100/min run
@@ -102,12 +102,12 @@ window.TYCOON_BUILDINGS = {
   bank: {
     capacity: 6,       // people who can be inside at once
     tier: 'mil_spec',
-    img: '/tycoon/art/bank.png',
+    img: '/tycoon/art/bank.png?v=2',
     cover: true,         // drawn on the map from the picture, not the pixel art
     label: 'Bank',
     w: 2, h: 2, zone: 'commercial',
     special: 'bank',
-    icon: '/tycoon/icons/bank.png',
+    icon: '/tycoon/icons/bank.png?v=2',
     description: 'A proper vault, with real marble. You need one standing before you can raise your wallet cap — tap it to open the Bank.',
     production: 3, buildMinutes: 90, cost: 3000, upkeepPct: 0.03,
     moodEffect: 3,
@@ -115,9 +115,9 @@ window.TYCOON_BUILDINGS = {
   seven_eleven: {
     label: '7-Eleven',
     tier: 'restricted',
-    img: '/tycoon/art/seven_eleven.png',
+    img: '/tycoon/art/seven_eleven.png?v=2',
     cover: true,
-    icon: '/tycoon/icons/seven_eleven.png',
+    icon: '/tycoon/icons/seven_eleven.png?v=2',
     w: 2, h: 1, zone: 'commercial',
     capacity: 6,
     food: 20,            // food/min it supplies to residents (needs a road); feeds 20 people
@@ -128,8 +128,8 @@ window.TYCOON_BUILDINGS = {
   park: {
     label: 'Park',
     tier: 'mil_spec',
-    img: '/tycoon/art/park.png',
-    icon: '/tycoon/icons/park.png',
+    img: '/tycoon/art/park.png?v=2',
+    icon: '/tycoon/icons/park.png?v=2',
     cover: true,         // drawn on the map from the picture
     open: true,          // villagers walk around inside it instead of vanishing indoors
     leisure: true,       // villagers flock here at lunch and in the evening
@@ -142,9 +142,9 @@ window.TYCOON_BUILDINGS = {
   office_building: {
     capacity: 8,       // people who can be inside at once
     tier: 'mil_spec',
-    img: '/tycoon/art/office_building.png',
+    img: '/tycoon/art/office_building.png?v=2',
     label: 'Office Building',
-    icon: '/tycoon/icons/office_building.png',
+    icon: '/tycoon/icons/office_building.png?v=2',
     w: 2, h: 2, zone: 'commercial',
     description: 'Glass, open-plan and entirely beige inside. Reliable rent from people who never look up from their screens.',
     production: 4, buildMinutes: 60, cost: 1200, upkeepPct: 0.04,
@@ -153,9 +153,9 @@ window.TYCOON_BUILDINGS = {
   sweatshop: {
     capacity: 10,       // people who can be inside at once
     tier: 'restricted',
-    img: '/tycoon/art/sweatshop.png',
+    img: '/tycoon/art/sweatshop.png?v=2',
     label: 'Sweatshop',
-    icon: '/tycoon/icons/sweatshop.png',
+    icon: '/tycoon/icons/sweatshop.png?v=2',
     w: 2, h: 2, zone: 'industrial',
     description: 'Cheap labour, long hours. It pays far better than it costs to build — and everybody nearby knows it.',
     production: 6, buildMinutes: 50, cost: 900, upkeepPct: 0.05,
@@ -164,9 +164,9 @@ window.TYCOON_BUILDINGS = {
   factory: {
     capacity: 14,       // people who can be inside at once
     tier: 'classified',
-    img: '/tycoon/art/factory.png',
+    img: '/tycoon/art/factory.png?v=2',
     label: 'Factory',
-    icon: '/tycoon/icons/factory.png',
+    icon: '/tycoon/icons/factory.png?v=2',
     w: 3, h: 2, zone: 'industrial',
     description: 'Brick, smokestacks and a loading dock that never stops. Solid output, and the air shows it.',
     production: 10, buildMinutes: 120, cost: 2500, upkeepPct: 0.05,
@@ -175,9 +175,9 @@ window.TYCOON_BUILDINGS = {
   coal_plant: {
     capacity: 8,       // people who can be inside at once
     tier: 'covert',
-    img: '/tycoon/art/coal_plant.png',
+    img: '/tycoon/art/coal_plant.png?v=2',
     label: 'Coal Plant',
-    icon: '/tycoon/icons/coal_plant.png',
+    icon: '/tycoon/icons/coal_plant.png?v=2',
     w: 3, h: 3, zone: 'industrial',
     description: 'Burns the old way. Big, dependable output, and a haze over everything within sight of it.',
     production: 16, buildMinutes: 300, cost: 8000, upkeepPct: 0.06,
@@ -186,9 +186,9 @@ window.TYCOON_BUILDINGS = {
   nuclear_plant: {
     capacity: 8,       // people who can be inside at once
     tier: 'exceedingly_rare',
-    img: '/tycoon/art/nuclear_plant.png',
+    img: '/tycoon/art/nuclear_plant.png?v=2',
     label: 'Nuclear Plant',
-    icon: '/tycoon/icons/nuclear_plant.png',
+    icon: '/tycoon/icons/nuclear_plant.png?v=2',
     w: 3, h: 3, zone: 'industrial',
     description: 'The most output of anything you can build. The neighbours are supportive in public.',
     production: 30, buildMinutes: 720, cost: 40000, upkeepPct: 0.07,
