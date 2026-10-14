@@ -244,7 +244,8 @@
     </div>
 
     <div id="stats-bar">
-      <span>Production: <b id="stat-production">0</b>/min</span>
+      <span title="Gross output of every road-connected building, mood-adjusted. Ranked on the GDP leaderboard.">GDP: <b id="stat-production">0</b>/min</span>
+      <span title="GDP per standing building — rewards a lean, well-run village over a sprawling one. Ranked on the Efficiency leaderboard.">Efficiency: <b id="stat-efficiency">0</b>/bldg</span>
       <span>Buildings: <b id="stat-placed">0/5</b></span>
       <span>Building: <b id="stat-building">0/3</b></span>
       <span>On a road: <b id="stat-road">0/0</b></span>
@@ -1459,7 +1460,16 @@
     drawGhost();
 
     const doneCount = village.b.filter((s) => s.status === 'complete').length;
-    $('stat-production').textContent = Math.floor(totalProduction);
+    // GDP: gross output of the village (mood- and road-connectivity-adjusted,
+    // see productionFor()) — the village's total economic size, same number
+    // that used to be labelled "Production". Efficiency divides that by the
+    // building count, so a lean 5-building village that nets 50/min outranks
+    // a sprawling 20-building one netting 60/min (10/bldg vs 3/bldg) — it
+    // rewards running a tight village over just building more of everything.
+    const gdp = totalProduction;
+    const efficiency = doneCount ? gdp / doneCount : 0;
+    $('stat-production').textContent = Math.floor(gdp);
+    $('stat-efficiency').textContent = efficiency.toFixed(1);
     $('stat-placed').textContent = village.b.length + '/' + slotCap();
     $('stat-building').textContent = buildingCount() + '/' + MAX_CONCURRENT;
     $('stat-road').textContent = onRoadCount + '/' + doneCount;
@@ -1471,7 +1481,7 @@
     $('stat-food').style.color = fs.demand && fs.satisfaction < 1 ? '#ff6b6b' : '';
     $('stat-upkeep').textContent = Math.floor(totalUpkeep);
     syncBalance();
-    maybePushLeaderboardScore(totalProduction - (totalUpkeep / 1440));
+    maybePushLeaderboardScore({ gdp, efficiency, buildings: doneCount, population: fs.pop });
   }
 
   const BOX_COLOR = { residential: '#2f6fd0', commercial: '#e08a1f', industrial: '#7b3fa0', water: '#2b7fd4', erase: '#ff4444' };
@@ -2381,21 +2391,30 @@
     refresh();
   }, 1000);
 
-  // ---------- Leaderboard score push (unchanged) ----------
-  let lastPushedNetProduction = null;
+  // ---------- Leaderboard score push ----------
+  // A one-Taipei-101 village would otherwise top the Efficiency board on a
+  // single building's output; qualified requires a minimum village size so
+  // the board rewards running many buildings well, not owning just one.
+  const EFFICIENCY_MIN_BUILDINGS = 3;
+  let lastPushedKey = null;
   let leaderboardPushInFlight = false;
-  function maybePushLeaderboardScore(netProduction) {
+  function maybePushLeaderboardScore(stats) {
     if (!window.CloudSync || !CloudSync.isSignedIn()) return;
-    if (netProduction === lastPushedNetProduction || leaderboardPushInFlight) return;
+    const key = JSON.stringify(stats);
+    if (key === lastPushedKey || leaderboardPushInFlight) return;
     const user = CloudSync.currentUser;
     if (!user) return;
     leaderboardPushInFlight = true;
     firebase.firestore().collection('leaderboard').doc(user.uid).set({
       displayName: user.displayName || 'Anonymous Tycoon',
-      netProduction: Math.round(netProduction * 1000) / 1000,
+      gdp: Math.round(stats.gdp * 1000) / 1000,
+      efficiency: Math.round(stats.efficiency * 1000) / 1000,
+      buildings: stats.buildings,
+      population: stats.population,
+      qualified: stats.buildings >= EFFICIENCY_MIN_BUILDINGS,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     }, { merge: true })
-      .then(() => { lastPushedNetProduction = netProduction; })
+      .then(() => { lastPushedKey = key; })
       .catch((err) => console.error('[leaderboard] push failed:', err))
       .finally(() => { leaderboardPushInFlight = false; });
   }

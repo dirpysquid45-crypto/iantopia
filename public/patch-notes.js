@@ -8,6 +8,16 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: "2026-10-14",
+    title: "GDP & Efficiency Leaderboards, Leaderboard Fix, Shop Image Fix",
+    changes: [
+      "New leaderboards: GDP ranks villages by total output (the same number shown as GDP in the stats bar), and Efficiency ranks by output per building, so a lean, well-run village can outrank a much bigger sprawling one. Efficiency needs at least 3 buildings to qualify, so a single big building can't top the board alone.",
+      "My Iantopia's \"Production\" stat is now labelled GDP, and there's a new Efficiency readout next to it.",
+      "Fixed: the Leaderboards page's back button went to My Iantopia no matter where you came from (including from the Horse Game). It goes home now, like every other page.",
+      "Fixed: the newer building art (Bank, Office Building, Sweatshop, Factory, Coal Plant, Nuclear Plant, 7-Eleven, Park) had no cache-busting, so a stale cache from an in-progress deploy could keep showing a broken image in the Shop. Versioned now, like every other asset.",
+    ],
+  },
+  {
     date: "2026-10-07",
     title: "The Big Drop: My Iantopia, Arena Overhaul, Collectibles & Credits",
     changes: [
