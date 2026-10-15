@@ -247,6 +247,7 @@
       <span title="Gross output of every road-connected building, adjusted for mood and specialty. Ranked on the GDP leaderboard.">GDP: <b id="stat-production">0</b>/min</span>
       <span title="GDP per standing building — rewards a lean, well-run village over a sprawling one. Ranked on the Efficiency leaderboard.">Efficiency: <b id="stat-efficiency">0</b>/bldg</span>
       <span id="stat-specialty-row" title="A majority of your zoned tiles in one type gives buildings of that type a production bonus, up to +25% fully committed." style="display:none;">Specialty: <b id="stat-specialty">—</b></span>
+      <span id="stat-jobs-row" title="Villagers with a job commute to it on a 9-5 schedule. A workday that's actually staffed lifts village mood a little." style="display:none;">Jobs: <b id="stat-jobs">0</b></span>
       <span>Buildings: <b id="stat-placed">0/5</b></span>
       <span>Building: <b id="stat-building">0/3</b></span>
       <span>On a road: <b id="stat-road">0/0</b></span>
@@ -832,11 +833,41 @@
   }
   let parkJoy = 0;                                // 0..1: how happy the villagers are from time in parks
 
+  // 9 am to 5 pm, with a 1-hour fade at each edge — a plateau, not a spike
+  // like park hours, since a workday is a block of time, not a moment.
+  const WORK_START = 9, WORK_END = 17, WORK_FADE = 1;
+  function workPull(h) {
+    if (h >= WORK_START && h < WORK_END) return 1;
+    if (h >= WORK_START - WORK_FADE && h < WORK_START) return (h - (WORK_START - WORK_FADE)) / WORK_FADE;
+    if (h >= WORK_END && h < WORK_END + WORK_FADE) return 1 - (h - WORK_END) / WORK_FADE;
+    return 0;
+  }
+
   const FOOD_PER_PERSON = 1;
   const MAX_VILLAGERS = 40;                      // sprites drawn at once, a performance ceiling
   const housingOf = (s) => (s.status === 'complete' && DEFS[s.key] && DEFS[s.key].housing) || 0;
   const housingTotal = () => village.b.reduce((a, s) => a + housingOf(s), 0);
   const capacityOf = (key) => (DEFS[key] && DEFS[key].capacity) || 0;
+  // A workplace is anywhere with room to hold people that isn't a home or a
+  // park — offices, shops, factories, plants. Villagers commute there on a
+  // 9-5 schedule; a well-staffed workday lifts village mood a little.
+  const isWorkplace = (key) => { const d = DEFS[key]; return !!(d && d.capacity && !d.housing && !d.leisure); };
+  const jobCount = (id) => { let n = 0; for (const v of villagers) if (v.job === id) n++; return n; };
+  function freeJob() {
+    for (const s of village.b) {
+      if (s.status === 'complete' && isWorkplace(s.key) && jobCount(s.id) < capacityOf(s.key)) return s;
+    }
+    return null;
+  }
+  // null when the village has no workplaces yet (no bonus, no penalty);
+  // otherwise how full those buildings physically are right now, 0..1.
+  function computeStaffing() {
+    const jobs = village.b.filter((s) => s.status === 'complete' && isWorkplace(s.key));
+    const cap = jobs.reduce((a, s) => a + capacityOf(s.key), 0);
+    if (!cap) return null;
+    const present = jobs.reduce((a, s) => a + Math.min(insideCount(s.id), capacityOf(s.key)), 0);
+    return present / cap;
+  }
   function foodStats() {
     let supply = 0;
     village.b.forEach((s) => {
@@ -867,6 +898,11 @@
     // Hungry residents are unhappy residents; a fully fed village gets a small lift.
     const fs = foodStats();
     if (fs.demand > 0) m += fs.satisfaction >= 1 ? 4 : -12 * (1 - fs.satisfaction);
+    // A bustling workday — offices and shops actually full of people during
+    // the 9-5 plateau — lifts mood too, up to +6. No workplaces yet is
+    // neutral, not a penalty: a village doesn't owe anyone a commute.
+    const staffing = computeStaffing();
+    if (staffing != null) m += 6 * staffing * workPull(gameHour());
     // Each building's own footprint on the village: a coal plant is a smell, a
     // bank is reassuring. See `moodEffect` in tycoon-buildings.js.
     done.forEach((s) => { m += (DEFS[s.key] && DEFS[s.key].moodEffect) || 0; });
@@ -1170,6 +1206,19 @@
     return true;
   }
 
+  // Commute to the villager's own job, if they have one and it's still standing.
+  function startJobTrip(v) {
+    if (!v.job) return false;
+    const target = bById.get(v.job);
+    if (!target || target.status !== 'complete') return false;
+    const goals = new Set(entranceTiles(target).map((t) => t.y * MAP + t.x));
+    if (!goals.size) return false;
+    const path = findPath(Math.floor(v.x), Math.floor(v.y), goals);
+    if (!path) return false;
+    v.trip = { id: target.id, path, i: 0, job: true };
+    return true;
+  }
+
   function startTrip(v) {
     const s = chooseDestination(v);
     if (!s) return false;
@@ -1204,7 +1253,7 @@
     const door = entranceTiles(home);
     if (!door.length) return;
     const t = door[Math.floor(Math.random() * door.length)];
-    const v = { x: t.x + 0.5, y: t.y + 0.5, vx: 0, vy: 0, pause: 0.2, home: home.id, inside: null, until: 0, trip: null, tripCool: 2 + Math.random() * 5, lastVisited: null, kind: pickKind() };
+    const v = { x: t.x + 0.5, y: t.y + 0.5, vx: 0, vy: 0, pause: 0.2, home: home.id, job: null, inside: null, until: 0, trip: null, tripCool: 2 + Math.random() * 5, lastVisited: null, kind: pickKind() };
     const h = pickHeading(v);
     v.vx = h.cx; v.vy = h.cy;
     villagers.push(v);
@@ -1237,10 +1286,14 @@
   function stepVillagers(dt) {
     simT += dt;
     const want = villagerCap();
-    // A home that is gone (or not finished) no longer houses anyone.
+    // A home that is gone (or not finished) no longer houses anyone; same
+    // for a job, and jobs are handed out a little slower than homes so a
+    // freshly-built workplace doesn't instantly poach everyone idle.
     villagers.forEach((v) => {
       if (v.home && !housingOf(bById.get(v.home) || {})) v.home = null;
       if (!v.home && Math.random() < dt) { const h = freeHome(); if (h) v.home = h.id; }
+      if (v.job && !isWorkplace((bById.get(v.job) || {}).key)) v.job = null;
+      if (!v.job && Math.random() < dt * 0.5) { const j = freeJob(); if (j) v.job = j.id; }
     });
     spawnClock += dt;
     if (villagers.length < want && spawnClock > 0.8) { spawnClock = 0; spawnVillager(); }
@@ -1267,7 +1320,16 @@
       if (v.inside) {
         const bld = bById.get(v.inside);
         const open = !!(bld && DEFS[bld.key].open);
-        if (simT >= v.until) { v.lastVisited = v.inside; v.inside = null; v.pause = 0.25; v.tripCool = 3 + Math.random() * 6; v.stroll = null; return; }
+        if (simT >= v.until) {
+          // Clocking out of work gets a longer cooldown than any other visit,
+          // so they don't turn straight back around for a second "shift"
+          // the moment workPull is still above the trip-preference threshold.
+          const wasWork = v.inside === v.job;
+          v.lastVisited = v.inside; v.inside = null; v.pause = 0.25;
+          v.tripCool = wasWork ? 20 + Math.random() * 20 : 3 + Math.random() * 6;
+          v.stroll = null;
+          return;
+        }
         if (open) {
           // Wander slowly inside the park's footprint, pausing now and then.
           if (v.pause > 0) { v.pause -= dt; return; }
@@ -1278,6 +1340,8 @@
           else { v.x += (dx / d) * step; v.y += (dy / d) * step; }
         } else if (parkPull(gameHour()) > 0.5 && v.until - simT > 3 && parks().length) {
           v.until = simT + Math.random() * 2.5;   // park hour: wrap up and head out
+        } else if (v.inside === v.job && workPull(gameHour()) < 0.3 && v.until - simT > 3) {
+          v.until = simT + Math.random() * 2.5;   // the workday's over: clock out
         }
         return;
       }
@@ -1304,6 +1368,11 @@
                 // A park: stay out in the open, strolling about, for a good while.
                 v.until = simT + 10 + Math.random() * 14;
                 v.stroll = null; v.pause = 0;
+              } else if (t.job && target.id === v.job) {
+                // A shift: stay until clock-out (the early-exit check above
+                // ends it the moment work hours are over, so this ceiling
+                // rarely matters — it just bounds a villager hired mid-shift).
+                v.until = simT + 30 + Math.random() * 20;
               } else v.until = simT + (target.id === v.home ? 8 + Math.random() * 12 : 4 + Math.random() * 8);
             } else v.pause = 0.4;   // it filled up while they walked: turn away
           }
@@ -1313,10 +1382,14 @@
 
       // Otherwise wander, and every so often decide to go somewhere.
       const pull = parks().length ? parkPull(gameHour()) : 0;
-      v.tripCool -= dt * (1 + 5 * pull);              // at park hour the urge to set off comes six times as often
+      const workNow = v.job ? workPull(gameHour()) : 0;
+      v.tripCool -= dt * (1 + 5 * Math.max(pull, workNow));   // park or work hours: the urge to set off comes more often
       if (v.tripCool <= 0) {
         v.tripCool = 5 + Math.random() * 9;
         if (pull > 0.3 && Math.random() < 0.55 + 0.4 * pull && startParkTrip(v)) return;
+        // The commute wins out over a casual trip once the workday's on —
+        // a job-holder doesn't wander into a shop instead of going to work.
+        if (workNow > 0.5 && Math.random() < 0.5 + 0.4 * workNow && startJobTrip(v)) return;
         if (startTrip(v)) return;
       }
       // Roads are the nice place to be, so walking one is slower (lingering).
@@ -1502,6 +1575,12 @@
     if (specialty) {
       const icon = { residential: '🏘️', commercial: '🏬', industrial: '🏭' }[specialty.type];
       $('stat-specialty').textContent = `${icon} ${BRUSH_LABEL[specialty.type]} (+${Math.round(specialty.bonus * 100)}%)`;
+    }
+    const jobCap = village.b.reduce((a, s) => a + (s.status === 'complete' && isWorkplace(s.key) ? capacityOf(s.key) : 0), 0);
+    $('stat-jobs-row').style.display = jobCap ? '' : 'none';
+    if (jobCap) {
+      const filled = village.b.reduce((a, s) => a + (s.status === 'complete' && isWorkplace(s.key) ? Math.min(jobCount(s.id), capacityOf(s.key)) : 0), 0);
+      $('stat-jobs').textContent = `${filled}/${jobCap}`;
     }
     $('stat-placed').textContent = village.b.length + '/' + slotCap();
     $('stat-building').textContent = buildingCount() + '/' + MAX_CONCURRENT;
@@ -2204,6 +2283,7 @@
     const bits = [];
     if (def.leisure) bits.push(`In the park now ${insideCount(s.id)}/${def.capacity} · villager happiness ${Math.round(parkJoy * 100)}%`);
     else if (def.housing) bits.push(`Residents ${homeCount(s.id)}/${def.housing} · inside now ${insideCount(s.id)}`);
+    else if (isWorkplace(s.key)) bits.push(`Workers ${jobCount(s.id)}/${def.capacity} · on shift now ${insideCount(s.id)} (9 am – 5 pm)`);
     else if (def.capacity) bits.push(`Inside now ${insideCount(s.id)}/${def.capacity}`);
     const road = isRoadConnected(s);
     if (def.food) bits.push(`Feeds up to ${def.food} residents${road ? '' : ' — needs a road touching it'}`);
@@ -2285,6 +2365,11 @@
         <div class="row-icon">🌳</div>
         <div class="row-info"><b>Parks and the time of day.</b>
           <small>The village has its own clock (a day lasts 8 real minutes, shown in the stats bar). Around 12 pm and 6 pm villagers drop what they are doing and head for a park, where they wander about in the open. Time spent in a park makes villagers happy (a pink heart), and a happy village earns more through mood. A park needs 3×3 residential zoning and earns nothing itself.</small></div>
+      </div>
+      <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">💼</div>
+        <div class="row-info"><b>Jobs and the commute.</b>
+          <small>Offices, shops, factories and plants are workplaces: any villager without a job is slowly hired into one with room, up to its capacity. From 9 am to 5 pm, job-holders commute there and clock in instead of wandering; after 5 pm they head home or out, same as anyone else. A workday that's actually staffed — not just zoned — lifts village mood a little, shown as the Jobs readout in the stats bar.</small></div>
       </div>
       <div class="guide-row" style="align-items:flex-start;">
         <div class="row-icon">↩️</div>
@@ -2474,7 +2559,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // Test hook for the browser suites; only exists in dev mode.
-  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty };
+  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing };
 })();
 </script>
 </body>
