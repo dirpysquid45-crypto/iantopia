@@ -1672,6 +1672,7 @@
     $('stat-upkeep').textContent = Math.floor(totalUpkeep);
     syncBalance();
     maybePushLeaderboardScore({ gdp, efficiency, buildings: doneCount, population: fs.pop, specialty: specialty ? specialty.type : null });
+    maybePushVillageSnapshot({ gdp, efficiency, population: fs.pop, mood, specialty: specialty ? specialty.type : null });
   }
 
   const BOX_COLOR = { residential: '#2f6fd0', commercial: '#e08a1f', industrial: '#7b3fa0', water: '#2b7fd4', erase: '#ff4444' };
@@ -2482,6 +2483,11 @@
           <small>Every so often, something happens. A fire can break out — more likely in industrial buildings, less likely if you've zoned any water — and stops that building earning until it burns out on its own or you pay to put it out. A trade caravan can pass through for a one-time windfall. An audit can catch a village that's let its upkeep slide and double what's owed. None of it can end your village — it's there to keep a thriving one on its toes.</small></div>
       </div>
       <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">👁️</div>
+        <div class="row-info"><b>Other villages, signed in.</b>
+          <small>Signed in, your village is visible to others as a read-only snapshot — click a name on the GDP or Efficiency leaderboard to drop in and look around, no interaction, just a look. You can do the same to anyone else's. ❤️ Like one if you want to say so.</small></div>
+      </div>
+      <div class="guide-row" style="align-items:flex-start;">
         <div class="row-icon">↩️</div>
         <div class="row-info"><b>Drag to zone, refunds on removal.</b>
           <small>Pick a zone and drag a box across the map to fill an area; the price is shown before you let go. Erasing a zone, or removing a building, pays back what you paid. Removing anything above Mil-Spec asks you to confirm first. Made a mistake? ↩ Undo (or Ctrl/Cmd+Z) reverses your last 30 zoning, road, build, move and remove actions, money included.</small></div>
@@ -2654,6 +2660,42 @@
       .then(() => { lastPushedKey = key; })
       .catch((err) => console.error('[leaderboard] push failed:', err))
       .finally(() => { leaderboardPushInFlight = false; });
+  }
+
+  // ---------- Neighbor visits ----------
+  // A read-only snapshot of the village (same trust model as the leaderboard
+  // push above: the client reports it, nobody validates it — this site
+  // already works that way end to end). /visit renders it with the same
+  // terrain/building art, no interaction. Throttled hard: this payload
+  // carries the whole tile map, not just a couple of numbers, so it pushes
+  // at most once every 30s and only when something actually changed.
+  const SNAPSHOT_MIN_INTERVAL_MS = 30000;
+  let lastSnapshotPush = 0, lastSnapshotKey = null, snapshotPushInFlight = false;
+  function maybePushVillageSnapshot(stats) {
+    if (!window.CloudSync || !CloudSync.isSignedIn()) return;
+    const user = CloudSync.currentUser;
+    if (!user) return;
+    const buildings = village.b.map((s) => ({ id: s.id, key: s.key, x: s.x, y: s.y, status: s.status, fireUntil: s.fireUntil || 0 }));
+    const payload = { tiles: village.tiles, buildings, ...stats };
+    const key = JSON.stringify(payload);
+    if (key === lastSnapshotKey) return;
+    const now = Date.now();
+    if (now - lastSnapshotPush < SNAPSHOT_MIN_INTERVAL_MS || snapshotPushInFlight) return;
+    snapshotPushInFlight = true;
+    firebase.firestore().collection('village_snapshots').doc(user.uid).set({
+      displayName: user.displayName || 'Anonymous Tycoon',
+      tiles: payload.tiles,
+      buildings: payload.buildings,
+      gdp: Math.round(stats.gdp * 1000) / 1000,
+      efficiency: Math.round(stats.efficiency * 1000) / 1000,
+      population: stats.population,
+      mood: Math.round(stats.mood),
+      specialty: stats.specialty,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    })
+      .then(() => { lastSnapshotKey = key; lastSnapshotPush = Date.now(); })
+      .catch((err) => console.error('[village-snapshot] push failed:', err))
+      .finally(() => { snapshotPushInFlight = false; });
   }
 
   // Read-only introspection for QA (same idea as window.HorseGame).

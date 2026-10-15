@@ -1,0 +1,313 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Visiting — Iantopia</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#0a0c12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script is:inline src="/pwa.js?v=1" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style is:global>
+  :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; }
+  body {
+    height:100dvh;
+    display:flex; flex-direction:column;
+    color:var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+    cursor:none;
+    position:relative;
+    overflow:hidden;
+    background:#0f1115;
+  }
+  main {
+    position:relative; z-index:2; max-width:1200px; width:100%; margin:0 auto;
+    padding:16px 20px;
+    flex:1 1 auto; min-height:0;
+    display:flex; flex-direction:column;
+  }
+  header { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; border-bottom:4px solid #000; padding-bottom:10px; gap:10px; flex-wrap:wrap; }
+  header a, .btn { color:var(--gold); text-decoration:none; border:3px solid #000; padding:8px 12px; font-weight:700; background:#000; transition:background 0.2s; font-size:10px; cursor:none; font-family:inherit; }
+  header a:hover, .btn:hover { background:var(--gold); color:#000; }
+  .btn:disabled { opacity:.5; pointer-events:none; }
+  .btn.liked { background:var(--gold); color:#000; }
+  h1 { margin:0; font-size:clamp(11px,2.4vw,16px); letter-spacing:1px; color:var(--gold); font-weight:400; text-shadow:2px 2px 0 #000; text-align:center; flex:1; }
+
+  #stats-bar {
+    display:flex; flex-wrap:wrap; gap:6px 16px; background:rgba(0,0,0,.4); border:2px solid var(--gold);
+    padding:10px 14px; margin-bottom:12px; font-size:9px; color:#fff;
+  }
+  #stats-bar b { color:var(--gold); }
+  #stats-bar .stale { color:#ff8a65; }
+
+  #game-stage {
+    position:relative; flex:1 1 auto; min-height:260px;
+    border:3px solid #000; outline:2px solid var(--gold); outline-offset:-2px;
+    background:rgba(4,12,8,.34); overflow:hidden; touch-action:none;
+  }
+  #game-stage canvas { display:block; touch-action:none; }
+
+  #msg {
+    display:none; flex:1 1 auto; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+    text-align:center; padding:30px; font-size:11px; color:var(--muted); line-height:1.8;
+  }
+  #msg.show { display:flex; }
+
+  @media (max-width:768px) {
+    main { padding:10px 12px; }
+    header a, .btn { font-size:9px; padding:6px 10px; }
+    #stats-bar { font-size:8px; gap:4px 12px; }
+  }
+</style>
+</head>
+<body>
+  <main>
+    <header>
+      <a href="/leaderboard" title="Back to Leaderboards">← Leaderboards</a>
+      <h1 id="page-title">VISITING</h1>
+      <button class="btn" id="like-btn" style="display:none;" type="button">♡ Like</button>
+    </header>
+
+    <div id="stats-bar" style="display:none;">
+      <span>GDP: <b id="stat-gdp">0</b>/min</span>
+      <span>Efficiency: <b id="stat-efficiency">0</b>/bldg</span>
+      <span>Specialty: <b id="stat-specialty">—</b></span>
+      <span>Population: <b id="stat-pop">0</b></span>
+      <span>Mood: <b id="stat-mood">—</b></span>
+      <span id="stat-likes-row">Likes: <b id="stat-likes">0</b></span>
+      <span>Last updated: <b id="stat-updated">—</b></span>
+    </div>
+
+    <div id="game-stage"></div>
+    <div id="msg"></div>
+  </main>
+
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/game-stats.js?v=1"></script>
+<script is:inline src="/cloud-sync.js?v=10"></script>
+<script is:inline src="/tycoon-buildings.js?v=13"></script>
+<script is:inline src="/tycoon-art.js?v=4"></script>
+<!-- Pinned exact version: Phaser 4 is new (Apr 2026), don't float it. -->
+<script is:inline src="https://cdn.jsdelivr.net/npm/phaser@4.0.0/dist/phaser.min.js"></script>
+<script is:inline>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const DEFS = window.TYCOON_BUILDINGS;
+  const MAP = 16, T = TycoonArt.T;
+  const foot = (key) => { const d = DEFS[key]; return { w: (d && d.w) || 1, h: (d && d.h) || 1 }; };
+
+  function showMessage(html) {
+    $('msg').innerHTML = html;
+    $('msg').classList.add('show');
+    $('game-stage').style.display = 'none';
+  }
+
+  const uid = new URLSearchParams(location.search).get('uid');
+  if (!uid) { showMessage('No village picked.<br><small>Visit one from the <a href="/leaderboard" style="color:var(--gold);">Leaderboards</a> — click a name to drop in.</small>'); return; }
+
+  let currentUser = null, liked = false, likeCount = 0;
+  window.addEventListener('cloudsync:authchanged', (e) => {
+    currentUser = e.detail && e.detail.user;
+    if (currentUser && currentUser.uid === uid) {
+      $('like-btn').style.display = 'none';   // can't like your own village
+    } else if (snapshot) {
+      $('like-btn').style.display = '';
+      refreshLikeButton();
+    }
+  });
+
+  let snapshot = null;
+  const db = () => firebase.firestore();
+
+  function refreshLikeButton() {
+    $('like-btn').disabled = !currentUser;
+    $('like-btn').title = currentUser ? '' : 'Sign in to like a village';
+    $('like-btn').textContent = (liked ? '♥ Liked' : '♡ Like') + (likeCount ? ` (${likeCount})` : '');
+    $('like-btn').classList.toggle('liked', liked);
+  }
+
+  function loadLikes() {
+    db().collection('village_snapshots').doc(uid).collection('likes').get().then((snap) => {
+      likeCount = snap.size;
+      liked = currentUser ? snap.docs.some((d) => d.id === currentUser.uid) : false;
+      $('stat-likes').textContent = likeCount;
+      refreshLikeButton();
+    }).catch((err) => console.error('[visit] likes failed:', err));
+  }
+
+  $('like-btn').addEventListener('click', () => {
+    if (!currentUser || currentUser.uid === uid) return;
+    const ref = db().collection('village_snapshots').doc(uid).collection('likes').doc(currentUser.uid);
+    const next = !liked;
+    liked = next; likeCount += next ? 1 : -1;        // optimistic
+    $('stat-likes').textContent = likeCount;
+    refreshLikeButton();
+    (next ? ref.set({ likedAt: firebase.firestore.FieldValue.serverTimestamp() }) : ref.delete())
+      .catch((err) => { console.error('[visit] like failed:', err); loadLikes(); });  // reconcile on failure
+  });
+
+  function timeAgo(ms) {
+    const s = Math.max(0, (Date.now() - ms) / 1000);
+    if (s < 90) return 'just now';
+    if (s < 3600) return Math.round(s / 60) + ' min ago';
+    if (s < 86400) return Math.round(s / 3600) + ' hr ago';
+    return Math.round(s / 86400) + ' days ago';
+  }
+
+  db().collection('village_snapshots').doc(uid).get().then((doc) => {
+    if (!doc.exists) {
+      showMessage('This village hasn\'t been out in public yet.<br><small>It shows up here once its owner has opened My Iantopia.</small>');
+      return;
+    }
+    snapshot = doc.data();
+    $('page-title').textContent = `👁️ VISITING ${(snapshot.displayName || 'A TYCOON').toUpperCase()}`;
+    $('stats-bar').style.display = '';
+    $('stat-gdp').textContent = Number(snapshot.gdp || 0).toLocaleString(undefined, { maximumFractionDigits: 1 });
+    $('stat-efficiency').textContent = Number(snapshot.efficiency || 0).toFixed(1);
+    const icon = { residential: '🏘️', commercial: '🏬', industrial: '🏭' }[snapshot.specialty];
+    $('stat-specialty').textContent = snapshot.specialty ? `${icon} ${snapshot.specialty[0].toUpperCase()}${snapshot.specialty.slice(1)}` : '—';
+    $('stat-pop').textContent = snapshot.population || 0;
+    $('stat-mood').textContent = Number.isFinite(snapshot.mood) ? snapshot.mood + '%' : '—';
+    const updatedMs = snapshot.updatedAt && snapshot.updatedAt.toMillis ? snapshot.updatedAt.toMillis() : Date.now();
+    const updEl = $('stat-updated');
+    updEl.textContent = timeAgo(updatedMs);
+    if (Date.now() - updatedMs > 3600e3 * 6) updEl.classList.add('stale');
+    if (currentUser === undefined || (currentUser && currentUser.uid !== uid)) { $('like-btn').style.display = ''; }
+    loadLikes();
+    startRenderer(snapshot);
+  }).catch((err) => {
+    console.error('[visit] load failed:', err);
+    showMessage('Couldn\'t load that village.<br><small>' + (err.code === 'permission-denied' ? 'Visits aren\'t turned on yet — check back soon!' : 'Try again in a moment.') + '</small>');
+  });
+
+  // ---------- Minimal read-only renderer ----------
+  // Reuses TycoonArt's own terrain/water painters and building baker — the
+  // exact same pixels as the live game, just with no economy, no villagers,
+  // no input beyond pan/zoom. A snapshot is a photo, not a second simulation.
+  function startRenderer(snap) {
+    const tiles = snap.tiles || {};
+    const getTile = (x, y) => (x < 0 || y < 0 || x >= MAP || y >= MAP) ? null : (tiles[x + '_' + y] || null);
+    const buildings = (snap.buildings || []).filter((s) => s.status === 'complete' && DEFS[s.key]);
+    const occ = new Set();
+    buildings.forEach((s) => { const f = foot(s.key); for (let y = s.y; y < s.y + f.h; y++) for (let x = s.x; x < s.x + f.w; x++) occ.add(y * MAP + x); });
+
+    const TERRAIN_PX = 64, WATER_PX = 32, COVER_RES = 4;
+    const art = TycoonArt.preload();
+
+    function create() {
+      const scene = this;
+      const cam = scene.cameras.main;
+      const terrainTex = scene.textures.createCanvas('terrain', MAP * TERRAIN_PX, MAP * TERRAIN_PX);
+      scene.add.image(0, 0, 'terrain').setOrigin(0, 0).setScale(T / TERRAIN_PX).setDepth(0);
+      const waterTex = scene.textures.createCanvas('water', MAP * WATER_PX, MAP * WATER_PX);
+      const waterImg = scene.add.image(0, 0, 'water').setOrigin(0, 0).setScale(T / WATER_PX).setDepth(1).setVisible(false);
+      const terrainPainter = TycoonArt.createTerrainPainter({ canvas: terrainTex.getCanvas(), map: MAP, px: TERRAIN_PX, images: art.images, getTile, isCovered: (x, y) => occ.has(y * MAP + x) });
+      const waterPainter = TycoonArt.createWaterPainter({ canvas: waterTex.getCanvas(), map: MAP, px: WATER_PX, images: art.images, getTile });
+      const WATER_STEP_MS = 120;
+      let waterFrame = 0, waterClock = 0;
+      const paintAll = () => {
+        terrainPainter.redraw(); terrainTex.refresh();
+        waterPainter.rescan();
+        waterImg.setVisible(waterPainter.hasWater());
+        waterPainter.draw(waterFrame); waterTex.refresh();
+      };
+      paintAll();
+      art.promise.then(paintAll);   // flat fallback first, then real textures once they load
+      scene.events.on('update', (time, delta) => {
+        if (!waterPainter.hasWater()) return;
+        waterClock += delta;
+        if (waterClock < WATER_STEP_MS) return;
+        waterClock = 0;
+        waterFrame = (waterFrame + 1) % waterPainter.frames;
+        waterPainter.draw(waterFrame); waterTex.refresh();
+      });
+
+      buildings.forEach((s) => {
+        const f = foot(s.key), def = DEFS[s.key];
+        const tk = 'bld_' + s.key;
+        if (!scene.textures.exists(tk)) {
+          const small = TycoonArt.bake(s.key, f.w, f.h);
+          if (def.cover) {
+            const big = document.createElement('canvas');
+            big.width = small.width * COVER_RES; big.height = small.height * COVER_RES;
+            const tex = scene.textures.addCanvas(tk, big);
+            tex.setFilter(Phaser.Textures.FilterMode.LINEAR);
+            const ctx = big.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(small, 0, 0, big.width, big.height);
+            tex.refresh();
+            const img = new Image();
+            img.onload = () => {
+              ctx.clearRect(0, 0, big.width, big.height);
+              ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+              const k = Math.min(big.width / img.width, big.height / img.height);
+              const w = img.width * k, h = img.height * k;
+              ctx.drawImage(img, (big.width - w) / 2, big.height - h, w, h);
+              tex.refresh();
+            };
+            img.src = def.img;
+          } else {
+            scene.textures.addCanvas(tk, small);
+          }
+        }
+        const scale = def.cover ? 1 / COVER_RES : 1;
+        const sp = scene.add.image(s.x * T, s.y * T - TycoonArt.PAD_TOP, tk).setOrigin(0, 0).setScale(scale);
+        sp.setDepth(10 + s.y + f.h);
+        if (s.fireUntil && s.fireUntil > Date.now()) sp.setTint(0xff9a66);
+      });
+
+      // Pan (drag) and zoom (wheel/pinch) only — no placement, no clicks on buildings.
+      const fitZoom = () => Math.max(0.5, Math.min(cam.width / (MAP * T + 48), cam.height / (MAP * T + 48)));
+      let camCX = (MAP * T) / 2, camCY = (MAP * T) / 2;
+      const clamp = () => {
+        const z = cam.zoom, halfW = cam.width / (2 * z), halfH = cam.height / (2 * z);
+        const pad = T * 2;
+        camCX = Math.max(-pad + halfW, Math.min(MAP * T + pad - halfW, camCX));
+        camCY = Math.max(-pad + halfH, Math.min(MAP * T + pad - halfH, camCY));
+        cam.centerOn(camCX, camCY);
+      };
+      cam.setZoom(fitZoom()); clamp();
+      let down = null, pinchD0 = null, zoom0 = 1;
+      scene.input.addPointer(1);
+      scene.input.on('pointerdown', (p) => { down = { x: p.x, y: p.y }; });
+      scene.input.on('pointermove', (p) => {
+        if (scene.input.pointer1 && scene.input.pointer1.isDown && scene.input.pointer2 && scene.input.pointer2.isDown) {
+          const d = Phaser.Math.Distance.Between(scene.input.pointer1.x, scene.input.pointer1.y, scene.input.pointer2.x, scene.input.pointer2.y);
+          if (pinchD0 == null) { pinchD0 = d; zoom0 = cam.zoom; } else { cam.setZoom(Math.max(fitZoom() * 0.75, Math.min(8, zoom0 * (d / pinchD0)))); clamp(); }
+          return;
+        }
+        pinchD0 = null;
+        if (!down || !p.isDown) return;
+        camCX -= (p.x - down.x) / cam.zoom; camCY -= (p.y - down.y) / cam.zoom;
+        down = { x: p.x, y: p.y };
+        clamp();
+      });
+      scene.input.on('pointerup', () => { down = null; pinchD0 = null; });
+      scene.game.canvas.addEventListener('wheel', (e) => { e.preventDefault(); cam.setZoom(Math.max(fitZoom() * 0.75, Math.min(8, cam.zoom * (e.deltaY < 0 ? 1.1 : 0.9)))); clamp(); }, { passive: false });
+      scene.scale.on('resize', () => { cam.setZoom(fitZoom()); clamp(); });
+    }
+
+    new Phaser.Game({
+      type: Phaser.AUTO, parent: 'game-stage', transparent: true, pixelArt: true,
+      scale: { mode: Phaser.Scale.RESIZE, width: '100%', height: '100%' },
+      scene: { create },
+    });
+  }
+})();
+</script>
+</body>
+</html>

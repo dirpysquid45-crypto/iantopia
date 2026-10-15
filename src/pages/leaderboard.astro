@@ -84,6 +84,10 @@
   .leaderboard-rank { color:var(--gold); font-weight:700; text-align:center; }
   .leaderboard-name { color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .specialty-badge { margin-right:4px; }
+  .leaderboard-row.visitable { cursor:pointer; }
+  .leaderboard-row.visitable:hover { background:rgba(255,215,0,.16); }
+  .visit-hint { display:inline-block; margin-left:6px; color:var(--gold); opacity:0; transition:opacity .15s; }
+  .leaderboard-row.visitable:hover .visit-hint { opacity:0.85; }
   .leaderboard-score { color:var(--muted); text-align:right; display:flex; flex-direction:column; gap:2px; line-height:1.3; }
   .leaderboard-score small { color:#6a7690; font-size:0.8em; }
 
@@ -150,14 +154,14 @@
   const EFFICIENCY_MIN_BUILDINGS = 3;
   const BOARDS = {
     gdp: {
-      collection: 'leaderboard', field: 'gdp',
+      collection: 'leaderboard', field: 'gdp', visitable: true,
       empty: 'No villages ranked yet — be the first!',
       fallbackName: 'Anonymous Tycoon',
       format: (v) => `${Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}/min`,
       sub: (d) => `${Number(d.buildings || 0)} building${d.buildings === 1 ? '' : 's'}`,
     },
     efficiency: {
-      collection: 'leaderboard', field: 'efficiency', requireQualified: true,
+      collection: 'leaderboard', field: 'efficiency', requireQualified: true, visitable: true,
       empty: `No villages ranked yet — build at least ${EFFICIENCY_MIN_BUILDINGS} buildings to qualify!`,
       fallbackName: 'Anonymous Tycoon',
       format: (v) => `${Number(v || 0).toFixed(1)}/bldg`,
@@ -198,15 +202,22 @@
       // little badge next to its name — see computeSpecialty() in tycoon.astro.
       const badge = data.specialty && SPECIALTY_ICON[data.specialty]
         ? `<span class="specialty-badge" title="${data.specialty[0].toUpperCase()}${data.specialty.slice(1)} specialty">${SPECIALTY_ICON[data.specialty]}</span>` : '';
+      // GDP/Efficiency rows link to a read-only visit of that village; the
+      // horse board has no village behind it, so it stays unclickable.
+      const visitable = board.visitable && !isCurrentUser;
       return `
-        <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}">
+        <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}${visitable ? ' visitable' : ''}" ${visitable ? `data-uid="${doc.id}"` : ''}>
           <div class="leaderboard-rank">#${rank}</div>
-          <div class="leaderboard-name">${badge}${name}</div>
+          <div class="leaderboard-name">${badge}${name}${visitable ? ' <small class=\"visit-hint\">👁️ visit</small>' : ''}</div>
           <div class="leaderboard-score">${board.format(data[board.field])}${sub}</div>
         </div>
       `;
     }).join('');
   }
+  listEl.addEventListener('click', (e) => {
+    const row = e.target.closest('.leaderboard-row[data-uid]');
+    if (row) location.href = '/visit?uid=' + encodeURIComponent(row.dataset.uid);
+  });
 
   function loadBoard(key) {
     activeBoard = key;
