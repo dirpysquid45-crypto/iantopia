@@ -641,6 +641,7 @@
   function tick() {
     const now = Date.now();
     const mood = computeMood();
+    const specialty = computeSpecialty();
     let earned = 0, changed = false;
     village.b.forEach((slot) => {
       const def = DEFS[slot.key];
@@ -662,7 +663,7 @@
         }
       } else if (slot.status === 'complete') {
         if (slot.lastTaxAt == null) { slot.lastTaxAt = now; slot.taxDebt = 0; changed = true; }
-        const eff = productionFor(slot, mood);
+        const eff = productionFor(slot, mood, specialty);
         if (eff <= 0) {
           // Unproductive time is forfeited, not banked — otherwise cutting a
           // building off the road network and reconnecting it a day later
@@ -2559,7 +2560,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // Test hook for the browser suites; only exists in dev mode.
-  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing };
+  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood };
 })();
 </script>
 </body>
