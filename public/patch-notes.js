@@ -9,12 +9,13 @@
 window.PATCH_NOTES = [
   {
     date: "2026-10-15",
-    title: "Village Specialization, Jobs & Commutes",
+    title: "Village Specialization, Jobs, Commutes & Random Events",
     changes: [
       "Specialize your village: once at least 9 tiles are zoned, a clear majority (50%+) committed to one zone type gives buildings of that type a production bonus, up to +25% fully committed. A balanced village of all three zones gets no bonus — leaning in is what's rewarded.",
       "Your specialty (if any) shows in the stats bar, in a building's own panel, and as a small badge next to your name on the GDP and Efficiency leaderboards.",
       "Villagers get jobs: any villager without one is hired into a nearby office, shop, factory or plant with room. From 9 am to 5 pm they commute to work and clock in instead of wandering; after hours they head home or out like anyone else.",
       "A workday that's actually staffed lifts village mood a little — a new Jobs readout in the stats bar shows how many positions are filled.",
+      "Random events: a fire can break out (more likely in industrial buildings, less likely with any water zoned) and halts that building's production until it burns out or you pay to put it out. A trade caravan can bring a one-time windfall. An audit can catch a village that's let its upkeep slide and double what's owed. Nothing here can end your village — it just keeps a thriving one on its toes.",
     ],
   },
   {

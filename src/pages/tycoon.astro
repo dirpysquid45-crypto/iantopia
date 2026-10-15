@@ -308,6 +308,7 @@
       <div id="manage-info"></div>
       <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
         <button class="btn" id="manage-bank" type="button" style="display:none;">🏦 Open Bank</button>
+        <button class="btn" id="manage-firefight" type="button" style="display:none;">🚒 Put it out</button>
         <button class="btn" id="manage-move" type="button">✋ Move</button>
         <button class="btn" id="manage-remove" type="button">🗑️ Remove</button>
       </div>
@@ -919,12 +920,79 @@
   function productionFor(s, mood, specialty) {
     const def = DEFS[s.key];
     if (!def || s.status !== 'complete') return 0;
+    if (s.fireUntil > Date.now()) return 0;    // on fire: nothing ships until it's out
     if (!isRoadConnected(s)) return 0; // no road, no business
     let p = def.production;
     if (touchesTile(s, 'industrial')) p *= 1 + INDUSTRIAL_BONUS;
     if (specialty && def.zone === specialty.type) p *= 1 + specialty.bonus;
     if (s.taxDebt > 0) p *= 0.5;
     return p * moodMultiplier(mood);
+  }
+
+  // ---------- Events ----------
+  // Rare random events test a village the way Kingdoms & Castles' fires and
+  // raids do, but stay small and reversible — this is a casual builder, not
+  // a game you can lose. Rolled roughly every 4 minutes of active play
+  // (never while the economy is frozen, never on an empty lot).
+  const EVENT_CHANCE_PER_SEC = 1 / 240;
+  const FIRE_DURATION_MS = 90 * 1000;
+  const FIRE_REPAIR_RATE = 0.1;  // Strubles to put one out early, as a fraction of the building's cost
+
+  function estimateGDP() {
+    const m = computeMood(), specialty = computeSpecialty();
+    let total = 0;
+    village.b.forEach((s) => { if (s.status === 'complete') total += productionFor(s, m, specialty); });
+    return total;
+  }
+
+  // Industrial buildings catch fire 3x as readily; a village with any water
+  // zoned is half as likely to have a fire event roll at all (a nod to fire
+  // safety without needing real building-to-water adjacency geometry).
+  function triggerFire() {
+    const candidates = village.b.filter((s) => s.status === 'complete' && !DEFS[s.key].leisure && !(s.fireUntil > Date.now()));
+    if (!candidates.length) return false;
+    const weighted = candidates.map((s) => ({ s, w: (touchesTile(s, 'industrial') || DEFS[s.key].zone === 'industrial') ? 3 : 1 }));
+    const total = weighted.reduce((a, x) => a + x.w, 0);
+    let r = Math.random() * total, chosen = weighted[weighted.length - 1].s;
+    for (const x of weighted) { r -= x.w; if (r <= 0) { chosen = x.s; break; } }
+    chosen.fireUntil = Date.now() + FIRE_DURATION_MS;
+    toast(`🔥 Fire at the ${DEFS[chosen.key].label}! No production until it's out.`, true);
+    saveVillage();
+    return true;
+  }
+
+  function triggerCaravan() {
+    const bonus = Math.round(Math.max(150, estimateGDP() * (2 + Math.random() * 3)));
+    try { Strubles.add(bonus); } catch {}
+    toast(`🚚 A trade caravan passed through! +${bonus.toLocaleString()} Strubles`);
+    return true;
+  }
+
+  // Only fires if the village is actually neglecting upkeep — bad luck
+  // doesn't invent debt that wasn't there, it just makes existing debt worse.
+  function triggerAudit() {
+    const debtors = village.b.filter((s) => s.status === 'complete' && s.taxDebt > 0);
+    if (!debtors.length) return false;
+    let added = 0;
+    debtors.forEach((s) => { added += s.taxDebt; s.taxDebt *= 2; });
+    toast(`📋 Tax audit — neglected buildings now owe ${Math.floor(added).toLocaleString()} more.`, true);
+    saveVillage();
+    return true;
+  }
+
+  function maybeTriggerEvent() {
+    if (TYCOON_DISABLED) return;
+    if (!village.b.some((s) => s.status === 'complete')) return;
+    if (Math.random() >= EVENT_CHANCE_PER_SEC) return;
+    const table = [
+      { run: triggerFire, weight: countZones('water') > 0 ? 1 : 2 },
+      { run: triggerCaravan, weight: 2 },
+      { run: triggerAudit, weight: 1, eligible: () => village.b.some((s) => s.status === 'complete' && s.taxDebt > 0) },
+    ].filter((e) => !e.eligible || e.eligible());
+    if (!table.length) return;
+    const total = table.reduce((a, e) => a + e.weight, 0);
+    let r = Math.random() * total;
+    for (const e of table) { r -= e.weight; if (r <= 0) { e.run(); return; } }
   }
 
   function buildingAt(tx, ty) {
@@ -1531,6 +1599,15 @@
             const bx = ox + w / 2 - 5, by = oy + h / 2 - 3;
             rect(layer, '#ff3b3b', bx, by, 10, 6);
             rect(layer, '#000000', bx + 2, by + 2, 6, 2);
+          }
+          // On fire: a small flame glyph over the roof, and a hot tint that
+          // overrides the others — it's the most urgent thing happening here.
+          if (s.fireUntil > now) {
+            tint = 0xff9a66;
+            const fx = ox + w / 2, fy = oy - 2;
+            rect(layer, '#ffb703', fx - 3, fy, 6, 3);
+            rect(layer, '#ff5a1f', fx - 2, fy - 3, 4, 3);
+            rect(layer, '#ffe066', fx - 1, fy - 5, 2, 2);
           }
         }
       }
@@ -2263,7 +2340,10 @@
     $('manage-title').textContent = def.label;
     const specialty = computeSpecialty();
     const specialtyNote = specialty && def.zone === specialty.type ? ` Specialty bonus: +${Math.round(specialty.bonus * 100)}%.` : '';
-    const statusLine = s.status === 'building'
+    const onFire = s.status === 'complete' && s.fireUntil > Date.now();
+    const statusLine = onFire
+      ? `🔥 On fire — no production until it's out (burns out on its own in ${Math.ceil((s.fireUntil - Date.now()) / 1000)}s, or put it out now).`
+      : s.status === 'building'
       ? 'Under construction — removing it loses the progress but refunds the permit.'
       : def.leisure ? 'A public park. It earns nothing, but visits here lift village mood — most of all around 12 pm and 6 pm.'
       : isRoadConnected(s) ? `Producing +${productionFor(s, mood, specialty).toFixed(1)}/min.${specialtyNote}` : 'No road touching it — not producing. Lay a road alongside.';
@@ -2276,6 +2356,9 @@
     $('manage-info').innerHTML = `<div class="guide-row">${iconImg(s.key)}<div class="row-info">${def.label} ${kindLabel(s.key, `${foot(s.key).w}×${foot(s.key).h} tiles`)}<small>${statusLine}</small>${upkeepLine}${modLine(s.key)}${def.description ? `<small class="row-desc">${def.description}</small>` : ''}</div></div>`;
     $('manage-info').innerHTML += peopleInfo(s, def);
     $('manage-bank').style.display = def.special === 'bank' && s.status === 'complete' ? '' : 'none';
+    const fireCost = Math.round(def.cost * FIRE_REPAIR_RATE);
+    $('manage-firefight').style.display = onFire ? '' : 'none';
+    $('manage-firefight').textContent = `🚒 Put it out (${fireCost.toLocaleString()})`;
     manageOverlay.classList.add('open');
   }
   // Residents / who is inside, and food, for the manage panel.
@@ -2339,6 +2422,27 @@
     closeManage();
   });
   $('manage-bank').addEventListener('click', () => { closeManage(); openBank(); });
+  $('manage-firefight').addEventListener('click', () => {
+    const s = bById.get(manageId);
+    if (!s || !(s.fireUntil > Date.now())) return;
+    const def = DEFS[s.key];
+    const cost = Math.round(def.cost * FIRE_REPAIR_RATE);
+    if (!Strubles.spend(cost)) { toast(`Need ${cost.toLocaleString()} Strubles`, true); return; }
+    const previousUntil = s.fireUntil;
+    s.fireUntil = 0;
+    pushUndo(`put out fire at ${def.label}`, () => {
+      const cur = bById.get(s.id);
+      if (!cur) return 'That building is gone';
+      const err = reverseMoney(cost);
+      if (err) return err;
+      cur.fireUntil = previousUntil;
+      return null;
+    });
+    saveVillage();
+    closeManage();
+    refresh();
+    toast(`🚒 Fire out at the ${def.label}.`);
+  });
   document.querySelectorAll('#manage-overlay, #manage-close').forEach((el) => {
     el.addEventListener('click', (e) => {
       if (e.target.id === 'manage-overlay' || e.target.id === 'manage-close') closeManage();
@@ -2371,6 +2475,11 @@
         <div class="row-icon">💼</div>
         <div class="row-info"><b>Jobs and the commute.</b>
           <small>Offices, shops, factories and plants are workplaces: any villager without a job is slowly hired into one with room, up to its capacity. From 9 am to 5 pm, job-holders commute there and clock in instead of wandering; after 5 pm they head home or out, same as anyone else. A workday that's actually staffed — not just zoned — lifts village mood a little, shown as the Jobs readout in the stats bar.</small></div>
+      </div>
+      <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">🔥</div>
+        <div class="row-info"><b>Random events.</b>
+          <small>Every so often, something happens. A fire can break out — more likely in industrial buildings, less likely if you've zoned any water — and stops that building earning until it burns out on its own or you pay to put it out. A trade caravan can pass through for a one-time windfall. An audit can catch a village that's let its upkeep slide and double what's owed. None of it can end your village — it's there to keep a thriving one on its toes.</small></div>
       </div>
       <div class="guide-row" style="align-items:flex-start;">
         <div class="row-icon">↩️</div>
@@ -2514,6 +2623,7 @@
   if (tick()) saveVillage();
   setInterval(() => {
     if (tick()) saveVillage();
+    maybeTriggerEvent();
     refresh();
   }, 1000);
 
@@ -2560,7 +2670,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // Test hook for the browser suites; only exists in dev mode.
-  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood };
+  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood, triggerFire, triggerCaravan, triggerAudit, estimateGDP };
 })();
 </script>
 </body>
