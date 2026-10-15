@@ -8,6 +8,14 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: "2026-10-15",
+    title: "Village Specialization",
+    changes: [
+      "Specialize your village: once at least 9 tiles are zoned, a clear majority (50%+) committed to one zone type gives buildings of that type a production bonus, up to +25% fully committed. A balanced village of all three zones gets no bonus — leaning in is what's rewarded.",
+      "Your specialty (if any) shows in the stats bar, in a building's own panel, and as a small badge next to your name on the GDP and Efficiency leaderboards.",
+    ],
+  },
+  {
     date: "2026-10-14",
     title: "GDP & Efficiency Leaderboards, Leaderboard Fix, Shop Image Fix",
     changes: [

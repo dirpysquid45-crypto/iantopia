@@ -244,8 +244,9 @@
     </div>
 
     <div id="stats-bar">
-      <span title="Gross output of every road-connected building, mood-adjusted. Ranked on the GDP leaderboard.">GDP: <b id="stat-production">0</b>/min</span>
+      <span title="Gross output of every road-connected building, adjusted for mood and specialty. Ranked on the GDP leaderboard.">GDP: <b id="stat-production">0</b>/min</span>
       <span title="GDP per standing building — rewards a lean, well-run village over a sprawling one. Ranked on the Efficiency leaderboard.">Efficiency: <b id="stat-efficiency">0</b>/bldg</span>
+      <span id="stat-specialty-row" title="A majority of your zoned tiles in one type gives buildings of that type a production bonus, up to +25% fully committed." style="display:none;">Specialty: <b id="stat-specialty">—</b></span>
       <span>Buildings: <b id="stat-placed">0/5</b></span>
       <span>Building: <b id="stat-building">0/3</b></span>
       <span>On a road: <b id="stat-road">0/0</b></span>
@@ -779,6 +780,28 @@
     return c;
   }
 
+  // ---------- Specialization ----------
+  // A village that commits to one zone type gets a production bonus on
+  // buildings of that type — leaning into residential, commercial or
+  // industrial pays off, the way a real town known for one industry ships
+  // it more efficiently than a town that dabbles in everything. A village
+  // with no clear majority zone (or too small to have committed to one yet)
+  // has no specialty and no bonus. Scales from 0% right at the threshold up
+  // to SPECIALTY_MAX_BONUS at a fully single-zoned village.
+  const SPECIALTY_MIN_ZONED = 9;     // below this, "specialty" is noise, not a choice
+  const SPECIALTY_THRESHOLD = 0.5;   // need a majority of zoned tiles in one type
+  const SPECIALTY_MAX_BONUS = 0.25;
+  function computeSpecialty() {
+    const counts = { residential: countZones('residential'), commercial: countZones('commercial'), industrial: countZones('industrial') };
+    const total = counts.residential + counts.commercial + counts.industrial;
+    if (total < SPECIALTY_MIN_ZONED) return null;
+    const [type, count] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    const share = count / total;
+    if (share < SPECIALTY_THRESHOLD) return null;
+    const bonus = SPECIALTY_MAX_BONUS * (share - SPECIALTY_THRESHOLD) / (1 - SPECIALTY_THRESHOLD);
+    return { type, share, bonus };
+  }
+
   // ---------- People, capacity and food ----------
   // Every residential building houses `housing` residents; every building has a
   // `capacity` of people who can be inside it at once. 7-Elevens supply food
@@ -851,14 +874,18 @@
   }
   const moodMultiplier = (mood) => 0.75 + (mood / 100) * 0.4; // 0.75x .. 1.15x
 
-  // No zone bonus any more: zoning is a requirement to build, so paying extra
-  // for it would just be a flat raise on everything.
-  function productionFor(s, mood) {
+  // No flat "zoned correctly" bonus: zoning is a requirement to build, so
+  // paying extra for it would just be a flat raise on everything. Specialty
+  // is different — it's a village-wide commitment (see computeSpecialty),
+  // not a per-building check, so it only rewards buildings of the type the
+  // whole village has leaned into.
+  function productionFor(s, mood, specialty) {
     const def = DEFS[s.key];
     if (!def || s.status !== 'complete') return 0;
     if (!isRoadConnected(s)) return 0; // no road, no business
     let p = def.production;
     if (touchesTile(s, 'industrial')) p *= 1 + INDUSTRIAL_BONUS;
+    if (specialty && def.zone === specialty.type) p *= 1 + specialty.bonus;
     if (s.taxDebt > 0) p *= 0.5;
     return p * moodMultiplier(mood);
   }
@@ -1377,6 +1404,7 @@
     if (!scene) return;
     const now = Date.now();
     mood = computeMood();
+    const specialty = computeSpecialty();
     // Tiles or buildings may have just changed under someone's feet.
     relocateVillagers();
     // Only the cheap dynamic overlays are redrawn here (scaffolds, warning
@@ -1413,7 +1441,7 @@
         }
       } else {
         sp.setVisible(!moving);
-        totalProduction += productionFor(s, mood);
+        totalProduction += productionFor(s, mood, specialty);
         totalUpkeep += def.cost * (def.upkeepPct || 0);
         const connected = roadOk(s);
         if (connected) onRoadCount++;
@@ -1470,6 +1498,11 @@
     const efficiency = doneCount ? gdp / doneCount : 0;
     $('stat-production').textContent = Math.floor(gdp);
     $('stat-efficiency').textContent = efficiency.toFixed(1);
+    $('stat-specialty-row').style.display = specialty ? '' : 'none';
+    if (specialty) {
+      const icon = { residential: '🏘️', commercial: '🏬', industrial: '🏭' }[specialty.type];
+      $('stat-specialty').textContent = `${icon} ${BRUSH_LABEL[specialty.type]} (+${Math.round(specialty.bonus * 100)}%)`;
+    }
     $('stat-placed').textContent = village.b.length + '/' + slotCap();
     $('stat-building').textContent = buildingCount() + '/' + MAX_CONCURRENT;
     $('stat-road').textContent = onRoadCount + '/' + doneCount;
@@ -1481,7 +1514,7 @@
     $('stat-food').style.color = fs.demand && fs.satisfaction < 1 ? '#ff6b6b' : '';
     $('stat-upkeep').textContent = Math.floor(totalUpkeep);
     syncBalance();
-    maybePushLeaderboardScore({ gdp, efficiency, buildings: doneCount, population: fs.pop });
+    maybePushLeaderboardScore({ gdp, efficiency, buildings: doneCount, population: fs.pop, specialty: specialty ? specialty.type : null });
   }
 
   const BOX_COLOR = { residential: '#2f6fd0', commercial: '#e08a1f', industrial: '#7b3fa0', water: '#2b7fd4', erase: '#ff4444' };
@@ -2148,10 +2181,12 @@
     const def = DEFS[s.key];
     const dailyUpkeep = def.cost * (def.upkeepPct || 0);
     $('manage-title').textContent = def.label;
+    const specialty = computeSpecialty();
+    const specialtyNote = specialty && def.zone === specialty.type ? ` Specialty bonus: +${Math.round(specialty.bonus * 100)}%.` : '';
     const statusLine = s.status === 'building'
       ? 'Under construction — removing it loses the progress but refunds the permit.'
       : def.leisure ? 'A public park. It earns nothing, but visits here lift village mood — most of all around 12 pm and 6 pm.'
-      : isRoadConnected(s) ? `Producing +${def.production}/min.` : 'No road touching it — not producing. Lay a road alongside.';
+      : isRoadConnected(s) ? `Producing +${productionFor(s, mood, specialty).toFixed(1)}/min.${specialtyNote}` : 'No road touching it — not producing. Lay a road alongside.';
     let upkeepLine = '';
     if (s.status === 'complete') {
       upkeepLine = s.taxDebt > 0
@@ -2265,6 +2300,11 @@
         <div class="row-icon">🏭</div>
         <div class="row-info"><b>Industry is the dirty option.</b>
           <small>Industrial next door adds +${Math.round(INDUSTRIAL_BONUS * 100)}% to any building. Sweatshops, factories and power plants all drag village mood down — and mood scales everything from 0.75x to 1.15x.</small></div>
+      </div>
+      <div class="guide-row" style="align-items:flex-start;">
+        <div class="row-icon">🎯</div>
+        <div class="row-info"><b>Specialize for a production bonus.</b>
+          <small>Once at least ${SPECIALTY_MIN_ZONED} tiles are zoned, a clear majority (${Math.round(SPECIALTY_THRESHOLD * 100)}%+) in one zone type gives every building of that type up to +${Math.round(SPECIALTY_MAX_BONUS * 100)}% production, scaling with how committed the village is. A balanced village of all three zones gets no bonus — leaning in is what's rewarded, and it's what the Efficiency leaderboard tends to favor too.</small></div>
       </div>
       <div class="guide-row" style="align-items:flex-start;">
         <div class="row-icon">💧</div>
@@ -2411,6 +2451,7 @@
       efficiency: Math.round(stats.efficiency * 1000) / 1000,
       buildings: stats.buildings,
       population: stats.population,
+      specialty: stats.specialty,
       qualified: stats.buildings >= EFFICIENCY_MIN_BUILDINGS,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     }, { merge: true })
@@ -2433,7 +2474,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // Test hook for the browser suites; only exists in dev mode.
-  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; } };
+  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty };
 })();
 </script>
 </body>

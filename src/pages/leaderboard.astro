@@ -83,6 +83,7 @@
 
   .leaderboard-rank { color:var(--gold); font-weight:700; text-align:center; }
   .leaderboard-name { color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .specialty-badge { margin-right:4px; }
   .leaderboard-score { color:var(--muted); text-align:right; display:flex; flex-direction:column; gap:2px; line-height:1.3; }
   .leaderboard-score small { color:#6a7690; font-size:0.8em; }
 
@@ -170,6 +171,7 @@
     },
   };
   let activeBoard = 'gdp';
+  const SPECIALTY_ICON = { residential: '🏘️', commercial: '🏬', industrial: '🏭' };
 
   function renderEmpty() {
     listEl.innerHTML = `<div class="leaderboard-empty">${BOARDS[activeBoard].empty}</div>`;
@@ -192,10 +194,14 @@
       const name = String(data.displayName || board.fallbackName)
         .replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
       const sub = board.sub ? `<small>${board.sub(data)}</small>` : '';
+      // A village with a committed majority zone shows its specialty as a
+      // little badge next to its name — see computeSpecialty() in tycoon.astro.
+      const badge = data.specialty && SPECIALTY_ICON[data.specialty]
+        ? `<span class="specialty-badge" title="${data.specialty[0].toUpperCase()}${data.specialty.slice(1)} specialty">${SPECIALTY_ICON[data.specialty]}</span>` : '';
       return `
         <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}">
           <div class="leaderboard-rank">#${rank}</div>
-          <div class="leaderboard-name">${name}</div>
+          <div class="leaderboard-name">${badge}${name}</div>
           <div class="leaderboard-score">${board.format(data[board.field])}${sub}</div>
         </div>
       `;
