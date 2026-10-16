@@ -245,6 +245,11 @@ class BattleshipGame extends ArenaGame {
     const payout = this.friendly ? 0 : pot - raked;
     const results = [{ result: 'loss', payout: 0 }, { result: 'loss', payout: 0 }];
     results[winnerIndex] = { result: 'win', payout };
+    // Kept so a resync during the result/rematch window (e.g. a phone that
+    // locked right as the game ended) can rebuild the exact same result
+    // screen the client already renders from a live game_result.
+    this.lastReason = reason;
+    this.lastResults = results;
     if (payout > 0) {
       try { this.pushBalance(winnerIndex, await this.balance.creditPayout(this.players[winnerIndex].userId, payout)); }
       catch (e) { console.error('[battleship] payout failed:', e.message); }
@@ -289,7 +294,14 @@ class BattleshipGame extends ArenaGame {
       state: this.state, yourReady: this.playersReady[i], opponentReady: this.playersReady[1 - i],
       setupMsLeft: Math.max(0, (this.setupDeadline || 0) - Date.now()), ...this.view(i),
       turnMsLeft: this.state === 'battle' ? Math.max(0, (this.turnDeadline || 0) - Date.now()) : 0,
-      ...(this.state === 'result' ? { winner: this.winner, fleets: this.shipPlacements } : {}),
+      // roundOver/rematchAccepted let a player who reconnects during the
+      // rematch window re-enable their Rematch button correctly instead of
+      // it staying stuck disabled — they missed the one-time
+      // show_rematch_prompt broadcast the same way they missed game_result.
+      ...(this.state === 'result' ? {
+        winner: this.winner, fleets: this.shipPlacements, reason: this.lastReason, results: this.lastResults,
+        roundOver: this.roundOver, rematchAccepted: this.rematchAccepted[i],
+      } : {}),
     });
   }
 }

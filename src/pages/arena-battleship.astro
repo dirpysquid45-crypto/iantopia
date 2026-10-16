@@ -696,6 +696,11 @@
     S.setupEnds = Date.now() + (msg.setupMs || 150000);
     setQueued(false); $('away-banner').hidden = true;
     $('setup-opp').textContent = S.oppName;
+    // A rematch (or a plain new game_start) leaves the previous round's
+    // revealed enemy fleet sitting in this layer otherwise — it's only ever
+    // written by onResult(), never cleared when the next round begins, so it
+    // shows through as "ghost ships" on top of the new radar board.
+    boards.enemy.layer.innerHTML = '';
     showPhase('setup'); renderSetup();
   }
 
@@ -833,17 +838,41 @@
   function onResync(m) {
     S.me = m.yourIndex; S.oppName = m.opponentName || 'Opponent'; S.friendly = !!m.friendly; S.bet = m.bet || 0;
     S.myShips = m.yourShips || []; S.yourHealth = m.yourHealth; S.enemyHealth = m.enemyHealth;
-    S.radar = m.radar || emptyGrid(); S.mineHits = m.mine || emptyGrid(); S.last = null; S.target = null; S.pending = false; S.over = false;
+    S.radar = m.radar || emptyGrid(); S.mineHits = m.mine || emptyGrid(); S.last = null; S.target = null; S.pending = false;
     $('setup-opp').textContent = S.oppName; $('enemy-name').textContent = S.oppName; setQueued(false);
     if (m.state === 'setup') {
+      S.over = false;
       S.placed = new Map((m.yourShips || []).map((s) => [s.name, s]));
       S.submitted = !!m.yourReady; S.oppReady = !!m.opponentReady; S.selected = S.submitted ? null : nextUnplaced(); S.aim = null;
       S.setupEnds = Date.now() + (m.setupMsLeft || 0);
+      boards.enemy.layer.innerHTML = '';   // see enterSetup(): clears a previous round's revealed fleet
       showPhase('setup'); renderSetup();
     } else if (m.state === 'battle') {
+      S.over = false;
       S.turn = m.currentTurn; S.turnEnds = Date.now() + (m.turnMsLeft || m.turnMs || 40000);
+      boards.enemy.layer.innerHTML = '';   // same ghost-fleet guard, for reconnecting mid-round
       $('result-card').hidden = true; showPhase('battle'); paintFleet(); paintBoards(); renderTurn();
+    } else if (m.state === 'result') {
+      // Reconnecting onto the result/rematch screen (e.g. a phone that locked
+      // right as the game ended) used to leave the player stuck on a bare
+      // battle view with no result card, no fleet reveal and a dead rematch
+      // button — this replays the exact same screen a live game_result
+      // would have shown, from the reason/results the server now keeps.
+      // S.over is deliberately NOT reset before this call: onResult() uses
+      // "was S.over already true" to tell a genuine first result from a
+      // resync replaying one the client already saw, so stats aren't
+      // recorded twice for the same game.
+      onResult({ results: m.results, friendly: m.friendly, reason: m.reason, fleets: m.fleets });
+      // onResult() always leaves the button disabled, since a *live*
+      // game_result is immediately followed by a separate show_rematch_prompt
+      // message that enables it — a message this reconnecting player also
+      // missed. roundOver says that window is still open right now.
+      if (m.roundOver) {
+        if (m.rematchAccepted) { S.rematchSent = true; $('btn-rematch').disabled = true; $('btn-rematch').textContent = 'Waiting…'; }
+        else $('btn-rematch').disabled = false;
+      }
     } else {
+      S.over = false;
       S.turn = -1; showPhase('battle'); paintFleet(); paintBoards();
     }
     toast('Reconnected — back in your game.', 2200);
