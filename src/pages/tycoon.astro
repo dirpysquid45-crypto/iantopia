@@ -2640,8 +2640,10 @@
   const EFFICIENCY_MIN_BUILDINGS = 3;
   let lastPushedKey = null;
   let leaderboardPushInFlight = false;
+  let leaderboardCooldownUntil = 0;
   function maybePushLeaderboardScore(stats) {
     if (!window.CloudSync || !CloudSync.isSignedIn()) return;
+    if (Date.now() < leaderboardCooldownUntil) return;
     const key = JSON.stringify(stats);
     if (key === lastPushedKey || leaderboardPushInFlight) return;
     const user = CloudSync.currentUser;
@@ -2658,7 +2660,13 @@
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     }, { merge: true })
       .then(() => { lastPushedKey = key; })
-      .catch((err) => console.error('[leaderboard] push failed:', err))
+      .catch((err) => {
+        // Almost always missing Firestore rules for this collection, not a
+        // transient blip — retrying every second forever just floods the
+        // console without ever succeeding, so back off instead.
+        leaderboardCooldownUntil = Date.now() + 60000;
+        console.error('[leaderboard] push failed, retrying in 60s:', err.message || err);
+      })
       .finally(() => { leaderboardPushInFlight = false; });
   }
 
@@ -2670,9 +2678,10 @@
   // carries the whole tile map, not just a couple of numbers, so it pushes
   // at most once every 30s and only when something actually changed.
   const SNAPSHOT_MIN_INTERVAL_MS = 30000;
-  let lastSnapshotPush = 0, lastSnapshotKey = null, snapshotPushInFlight = false;
+  let lastSnapshotPush = 0, lastSnapshotKey = null, snapshotPushInFlight = false, snapshotCooldownUntil = 0;
   function maybePushVillageSnapshot(stats) {
     if (!window.CloudSync || !CloudSync.isSignedIn()) return;
+    if (Date.now() < snapshotCooldownUntil) return;
     const user = CloudSync.currentUser;
     if (!user) return;
     const buildings = village.b.map((s) => ({ id: s.id, key: s.key, x: s.x, y: s.y, status: s.status, fireUntil: s.fireUntil || 0 }));
@@ -2694,7 +2703,12 @@
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     })
       .then(() => { lastSnapshotKey = key; lastSnapshotPush = Date.now(); })
-      .catch((err) => console.error('[village-snapshot] push failed:', err))
+      .catch((err) => {
+        // Same reasoning as the leaderboard push: a missing-rules error
+        // never resolves itself, so stop retrying every tick.
+        snapshotCooldownUntil = Date.now() + 60000;
+        console.error('[village-snapshot] push failed, retrying in 60s:', err.message || err);
+      })
       .finally(() => { snapshotPushInFlight = false; });
   }
 
