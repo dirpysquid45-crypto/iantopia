@@ -37,16 +37,27 @@ window.TycoonArt = (function () {
     const bl = Math.round((a & 255) + (((b & 255) - (a & 255)) * t));
     return (r << 16) | (gr << 8) | bl;
   }
-  // 1px-band gradients: still crisp pixel art, just shaded.
-  function vgrad(g, x, y, w, h, top, bottom, alpha) {
+  // Banded gradients: a handful of flat, discrete shades (like hand-placed
+  // pixel-art dithering), not one unique tone per row/column. A continuous
+  // mix() per pixel reads as a smooth photographic ramp at this resolution,
+  // which fights the rest of the art rather than matching it.
+  const GRAD_STEPS = 4;
+  function band(n, i, span) {
+    if (n <= 1) return 0;
+    const k = Math.min(n - 1, Math.floor((i / span) * n));
+    return k / (n - 1);
+  }
+  function vgrad(g, x, y, w, h, top, bottom, alpha, steps) {
+    const n = Math.max(1, Math.min(h, steps || GRAD_STEPS));
     for (let i = 0; i < h; i++) {
-      g.fillStyle(mix(top, bottom, h <= 1 ? 0 : i / (h - 1)), alpha == null ? 1 : alpha);
+      g.fillStyle(mix(top, bottom, band(n, i, h)), alpha == null ? 1 : alpha);
       g.fillRect(x, y + i, w, 1);
     }
   }
-  function hgrad(g, x, y, w, h, left, right, alpha) {
+  function hgrad(g, x, y, w, h, left, right, alpha, steps) {
+    const n = Math.max(1, Math.min(w, steps || GRAD_STEPS));
     for (let i = 0; i < w; i++) {
-      g.fillStyle(mix(left, right, w <= 1 ? 0 : i / (w - 1)), alpha == null ? 1 : alpha);
+      g.fillStyle(mix(left, right, band(n, i, w)), alpha == null ? 1 : alpha);
       g.fillRect(x + i, y, 1, h);
     }
   }
@@ -194,8 +205,7 @@ window.TycoonArt = (function () {
       rect(g, '#6a4f12', ox + 16, oy + 18, 1, 8, 0.6);
       for (let r = 0; r < 7; r++) {                                     // pediment
         const half = 2 + r * 2;
-        const t = r / 6;
-        rect(g, mixHex('#f4f1e7', '#c9c5b7', t), ox + 16 - half, oy + 3 + r, half * 2, 1);
+        rect(g, mixHex('#f4f1e7', '#c9c5b7', band(GRAD_STEPS, r, 7)), ox + 16 - half, oy + 3 + r, half * 2, 1);
       }
       rect(g, '#d6d2c4', ox + 16 - 2, oy + 3, 4, 1);
       rect(g, '#a8a498', ox + 2, oy + 10, 28, 1);                      // cornice
@@ -302,7 +312,7 @@ window.TycoonArt = (function () {
       for (let i = 0; i < 4; i++) {                                     // sawtooth roof
         const x = ox + 3 + i * 10;
         for (let r = 0; r < 6; r++) {
-          rect(g, mixHex('#9aa0a6', '#555b61', r / 5), x, oy + 7 + r, 3 + r * 2, 1);
+          rect(g, mixHex('#9aa0a6', '#555b61', band(GRAD_STEPS, r, 6)), x, oy + 7 + r, 3 + r * 2, 1);
         }
         rect(g, '#a8d4ea', x + 1, oy + 8, 2, 4);                       // north-light glazing
         rect(g, '#d8eef8', x + 1, oy + 8, 1, 4, 0.7);
@@ -358,10 +368,16 @@ window.TycoonArt = (function () {
       rect(g, '#40454b', ox + 42, oy - 7, 6, 4, 0.4);
       for (let r = 0; r < 6; r++) rect(g, '#16171a', ox + 2 + Math.floor(r / 2), oy + 41 + r, 12 - r * 2 + 2, 1); // coal heap
       rect(g, '#2a2c30', ox + 4, oy + 41, 6, 1);
-      for (let i = 0; i < 13; i++) {                                    // conveyor gantry
-        rect(g, '#d6b13c', ox + 10 + i, oy + 36 - Math.floor(i * 0.9), 1, 2);
+      for (let i = 0; i < 13; i++) {                                    // conveyor gantry: coal
+        rect(g, '#d6b13c', ox + 10 + i, oy + 36 - Math.floor(i * 0.9), 1, 2);  // heap up into the hopper
       }
-      rect(g, '#8a6f1c', ox + 10, oy + 38, 13, 1, 0.5);
+      rect(g, '#8a6f1c', ox + 10, oy + 38, 13, 1, 0.5);                 // it rides on the pipework rail
+      rect(g, '#1c1e21', ox + 18, oy + 20, 11, 9);                      // the hopper the belt feeds (was dangling before)
+      vgrad(g, ox + 19, oy + 21, 9, 7, '#a6acb3', '#565b62');
+      rect(g, '#d6dade', ox + 19, oy + 21, 9, 1, 0.8);                  // top rim catches the light
+      rect(g, '#2a2c30', ox + 21, oy + 25, 1, 3, 0.6);                  // rivet seam
+      rect(g, '#2a2c30', ox + 24, oy + 25, 1, 3, 0.6);
+      rect(g, '#1c1e21', ox + 21, oy + 26, 4, 3);                       // chute mouth, wraps the belt's top end
       rect(g, '#e6c14a', ox + 28, oy + 41, 6, 4);                      // warning plate
       rect(g, '#141414', ox + 29, oy + 42, 1, 2);
       rect(g, '#141414', ox + 31, oy + 42, 1, 2);

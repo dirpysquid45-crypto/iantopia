@@ -102,8 +102,7 @@ window.TYCOON_BUILDINGS = {
   bank: {
     capacity: 6,       // people who can be inside at once
     tier: 'mil_spec',
-    img: '/tycoon/art/bank.png?v=2',
-    cover: true,         // drawn on the map from the picture, not the pixel art
+    img: '/tycoon/art/bank.png?v=2',   // shop/collectible card art only -- the map uses the pixel art below
     label: 'Bank',
     w: 2, h: 2, zone: 'commercial',
     special: 'bank',
@@ -115,8 +114,7 @@ window.TYCOON_BUILDINGS = {
   seven_eleven: {
     label: '7-Eleven',
     tier: 'restricted',
-    img: '/tycoon/art/seven_eleven.png?v=2',
-    cover: true,
+    img: '/tycoon/art/seven_eleven.png?v=2',   // shop/collectible card art only -- the map uses the pixel art below
     icon: '/tycoon/icons/seven_eleven.png?v=2',
     w: 2, h: 1, zone: 'commercial',
     capacity: 6,
@@ -128,9 +126,8 @@ window.TYCOON_BUILDINGS = {
   park: {
     label: 'Park',
     tier: 'mil_spec',
-    img: '/tycoon/art/park.png?v=2',
+    img: '/tycoon/art/park.png?v=2',   // shop/collectible card art only -- the map uses the pixel art below
     icon: '/tycoon/icons/park.png?v=2',
-    cover: true,         // drawn on the map from the picture
     open: true,          // villagers walk around inside it instead of vanishing indoors
     leisure: true,       // villagers flock here at lunch and in the evening
     w: 3, h: 3, zone: 'residential',
