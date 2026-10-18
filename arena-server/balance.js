@@ -5,6 +5,23 @@
 // guest has no Firestore document, and a bet of 0 is a no-op by design, so
 // there is no code path where a guest can create or move Strubles.
 
+const fs = require('fs');
+const path = require('path');
+
+// tycoon-cap.js is a UMD file shared with the browser (same pattern as the
+// blackjack engine below it in this directory). `require()` of it only
+// works when no ancestor package.json declares "type": "module" -- true
+// inside the Docker image (mounted at /public) but not in the repo
+// checkout, where the site's own package.json does. Reading and evaluating
+// it directly behaves identically in both places.
+function loadCap() {
+  const file = path.join(__dirname, '..', 'public', 'tycoon-cap.js');
+  const mod = { exports: {} };
+  new Function('module', 'exports', fs.readFileSync(file, 'utf8'))(mod, mod.exports);
+  return mod.exports;
+}
+const Cap = loadCap();
+
 const isGuestId = (userId) => typeof userId === 'string' && userId.startsWith('guest_');
 
 // A stake must be a non-negative whole number. Anything else is refused here
@@ -41,17 +58,8 @@ class BalanceManager {
     let inv = {};
     try { inv = JSON.parse(invStr); } catch {}
     const taipei = (Array.isArray(inv.buildings) ? inv.buildings : []).filter(k => k === 'taipei_101').length;
-    const taipeiBonus = Math.min(taipei, 5) * 10000;
-    let cap = 20000;
-    for (let i = 1; i <= bankLevel; i++) {
-      if (i <= 3) {
-        const gains = [0, 15000, 25000, 40000];
-        cap += gains[i] || 0;
-      } else {
-        cap += 40000 * Math.pow(3, i - 3);
-      }
-    }
-    return cap + taipeiBonus;
+    const taipeiBonus = Math.min(taipei, Cap.MAX_TAIPEI_COPIES) * Cap.TAIPEI_BONUS_PER_COPY;
+    return Cap.capForLevel(bankLevel) + taipeiBonus;
   }
 
   // Both writes below are transactions. They used to be a plain read followed
