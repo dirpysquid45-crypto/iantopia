@@ -188,8 +188,12 @@
   // gone. The bug this caused: change a background, navigate away inside
   // the debounce window, and the push is silently lost; the next sign-in
   // pull then overwrites the fresh local choice with the stale cloud one.
+  // Pushes wait until this tab has pulled the account's copy. Otherwise a push
+  // from a fresh device (its local stats are nearly empty) can land first and
+  // overwrite the cloud's counters before the pull has merged them back.
+  let reconciled = false;
   function pushToCloud(immediate) {
-    if (!currentUser || applyingRemote) return;
+    if (!currentUser || applyingRemote || !reconciled) return;
     clearTimeout(pushTimer);
     const doPush = () => {
       db.collection('users').doc(currentUser.uid).set(snapshotLocalState(), { merge: true }).catch((err) => {
@@ -224,7 +228,13 @@
     // set by then or it'd pull-and-potentially-reload every time forever.
     if (user && !sessionStorage.getItem(RECONCILE_KEY)) {
       try { sessionStorage.setItem(RECONCILE_KEY, '1'); } catch {}
-      pullFromCloud(user.uid);
+      // A failed pull still lets pushes resume (the old behaviour), so an
+      // offline or permission error can't freeze saving for the whole session.
+      pullFromCloud(user.uid)
+        .catch((err) => console.error('[cloud-sync] pull failed:', err))
+        .finally(() => { reconciled = true; pushToCloud(false); });
+    } else {
+      reconciled = true;
     }
   });
 
