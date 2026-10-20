@@ -19,19 +19,20 @@
   html, body { margin:0; height:100%; overflow:hidden; background:#000; }
   body {
     font-family:'Press Start 2P', ui-monospace, monospace;
-    color:#fff; cursor:none;
+    color:#fff; cursor:default;
     display:flex; align-items:center; justify-content:center;
     position:relative;
   }
   #stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
-  canvas { display:block; touch-action:none; }
+  /* Square game board, not edge-to-edge -- a contained frame reads more
+     like the classic prank than a full-viewport canvas does. */
+  canvas { display:block; touch-action:none; border:3px solid #0ff; box-shadow:0 0 30px rgba(0,255,255,.35); }
 
   #hud {
     position:fixed; top:12px; left:50%; transform:translateX(-50%);
     font-size:10px; color:var(--orange); text-shadow:0 0 8px rgba(255,111,0,.7);
     text-align:center; z-index:5; line-height:1.8; pointer-events:none;
   }
-  #hud b { color:var(--green); }
 
   a.back-link {
     position:fixed; top:14px; left:14px; z-index:6;
@@ -39,26 +40,6 @@
     padding:8px 12px; font-family:inherit; font-size:9px; text-decoration:none;
   }
   a.back-link:hover { background:var(--purple); color:#fff; }
-
-  /* ---------- Start screen ---------- */
-  #start-screen {
-    position:fixed; inset:0; z-index:20; background:#000;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:22px; text-align:center; padding:20px;
-  }
-  #start-screen.hidden { display:none; }
-  #start-screen h1 {
-    font-size:clamp(16px,4vw,26px); color:var(--orange);
-    text-shadow:0 0 10px rgba(255,111,0,.8), 0 0 24px rgba(94,23,168,.6);
-    margin:0;
-  }
-  #start-screen p { font-size:11px; line-height:2; color:#cbb; max-width:480px; }
-  #start-btn {
-    background:#1a0a00; border:3px solid var(--orange); color:var(--orange);
-    padding:16px 28px; font-family:inherit; font-size:13px; cursor:none;
-    box-shadow:0 0 20px rgba(255,111,0,.4);
-  }
-  #start-btn:hover { background:var(--orange); color:#1a0a00; }
 
   /* ---------- Jumpscare ---------- */
   #jumpscare {
@@ -76,6 +57,9 @@
     90% { transform:translate(-10px,-10px); }
   }
   #jumpscare.show { animation: screenShake 0.6s linear 3; }
+
+  /* ---------- Confetti ---------- */
+  #confetti { position:fixed; inset:0; z-index:45; pointer-events:none; display:none; }
 
   /* ---------- Result screen ---------- */
   #result-screen {
@@ -101,18 +85,12 @@
 </head>
 <body>
   <a class="back-link" href="/">← Iantopia</a>
-  <div id="hud">Guide the dot through the maze.<br>Don't touch the walls. <b id="hud-tries">0</b> oops so far.</div>
+  <div id="hud">Click the red square to pick it up.</div>
 
   <div id="stage"><canvas id="maze"></canvas></div>
 
-  <div id="start-screen">
-    <h1>🎃 the maze 🎃</h1>
-    <p>Move your mouse to steer the glowing dot from one end to the other without touching a wall.
-      It gets narrower near the end. Don't rush — but don't stop, either.</p>
-    <button id="start-btn" type="button">Enter, if you dare</button>
-  </div>
-
   <div id="jumpscare"><img src="/maze-game/scary-face.jpg" alt="" /></div>
+  <canvas id="confetti"></canvas>
 
   <div id="result-screen">
     <h1>you made it out</h1>
@@ -123,20 +101,20 @@
     <a href="/">← Back to Iantopia</a>
   </div>
 
-  <audio id="sfx-oops" src="/maze-game/oops.mp3" preload="auto"></audio>
   <audio id="sfx-scream" src="/maze-game/scream.mp3" preload="auto"></audio>
+  <audio id="sfx-cheer" src="/maze-game/cheer.mp3" preload="auto"></audio>
 
 <script is:inline>
 (() => {
   const canvas = document.getElementById('maze');
   const ctx = canvas.getContext('2d');
-  const hudTries = document.getElementById('hud-tries');
-  const startScreen = document.getElementById('start-screen');
-  const startBtn = document.getElementById('start-btn');
+  const hud = document.getElementById('hud');
   const jumpscare = document.getElementById('jumpscare');
   const resultScreen = document.getElementById('result-screen');
-  const sfxOops = document.getElementById('sfx-oops');
+  const confettiCanvas = document.getElementById('confetti');
+  const confettiCtx = confettiCanvas.getContext('2d');
   const sfxScream = document.getElementById('sfx-scream');
+  const sfxCheer = document.getElementById('sfx-cheer');
 
   // Normalized (0..1) waypoints -- a single winding corridor, not a
   // branching maze, same as the classic prank this page recreates. Scaled
@@ -156,8 +134,11 @@
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth; H = window.innerHeight;
-    PAD = Math.min(W, H) * 0.06;
+    // Square board: the smaller of width/height, with a margin, instead of
+    // stretching to fill a rectangular viewport.
+    const side = Math.min(window.innerWidth, window.innerHeight) * 0.88;
+    W = side; H = side;
+    PAD = side * 0.06;
     canvas.width = W * dpr; canvas.height = H * dpr;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -180,22 +161,19 @@
 
   function draw() {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-    // Floor, drawn as a sequence of thick round-jointed strokes so each
-    // segment can have its own (narrowing) width.
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // Floor: flat light cyan-blue, square (butt-cap/miter) joints instead
+    // of rounded, for the blockier look.
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    ctx.strokeStyle = '#7de8ff';
     for (let i = 1; i < path.length; i++) {
-      const w = widthAt((cumLen[i - 1] + cumLen[i]) / 2);
-      const grad = ctx.createLinearGradient(path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]);
-      grad.addColorStop(0, '#2a1240'); grad.addColorStop(1, '#180a28');
-      ctx.strokeStyle = grad; ctx.lineWidth = w;
+      ctx.lineWidth = widthAt((cumLen[i - 1] + cumLen[i]) / 2);
       ctx.beginPath(); ctx.moveTo(...path[i - 1]); ctx.lineTo(...path[i]); ctx.stroke();
     }
-    // A faint inner glow line down the centre, purple/orange like the theme.
-    ctx.strokeStyle = 'rgba(255,111,0,.18)'; ctx.lineWidth = 2;
-    ctx.beginPath(); path.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.stroke();
-    // Start and end markers.
-    ctx.fillStyle = '#39ff14'; ctx.beginPath(); ctx.arc(path[0][0], path[0][1], 10, 0, 7); ctx.fill();
-    ctx.fillStyle = '#ff6f00'; ctx.beginPath(); ctx.arc(path[path.length - 1][0], path[path.length - 1][1], 12, 0, 7); ctx.fill();
+    // Square start/end markers (not circles), matching the dot.
+    ctx.fillStyle = '#ff2d2d';
+    ctx.fillRect(path[0][0] - 7, path[0][1] - 7, 14, 14);
+    ctx.fillStyle = '#ff2d2d';
+    ctx.fillRect(path[path.length - 1][0] - 8, path[path.length - 1][1] - 8, 16, 16);
   }
 
   // Signed distance from (x,y) to the nearest point on the path, plus the
@@ -216,51 +194,132 @@
     return { dist: best, len: bestLen };
   }
 
-  let playing = false, tries = 0, dotX = 0, dotY = 0, armed = false;
-  function resetToStart() {
-    dotX = path[0][0]; dotY = path[0][1];
-    armed = false; // a brief grace window right after a reset/start, so landing back on the dot doesn't instantly re-trigger
-    setTimeout(() => { armed = true; }, 400);
+  function inCorridor(x, y) {
+    const { dist, len } = nearest(x, y);
+    return dist <= widthAt(len) / 2;
   }
 
-  function pointerPos(e) {
+  // The dot is a virtual point, not the system cursor -- a web page can't
+  // move the real cursor. Once picked up, the pointer is locked (hidden,
+  // relative movement only), so the dot can only travel the way the mouse
+  // actually moves. The cursor can't jump across the maze to the end.
+  let playing = false, over = false, hasStarted = false;
+  let dotX = 0, dotY = 0, lastTouchX = 0, lastTouchY = 0;
+
+  function resetDot() {
+    dotX = path[0][0]; dotY = path[0][1];
+  }
+
+  function localPos(e) {
     const r = canvas.getBoundingClientRect();
     const t = e.touches && e.touches[0];
     return { x: (t ? t.clientX : e.clientX) - r.left, y: (t ? t.clientY : e.clientY) - r.top };
   }
 
-  function onMove(e) {
-    if (!playing) return;
-    const p = pointerPos(e);
-    dotX = p.x; dotY = p.y;
-    const { dist, len } = nearest(dotX, dotY);
-    const corridor = widthAt(len) / 2;
-    if (armed && dist > corridor) {
-      tries++; hudTries.textContent = tries;
-      try { sfxOops.currentTime = 0; sfxOops.volume = 0.6; sfxOops.play().catch(() => {}); } catch {}
-      flashRed();
-      resetToStart();
-      return;
+  function nearDot(x, y) {
+    return Math.hypot(x - dotX, y - dotY) < 24;
+  }
+
+  // Move the dot in small steps, so a fast flick can't jump over a wall
+  // between two input events.
+  function moveTo(tx, ty) {
+    const dx = tx - dotX, dy = ty - dotY;
+    const steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / 2));
+    for (let i = 1; i <= steps; i++) {
+      dotX += dx / steps; dotY += dy / steps;
+      if (!inCorridor(dotX, dotY)) { caught(); return; }
     }
-    // Reached the end: close enough to the final waypoint.
     const end = path[path.length - 1];
-    if (Math.hypot(dotX - end[0], dotY - end[1]) < 16) { win(); return; }
+    if (Math.hypot(dotX - end[0], dotY - end[1]) < 16) win();
   }
 
-  function flashRed() {
-    ctx.fillStyle = 'rgba(255,0,0,.35)'; ctx.fillRect(0, 0, W, H);
-    setTimeout(draw, 90);
+  function caught() {
+    over = true; playing = false;
+    if (document.pointerLockElement) document.exitPointerLock();
+    jumpscare.classList.add('show');
+    try { sfxScream.currentTime = 0; sfxScream.volume = 0.85; sfxScream.play().catch(() => {}); } catch {}
+    setTimeout(() => { location.href = '/'; }, 1900);
   }
 
-  function renderDot() {
-    draw();
+  function win() {
+    over = true; playing = false;
+    if (document.pointerLockElement) document.exitPointerLock();
+    grantJobApplication();
+    showConfetti();
+    try { sfxCheer.currentTime = 0; sfxCheer.volume = 0.8; sfxCheer.play().catch(() => {}); } catch {}
+    setTimeout(() => {
+      confettiCanvas.style.display = 'none';
+      resultScreen.classList.add('show');
+    }, 3600);
+  }
+
+  function showConfetti() {
+    confettiCanvas.style.display = 'block';
+    confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight;
+    const colors = ['#ff2d2d', '#00e5ff', '#ff6f00', '#39ff14', '#ffd600', '#ff4fd8'];
+    const pieces = Array.from({ length: 220 }, () => ({
+      x: Math.random() * confettiCanvas.width,
+      y: -Math.random() * confettiCanvas.height * 0.5,
+      vx: (Math.random() - 0.5) * 4,
+      vy: 2 + Math.random() * 4,
+      s: 6 + Math.random() * 6,
+      r: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.3,
+      c: colors[Math.floor(Math.random() * colors.length)],
+    }));
+    const end = performance.now() + 3400;
+    (function frame(now) {
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      for (const p of pieces) {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.03; p.r += p.vr;
+        confettiCtx.save();
+        confettiCtx.translate(p.x, p.y); confettiCtx.rotate(p.r);
+        confettiCtx.fillStyle = p.c;
+        confettiCtx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+        confettiCtx.restore();
+      }
+      if (now < end) requestAnimationFrame(frame);
+    })(performance.now());
+  }
+
+  // Click the dot to pick it up (or resume after Esc).
+  canvas.addEventListener('click', (e) => {
+    if (playing || over) return;
+    const p = localPos(e);
+    if (nearDot(p.x, p.y)) canvas.requestPointerLock();
+  });
+
+  document.addEventListener('pointerlockchange', () => {
+    if (over) return;
+    const locked = document.pointerLockElement === canvas;
+    playing = locked;
+    if (locked) hasStarted = true;
+    document.body.style.cursor = locked ? 'none' : 'default';
+    hud.textContent = locked
+      ? "Esc pauses. Don't touch the black walls."
+      : (hasStarted ? 'Click the red square to resume.' : 'Click the red square to pick it up.');
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (playing) moveTo(dotX + e.movementX, dotY + e.movementY);
+  });
+
+  // Touch has no pointer lock, so the dot follows finger movement instead
+  // of the finger's absolute position.
+  canvas.addEventListener('touchstart', (e) => {
+    if (over) return;
+    const p = localPos(e);
+    if (!playing && nearDot(p.x, p.y)) { playing = true; hasStarted = true; }
+    lastTouchX = p.x; lastTouchY = p.y;
+    hud.textContent = "Don't touch the black walls.";
+  }, { passive: true });
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
     if (!playing) return;
-    ctx.fillStyle = '#fff';
-    ctx.shadowColor = '#ff6f00'; ctx.shadowBlur = 14;
-    ctx.beginPath(); ctx.arc(dotX, dotY, 6, 0, 7); ctx.fill();
-    ctx.shadowBlur = 0;
-    requestAnimationFrame(renderDot);
-  }
+    const p = localPos(e);
+    moveTo(dotX + p.x - lastTouchX, dotY + p.y - lastTouchY);
+    lastTouchX = p.x; lastTouchY = p.y;
+  }, { passive: false });
 
   function grantJobApplication() {
     try {
@@ -275,29 +334,24 @@
     } catch {}
   }
 
-  function win() {
-    playing = false;
-    jumpscare.classList.add('show');
-    try { sfxScream.currentTime = 0; sfxScream.volume = 0.85; sfxScream.play().catch(() => {}); } catch {}
-    grantJobApplication();
-    setTimeout(() => {
-      jumpscare.classList.remove('show');
-      resultScreen.classList.add('show');
-    }, 1900);
+  function loop() {
+    draw();
+    ctx.fillStyle = '#ff0000';
+    ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10;
+    ctx.fillRect(dotX - 6, dotY - 6, 12, 12);
+    ctx.shadowBlur = 0;
+    requestAnimationFrame(loop);
   }
 
-  startBtn.addEventListener('click', () => {
-    startScreen.classList.add('hidden');
-    playing = true; tries = 0; hudTries.textContent = '0';
-    resetToStart();
-    renderDot();
+  window.addEventListener('resize', () => {
+    resize();
+    // The board moved, so the dot goes back to the start and the game pauses.
+    if (document.pointerLockElement) document.exitPointerLock();
+    resetDot();
   });
-
-  canvas.addEventListener('mousemove', onMove);
-  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e); }, { passive: false });
-
-  window.addEventListener('resize', resize);
   resize();
+  resetDot();
+  loop();
 })();
 </script>
 </body>

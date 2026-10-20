@@ -6,7 +6,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Glorious Iantopia</title>
+  <title>Haunted Iantopia</title>
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
   <link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
@@ -34,6 +34,31 @@
       box-sizing: border-box;
     }
 
+    /* Ghostly title: the whole heading drifts up and down, fading in and
+       out, and a dimmer copy of the name trails behind it. The motion sits
+       on the wrapper, not the h1, so no theme's h1 animation overrides it. */
+    .ghost-title { animation: ghostFloat 3.2s ease-in-out infinite; }
+    .ghost-title h1 { position: relative; isolation: isolate; }
+    .ghost-title h1::before {
+      content: attr(data-ghost);
+      position: absolute; inset: 0;
+      color: rgba(190, 255, 255, 0.55);
+      -webkit-text-stroke: 0;
+      text-shadow: none;
+      filter: blur(3px);
+      text-align: center;
+      pointer-events: none;
+      z-index: -1;
+      animation: ghostTrace 3.2s ease-in-out infinite;
+    }
+    @keyframes ghostFloat {
+      0%, 100% { transform: translateY(-10px); opacity: 0.55; }
+      50%      { transform: translateY(10px);  opacity: 1; }
+    }
+    @keyframes ghostTrace {
+      0%, 100% { transform: translateY(18px);  opacity: 0; }
+      50%      { transform: translateY(-18px); opacity: 0.5; }
+    }
     @keyframes titleGlow {
       0%, 100% {
         text-shadow: 0 0 10px rgba(255, 235, 59, 0.3), 0 0 20px rgba(255, 152, 86, 0.2);
@@ -1667,7 +1692,7 @@
     })();
   </script>
 
-  <h1>Glorious I<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span>ntopi<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span></h1>
+  <div class="ghost-title"><h1 data-ghost="Haunted Iantopia">Haunted I<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span>ntopi<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span></h1></div>
 
   <div class="button-grid">
     <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
@@ -2351,10 +2376,22 @@
       let activeBgKey = 'default';
       function getActiveBgKey() {
         const key = localStorage.getItem(ACTIVE_BG_KEY);
-        if (key && BG_LIBRARY[key]) return key;
-        // No explicit pick saved: the Halloween background for all of
-        // October, Taipei otherwise -- see getActiveTrackKey() above for
-        // why this resolves fresh each load instead of writing a choice.
+        // key !== 'default' matters: a returning visitor's storage very
+        // often already holds the literal string "default" (the picker
+        // writes it back on every open, not just on a real change), which
+        // the old `key && BG_LIBRARY[key]` check treated as just as
+        // "explicit" as actually picking Vegas or Minecraft -- so it never
+        // fell through to the seasonal check below, and the whole page
+        // stayed on Taipei/white-title/plain-buttons for anyone who'd ever
+        // visited before. getActiveTrackKey() already excluded it; this
+        // one didn't, which is exactly why music switched to Ghost House
+        // but the background (and therefore the title/button theme, both
+        // driven off this) silently didn't.
+        if (key && key !== 'default' && BG_LIBRARY[key]) return key;
+        // No explicit (non-default) pick saved: the Halloween background
+        // for all of October, Taipei otherwise -- see getActiveTrackKey()
+        // above for why this resolves fresh each load instead of writing a
+        // choice.
         return (window.isHalloweenSeason() && BG_LIBRARY.halloween_theme) ? 'halloween_theme' : 'default';
       }
       // Same fix as every other page's pickers.js already has: without this,
