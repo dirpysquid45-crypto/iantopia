@@ -7,9 +7,21 @@ Upstream commit: 51154f2ecb21ced1c56a0a142f8885b633e31d5e
 `ng build --configuration production --aot --base-href "/mah/"`
 (Angular 22, Node 26). The license is in `public/mah/LICENSE.txt`.
 
-Iantopia's only change is in `patch-mah-solved.diff`: when a board is won, the
-game posts `{ type: 'mah-solved' }` to its parent page (same origin), which
-`src/pages/solitaire.astro` uses to pay Strubles.
+Iantopia's changes are in `patch-mah.diff` (text files only; the binary assets
+are listed below):
+
+- A won board posts `{ type: 'mah-solved' }` to its parent page (same origin),
+  which `src/pages/solitaire.astro` uses to pay Strubles.
+- Pixel font (Press Start 2P) for the game's text.
+- Bamboo panel as the background (`src/assets/bg/bamboo.jpg`, from
+  Bamboo-panel.jpg), with black text that has a white glow.
+- Background music that cycles through three tracks while a game runs
+  (`src/assets/music/`: avatars-love.mp3, fei-yu-yi-jian-mei.mp3,
+  ninjago-overture.mp3, all 128 kbps), with a music button and a volume slider
+  in the bottom menu, saved in localStorage as `mah_music_volume`. Music is on
+  by default.
+- Sound effects added for an Oops on a wrong pick and a card sound on a match
+  (`src/assets/sfx/`). The game's own synthesized sounds are still there.
 
 To rebuild: clone upstream at the commit above, apply the patch with
 `git apply patch-mah-solved.diff`, run `npm ci`, then the build command above,

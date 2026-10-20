@@ -1,0 +1,305 @@
+diff --git a/src/app/components/controls-bottom/controls-bottom.component.html b/src/app/components/controls-bottom/controls-bottom.component.html
+index c867865..80c68f1 100644
+--- a/src/app/components/controls-bottom/controls-bottom.component.html
++++ b/src/app/components/controls-bottom/controls-bottom.component.html
+@@ -23,6 +23,12 @@
+ 		<button type="button" class="button" [class.inactive]="!app.settings.sounds()" (click)="app.toggleSound()" title="{{'AUDIO_SOUNDS' | translate}}" [attr.aria-label]="'AUDIO_SOUNDS' | translate" [attr.aria-checked]="app.settings.sounds()" role="menuitemcheckbox">
+ 			<app-icon-mute/>
+ 		</button>
++		<div class="music-control">
++			<button type="button" class="button" [class.inactive]="!app.settings.music()" (click)="app.toggleMusic()" title="Music" aria-label="Music" [attr.aria-checked]="app.settings.music()" role="menuitemcheckbox">
++				<span aria-hidden="true">♪</span>
++			</button>
++			<input type="range" class="music-volume" min="0" max="100" step="5" [value]="app.musicVolumePercent()" (input)="app.setMusicVolume(+$any($event.target).value)" aria-label="Music volume" title="Music volume" />
++		</div>
+ 		<button type="button" class="button" (click)="infoEvent.emit()" title="{{'TILES_INFO' | translate}}" [attr.aria-label]="'TILES_INFO' | translate" role="menuitem">
+ 			<app-icon-tilesinfo/>
+ 		</button>
+diff --git a/src/app/components/controls-bottom/controls-bottom.component.scss b/src/app/components/controls-bottom/controls-bottom.component.scss
+index 0dd930c..5f3c5e5 100644
+--- a/src/app/components/controls-bottom/controls-bottom.component.scss
++++ b/src/app/components/controls-bottom/controls-bottom.component.scss
+@@ -80,3 +80,16 @@
+ 		}
+ 	}
+ }
++
++// Iantopia: the music button and its volume slider, sitting side by side in the menu.
++.music-control {
++	display: flex;
++	align-items: center;
++	gap: 6px;
++}
++
++.music-volume {
++	width: 72px;
++	accent-color: #fff;
++	cursor: pointer;
++}
+diff --git a/src/app/components/game/game-component.component.ts b/src/app/components/game/game-component.component.ts
+index 1550972..9c60555 100644
+--- a/src/app/components/game/game-component.component.ts
++++ b/src/app/components/game/game-component.component.ts
+@@ -118,7 +118,13 @@ export class GameComponent {
+ 
+ 	constructor() {
+ 		this.game = this.app.game;
+-		this.game.onWin = () => this.triggerConfetti();
++		this.game.onWin = () => {
++			this.triggerConfetti();
++			// Iantopia patch: tell the page hosting this game (same origin) that a board was solved, so it can pay out.
++			if (window.parent !== window) {
++				window.parent.postMessage({ type: 'mah-solved' }, window.location.origin);
++			}
++		};
+ 		this.game.onChallengeEnd = outcome => {
+ 			const challenge = outcome.challenge;
+ 			if (!challenge.dayKey) {
+diff --git a/src/app/model/game.ts b/src/app/model/game.ts
+index d3f0158..1ccbca7 100644
+--- a/src/app/model/game.ts
++++ b/src/app/model/game.ts
+@@ -2,7 +2,7 @@ import { computed, signal } from '@angular/core';
+ import { Board } from './board';
+ import { Clock } from './clock';
+ import { GAME_MODE_CHALLENGE, GAME_MODE_EASY, GAME_MODE_EXPERT, type GAME_MODE_ID, GAME_MODE_ID_DEFAULT, RESCUE_SHUFFLE_ATTEMPTS, STATES, isPlayableTileCount } from './consts';
+-import { SOUNDS, Sound } from './sound';
++import { SOUNDS, SFX_CARD, SFX_OOPS, Sound } from './sound';
+ import type { Stone } from './stone';
+ import type { GameStateStore, Layout, StorageProvider } from './types';
+ import { type BUILD_MODE_ID, MODE_SOLVABLE } from './builder';
+@@ -95,6 +95,11 @@ export class Game {
+ 		if (!stone.hinted()) {
+ 			this.board.clearHints();
+ 		}
++		// Iantopia: a second tile that doesn't match the selected one is a wrong pick.
++		if (this.board.selected && this.board.selected !== stone) {
++			this.sound.playFile(SFX_OOPS);
++			this.wiggleStone(stone);
++		}
+ 		this.board.setStoneSelected(this.board.selected === stone ? undefined : stone);
+ 		this.sound.play(SOUNDS.SELECT);
+ 		if (this.board.selected && this.ruleMode() === GAME_MODE_EASY) {
+@@ -354,7 +359,7 @@ export class Game {
+ 			}
+ 			this.gameOverLosing();
+ 		} else {
+-			this.sound.play(SOUNDS.MATCH);
++			this.sound.playFile(SFX_CARD);
+ 			this.delayedSave();
+ 			return true;
+ 		}
+diff --git a/src/app/model/music.ts b/src/app/model/music.ts
+index a49ac03..195268f 100644
+--- a/src/app/model/music.ts
++++ b/src/app/model/music.ts
+@@ -1,19 +1,85 @@
++// Iantopia: the background music cycles through these tracks in order, looping
++// back to the first, while a game is running. Music is only audible when the
++// music setting is on (game.music.enabled) and the game is being played.
++const TRACKS = [
++	'assets/music/avatars-love.mp3',
++	'assets/music/fei-yu-yi-jian-mei.mp3',
++	'assets/music/ninjago-overture.mp3',
++];
++
++const VOLUME_KEY = 'mah_music_volume';
++
+ export class Music {
+ 	enabled: boolean = false;
++	// 0 to 1. Saved between visits, and applied to the track that is playing.
++	volume: number = Music.savedVolume();
++	private audio?: HTMLAudioElement;
++	private index = 0;
++
++	private static savedVolume(): number {
++		try {
++			const saved = Number.parseFloat(localStorage.getItem(VOLUME_KEY) ?? '');
++			if (Number.isFinite(saved)) {
++				return Math.max(0, Math.min(1, saved));
++			}
++		} catch {
++			// no storage: use the default
++		}
++		return 0.35;
++	}
++
++	setVolume(value: number): void {
++		this.volume = Math.max(0, Math.min(1, value));
++		if (this.audio) {
++			this.audio.volume = this.volume;
++		}
++		try {
++			localStorage.setItem(VOLUME_KEY, String(this.volume));
++		} catch {
++			// not saved, but still applied
++		}
++	}
+ 
+-	play() {
+-		// not yet implemented
++	play(): void {
++		if (!this.enabled) {
++			return;
++		}
++		const audio = this.current();
++		void audio.play().catch(() => {});
+ 	}
+ 
+-	pause() {
+-		// not yet implemented
++	pause(): void {
++		this.audio?.pause();
+ 	}
+ 
+-	toggle() {
+-		// not yet implemented
++	toggle(): void {
++		if (this.enabled) {
++			this.play();
++		} else {
++			this.pause();
++		}
+ 	}
+ 
+ 	toggleMusic(): void {
+-		// not yet implemented
++		this.toggle();
++	}
++
++	private current(): HTMLAudioElement {
++		if (!this.audio) {
++			const audio = new Audio(TRACKS[this.index]);
++			audio.volume = this.volume;
++			audio.addEventListener('ended', () => this.next());
++			this.audio = audio;
++		}
++		return this.audio;
++	}
++
++	private next(): void {
++		this.index = (this.index + 1) % TRACKS.length;
++		const audio = this.current();
++		audio.src = TRACKS[this.index];
++		if (this.enabled) {
++			void audio.play().catch(() => {});
++		}
+ 	}
+ }
+diff --git a/src/app/model/settings.ts b/src/app/model/settings.ts
+index e6516bb..c8ca50f 100644
+--- a/src/app/model/settings.ts
++++ b/src/app/model/settings.ts
+@@ -10,7 +10,7 @@ export class Settings {
+ 	readonly buildMode = signal<BUILD_MODE_ID>(MODE_SOLVABLE);
+ 	readonly sounds = signal(true);
+ 	readonly tileset = signal(ImageSetDefault);
+-	readonly music = signal(false);
++	readonly music = signal(true);
+ 	readonly contrast = signal(false);
+ 	readonly dark = signal(false);
+ 	readonly tile3d = signal(true);
+diff --git a/src/app/model/sound.ts b/src/app/model/sound.ts
+index b0d77d1..68f1d0c 100644
+--- a/src/app/model/sound.ts
++++ b/src/app/model/sound.ts
+@@ -26,4 +26,23 @@ export class Sound {
+ 			// nope, we ignore platforms which do not support web audio
+ 		}
+ 	}
++
++	// Iantopia: sound files shipped with the app (see assets/sfx). Each play
++	// makes its own element, so quick repeats can overlap instead of cutting off.
++	playFile(src: string, volume: number = 0.6): void {
++		if (!this.enabled) {
++			return;
++		}
++		try {
++			const audio = new Audio(src);
++			audio.volume = volume;
++			void audio.play().catch(() => {});
++		} catch {
++			// no audio support on this platform
++		}
++	}
+ }
++
++// Iantopia: the wrong-pick sound, and the card sound for a matched pair.
++export const SFX_OOPS = 'assets/sfx/oops.mp3';
++export const SFX_CARD = 'assets/sfx/card-slide.ogg';
+diff --git a/src/app/service/app.service.ts b/src/app/service/app.service.ts
+index fdbbbba..9ea069d 100644
+--- a/src/app/service/app.service.ts
++++ b/src/app/service/app.service.ts
+@@ -61,6 +61,14 @@ export class AppService implements OnDestroy {
+ 		this.settings.save();
+ 	}
+ 
++	musicVolumePercent(): number {
++		return Math.round(this.game.music.volume * 100);
++	}
++
++	setMusicVolume(percent: number): void {
++		this.game.music.setVolume(percent / 100);
++	}
++
+ 	toggleMusic(): void {
+ 		this.settings.music.set(!this.settings.music());
+ 		this.game.music.enabled = this.settings.music();
+diff --git a/src/app/style/_variables.scss b/src/app/style/_variables.scss
+index 9cafe12..0efb0ea 100755
+--- a/src/app/style/_variables.scss
++++ b/src/app/style/_variables.scss
+@@ -1,4 +1,4 @@
+-$text-font: 'Kulim Park', 'Tahoma', sans-serif;
++$text-font: 'Press Start 2P', ui-monospace, monospace;
+ $logo-color: red;
+ 
+ // Font-Size
+diff --git a/src/index.html b/src/index.html
+index 2a05ace..848e6d5 100644
+--- a/src/index.html
++++ b/src/index.html
+@@ -14,6 +14,9 @@
+ 	<meta name="msapplication-TileColor" content="#00aba9">
+ 	<meta name="msapplication-config" content="assets/app/browserconfig.xml">
+ 	<meta name="theme-color" content="#2b424f">
++	<link rel="preconnect" href="https://fonts.googleapis.com">
++	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
++	<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+ 	<title>{{APP_NAME}}</title>
+ 	<link rel="canonical" href="{{APP_URL}}">
+ 	<meta name="apple-mobile-web-app-title" content="{{APP_NAME}}">
+diff --git a/src/styles.scss b/src/styles.scss
+index 0820bb2..9ef7efa 100644
+--- a/src/styles.scss
++++ b/src/styles.scss
+@@ -81,6 +81,28 @@ html {
+ 	--dialog-background-text-color: #256d02;
+ 
+ 	background-color: var(--main-bg-color);
++	// Iantopia: the bamboo panel backdrop.
++	background-image: url('assets/bg/bamboo.jpg');
++	background-size: cover;
++	background-position: center;
++	background-attachment: fixed;
++}
++
++// Iantopia: the game's text is black with a white glow, so it reads on the bamboo.
++app-root,
++app-root * {
++	color: #000 !important;
++	text-shadow: 0 0 3px #fff, 0 0 8px #fff, 0 0 14px #fff !important;
++}
++
++// Iantopia: let the bamboo show through the page body too.
++body {
++	background-color: transparent !important;
++}
++
++// Iantopia: let the bamboo show through behind the board.
++app-game-component {
++	background: transparent !important;
+ }
+ 
+ // android browsers keep their viewport clear of the system bars but report those bars as safe area
