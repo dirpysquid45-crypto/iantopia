@@ -8,6 +8,7 @@
 <title>Puzzles</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="stylesheet" href="/card-stack.css?v=1">
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -36,13 +37,13 @@
   <a class="back" href="/">← Iantopia</a>
   <h1>🧩 PUZZLES</h1>
   <p class="sub">Brain teasers and games of skill. Some pay Strubles.</p>
-  <div class="cards">
-    <div class="card">
+  <div class="card-stack" style="--stack-h: 200px">
+    <div class="card stack-card" style="--i: 0">
       <h2>💣 Minesweeper</h2>
       <p>Clear the board without hitting a mine. Beginner, Intermediate, Expert, and the Strait of Hormuz. Win-loss is on the leaderboard.</p>
       <a href="/minesweeper">Play Now</a>
     </div>
-    <div class="card new">
+    <div class="card stack-card new" style="--i: 1">
       <h2>🀄 Mahjong Solitaire</h2>
       <p>Match the free tiles until the board is clear. Solve a board to earn Strubles, up to 10 boards a day.</p>
       <a href="/solitaire">Play Now</a>

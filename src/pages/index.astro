@@ -236,40 +236,37 @@
       a.big::before, button.big::before { display: none; }
     }
 
-    /* The menu is a stack of cards, each one overlapping the card above, the way
-       a hand of cards or a pile of tickets sits. Later buttons paint on top, so
-       every label shows in the strip above the next card. Hovering lifts a card
-       out of the stack and straightens it; on load the cards drop in one after
-       another. Reduced-motion visitors get the same stack, still, with no tilt. */
+    /* The menu is one column of large buttons with room between them, so the
+       page scrolls and nothing is crammed. Each button drops in one after
+       another on load and lifts a little on hover. Reduced-motion visitors
+       get the same layout without the animation. */
     .button-grid {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 0;
-      max-width: 380px;
+      gap: 30px;
+      max-width: 560px;
       width: 100%;
-      margin: 18px auto 0;
-      padding: 0 16px 12px;
+      margin: 36px auto 0;
+      padding: 0 16px 56px;
     }
     .button-grid > .big {
       position: relative;
       width: 100%;
-      max-width: 340px;
-      height: 68px;
-      margin: -22px 0 0;
-      padding: 14px 22px 0;
-      display: block;
+      max-width: 520px;
+      min-height: 92px;
+      margin: 0;
+      padding: 26px 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       text-align: center;
-      line-height: 1.2;
-      font-size: clamp(15px, 2.2vw, 21px);
-      box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.5), 0 10px 22px rgba(0, 0, 0, 0.35);
-      transform: rotate(-0.4deg);
-      transform-origin: 50% 100%;
+      line-height: 1.25;
+      font-size: clamp(18px, 2.6vw, 26px);
+      box-shadow: 0 12px 26px rgba(0, 0, 0, 0.4);
       transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.3s;
       animation: stackDrop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards;
     }
-    .button-grid > .big:first-child { margin-top: 0; }
-    .button-grid > .big:nth-child(even) { transform: rotate(0.45deg); }
     .button-grid > .big:nth-child(1) { animation-delay: 0ms; }
     .button-grid > .big:nth-child(2) { animation-delay: 80ms; }
     .button-grid > .big:nth-child(3) { animation-delay: 160ms; }
@@ -281,13 +278,12 @@
     .button-grid > .big:nth-child(9) { animation-delay: 640ms; }
     .button-grid > .big:nth-child(10) { animation-delay: 720ms; }
     .button-grid > .big:hover {
-      z-index: 20;
-      transform: translateY(-8px) rotate(0deg) scale(1.03);
-      box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.4), 0 18px 30px rgba(0, 0, 0, 0.5);
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: 0 18px 32px rgba(0, 0, 0, 0.5);
       animation: none;
     }
     .button-grid > .big:active {
-      transform: translateY(-2px) rotate(0deg) scale(0.99);
+      transform: translateY(-1px) scale(0.99);
     }
     @keyframes stackDrop {
       0% { opacity: 0; transform: translateY(-48px) rotate(-8deg); }
@@ -296,7 +292,6 @@
     }
     @media (prefers-reduced-motion: reduce) {
       .button-grid > .big,
-      .button-grid > .big:nth-child(even),
       .button-grid > .big:hover { animation: none; transform: none; }
     }
 
@@ -1649,10 +1644,11 @@
   <div id="halloween-gift-toast" role="status" aria-live="polite"></div>
   <div id="spider-crawler" aria-hidden="true"><img src="/assets/decorations/spider-crawl.webp" alt="" /></div>
   <script is:inline>
-    // The spider crosses the screen from one side to the other, fast (about
-    // 2 to 3 seconds), at a random height, now and then (every 20 to 55
-    // seconds). It starts and ends fully off screen. Only during the Halloween
-    // theme, and never for people who asked their system for reduced motion.
+    // The spider drops from the top of the screen to the bottom, straight down,
+    // at a random horizontal position, fast (about 2 to 3 seconds), now and
+    // then (every 20 to 55 seconds). It starts and ends fully off screen. Only
+    // during the Halloween theme, and never for people who asked their system
+    // for reduced motion.
     (function () {
       const el = document.getElementById('spider-crawler');
       if (!el) return;
@@ -1662,16 +1658,12 @@
         running = true;
         const w = el.offsetWidth || 300, h = el.offsetHeight || 414;
         const vw = window.innerWidth, vh = window.innerHeight;
-        const fromLeft = Math.random() < 0.5;
-        const y = Math.round((vh - h) * (0.05 + Math.random() * 0.8));
-        const sx = fromLeft ? 1 : -1;
-        const from = fromLeft ? -w - 4 : vw + 4;
-        const to = fromLeft ? vw + 4 : -w - 4;
+        const x = Math.round((vw - w) * (0.05 + Math.random() * 0.9));
         el.style.opacity = '1';
         const anim = el.animate([
-          { transform: `translate(${from}px, ${y}px) scaleX(${sx})` },
-          { transform: `translate(${to}px, ${y}px) scaleX(${sx})` },
-        ], { duration: 2000 + Math.random() * 1000, easing: 'linear', fill: 'forwards' });
+          { transform: `translate(${x}px, ${-h - 4}px)` },
+          { transform: `translate(${x}px, ${vh + 4}px)` },
+        ], { duration: 2400 + Math.random() * 1000, easing: 'linear', fill: 'forwards' });
         anim.onfinish = () => { el.style.opacity = '0'; anim.cancel(); running = false; };
       }
       function schedule() {
