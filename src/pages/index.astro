@@ -1058,31 +1058,22 @@
     body.theme-halloween .flip-card img {
       box-shadow: 0 0 40px rgba(94,23,168,.65), 0 0 80px rgba(94,23,168,.4), inset 0 0 30px rgba(94,23,168,.3);
     }
-    /* Crawling spider: hangs on a thread at the right edge and lowers, then
-       climbs back up, looping slowly. Decorative only (pointer-events off,
-       hidden from assistive tech), and only shown during the Halloween theme,
-       so it disappears on November 1st with the rest of the theme. */
+    /* The clickable word "Haunted" in the title. */
+    .haunted-word { cursor: pointer; border-radius: 2px; transition: text-shadow .2s; }
+    .haunted-word:hover, .haunted-word:focus-visible { text-shadow: 0 0 14px rgba(255,111,0,.9); outline: none; }
+    /* Crawling spider: appears now and then, crawls across the page, and is
+       gone again. Decorative only (pointer-events off, hidden from assistive
+       tech), and only during the Halloween theme, so it goes with the rest of
+       the theme on November 1st. The JavaScript below drives the movement. */
     #spider-crawler { display: none; }
     body.theme-halloween #spider-crawler {
-      display: block; position: fixed; top: 0; right: 4vw; z-index: 4;
-      width: clamp(70px, 9vw, 120px); pointer-events: none;
-      animation: spiderDescend 22s ease-in-out infinite;
-      transform-origin: top center;
-    }
-    body.theme-halloween #spider-crawler::before {
-      content: ""; position: absolute; left: 50%; bottom: 100%; height: 100vh;
-      width: 1px; background: rgba(255,255,255,.45);
+      display: block; position: fixed; left: 0; top: 0; z-index: 4;
+      width: clamp(70px, 9vw, 110px); pointer-events: none; opacity: 0;
+      will-change: transform;
     }
     body.theme-halloween #spider-crawler img {
       display: block; width: 100%; height: auto;
       filter: drop-shadow(0 0 6px rgba(94,23,168,.9)) drop-shadow(0 0 14px rgba(255,111,0,.45));
-    }
-    @keyframes spiderDescend {
-      0%, 100% { transform: translateY(0); }
-      45%, 55% { transform: translateY(min(55vh, 420px)); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      body.theme-halloween #spider-crawler { animation: none; }
     }
     /* Buttons cycle through the three theme colours rather than one flat
        recolour — the three-colour "pumpkin / witch / radioactive" palette
@@ -1611,6 +1602,44 @@
   <div id="sakura-overlay" aria-hidden="true"></div>
   <div id="halloween-gift-toast" role="status" aria-live="polite"></div>
   <div id="spider-crawler" aria-hidden="true"><img src="/assets/decorations/spider-crawl.webp" alt="" /></div>
+  <script is:inline>
+    // The spider appears at random intervals (roughly every 25 to 70 seconds),
+    // crawls straight across the screen from one side to the other at a random
+    // height, then disappears. Only during the Halloween theme, and never for
+    // people who have asked their system for reduced motion.
+    (function () {
+      const el = document.getElementById('spider-crawler');
+      if (!el) return;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let running = false;
+      function crawl() {
+        if (running) return;
+        running = true;
+        const w = el.offsetWidth || 100, h = el.offsetHeight || 160;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const fromLeft = Math.random() < 0.5;
+        const y = Math.round(vh * (0.15 + Math.random() * 0.55)) - h / 2;
+        const drift = (Math.random() - 0.5) * 80;
+        const from = fromLeft ? -w - 10 : vw + 10;
+        const to = fromLeft ? vw + 10 : -w - 10;
+        const anim = el.animate([
+          { transform: `translate(${from}px, ${y}px) scaleX(${fromLeft ? 1 : -1})`, opacity: 0 },
+          { opacity: 1, offset: 0.08 },
+          { opacity: 1, offset: 0.92 },
+          { transform: `translate(${to}px, ${y + drift}px) scaleX(${fromLeft ? 1 : -1})`, opacity: 0 },
+        ], { duration: 9000 + Math.random() * 5000, easing: 'linear', fill: 'forwards' });
+        anim.onfinish = () => { el.style.opacity = '0'; anim.cancel(); running = false; schedule(); };
+      }
+      function schedule() {
+        if (reduced) return;
+        setTimeout(() => {
+          if (document.body.classList.contains('theme-halloween') && !running) crawl();
+          schedule();
+        }, 25000 + Math.random() * 45000);
+      }
+      schedule();
+    })();
+  </script>
   <!-- Free Halloween gift: everyone gets exactly one jack-o'-lantern, the
        first time they load the site in October. Not a case drop or a shop
        item (see case-data.js's comment on col_jackolantern) -- just
@@ -1732,7 +1761,7 @@
     })();
   </script>
 
-  <div class="ghost-title"><h1 data-ghost="Haunted Iantopia">Haunted I<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span>ntopi<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span></h1></div>
+  <div class="ghost-title"><h1 data-ghost="Haunted Iantopia"><span class="haunted-word" role="button" tabindex="0" title="Click for the spooky theme">Haunted</span> I<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span>ntopi<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span></h1></div>
 
   <div class="button-grid">
     <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
@@ -2439,6 +2468,28 @@
       // while the audio track kept its place, so the two drifted out of sync
       // (worse under lag, where the video reload itself takes a beat).
       const VIDEO_POS_KEY = 'home_video_pos_v1';
+
+      // Clicking the word "Haunted" switches this visitor to the spooky theme:
+      // the Halloween background (which applies the theme colours) and the
+      // Ghost House track, saved like any other pick. One-way on purpose; the
+      // Background picker changes it back.
+      (function () {
+        const word = document.querySelector('.haunted-word');
+        if (!word) return;
+        const goSpooky = () => {
+          if (document.body.classList.contains('theme-halloween')) return;
+          try { localStorage.setItem(ACTIVE_BG_KEY, 'halloween_theme'); } catch {}
+          applyBackground('halloween_theme');
+          activeTrackKey = 'ghost_house';
+          try { localStorage.setItem(ACTIVE_TRACK_KEY, activeTrackKey); } catch {}
+          applyActiveTrack(true);
+          window.dispatchEvent(new CustomEvent('active-track:changed', { detail: { key: activeTrackKey } }));
+        };
+        word.addEventListener('click', goSpooky);
+        word.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goSpooky(); }
+        });
+      })();
 
       function applyBackground(key) {
         const bg = BG_LIBRARY[key] || BG_LIBRARY.default;
