@@ -172,6 +172,14 @@ window.CASE_ITEMS = {
     col_smirnoff: { label: 'Smirnoff Ice',     tier: 'mil_spec',   img: '/assets/items/smirnoff-ice.png',       type: 'item', draggable: true, glow: true, collectible: true, size: 70 },
     col_tuffbear: { label: 'Tuff Ahh Bear',    tier: 'classified', img: '/assets/items/tuff-ahh-bear.png',      type: 'item', draggable: true, glow: true, collectible: true, size: 110 },
     col_modelo:  { label: 'Modelo Negra',      tier: 'restricted', img: '/assets/items/modelo-negra.png',       type: 'item', draggable: true, glow: true, collectible: true, size: 90 },
+    // Halloween-exclusive: neither is in any case's roll pool or the shop
+    // (no `collectible: true`) -- the jack-o'-lantern is a free gift every
+    // visitor gets once during October (see index.astro), and the job
+    // application is handed out specifically for finishing the maze
+    // (see scary-maze.astro). Each is granted directly to the inventory,
+    // not won.
+    col_jackolantern: { label: "Jack-o'-Lantern", tier: 'restricted', img: '/assets/items/jack-o-lantern.png', type: 'item', draggable: true, glow: true, size: 140 },
+    col_jobapplication: { label: 'Job Application Form', tier: 'covert', img: '/assets/decorations/job-application-form.png', type: 'item', draggable: true, glow: true, size: 120 },
   });
 })();
 

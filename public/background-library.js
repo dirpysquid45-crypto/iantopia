@@ -45,6 +45,15 @@ window.BACKGROUND_LIBRARY = {
   girl_like_me:     { label: 'PinkPantheress – Girl Like Me', type: 'video', src: '/video/girl-like-me.mp4', theme: 'theme-girl-like-me', comboTrack: 'girl_like_me' },
   minecraft:        { label: 'Minecraft',          type: 'video', src: '/video/minecraft-panorama.mp4', theme: 'theme-minecraft', comboTrack: 'minecraft_ost' },
   mongolia:         { label: 'Mongolia',           type: 'video', src: '/video/mongolia.mp4', theme: 'theme-mongolia' },
+  // Seasonal: index.astro resolves this as the home page's DEFAULT for all
+  // of October (see isHalloweenSeason()/getActiveBgKey() there), not
+  // through the picker or an unlock — nobody owns it, it's just what you
+  // get absent an explicit choice, the same way Taipei is every other
+  // month. No comboTrack here on purpose: that field persists its track to
+  // localStorage as if you'd picked it by hand, which would survive past
+  // October — the seasonal music default is resolved the same no-write way
+  // as the background, so November 1st reverts both with nothing to clean up.
+  halloween_theme:  { label: '🎃 Halloween Theme',  type: 'gif',   src: '/video/halloween-theme.gif', position: 'center', theme: 'theme-halloween' },
   // Unlike every other comboTrack, Orb of Dreamers is ALSO separately
   // unlockable/selectable (see case-data.js's mus_orb) -- owning just the
   // background still gets you the auto-switch on pick, same as always.

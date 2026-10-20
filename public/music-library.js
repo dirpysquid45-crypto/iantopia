@@ -37,6 +37,10 @@ window.MUSIC_LIBRARY = {
   hello_kitty:         { label: 'Hello Kitty',                       src: '/audio/music/hello-kitty.mp3' },
   girl_like_me:        { label: 'PinkPantheress – Girl Like Me',     src: '/audio/music/girl-like-me.mp3' },
   minecraft_ost:       { label: 'Minecraft OST (C418)',              src: '/audio/music/minecraft-ost.mp3' },
+  // Seasonal: index.astro resolves this as the home page's default track
+  // for October, the same no-persistent-write way it resolves the
+  // halloween_theme background -- see background-library.js's comment.
+  ghost_house:         { label: 'Ghost House',                      src: '/audio/music/ghost-house.mp3' },
 
   // --- Arena-only free defaults ---
   // koronba has no shop entry (Arena Battleship's page-only free

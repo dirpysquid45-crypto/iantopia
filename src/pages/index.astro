@@ -460,6 +460,17 @@
     }
     body.theme-hello-kitty #sakura-overlay { display: block; }
 
+    /* ---------- Halloween free-gift toast ---------- */
+    #halloween-gift-toast {
+      position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px);
+      z-index: 80; background: #1a0a00; border: 3px solid #ff6f00; color: #ffb74d;
+      padding: 12px 18px; font-family: 'Press Start 2P', cursive; font-size: 10px;
+      text-align: center; max-width: min(320px, 85vw); line-height: 1.8;
+      box-shadow: 0 0 24px rgba(255,111,0,.6), 0 0 48px rgba(94,23,168,.4);
+      opacity: 0; pointer-events: none; transition: opacity .4s ease, transform .4s ease;
+    }
+    #halloween-gift-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
     /* Spinning strubles image + Topia countdown recolored to match — same
        pink, static (no pulse; Hello Kitty's own motion is the falling
        petals, not a beat). */
@@ -1002,6 +1013,79 @@
       box-shadow: 0 0 20px rgba(255,255,255,.6), 0 0 40px rgba(255,255,255,.3);
     }
 
+    /* ---------- Halloween (seasonal default for all of October — see
+       isHalloweenSeason()/getActiveBgKey()/getActiveTrackKey()). Same
+       body.theme-X pattern as every theme above; nothing here is reachable
+       outside October since nothing ever adds this class then. */
+    @keyframes halloweenTitleGlow {
+      0%, 100% { text-shadow: 0 0 6px #000, 2px 2px 0 #000, -2px 2px 0 #000, 0 0 18px rgba(255,111,0,.7), 0 0 36px rgba(94,23,168,.5); }
+      50%      { text-shadow: 0 0 10px #000, 2px 2px 0 #000, -2px 2px 0 #000, 0 0 26px rgba(255,111,0,1), 0 0 52px rgba(94,23,168,.8); }
+    }
+    body.theme-halloween h1 {
+      color: #ff6f00;
+      -webkit-text-stroke: 1.5px #ffffff;
+      paint-order: stroke fill;
+      animation: titleScale 0.8s ease-out, halloweenTitleGlow 2.6s ease-in-out infinite 0.8s;
+    }
+    body.theme-halloween .flip-card {
+      filter: drop-shadow(0 0 26px rgba(94,23,168,.8)) drop-shadow(0 0 52px rgba(57,255,20,.35));
+    }
+    body.theme-halloween .flip-card img {
+      box-shadow: 0 0 40px rgba(94,23,168,.65), 0 0 80px rgba(94,23,168,.4), inset 0 0 30px rgba(94,23,168,.3);
+    }
+    /* Buttons cycle through the three theme colours rather than one flat
+       recolour — the three-colour "pumpkin / witch / radioactive" palette
+       is the point, a single colour would read as just another theme. */
+    body.theme-halloween a.big.neon-gamble, body.theme-halloween a.big.neon-arena,
+    body.theme-halloween button.big.neon-daily, body.theme-halloween a.big.neon-tycoon {
+      background: #2a1206; border-color: #ff6f00; color: #ffb74d;
+      box-shadow: 0 10px 24px rgba(255,111,0,.35);
+    }
+    body.theme-halloween a.big.neon-gamble:hover, body.theme-halloween a.big.neon-arena:hover,
+    body.theme-halloween button.big.neon-daily:hover:not(:disabled), body.theme-halloween a.big.neon-tycoon:hover {
+      background: #ff6f00; color: #1a0a00; box-shadow: 0 0 30px rgba(255,111,0,.7);
+    }
+    body.theme-halloween a.big.neon-mines, body.theme-halloween a.big.neon-shop,
+    body.theme-halloween a.big.neon-yt {
+      background: #1c0b2e; border-color: #5e17a8; color: #ce93d8;
+      box-shadow: 0 10px 24px rgba(94,23,168,.4);
+    }
+    body.theme-halloween a.big.neon-mines:hover, body.theme-halloween a.big.neon-shop:hover,
+    body.theme-halloween a.big.neon-yt:hover {
+      background: #5e17a8; color: #fff; box-shadow: 0 0 30px rgba(94,23,168,.8);
+    }
+    body.theme-halloween a.big.neon-horse, body.theme-halloween a.big.neon-news,
+    body.theme-halloween a.big.neon-never {
+      background: #0d1f0a; border-color: #39ff14; color: #a5ff8f;
+      box-shadow: 0 10px 24px rgba(57,255,20,.3);
+    }
+    body.theme-halloween a.big.neon-horse:hover, body.theme-halloween a.big.neon-news:hover,
+    body.theme-halloween a.big.neon-never:hover {
+      background: #39ff14; color: #072005; box-shadow: 0 0 30px rgba(57,255,20,.6);
+    }
+    /* Small utility chrome (inventory/background/cursor/account/patch notes/
+       suggest/now-playing) gets one consistent accent rather than joining
+       the three-way cycle — they're chrome, not the seasonal centrepiece. */
+    body.theme-halloween #inv-btn, body.theme-halloween #bg-btn,
+    body.theme-halloween #cursor-btn, body.theme-halloween #account-btn,
+    body.theme-halloween #patch-btn, body.theme-halloween #suggest-btn,
+    body.theme-halloween #now-playing, body.theme-halloween #ending-link {
+      background: #1c0b2e; border-color: #5e17a8; color: #ce93d8;
+      box-shadow: 0 10px 24px rgba(94,23,168,.4);
+    }
+    body.theme-halloween #inv-btn:hover, body.theme-halloween #bg-btn:hover,
+    body.theme-halloween #cursor-btn:hover, body.theme-halloween #account-btn:hover,
+    body.theme-halloween #patch-btn:hover, body.theme-halloween #suggest-btn:hover,
+    body.theme-halloween #now-playing:hover, body.theme-halloween #ending-link:hover {
+      background: #5e17a8; color: #fff; box-shadow: 0 0 30px rgba(94,23,168,.8);
+    }
+    body.theme-halloween #topia-timer {
+      background-color: #1a0a00; background-image: none;
+      border-style: solid; border-width: 3px; border-color: #ff6f00;
+      color: #ffb74d; text-shadow: 0 0 6px rgba(255,111,0,.9);
+      box-shadow: 0 0 20px rgba(255,111,0,.5), 0 0 40px rgba(94,23,168,.3);
+    }
+
     /* ---------- Daily struble reel ---------- */
     #daily-reel-overlay {
       display:none; position:fixed; inset:0; z-index:60;
@@ -1452,7 +1536,45 @@
   <link rel="preload" as="image" href="/strubles.png" />
 </head>
 <body>
+  <!-- Defined first, before anything that needs it (the flip-card script
+       right below, then the background/music resolution further down) --
+       a single source of truth for "is it Halloween season right now"
+       (all of October), reused everywhere instead of each place computing
+       its own date check that could quietly drift out of sync. -->
+  <script is:inline>
+    window.isHalloweenSeason = function () { return new Date().getMonth() === 9; };
+  </script>
   <div id="sakura-overlay" aria-hidden="true"></div>
+  <div id="halloween-gift-toast" role="status" aria-live="polite"></div>
+  <!-- Free Halloween gift: everyone gets exactly one jack-o'-lantern, the
+       first time they load the site in October. Not a case drop or a shop
+       item (see case-data.js's comment on col_jackolantern) -- just
+       appended straight to the inventory like any other granted item, same
+       localStorage shape and inventory:changed event lootbox.js's own
+       grants use, so Inventory/the desktop toys pick it up immediately
+       with no extra wiring. Guarded by its own flag (not "do they own it
+       yet") so re-granting can never happen just because someone later
+       drags it into storage or it's lost some other way. -->
+  <script is:inline>
+    (() => {
+      if (!window.isHalloweenSeason()) return;
+      const FLAG_KEY = 'halloween_gift_2026_v1';
+      try { if (localStorage.getItem(FLAG_KEY)) return; } catch { return; }
+      try {
+        const raw = localStorage.getItem('strubles_inventory_v1');
+        const inv = raw ? JSON.parse(raw) : {};
+        if (!Array.isArray(inv.items)) inv.items = [];
+        if (!inv.items.includes('col_jackolantern')) inv.items.push('col_jackolantern');
+        localStorage.setItem('strubles_inventory_v1', JSON.stringify(inv));
+        localStorage.setItem(FLAG_KEY, '1');
+        window.dispatchEvent(new CustomEvent('inventory:changed'));
+        const toast = document.getElementById('halloween-gift-toast');
+        toast.textContent = "🎃 A Jack-o'-Lantern appeared in your Inventory — happy Halloween!";
+        requestAnimationFrame(() => toast.classList.add('show'));
+        setTimeout(() => toast.classList.remove('show'), 6000);
+      } catch {}
+    })();
+  </script>
 
   <div class="image-container" id="image-container" role="button" tabindex="0" aria-label="Spin the Iantopia image faster">
     <div class="flip-card" id="flip-card">
@@ -1472,6 +1594,19 @@
     (() => {
       const imageContainer = document.getElementById('image-container');
       const flipCard = document.getElementById('flip-card');
+
+      // Halloween: both faces become the job application form, and a click
+      // flips it over then takes you to the maze -- the ONE direct route
+      // in, the Easter egg this whole image exists for in October. Outside
+      // the season it's just the ordinary spin-boost on click, unchanged.
+      const halloween = window.isHalloweenSeason();
+      if (halloween) {
+        document.body.classList.add('theme-halloween');
+        document.querySelectorAll('#flip-card img').forEach((img) => {
+          img.src = '/assets/decorations/job-application-form.png';
+          img.alt = 'Job Application Form';
+        });
+      }
 
       const NORMAL_SPEED = 360 / 4000; // deg/ms -- matches the old 4s-per-rotation
       const FAST_SPEED = 360 / 400;    // deg/ms -- matches the old 0.4s-per-rotation
@@ -1519,7 +1654,10 @@
       }
       requestAnimationFrame(tick);
 
-      imageContainer.addEventListener('click', boostSpin);
+      imageContainer.addEventListener('click', () => {
+        boostSpin();
+        if (halloween) setTimeout(() => { location.href = '/scary-maze'; }, 650); // let the flip actually play out first
+      });
       imageContainer.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -1876,6 +2014,13 @@
       // by default here. Only an explicit, current-session playlist click
       // (handled below) can switch it to something else.
       const HOME_THEME = { label: 'Home Theme', src: '/audio/music/home-theme.mp3' };
+      // Seasonal default, hardcoded for the same reason HOME_THEME is: must
+      // never depend on a possibly-stale music-library.js. Resolved by
+      // isHalloweenSeason() below, same no-persistent-write pattern as
+      // getActiveBgKey() -- November 1st reverts to HOME_THEME with nothing
+      // in localStorage to clean up.
+      const HALLOWEEN_THEME = { label: '🎃 Ghost House', src: '/audio/music/ghost-house.mp3' };
+      // isHalloweenSeason() itself is defined once, right after <body> opens.
 
       // Kept separate from other pages on purpose — each page's music/bg
       // choice is independent (a prior attempt to unify these caused a
@@ -1884,7 +2029,7 @@
       // would silently revert to a stale value).
       const ACTIVE_TRACK_KEY = 'home_active_track_v1';
       const INV_KEY = 'strubles_inventory_v1';
-      const LIBRARY = Object.assign({}, window.MUSIC_LIBRARY, { default: HOME_THEME });
+      const LIBRARY = Object.assign({}, window.MUSIC_LIBRARY, { default: HOME_THEME, halloween: HALLOWEEN_THEME });
 
       function loadInventory() {
         try {
@@ -1895,7 +2040,11 @@
 
       function getActiveTrackKey() {
         const key = localStorage.getItem(ACTIVE_TRACK_KEY);
-        return (key && key !== 'default' && LIBRARY[key]) ? key : 'default';
+        if (key && key !== 'default' && LIBRARY[key]) return key;
+        // No explicit pick saved: Ghost House for all of October, Home
+        // Theme otherwise -- resolved fresh on every load, nothing written
+        // to localStorage, so this never needs manually turning off.
+        return window.isHalloweenSeason() ? 'halloween' : 'default';
       }
 
       let audioEnabled = true;
@@ -2202,7 +2351,11 @@
       let activeBgKey = 'default';
       function getActiveBgKey() {
         const key = localStorage.getItem(ACTIVE_BG_KEY);
-        return (key && BG_LIBRARY[key]) ? key : 'default';
+        if (key && BG_LIBRARY[key]) return key;
+        // No explicit pick saved: the Halloween background for all of
+        // October, Taipei otherwise -- see getActiveTrackKey() above for
+        // why this resolves fresh each load instead of writing a choice.
+        return (window.isHalloweenSeason() && BG_LIBRARY.halloween_theme) ? 'halloween_theme' : 'default';
       }
       // Same fix as every other page's pickers.js already has: without this,
       // the video restarted from 0:00 on every trip back to the homescreen

@@ -1,0 +1,304 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>???</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style is:global>
+  :root { --orange:#ff6f00; --purple:#5e17a8; --green:#39ff14; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#000; }
+  body {
+    font-family:'Press Start 2P', ui-monospace, monospace;
+    color:#fff; cursor:none;
+    display:flex; align-items:center; justify-content:center;
+    position:relative;
+  }
+  #stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
+  canvas { display:block; touch-action:none; }
+
+  #hud {
+    position:fixed; top:12px; left:50%; transform:translateX(-50%);
+    font-size:10px; color:var(--orange); text-shadow:0 0 8px rgba(255,111,0,.7);
+    text-align:center; z-index:5; line-height:1.8; pointer-events:none;
+  }
+  #hud b { color:var(--green); }
+
+  a.back-link {
+    position:fixed; top:14px; left:14px; z-index:6;
+    color:var(--purple); background:#000; border:2px solid var(--purple);
+    padding:8px 12px; font-family:inherit; font-size:9px; text-decoration:none;
+  }
+  a.back-link:hover { background:var(--purple); color:#fff; }
+
+  /* ---------- Start screen ---------- */
+  #start-screen {
+    position:fixed; inset:0; z-index:20; background:#000;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:22px; text-align:center; padding:20px;
+  }
+  #start-screen.hidden { display:none; }
+  #start-screen h1 {
+    font-size:clamp(16px,4vw,26px); color:var(--orange);
+    text-shadow:0 0 10px rgba(255,111,0,.8), 0 0 24px rgba(94,23,168,.6);
+    margin:0;
+  }
+  #start-screen p { font-size:11px; line-height:2; color:#cbb; max-width:480px; }
+  #start-btn {
+    background:#1a0a00; border:3px solid var(--orange); color:var(--orange);
+    padding:16px 28px; font-family:inherit; font-size:13px; cursor:none;
+    box-shadow:0 0 20px rgba(255,111,0,.4);
+  }
+  #start-btn:hover { background:var(--orange); color:#1a0a00; }
+
+  /* ---------- Jumpscare ---------- */
+  #jumpscare {
+    position:fixed; inset:0; z-index:50; background:#000;
+    display:none; align-items:center; justify-content:center; overflow:hidden;
+  }
+  #jumpscare.show { display:flex; }
+  #jumpscare img { width:100%; height:100%; object-fit:cover; }
+  @keyframes screenShake {
+    0%,100% { transform:translate(0,0); }
+    10% { transform:translate(-14px,8px); } 20% { transform:translate(12px,-10px); }
+    30% { transform:translate(-10px,-6px); } 40% { transform:translate(14px,10px); }
+    50% { transform:translate(-8px,12px); } 60% { transform:translate(10px,-8px); }
+    70% { transform:translate(-12px,-4px); } 80% { transform:translate(6px,10px); }
+    90% { transform:translate(-10px,-10px); }
+  }
+  #jumpscare.show { animation: screenShake 0.6s linear 3; }
+
+  /* ---------- Result screen ---------- */
+  #result-screen {
+    position:fixed; inset:0; z-index:40; background:#000;
+    display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:18px; text-align:center; padding:20px;
+  }
+  #result-screen.show { display:flex; }
+  #result-screen h1 { font-size:clamp(16px,4vw,24px); color:var(--green); text-shadow:0 0 16px rgba(57,255,20,.7); margin:0; }
+  #result-screen .reward {
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    border:3px solid var(--purple); padding:18px 24px; background:#120a1e;
+    box-shadow:0 0 30px rgba(94,23,168,.5);
+  }
+  #result-screen .reward img { width:110px; filter:drop-shadow(0 0 16px rgba(94,23,168,.8)); }
+  #result-screen .reward span { font-size:9px; color:#ce93d8; line-height:1.8; }
+  #result-screen a {
+    color:var(--orange); border:2px solid var(--orange); background:#1a0a00;
+    padding:10px 18px; text-decoration:none; font-size:10px;
+  }
+  #result-screen a:hover { background:var(--orange); color:#1a0a00; }
+</style>
+</head>
+<body>
+  <a class="back-link" href="/">← Iantopia</a>
+  <div id="hud">Guide the dot through the maze.<br>Don't touch the walls. <b id="hud-tries">0</b> oops so far.</div>
+
+  <div id="stage"><canvas id="maze"></canvas></div>
+
+  <div id="start-screen">
+    <h1>🎃 the maze 🎃</h1>
+    <p>Move your mouse to steer the glowing dot from one end to the other without touching a wall.
+      It gets narrower near the end. Don't rush — but don't stop, either.</p>
+    <button id="start-btn" type="button">Enter, if you dare</button>
+  </div>
+
+  <div id="jumpscare"><img src="/maze-game/scary-face.jpg" alt="" /></div>
+
+  <div id="result-screen">
+    <h1>you made it out</h1>
+    <div class="reward">
+      <img src="/assets/decorations/job-application-form.png" alt="Job Application Form" />
+      <span>Reward unlocked: Job Application Form<br>(check your Inventory)</span>
+    </div>
+    <a href="/">← Back to Iantopia</a>
+  </div>
+
+  <audio id="sfx-oops" src="/maze-game/oops.mp3" preload="auto"></audio>
+  <audio id="sfx-scream" src="/maze-game/scream.mp3" preload="auto"></audio>
+
+<script is:inline>
+(() => {
+  const canvas = document.getElementById('maze');
+  const ctx = canvas.getContext('2d');
+  const hudTries = document.getElementById('hud-tries');
+  const startScreen = document.getElementById('start-screen');
+  const startBtn = document.getElementById('start-btn');
+  const jumpscare = document.getElementById('jumpscare');
+  const resultScreen = document.getElementById('result-screen');
+  const sfxOops = document.getElementById('sfx-oops');
+  const sfxScream = document.getElementById('sfx-scream');
+
+  // Normalized (0..1) waypoints -- a single winding corridor, not a
+  // branching maze, same as the classic prank this page recreates. Scaled
+  // to actual canvas pixels on every resize.
+  const WAYPOINTS = [
+    [0.10, 0.10], [0.10, 0.42], [0.34, 0.42], [0.34, 0.14], [0.58, 0.14],
+    [0.58, 0.55], [0.28, 0.55], [0.28, 0.80], [0.52, 0.80], [0.52, 0.62],
+    [0.74, 0.62], [0.74, 0.90], [0.90, 0.90], [0.90, 0.36], [0.68, 0.36],
+    [0.68, 0.20], [0.90, 0.20], [0.90, 0.06], [0.50, 0.06],
+  ];
+  const START_WIDTH = 46, END_WIDTH = 15; // the corridor narrows toward the end, like the original
+
+  let W = 0, H = 0, PAD = 0;
+  let path = [];       // WAYPOINTS scaled to pixels
+  let segLen = [];      // length of each segment
+  let totalLen = 0, cumLen = [];
+
+  function resize() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    PAD = Math.min(W, H) * 0.06;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const innerW = W - PAD * 2, innerH = H - PAD * 2;
+    path = WAYPOINTS.map(([x, y]) => [PAD + x * innerW, PAD + y * innerH]);
+    segLen = []; cumLen = [0]; totalLen = 0;
+    for (let i = 1; i < path.length; i++) {
+      const d = Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+      segLen.push(d); totalLen += d; cumLen.push(totalLen);
+    }
+    draw();
+  }
+
+  // Corridor width at distance `d` along the path -- a smooth, continuous
+  // narrowing from START_WIDTH to END_WIDTH, not a sudden drop.
+  function widthAt(d) {
+    const t = Math.max(0, Math.min(1, d / totalLen));
+    return START_WIDTH + (END_WIDTH - START_WIDTH) * t;
+  }
+
+  function draw() {
+    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+    // Floor, drawn as a sequence of thick round-jointed strokes so each
+    // segment can have its own (narrowing) width.
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (let i = 1; i < path.length; i++) {
+      const w = widthAt((cumLen[i - 1] + cumLen[i]) / 2);
+      const grad = ctx.createLinearGradient(path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]);
+      grad.addColorStop(0, '#2a1240'); grad.addColorStop(1, '#180a28');
+      ctx.strokeStyle = grad; ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(...path[i - 1]); ctx.lineTo(...path[i]); ctx.stroke();
+    }
+    // A faint inner glow line down the centre, purple/orange like the theme.
+    ctx.strokeStyle = 'rgba(255,111,0,.18)'; ctx.lineWidth = 2;
+    ctx.beginPath(); path.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.stroke();
+    // Start and end markers.
+    ctx.fillStyle = '#39ff14'; ctx.beginPath(); ctx.arc(path[0][0], path[0][1], 10, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ff6f00'; ctx.beginPath(); ctx.arc(path[path.length - 1][0], path[path.length - 1][1], 12, 0, 7); ctx.fill();
+  }
+
+  // Signed distance from (x,y) to the nearest point on the path, plus the
+  // arc-length at that nearest point (used to look up the corridor width
+  // there, since it narrows along the way).
+  function nearest(x, y) {
+    let best = Infinity, bestLen = 0;
+    for (let i = 1; i < path.length; i++) {
+      const [x1, y1] = path[i - 1], [x2, y2] = path[i];
+      const dx = x2 - x1, dy = y2 - y1;
+      const len2 = dx * dx + dy * dy;
+      let t = len2 ? ((x - x1) * dx + (y - y1) * dy) / len2 : 0;
+      t = Math.max(0, Math.min(1, t));
+      const px = x1 + dx * t, py = y1 + dy * t;
+      const d = Math.hypot(x - px, y - py);
+      if (d < best) { best = d; bestLen = cumLen[i - 1] + segLen[i - 1] * t; }
+    }
+    return { dist: best, len: bestLen };
+  }
+
+  let playing = false, tries = 0, dotX = 0, dotY = 0, armed = false;
+  function resetToStart() {
+    dotX = path[0][0]; dotY = path[0][1];
+    armed = false; // a brief grace window right after a reset/start, so landing back on the dot doesn't instantly re-trigger
+    setTimeout(() => { armed = true; }, 400);
+  }
+
+  function pointerPos(e) {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches && e.touches[0];
+    return { x: (t ? t.clientX : e.clientX) - r.left, y: (t ? t.clientY : e.clientY) - r.top };
+  }
+
+  function onMove(e) {
+    if (!playing) return;
+    const p = pointerPos(e);
+    dotX = p.x; dotY = p.y;
+    const { dist, len } = nearest(dotX, dotY);
+    const corridor = widthAt(len) / 2;
+    if (armed && dist > corridor) {
+      tries++; hudTries.textContent = tries;
+      try { sfxOops.currentTime = 0; sfxOops.volume = 0.6; sfxOops.play().catch(() => {}); } catch {}
+      flashRed();
+      resetToStart();
+      return;
+    }
+    // Reached the end: close enough to the final waypoint.
+    const end = path[path.length - 1];
+    if (Math.hypot(dotX - end[0], dotY - end[1]) < 16) { win(); return; }
+  }
+
+  function flashRed() {
+    ctx.fillStyle = 'rgba(255,0,0,.35)'; ctx.fillRect(0, 0, W, H);
+    setTimeout(draw, 90);
+  }
+
+  function renderDot() {
+    draw();
+    if (!playing) return;
+    ctx.fillStyle = '#fff';
+    ctx.shadowColor = '#ff6f00'; ctx.shadowBlur = 14;
+    ctx.beginPath(); ctx.arc(dotX, dotY, 6, 0, 7); ctx.fill();
+    ctx.shadowBlur = 0;
+    requestAnimationFrame(renderDot);
+  }
+
+  function grantJobApplication() {
+    try {
+      const raw = localStorage.getItem('strubles_inventory_v1');
+      const inv = raw ? JSON.parse(raw) : {};
+      if (!Array.isArray(inv.items)) inv.items = [];
+      if (!inv.items.includes('col_jobapplication')) {
+        inv.items.push('col_jobapplication');
+        localStorage.setItem('strubles_inventory_v1', JSON.stringify(inv));
+        window.dispatchEvent(new CustomEvent('inventory:changed'));
+      }
+    } catch {}
+  }
+
+  function win() {
+    playing = false;
+    jumpscare.classList.add('show');
+    try { sfxScream.currentTime = 0; sfxScream.volume = 0.85; sfxScream.play().catch(() => {}); } catch {}
+    grantJobApplication();
+    setTimeout(() => {
+      jumpscare.classList.remove('show');
+      resultScreen.classList.add('show');
+    }, 1900);
+  }
+
+  startBtn.addEventListener('click', () => {
+    startScreen.classList.add('hidden');
+    playing = true; tries = 0; hudTries.textContent = '0';
+    resetToStart();
+    renderDot();
+  });
+
+  canvas.addEventListener('mousemove', onMove);
+  canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e); }, { passive: false });
+
+  window.addEventListener('resize', resize);
+  resize();
+})();
+</script>
+</body>
+</html>
