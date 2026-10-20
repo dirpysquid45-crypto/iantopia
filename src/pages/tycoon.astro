@@ -246,6 +246,7 @@
     <div id="stats-bar">
       <span title="Gross output of every road-connected building, adjusted for mood and specialty. Ranked on the GDP leaderboard.">GDP: <b id="stat-production">0</b>/min</span>
       <span title="GDP per standing building — rewards a lean, well-run village over a sprawling one. Ranked on the Efficiency leaderboard.">Efficiency: <b id="stat-efficiency">0</b>/bldg</span>
+      <span title="Click to rename your village." style="cursor:pointer;">Village: <b id="stat-name">My Village</b></span>
       <span id="stat-specialty-row" title="A majority of your zoned tiles in one type gives buildings of that type a production bonus, up to +25% fully committed." style="display:none;">Specialty: <b id="stat-specialty">—</b></span>
       <span id="stat-jobs-row" title="Villagers with a job commute to it on a 9-5 schedule. A workday that's actually staffed lifts village mood a little." style="display:none;">Jobs: <b id="stat-jobs">0</b></span>
       <span>Buildings: <b id="stat-placed">0/5</b></span>
@@ -482,7 +483,7 @@
   // Village state: { v:2, nextId, b:[...buildings], tiles:{tx_ty: type} }
   // tiles map: "x_y" -> "residential"/"commercial"/"industrial"/"road"/"water"
   // paid map:  "x_y" -> Strubles paid for that tile (refunded when it is erased or replaced)
-  function freshVillage() { return { v: 2, nextId: 1, b: [], tiles: {}, paid: {} }; }
+  function freshVillage() { return { v: 2, nextId: 1, name: 'My Village', b: [], tiles: {}, paid: {} }; }
 
   // First load after the rework: carry the old one-row skyline's buildings
   // over (same construction progress, same keys) into a row on the new map
@@ -510,6 +511,7 @@
       // Saves from before roads/zones existed have no `tiles` map at all, and
       // the first paint would throw on it.
       if (!raw.tiles || typeof raw.tiles !== 'object') raw.tiles = {};
+      if (typeof raw.name !== 'string' || !raw.name.trim()) raw.name = 'My Village';
       // What each tile cost when it was painted, so erasing it can refund the same.
       if (!raw.paid || typeof raw.paid !== 'object') raw.paid = {};
       // Farms, Grocery Stores and Farmland were removed: drop any left in a save.
@@ -821,6 +823,26 @@
   const PARK_WINDOW = 1.5;                        // hours either side where the pull fades in and out
   let clockShiftMs = 0;                           // test hook only
   const gameHour = () => ((((Date.now() + clockShiftMs) % DAY_REAL_MS) / DAY_REAL_MS) * 24);
+  // Day/night tint: a translucent overlay whose colour and opacity follow the
+  // village clock. Clear in daylight, deep blue at night, warm orange at dawn
+  // and dusk. Keyframes are [hour, colour, alpha], blended linearly.
+  const DAYLIGHT = [
+    [0, 0x0b0b2e, 0.5], [5.5, 0x0b0b2e, 0.5], [7, 0x9a4a14, 0.28], [8.5, 0x000000, 0],
+    [17.5, 0x000000, 0], [19, 0x9a4a14, 0.28], [20.5, 0x0b0b2e, 0.5], [24, 0x0b0b2e, 0.5],
+  ];
+  function daylight(h) {
+    for (let i = 1; i < DAYLIGHT.length; i++) {
+      const [h1, c1, a1] = DAYLIGHT[i], [h0, c0, a0] = DAYLIGHT[i - 1];
+      if (h <= h1) {
+        const t = (h - h0) / (h1 - h0);
+        const ch = (c) => [(c >> 16) & 255, (c >> 8) & 255, c & 255];
+        const x = ch(c0), y = ch(c1);
+        const mix = x.map((v, k) => Math.round(v + (y[k] - v) * t));
+        return { color: (mix[0] << 16) | (mix[1] << 8) | mix[2], alpha: a0 + (a1 - a0) * t };
+      }
+    }
+    return { color: 0x000000, alpha: 0 };
+  }
   // 0 outside park hours, rising to 1 at the hour itself.
   function parkPull(h) {
     let best = 0;
@@ -1104,6 +1126,7 @@
   // movement look like a stutter.
   const villagers = [];
   let villagerG = null;
+  let nightG = null;
   let mood = 50;
   const WALK = 1.3; // tiles per second
 
@@ -1662,6 +1685,7 @@
       $('stat-jobs').textContent = `${filled}/${jobCap}`;
     }
     $('stat-placed').textContent = village.b.length + '/' + slotCap();
+    $('stat-name').textContent = village.name || 'My Village';
     $('stat-building').textContent = buildingCount() + '/' + MAX_CONCURRENT;
     $('stat-road').textContent = onRoadCount + '/' + doneCount;
     $('stat-road').style.color = doneCount && onRoadCount < doneCount ? '#ff6b6b' : '';
@@ -1762,6 +1786,10 @@
     gridG = this.add.graphics().setDepth(2);
     layer = this.add.graphics().setDepth(40);
     villagerG = this.add.graphics().setDepth(50);
+    // Above the buildings and villagers, below the HTML overlay. Alpha 0 in
+    // daylight, so it costs nothing during the day.
+    nightG = this.add.rectangle(0, 0, MAP * T, MAP * T, 0x000000, 0)
+      .setOrigin(0, 0).setDepth(70);
     ghostG = this.add.graphics().setDepth(61);
     this.input.addPointer(1);
 
@@ -1886,6 +1914,7 @@
     if (clockAcc > 500) {
       clockAcc = 0;
       const h = gameHour(), pull = parkPull(h);
+      if (nightG) { const d = daylight(h); nightG.setFillStyle(d.color, d.alpha); }
       const el = $('stat-time');
       el.textContent = fmtClock(h) + (pull > 0.3 && parks().length ? ' · park hour' : '');
       el.style.color = pull > 0.3 ? '#8be08b' : '';
@@ -2045,6 +2074,17 @@
   }
 
   $('build-btn').addEventListener('click', () => { setBrush(null); openPlacePicker(); });
+  // Rename the village from the stats bar. Kept short so the bar stays on one row.
+  $('stat-name').parentElement.addEventListener('click', () => {
+    const next = prompt('Name your village (up to 24 characters):', village.name || 'My Village');
+    if (next == null) return;
+    const clean = next.replace(/[<>]/g, '').trim().slice(0, 24);
+    if (!clean) return;
+    village.name = clean;
+    $('stat-name').textContent = clean;
+    saveVillage();
+    toast('🏘️ Your village is now ' + clean + '.');
+  });
   $('place-confirm').addEventListener('click', confirmPlacing);
   $('place-cancel').addEventListener('click', stopPlacing);
   $('recenter-btn').addEventListener('click', () => { if (cam) recenter(); });
