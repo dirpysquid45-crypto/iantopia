@@ -1,0 +1,51 @@
+rules_version = '2';
+
+// Iantopia Firestore rules. Previously these lived only in the Firebase
+// console, which is why the leaderboards and village visits were refused
+// ("Missing or insufficient permissions") -- nothing here was ever set.
+//
+// Deploy with:  firebase deploy --only firestore:rules
+// or paste this file into Firebase console > Firestore > Rules.
+//
+// Trust model: clients still write their own documents directly (the game
+// has no server-side validation for these yet). These rules stop anyone
+// from writing someone else's document, and keep private data private.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Each player's own save data. Only the owner reads or writes it.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Public boards: anyone can read, only the owner writes their own row.
+    match /leaderboard/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /horse_leaderboard/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Village snapshots back the public visit page, so they're readable by
+    // anyone. Only the owner can publish or change their village.
+    match /village_snapshots/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+
+      // Likes: anyone signed in can like a village once, as themselves.
+      // The like's document id is the liker's uid, so one like per person.
+      match /likes/{likerUid} {
+        allow read: if true;
+        allow create: if request.auth != null && request.auth.uid == likerUid;
+        allow update, delete: if false;
+      }
+    }
+
+    // Everything else is closed by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
