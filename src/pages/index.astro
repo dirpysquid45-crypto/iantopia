@@ -236,33 +236,68 @@
       a.big::before, button.big::before { display: none; }
     }
 
-    /* Buttons wrap into a centered, evenly-gapped grid instead of one long
-       vertical stack — 2 across once there's room, single column below
-       that. Sizing/spacing here overrides the plain stacked defaults above
-       for anything inside the grid. */
+    /* The menu is a stack of cards, each one overlapping the card above, the way
+       a hand of cards or a pile of tickets sits. Later buttons paint on top, so
+       every label shows in the strip above the next card. Hovering lifts a card
+       out of the stack and straightens it; on load the cards drop in one after
+       another. Reduced-motion visitors get the same stack, still, with no tilt. */
     .button-grid {
       display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      align-items: stretch;
-      gap: 16px;
-      max-width: 720px;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      max-width: 380px;
       width: 100%;
       margin: 18px auto 0;
-      padding: 0 16px;
+      padding: 0 16px 12px;
     }
     .button-grid > .big {
-      margin: 0;
-      flex: 1 1 260px;
-      max-width: 320px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      position: relative;
+      width: 100%;
+      max-width: 340px;
+      height: 68px;
+      margin: -22px 0 0;
+      padding: 14px 22px 0;
+      display: block;
       text-align: center;
+      line-height: 1.2;
       font-size: clamp(15px, 2.2vw, 21px);
+      box-shadow: 0 -8px 16px rgba(0, 0, 0, 0.5), 0 10px 22px rgba(0, 0, 0, 0.35);
+      transform: rotate(-0.4deg);
+      transform-origin: 50% 100%;
+      transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.3s;
+      animation: stackDrop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards;
     }
+    .button-grid > .big:first-child { margin-top: 0; }
+    .button-grid > .big:nth-child(even) { transform: rotate(0.45deg); }
+    .button-grid > .big:nth-child(1) { animation-delay: 0ms; }
+    .button-grid > .big:nth-child(2) { animation-delay: 80ms; }
+    .button-grid > .big:nth-child(3) { animation-delay: 160ms; }
+    .button-grid > .big:nth-child(4) { animation-delay: 240ms; }
+    .button-grid > .big:nth-child(5) { animation-delay: 320ms; }
+    .button-grid > .big:nth-child(6) { animation-delay: 400ms; }
+    .button-grid > .big:nth-child(7) { animation-delay: 480ms; }
+    .button-grid > .big:nth-child(8) { animation-delay: 560ms; }
+    .button-grid > .big:nth-child(9) { animation-delay: 640ms; }
+    .button-grid > .big:nth-child(10) { animation-delay: 720ms; }
     .button-grid > .big:hover {
-      transform: translateY(-2px);
+      z-index: 20;
+      transform: translateY(-8px) rotate(0deg) scale(1.03);
+      box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.4), 0 18px 30px rgba(0, 0, 0, 0.5);
+      animation: none;
+    }
+    .button-grid > .big:active {
+      transform: translateY(-2px) rotate(0deg) scale(0.99);
+    }
+    @keyframes stackDrop {
+      0% { opacity: 0; transform: translateY(-48px) rotate(-8deg); }
+      60% { opacity: 1; transform: translateY(6px) rotate(1deg); }
+      100% { opacity: 1; transform: translateY(0) rotate(0deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .button-grid > .big,
+      .button-grid > .big:nth-child(even),
+      .button-grid > .big:hover { animation: none; transform: none; }
     }
 
     /* Neon sign buttons */
