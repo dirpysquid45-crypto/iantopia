@@ -1568,6 +1568,19 @@
        its own date check that could quietly drift out of sync. -->
   <script is:inline>
     window.isHalloweenSeason = function () { return new Date().getMonth() === 9; };
+    // One-time reset for the 2026 Halloween season: clears any background or
+    // track someone picked before October, so the seasonal default actually
+    // shows for them. The flag makes it run once per browser; picks made
+    // after this stick as usual.
+    (function () {
+      try {
+        const FLAG = 'halloween_default_reset_2026_v1';
+        if (!window.isHalloweenSeason() || localStorage.getItem(FLAG)) return;
+        localStorage.removeItem('home_active_bg_v1');
+        localStorage.removeItem('home_active_track_v1');
+        localStorage.setItem(FLAG, '1');
+      } catch {}
+    })();
   </script>
   <div id="sakura-overlay" aria-hidden="true"></div>
   <div id="halloween-gift-toast" role="status" aria-live="polite"></div>
