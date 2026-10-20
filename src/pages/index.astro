@@ -2351,10 +2351,22 @@
       let activeBgKey = 'default';
       function getActiveBgKey() {
         const key = localStorage.getItem(ACTIVE_BG_KEY);
-        if (key && BG_LIBRARY[key]) return key;
-        // No explicit pick saved: the Halloween background for all of
-        // October, Taipei otherwise -- see getActiveTrackKey() above for
-        // why this resolves fresh each load instead of writing a choice.
+        // key !== 'default' matters: a returning visitor's storage very
+        // often already holds the literal string "default" (the picker
+        // writes it back on every open, not just on a real change), which
+        // the old `key && BG_LIBRARY[key]` check treated as just as
+        // "explicit" as actually picking Vegas or Minecraft -- so it never
+        // fell through to the seasonal check below, and the whole page
+        // stayed on Taipei/white-title/plain-buttons for anyone who'd ever
+        // visited before. getActiveTrackKey() already excluded it; this
+        // one didn't, which is exactly why music switched to Ghost House
+        // but the background (and therefore the title/button theme, both
+        // driven off this) silently didn't.
+        if (key && key !== 'default' && BG_LIBRARY[key]) return key;
+        // No explicit (non-default) pick saved: the Halloween background
+        // for all of October, Taipei otherwise -- see getActiveTrackKey()
+        // above for why this resolves fresh each load instead of writing a
+        // choice.
         return (window.isHalloweenSeason() && BG_LIBRARY.halloween_theme) ? 'halloween_theme' : 'default';
       }
       // Same fix as every other page's pickers.js already has: without this,

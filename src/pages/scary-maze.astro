@@ -24,7 +24,9 @@
     position:relative;
   }
   #stage { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; }
-  canvas { display:block; touch-action:none; }
+  /* Square game board, not edge-to-edge -- a contained frame reads more
+     like the classic prank than a full-viewport canvas does. */
+  canvas { display:block; touch-action:none; border:3px solid #0ff; box-shadow:0 0 30px rgba(0,255,255,.35); }
 
   #hud {
     position:fixed; top:12px; left:50%; transform:translateX(-50%);
@@ -39,26 +41,6 @@
     padding:8px 12px; font-family:inherit; font-size:9px; text-decoration:none;
   }
   a.back-link:hover { background:var(--purple); color:#fff; }
-
-  /* ---------- Start screen ---------- */
-  #start-screen {
-    position:fixed; inset:0; z-index:20; background:#000;
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:22px; text-align:center; padding:20px;
-  }
-  #start-screen.hidden { display:none; }
-  #start-screen h1 {
-    font-size:clamp(16px,4vw,26px); color:var(--orange);
-    text-shadow:0 0 10px rgba(255,111,0,.8), 0 0 24px rgba(94,23,168,.6);
-    margin:0;
-  }
-  #start-screen p { font-size:11px; line-height:2; color:#cbb; max-width:480px; }
-  #start-btn {
-    background:#1a0a00; border:3px solid var(--orange); color:var(--orange);
-    padding:16px 28px; font-family:inherit; font-size:13px; cursor:none;
-    box-shadow:0 0 20px rgba(255,111,0,.4);
-  }
-  #start-btn:hover { background:var(--orange); color:#1a0a00; }
 
   /* ---------- Jumpscare ---------- */
   #jumpscare {
@@ -105,13 +87,6 @@
 
   <div id="stage"><canvas id="maze"></canvas></div>
 
-  <div id="start-screen">
-    <h1>🎃 the maze 🎃</h1>
-    <p>Move your mouse to steer the glowing dot from one end to the other without touching a wall.
-      It gets narrower near the end. Don't rush — but don't stop, either.</p>
-    <button id="start-btn" type="button">Enter, if you dare</button>
-  </div>
-
   <div id="jumpscare"><img src="/maze-game/scary-face.jpg" alt="" /></div>
 
   <div id="result-screen">
@@ -131,8 +106,6 @@
   const canvas = document.getElementById('maze');
   const ctx = canvas.getContext('2d');
   const hudTries = document.getElementById('hud-tries');
-  const startScreen = document.getElementById('start-screen');
-  const startBtn = document.getElementById('start-btn');
   const jumpscare = document.getElementById('jumpscare');
   const resultScreen = document.getElementById('result-screen');
   const sfxOops = document.getElementById('sfx-oops');
@@ -156,8 +129,11 @@
 
   function resize() {
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    W = window.innerWidth; H = window.innerHeight;
-    PAD = Math.min(W, H) * 0.06;
+    // Square board: the smaller of width/height, with a margin, instead of
+    // stretching to fill a rectangular viewport.
+    const side = Math.min(window.innerWidth, window.innerHeight) * 0.88;
+    W = side; H = side;
+    PAD = side * 0.06;
     canvas.width = W * dpr; canvas.height = H * dpr;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -180,22 +156,19 @@
 
   function draw() {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-    // Floor, drawn as a sequence of thick round-jointed strokes so each
-    // segment can have its own (narrowing) width.
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    // Floor: flat light cyan-blue, square (butt-cap/miter) joints instead
+    // of rounded, for the blockier look.
+    ctx.lineCap = 'butt'; ctx.lineJoin = 'miter';
+    ctx.strokeStyle = '#7de8ff';
     for (let i = 1; i < path.length; i++) {
-      const w = widthAt((cumLen[i - 1] + cumLen[i]) / 2);
-      const grad = ctx.createLinearGradient(path[i - 1][0], path[i - 1][1], path[i][0], path[i][1]);
-      grad.addColorStop(0, '#2a1240'); grad.addColorStop(1, '#180a28');
-      ctx.strokeStyle = grad; ctx.lineWidth = w;
+      ctx.lineWidth = widthAt((cumLen[i - 1] + cumLen[i]) / 2);
       ctx.beginPath(); ctx.moveTo(...path[i - 1]); ctx.lineTo(...path[i]); ctx.stroke();
     }
-    // A faint inner glow line down the centre, purple/orange like the theme.
-    ctx.strokeStyle = 'rgba(255,111,0,.18)'; ctx.lineWidth = 2;
-    ctx.beginPath(); path.forEach((p, i) => i ? ctx.lineTo(...p) : ctx.moveTo(...p)); ctx.stroke();
-    // Start and end markers.
-    ctx.fillStyle = '#39ff14'; ctx.beginPath(); ctx.arc(path[0][0], path[0][1], 10, 0, 7); ctx.fill();
-    ctx.fillStyle = '#ff6f00'; ctx.beginPath(); ctx.arc(path[path.length - 1][0], path[path.length - 1][1], 12, 0, 7); ctx.fill();
+    // Square start/end markers (not circles), matching the dot.
+    ctx.fillStyle = '#00e5ff';
+    ctx.fillRect(path[0][0] - 7, path[0][1] - 7, 14, 14);
+    ctx.fillStyle = '#ff2d2d';
+    ctx.fillRect(path[path.length - 1][0] - 8, path[path.length - 1][1] - 8, 16, 16);
   }
 
   // Signed distance from (x,y) to the nearest point on the path, plus the
@@ -255,9 +228,9 @@
   function renderDot() {
     draw();
     if (!playing) return;
-    ctx.fillStyle = '#fff';
-    ctx.shadowColor = '#ff6f00'; ctx.shadowBlur = 14;
-    ctx.beginPath(); ctx.arc(dotX, dotY, 6, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ff0000';
+    ctx.shadowColor = '#ff0000'; ctx.shadowBlur = 10;
+    ctx.fillRect(dotX - 6, dotY - 6, 12, 12);
     ctx.shadowBlur = 0;
     requestAnimationFrame(renderDot);
   }
@@ -286,18 +259,15 @@
     }, 1900);
   }
 
-  startBtn.addEventListener('click', () => {
-    startScreen.classList.add('hidden');
-    playing = true; tries = 0; hudTries.textContent = '0';
-    resetToStart();
-    renderDot();
-  });
-
   canvas.addEventListener('mousemove', onMove);
   canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e); }, { passive: false });
 
   window.addEventListener('resize', resize);
   resize();
+  // No "click to begin" gate -- straight into it.
+  playing = true;
+  resetToStart();
+  renderDot();
 })();
 </script>
 </body>
