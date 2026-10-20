@@ -39,6 +39,13 @@
   animation: none;
 }
 .card-stack > .stack-card:active { transform: translateY(-2px) rotate(0deg); }
+/* Opened by a tap (see card-stack.js): lift it out of the stack, in full. */
+.card-stack > .stack-card.is-open {
+  z-index: 20;
+  transform: translateY(-8px) rotate(0deg);
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.4), 0 18px 30px rgba(0, 0, 0, 0.5);
+  animation: none;
+}
 @keyframes cardStackDrop {
   0% { opacity: 0; transform: translateY(-48px) rotate(-8deg); }
   60% { opacity: 1; transform: translateY(6px) rotate(1deg); }
