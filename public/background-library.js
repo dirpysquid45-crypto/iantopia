@@ -59,6 +59,11 @@ window.BACKGROUND_LIBRARY = {
   // background still gets you the auto-switch on pick, same as always.
   dreamer:          { label: 'Dreamer',             type: 'video', src: '/video/dreamer-storm.mp4', theme: 'theme-dreamer', comboTrack: 'orb_of_dreamers' },
 
+  // Common theme: not an unlock. index.astro's Background picker always lists
+  // it (see COMMON_BG_KEYS there). Its theme class skins the homepage buttons
+  // with the wood-sign texture.
+  iantopia_wood:    { label: 'Iantopia Wood',      type: 'gif',   src: '/video/iantopia-wood.jpg', position: 'center', theme: 'theme-wood' },
+
   // Inventory-page-only backgrounds. `restricted: true` means every picker
   // (pickers.js, and home's and lootbox's own separate copies) skips this
   // entry entirely UNLESS the current page's own PAGE_BG_ALLOWLIST names it

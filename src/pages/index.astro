@@ -1071,6 +1071,19 @@
       width: clamp(70px, 9vw, 110px); pointer-events: none; opacity: 0;
       will-change: transform;
     }
+    /* Iantopia Wood theme: the wood-sign texture is the skin for the big menu
+       buttons and the top-bar buttons. Dark ink reads well on the light grain. */
+    body.theme-wood .big,
+    body.theme-wood #suggest-btn, body.theme-wood #patch-btn {
+      background: #3b2412 url('/assets/decorations/wood-sign.jpg') center / cover no-repeat !important;
+      color: #1d0f04 !important;
+      border: 2px solid #2a1606 !important;
+      box-shadow: inset 0 0 0 2px rgba(255,235,190,.35), 0 3px 0 #2a1606, 0 0 14px rgba(0,0,0,.45) !important;
+      text-shadow: 0 1px 0 rgba(255,240,210,.55) !important;
+    }
+    body.theme-wood .big:hover, body.theme-wood #suggest-btn:hover, body.theme-wood #patch-btn:hover {
+      filter: brightness(1.12);
+    }
     body.theme-halloween #spider-crawler img {
       display: block; width: 100%; height: auto;
       filter: drop-shadow(0 0 6px rgba(94,23,168,.9)) drop-shadow(0 0 14px rgba(255,111,0,.45));
@@ -1333,6 +1346,15 @@
       overflow-y: auto;
       box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
     }
+    .suggest-tabs { display:flex; gap:6px; margin:0 0 12px; }
+    .suggest-tab { flex:1; font-size:11px; padding:8px 6px; border:2px solid #555; background:#111; color:#aaa; cursor:pointer; }
+    .suggest-tab.active { border-color:#ffd700; color:#ffd700; }
+    .suggest-board { max-height:50vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding-right:4px; }
+    .suggest-post { border:1px solid #444; background:#0c0c0c; padding:10px 12px; }
+    .suggest-meta-row { display:flex; justify-content:space-between; gap:8px; font-size:11px; color:#888; margin-bottom:6px; }
+    .suggest-meta-row b { color:#ffd700; font-size:12px; }
+    .suggest-text { margin:0; font-size:13px; line-height:1.6; white-space:pre-wrap; word-break:break-word; color:#eee; }
+    .suggest-empty { color:#888; font-size:12px; text-align:center; padding:20px; border:1px dashed #444; }
     .modal-box h2 {
       margin: 0 0 14px;
       color: #ffd700;
@@ -1891,19 +1913,31 @@
   </div>
 
   <!-- Suggestion box -->
+  <script is:inline src="/arena-client.js?v=1"></script>
   <div class="modal-overlay" id="suggest-overlay" role="dialog" aria-modal="true" aria-labelledby="suggest-title">
     <div class="modal-box">
       <h2 id="suggest-title">Suggestion Box</h2>
-      <p style="font-size:12px; color:#888; margin:0 0 12px; line-height:1.7;">
-        Ideas, bugs, things you want added — it goes straight to the admin.
-      </p>
-      <textarea id="suggest-text" maxlength="1000" placeholder="What should Iantopia add next?"></textarea>
-      <div id="suggest-meta">
-        <span id="suggest-count">0 / 1000</span>
-        <button class="modal-close" id="suggest-send" style="margin:0;">Send</button>
+      <div class="suggest-tabs" role="tablist">
+        <button class="suggest-tab active" data-tab="send" role="tab" aria-selected="true">Send</button>
+        <button class="suggest-tab" data-tab="board" role="tab" aria-selected="false">Board</button>
       </div>
-      <div id="suggest-status"></div>
-      <a href="/suggestions" style="display:block;margin:6px 0 10px;font-size:12px;color:#8fb8e8;">See suggestions posted by other players</a>
+      <div id="suggest-panel-send">
+        <p style="font-size:12px; color:#888; margin:0 0 12px; line-height:1.7;">
+          Ideas, bugs, things you want added — it goes straight to the admin.
+        </p>
+        <textarea id="suggest-text" maxlength="1000" placeholder="What should Iantopia add next?"></textarea>
+        <div id="suggest-meta">
+          <span id="suggest-count">0 / 1000</span>
+          <button class="modal-close" id="suggest-send" style="margin:0;">Send</button>
+        </div>
+        <div id="suggest-status"></div>
+      </div>
+      <div id="suggest-panel-board" hidden>
+        <p style="font-size:12px; color:#888; margin:0 0 10px; line-height:1.7;">
+          Suggestions the admin has picked to post. Scroll to read them.
+        </p>
+        <div id="suggest-board" class="suggest-board"><div class="suggest-empty">Open the Board tab to load posts.</div></div>
+      </div>
       <button class="modal-close" id="suggest-close">Close</button>
     </div>
   </div>
@@ -2431,6 +2465,62 @@
         if (e.target === suggestOverlay) suggestOverlay.classList.remove('open');
       });
 
+      // --- Suggestion board (the Board tab) ---
+      // Public, admin-approved suggestions, read through one guest connection to
+      // the arena server (the same feed the old /suggestions page used). Names and
+      // text are set with textContent, so nothing a player wrote is run as HTML.
+      const suggestTabs = document.querySelectorAll('.suggest-tab');
+      const panelSend = document.getElementById('suggest-panel-send');
+      const panelBoard = document.getElementById('suggest-panel-board');
+      const boardList = document.getElementById('suggest-board');
+      let boardArena = null, boardReady = false;
+      function renderBoard(rows) {
+        boardList.textContent = '';
+        if (!rows.length) {
+          const empty = document.createElement('div'); empty.className = 'suggest-empty';
+          empty.textContent = 'Nothing posted yet.';
+          boardList.append(empty); return;
+        }
+        for (const r of rows) {
+          const post = document.createElement('article'); post.className = 'suggest-post';
+          const meta = document.createElement('div'); meta.className = 'suggest-meta-row';
+          const who = document.createElement('b'); who.textContent = r.name || 'Anonymous';
+          const when = document.createElement('span'); when.textContent = r.postedAt ? new Date(r.postedAt).toLocaleDateString() : '';
+          meta.append(who, when);
+          const body = document.createElement('p'); body.className = 'suggest-text'; body.textContent = r.text;
+          post.append(meta, body); boardList.append(post);
+        }
+      }
+      function loadBoard() {
+        if (!boardArena) {
+          boardArena = ArenaClient.create({
+            game: 'suggest',
+            canSwitchIdentity: () => false,
+            onMessage: (msg) => {
+              if (msg.type === 'auth_ok') { boardReady = true; boardArena.send({ type: 'suggestions_public' }); }
+              else if (msg.type === 'suggestions_public') renderBoard(msg.rows);
+              else if (msg.type === 'error') {
+                boardList.innerHTML = '<div class="suggest-empty">Could not load the board. Try again later.</div>';
+              }
+            },
+          });
+          boardArena.connect();
+        } else if (boardReady) {
+          boardArena.send({ type: 'suggestions_public' });
+        }
+      }
+      suggestTabs.forEach((tab) => tab.addEventListener('click', () => {
+        const onBoard = tab.dataset.tab === 'board';
+        suggestTabs.forEach((t) => {
+          const on = t === tab;
+          t.classList.toggle('active', on);
+          t.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        panelSend.hidden = onBoard;
+        panelBoard.hidden = !onBoard;
+        if (onBoard) loadBoard();
+      }));
+
       // --- Background switcher ---
       // Kept separate from other pages on purpose — see the note on
       // ACTIVE_TRACK_KEY above for why.
@@ -2539,10 +2629,15 @@
       }
       applyBackground(getActiveBgKey());
 
+      const COMMON_BG_KEYS = ['iantopia_wood'];
       function renderBackgroundList() {
         const inv = loadInventory();
         const unlocked = Array.isArray(inv.backgrounds) ? inv.backgrounds : [];
         let html = bgRow('default', BG_LIBRARY.default.label);
+        // Common backgrounds that everyone can pick, no unlock needed.
+        COMMON_BG_KEYS.forEach((key) => {
+          if (BG_LIBRARY[key] && !unlocked.includes(key)) html += bgRow(key, BG_LIBRARY[key].label);
+        });
         if (unlocked.length === 0) {
           html += '<div class="modal-empty">No extra backgrounds unlocked yet — try the Lootbox!</div>';
         } else {
