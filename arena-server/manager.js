@@ -1,8 +1,9 @@
 const BlackjackGame = require('./blackjack');
 const { BattleshipGame } = require('./battleship');
+const { PongGame } = require('./pong');
 const BalanceManager = require('./balance');
 
-const GAME_TYPES = new Set(['blackjack', 'battleship']);
+const GAME_TYPES = new Set(['blackjack', 'battleship', 'pong']);
 const MAX_BET = 1000000;
 const SUGGESTION_STATUSES = new Set(['new', 'public', 'archived']);
 
@@ -261,6 +262,8 @@ class Manager {
     // negative bet was accepted (it passed `balance < bet`) and then "deducted"
     // as a credit, which matched against itself or an accomplice minted money.
     if (!Number.isSafeInteger(bet) || bet < 0 || bet > MAX_BET) return this.fail(ws, 'Invalid bet');
+    // Pong is a friendly game only: nothing is staked, so nothing can be lost or won.
+    if (gameType === 'pong' && bet !== 0) return this.fail(ws, 'Pong is friendly only');
     const stake = this.stakeError(conn, bet);
     if (stake) return this.fail(ws, stake, 'guest_stake');
 
@@ -346,7 +349,9 @@ class Manager {
     const opts = { timing: this.opts.timing, db: this.db, makeDeck: this.opts.makeDeck };
     const game = a.gameType === 'battleship'
       ? new BattleshipGame(tableId, a, b, this.balance, opts)
-      : new BlackjackGame(tableId, a, b, this.balance, opts);
+      : a.gameType === 'pong'
+        ? new PongGame(tableId, a, b, this.balance, opts)
+        : new BlackjackGame(tableId, a, b, this.balance, opts);
     game.closeTable = () => this.tables.delete(tableId);
     this.tables.set(tableId, game);
     try {

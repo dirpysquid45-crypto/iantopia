@@ -1,0 +1,386 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Arena Pong</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style is:global>
+  :root { --gold:#ffd700; --red:#ff2d2d; --blue:#3d8bff; --ink:#f2f2f2; --muted:#9aa3b5; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:#000; color:var(--ink); }
+  body { font-family:'Press Start 2P', ui-monospace, monospace; overflow:hidden; display:flex; flex-direction:column; }
+  a.back { position:fixed; top:12px; left:12px; z-index:20; color:var(--gold); border:2px solid var(--gold); background:#000; padding:8px 10px; font-size:9px; text-decoration:none; }
+
+  #scoreboard {
+    display:flex; justify-content:center; align-items:center; gap:18px; padding:14px 12px 8px; flex:0 0 auto;
+    font-size:clamp(10px, 2.4vw, 16px);
+  }
+  #scoreboard .side { text-align:center; min-width:120px; }
+  #scoreboard .side small { display:block; font-size:8px; color:var(--muted); margin-bottom:6px; }
+  #score-left { color:var(--red); text-shadow:0 0 12px rgba(255,45,45,.8); }
+  #score-right { color:var(--blue); text-shadow:0 0 12px rgba(61,139,255,.8); }
+  #scoreboard .dash { color:var(--muted); }
+
+  #stage { flex:1 1 auto; position:relative; display:flex; align-items:center; justify-content:center; min-height:0; padding:4px 8px 8px; }
+  canvas#field { display:block; max-width:100%; max-height:100%; touch-action:none; border:2px solid #222; background:#050508; }
+
+  #lobby, #result {
+    position:fixed; inset:0; z-index:15; display:none; flex-direction:column; align-items:center; justify-content:center;
+    gap:16px; background:rgba(0,0,0,.92); padding:20px; text-align:center;
+  }
+  #lobby.show, #result.show { display:flex; }
+  #lobby h1, #result h1 { margin:0; font-size:clamp(14px, 3.4vw, 22px); color:var(--gold); text-shadow:0 0 14px rgba(255,215,0,.6); }
+  #result h1.win { color:#7dff7d; text-shadow:0 0 16px rgba(125,255,125,.7); }
+  #result h1.lose { color:var(--muted); text-shadow:none; }
+  #lobby p, #result p { margin:0; font-size:9px; line-height:1.8; color:var(--muted); max-width:420px; }
+  button.arcade {
+    font-family:inherit; font-size:11px; padding:12px 18px; background:#000; color:var(--gold);
+    border:3px solid var(--gold); cursor:pointer;
+  }
+  button.arcade:hover:not(:disabled) { background:var(--gold); color:#000; }
+  button.arcade:disabled { opacity:.4; cursor:default; }
+  #status { font-size:9px; color:var(--muted); min-height:14px; }
+  #hint { position:fixed; bottom:8px; left:0; right:0; text-align:center; font-size:8px; color:var(--muted); pointer-events:none; }
+  #banner { position:fixed; top:0; left:0; right:0; z-index:25; background:rgba(180,30,30,.92); color:#fff; font-size:9px; padding:8px; text-align:center; display:none; }
+
+  #confetti { position:fixed; inset:0; z-index:30; pointer-events:none; display:none; }
+</style>
+</head>
+<body>
+  <a class="back" href="/arena">← Arena</a>
+
+  <div id="banner"></div>
+
+  <div id="scoreboard" aria-live="polite">
+    <div class="side"><small id="name-left">You</small><span id="score-left">0</span></div>
+    <div class="dash">—</div>
+    <div class="side"><small id="name-right">Opponent</small><span id="score-right">0</span></div>
+  </div>
+
+  <div id="stage"><canvas id="field" aria-label="Pong field"></canvas></div>
+  <div id="hint">Move your mouse or finger, or use W / S or the arrow keys. First to 5 wins.</div>
+
+  <div id="lobby" class="show">
+    <h1>🏓 ARENA PONG</h1>
+    <p>1 versus 1, friendly. Nothing is staked, so nothing is won or lost. Red paddle on the left, blue on the right.</p>
+    <button class="arcade" id="btn-find" type="button">Find a match</button>
+    <div id="status"></div>
+  </div>
+
+  <div id="result">
+    <h1 id="result-title">Game over</h1>
+    <p id="result-score"></p>
+    <p id="rematch-note"></p>
+    <button class="arcade" id="btn-rematch" type="button" disabled>Rematch</button>
+    <button class="arcade" id="btn-lobby" type="button">Back to lobby</button>
+  </div>
+
+  <canvas id="confetti"></canvas>
+
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/game-stats.js?v=1"></script>
+<script is:inline src="/cloud-sync.js?v=10"></script>
+<script is:inline src="/arena-client.js?v=1"></script>
+<script is:inline>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const canvas = $('field'), ctx = canvas.getContext('2d');
+  const confettiCanvas = $('confetti'), confettiCtx = confettiCanvas.getContext('2d');
+
+  // Game state, as the server reports it.
+  const S = {
+    phase: 'lobby',     // lobby | queued | playing | over
+    field: null,        // { w, h, paddleH, paddleW, ballR, winScore }
+    yourIndex: 0,
+    opponentName: 'Opponent',
+    ball: { x: 400, y: 250 },
+    paddles: [250, 250],   // what the server last sent
+    shown: { ball: { x: 400, y: 250 }, paddles: [250, 250] }, // smoothed for drawing
+    score: [0, 0],
+    serving: false,
+    winner: null,
+    rematchSent: false,
+    lastMove: 0,
+  };
+  let myTarget = 0.5;   // 0..1 fraction of the field height the player is aiming at
+  const keys = { up: false, down: false };
+  let lastSent = -1;
+
+  // ----------------------------------------------------------------- sound
+  // Synth beeps, so there are no sound files to load or host. The audio context
+  // starts on the first click or key press (browsers block sound before that).
+  let audio = null;
+  function ac() {
+    if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
+    if (audio.state === 'suspended') audio.resume();
+    return audio;
+  }
+  function tone(freq, dur, type = 'square', vol = 0.12, when = 0, slideTo = null) {
+    const a = ac(); if (!a) return;
+    const t = a.currentTime + when;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(a.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  const SFX = {
+    paddle: () => tone(520, 0.08, 'square', 0.14),
+    wall: () => tone(260, 0.06, 'triangle', 0.10),
+    score: () => tone(330, 0.35, 'sawtooth', 0.14, 0, 110),
+    win: () => { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.22, 'square', 0.12, i * 0.13)); },
+    lose: () => { [392, 330, 262].forEach((f, i) => tone(f, 0.28, 'triangle', 0.12, i * 0.2)); },
+    start: () => tone(660, 0.12, 'square', 0.10),
+  };
+
+  // ------------------------------------------------------------- confetti
+  function sizeCanvases() {
+    canvas.width = canvas.parentElement.clientWidth * (window.devicePixelRatio || 1);
+    canvas.height = canvas.parentElement.clientHeight * (window.devicePixelRatio || 1);
+    confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight;
+  }
+  function confetti() {
+    confettiCanvas.style.display = 'block';
+    const colors = ['#ffd700', '#ff2d2d', '#3d8bff', '#7dff7d', '#ff4fd8', '#ffffff'];
+    const pieces = Array.from({ length: 180 }, () => ({
+      x: Math.random() * confettiCanvas.width, y: -Math.random() * confettiCanvas.height * 0.4,
+      vx: (Math.random() - 0.5) * 5, vy: 2 + Math.random() * 4, s: 6 + Math.random() * 7,
+      r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, c: colors[Math.floor(Math.random() * colors.length)],
+    }));
+    const end = performance.now() + 3600;
+    (function frame(now) {
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      for (const p of pieces) {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.035; p.r += p.vr;
+        confettiCtx.save(); confettiCtx.translate(p.x, p.y); confettiCtx.rotate(p.r);
+        confettiCtx.fillStyle = p.c; confettiCtx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+        confettiCtx.restore();
+      }
+      if (now < end) requestAnimationFrame(frame);
+      else confettiCanvas.style.display = 'none';
+    })(performance.now());
+  }
+
+  // ------------------------------------------------------------ drawing
+  function drawFrame() {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const f = S.field || { w: 800, h: 500, paddleH: 96, paddleW: 12, ballR: 8 };
+    // Fit the logical field into the canvas, keeping its aspect ratio.
+    const k = Math.min(W / f.w, H / f.h);
+    const ox = (W - f.w * k) / 2, oy = (H - f.h * k) / 2;
+    const X = (x) => ox + x * k, Y = (y) => oy + y * k;
+
+    ctx.fillStyle = '#050508'; ctx.fillRect(ox, oy, f.w * k, f.h * k);
+    // Centre line.
+    ctx.setLineDash([10 * k, 14 * k]); ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 2 * k;
+    ctx.beginPath(); ctx.moveTo(X(f.w / 2), Y(0)); ctx.lineTo(X(f.w / 2), Y(f.h)); ctx.stroke(); ctx.setLineDash([]);
+
+    // Paddles: red glow on the left, blue on the right, whichever seat you have.
+    const left = { x: 24, color: '#ff2d2d', glow: 'rgba(255,45,45,' };
+    const right = { x: f.w - 24 - f.paddleW, color: '#3d8bff', glow: 'rgba(61,139,255,' };
+    [left, right].forEach((p, i) => {
+      const py = S.shown.paddles[i] - f.paddleH / 2;
+      ctx.save();
+      ctx.shadowColor = p.color; ctx.shadowBlur = 26 * k;
+      ctx.fillStyle = p.color;
+      ctx.fillRect(X(p.x), Y(py), f.paddleW * k, f.paddleH * k);
+      ctx.restore();
+      // A softer outer halo, so the glow reads on dark screens.
+      ctx.fillStyle = p.glow + '0.18)';
+      ctx.fillRect(X(p.x) - 4 * k, Y(py) - 4 * k, f.paddleW * k + 8 * k, f.paddleH * k + 8 * k);
+    });
+
+    // Ball.
+    ctx.save();
+    ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 14 * k;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(X(S.shown.ball.x), Y(S.shown.ball.y), f.ballR * k, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    if (S.serving && S.phase === 'playing') {
+      ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.font = `${Math.round(14 * k)}px "Press Start 2P", monospace`;
+      ctx.textAlign = 'center'; ctx.fillText('GET READY', X(f.w / 2), Y(f.h / 2 - 40));
+    }
+  }
+
+  // Smooth the drawing toward the latest server state, so 30 updates a second look like motion.
+  function animate() {
+    const a = 0.35;
+    S.shown.ball.x += (S.ball.x - S.shown.ball.x) * a;
+    S.shown.ball.y += (S.ball.y - S.shown.ball.y) * a;
+    for (let i = 0; i < 2; i++) S.shown.paddles[i] += (S.paddles[i] - S.shown.paddles[i]) * a;
+    drawFrame();
+    requestAnimationFrame(animate);
+  }
+
+  // --------------------------------------------------------------- input
+  function setTargetFromPointer(clientY) {
+    const r = canvas.getBoundingClientRect();
+    myTarget = Math.max(0, Math.min(1, (clientY - r.top) / r.height));
+  }
+  canvas.addEventListener('pointermove', (e) => { if (S.phase === 'playing') setTargetFromPointer(e.clientY); });
+  canvas.addEventListener('pointerdown', (e) => { ac(); if (S.phase === 'playing') setTargetFromPointer(e.clientY); });
+  window.addEventListener('keydown', (e) => {
+    ac();
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = true;
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
+    if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault();
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = false;
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = false;
+  });
+  // Keyboard nudges the target; the server moves the paddle there at its own capped speed.
+  setInterval(() => {
+    if (S.phase !== 'playing') return;
+    if (keys.up) myTarget = Math.max(0, myTarget - 0.03);
+    if (keys.down) myTarget = Math.min(1, myTarget + 0.03);
+    const now = performance.now();
+    // Stay under the server's 12 messages a second: send at most every 90 ms, and only when it changed.
+    if (now - S.lastMove >= 90 && Math.abs(myTarget - lastSent) > 0.002) {
+      arena.send({ type: 'action', action: 'move', y: myTarget });
+      lastSent = myTarget; S.lastMove = now;
+    }
+  }, 30);
+
+  // ------------------------------------------------------------ screens
+  function showLobby(msg) { $('lobby').classList.add('show'); $('result').classList.remove('show'); $('status').textContent = msg || ''; $('btn-find').disabled = false; }
+  function hideOverlays() { $('lobby').classList.remove('show'); $('result').classList.remove('show'); }
+  function setScore() {
+    $('score-left').textContent = S.score[0];
+    $('score-right').textContent = S.score[1];
+  }
+  function setNames() {
+    const me = window.CloudSync && CloudSync.currentUser ? (CloudSync.currentUser.displayName || 'You') : 'You';
+    const left = S.yourIndex === 0 ? me : S.opponentName;
+    const right = S.yourIndex === 0 ? S.opponentName : me;
+    $('name-left').textContent = left;
+    $('name-right').textContent = right;
+  }
+  function banner(text) { const b = $('banner'); if (!text) { b.style.display = 'none'; return; } b.textContent = text; b.style.display = 'block'; }
+
+  function onGameStart(m) {
+    S.phase = 'playing';
+    S.yourIndex = m.yourIndex;
+    S.opponentName = m.opponentName || 'Opponent';
+    S.field = m.field;
+    S.score = [0, 0]; S.winner = null; S.rematchSent = false;
+    myTarget = 0.5; lastSent = -1;
+    S.ball = { x: m.field.w / 2, y: m.field.h / 2 };
+    S.paddles = [m.field.h / 2, m.field.h / 2];
+    S.shown = { ball: { ...S.ball }, paddles: S.paddles.slice() };
+    hideOverlays(); setNames(); setScore(); banner('');
+    SFX.start();
+  }
+
+  function onState(m) {
+    S.ball = m.ball; S.paddles = m.paddles; S.score = m.score; S.serving = m.serving;
+    setScore();
+    for (const ev of m.events || []) {
+      if (ev === 'paddle0' || ev === 'paddle1') SFX.paddle();
+      else if (ev === 'wall') SFX.wall();
+      else if (ev === 'score0' || ev === 'score1') SFX.score();
+    }
+  }
+
+  function onOver(m) {
+    S.phase = 'over';
+    S.winner = m.winner;
+    S.score = m.score;
+    setScore();
+    const won = m.winner === S.yourIndex;
+    const title = $('result-title');
+    if (won) { title.textContent = '🏆 YOU WIN'; title.className = 'win'; }
+    else { title.textContent = 'You lost'; title.className = 'lose'; }
+    const reason = m.reason === 'left' ? ' Your opponent left.' : m.reason === 'disconnect' ? ' Your opponent disconnected.' : '';
+    $('result-score').textContent = `Final score ${m.score[S.yourIndex]} to ${m.score[1 - S.yourIndex]}.${reason}`;
+    $('rematch-note').textContent = '';
+    $('btn-rematch').disabled = true;
+    $('result').classList.add('show');
+    if (won) { SFX.win(); confetti(); } else { SFX.lose(); }
+  }
+
+  function resync(m) {
+    S.yourIndex = m.yourIndex;
+    S.opponentName = m.opponentName || 'Opponent';
+    S.field = m.field;
+    S.score = m.score; S.ball = m.ball; S.paddles = m.paddles; S.serving = m.serving;
+    S.shown = { ball: { ...m.ball }, paddles: m.paddles.slice() };
+    setNames(); setScore();
+    if (m.phase === 'playing') { S.phase = 'playing'; hideOverlays(); }
+    else if (m.phase === 'over') { S.phase = 'over'; S.winner = m.winner; onOver({ winner: m.winner, score: m.score, reason: 'resync' }); }
+  }
+
+  // ----------------------------------------------------------- network
+  const arena = ArenaClient.create({
+    game: 'pong',
+    canSwitchIdentity: () => S.phase === 'lobby',
+    onState: (state) => {
+      if (state === 'open') banner('');
+      else if (state === 'replaced') banner('This game was opened in another tab. Close that tab, then reload this page.');
+      else banner('Connection lost — reconnecting…');
+    },
+    onMessage: (m) => {
+      switch (m.type) {
+        case 'auth_ok': break;
+        case 'status':
+          if (m.status === 'queued') { S.phase = 'queued'; $('status').textContent = 'Waiting for a friendly opponent…'; $('btn-find').disabled = true; }
+          if (m.status === 'matched') { $('status').textContent = 'Matched! Starting…'; }
+          break;
+        case 'game_start': onGameStart(m); break;
+        case 'pong_state': onState(m); break;
+        case 'pong_over': onOver(m); break;
+        case 'show_rematch_prompt': if (S.phase === 'over') $('btn-rematch').disabled = false; break;
+        case 'rematch_opponent_accepted': $('rematch-note').textContent = `${S.opponentName} wants a rematch!`; break;
+        case 'rematch_declined': $('rematch-note').textContent = `${S.opponentName} left.`; $('btn-rematch').disabled = true; break;
+        case 'rematch_failed': $('rematch-note').textContent = m.message || 'Rematch failed.'; $('btn-rematch').disabled = true; break;
+        case 'ready_for_queue': if (S.phase === 'over') { $('btn-rematch').disabled = true; $('rematch-note').textContent ||= 'The table has closed.'; } break;
+        case 'opponent_away': banner(`${S.opponentName} disconnected — holding the game for ${Math.round((m.graceMs || 30000) / 1000)}s…`); break;
+        case 'opponent_back': banner(''); break;
+        case 'resync': resync(m); break;
+        case 'balance_update': break;
+        case 'error': $('status').textContent = m.message || 'Something went wrong.'; $('btn-find').disabled = false; break;
+        default: break;
+      }
+    },
+  });
+  arena.connect();
+
+  $('btn-find').addEventListener('click', () => {
+    ac();
+    $('status').textContent = 'Looking for an opponent…';
+    arena.send({ type: 'join_queue', bet: 0, gameType: 'pong' });
+  });
+  $('btn-rematch').addEventListener('click', () => {
+    if (S.rematchSent) return;
+    S.rematchSent = true;
+    $('rematch-note').textContent = 'Waiting for your opponent…';
+    arena.send({ type: 'rematch_accept' });
+  });
+  $('btn-lobby').addEventListener('click', () => {
+    arena.send({ type: 'rematch_decline' });
+    arena.send({ type: 'leave_game' });
+    S.phase = 'lobby'; S.score = [0, 0]; setScore();
+    showLobby('');
+  });
+
+  window.addEventListener('resize', sizeCanvases);
+  sizeCanvases();
+  animate();
+})();
+</script>
+</body>
+</html>

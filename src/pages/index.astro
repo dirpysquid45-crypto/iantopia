@@ -1061,28 +1061,17 @@
     /* The clickable word "Haunted" in the title. */
     .haunted-word { cursor: pointer; border-radius: 2px; transition: text-shadow .2s; }
     .haunted-word:hover, .haunted-word:focus-visible { text-shadow: 0 0 14px rgba(255,111,0,.9); outline: none; }
-    /* Crawling spider: appears now and then, crawls across the page, and is
-       gone again. Decorative only (pointer-events off, hidden from assistive
-       tech), and only during the Halloween theme, so it goes with the rest of
-       the theme on November 1st. The JavaScript below drives the movement. */
+    /* Crawling spider: a large spider that walks straight across the whole
+       screen, over the UI, and is gone again. It starts and ends fully off
+       screen, so it never pops in or gets cut off at an edge. Decorative only
+       (pointer-events off, hidden from assistive tech); Halloween theme only,
+       so it goes with the rest of the theme on November 1st. The JavaScript
+       below drives the movement. */
     #spider-crawler { display: none; }
     body.theme-halloween #spider-crawler {
-      display: block; position: fixed; left: 0; top: 0; z-index: 4;
-      width: clamp(70px, 9vw, 110px); pointer-events: none; opacity: 0;
+      display: block; position: fixed; left: 0; top: 0; z-index: 9000;
+      width: clamp(240px, 34vw, 380px); pointer-events: none; opacity: 0;
       will-change: transform;
-    }
-    /* Iantopia Wood theme: the wood-sign texture is the skin for the big menu
-       buttons and the top-bar buttons. Dark ink reads well on the light grain. */
-    body.theme-wood .big,
-    body.theme-wood #suggest-btn, body.theme-wood #patch-btn {
-      background: #3b2412 url('/assets/decorations/wood-sign.jpg') center / cover no-repeat !important;
-      color: #1d0f04 !important;
-      border: 2px solid #2a1606 !important;
-      box-shadow: inset 0 0 0 2px rgba(255,235,190,.35), 0 3px 0 #2a1606, 0 0 14px rgba(0,0,0,.45) !important;
-      text-shadow: 0 1px 0 rgba(255,240,210,.55) !important;
-    }
-    body.theme-wood .big:hover, body.theme-wood #suggest-btn:hover, body.theme-wood #patch-btn:hover {
-      filter: brightness(1.12);
     }
     body.theme-halloween #spider-crawler img {
       display: block; width: 100%; height: auto;
@@ -1625,39 +1614,37 @@
   <div id="halloween-gift-toast" role="status" aria-live="polite"></div>
   <div id="spider-crawler" aria-hidden="true"><img src="/assets/decorations/spider-crawl.webp" alt="" /></div>
   <script is:inline>
-    // The spider appears at random intervals (roughly every 25 to 70 seconds),
-    // crawls straight across the screen from one side to the other at a random
-    // height, then disappears. Only during the Halloween theme, and never for
-    // people who have asked their system for reduced motion.
+    // The spider crosses the screen from one side to the other, fast (about
+    // 2 to 3 seconds), at a random height, now and then (every 20 to 55
+    // seconds). It starts and ends fully off screen. Only during the Halloween
+    // theme, and never for people who asked their system for reduced motion.
     (function () {
       const el = document.getElementById('spider-crawler');
       if (!el) return;
       const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       let running = false;
       function crawl() {
-        if (running) return;
         running = true;
-        const w = el.offsetWidth || 100, h = el.offsetHeight || 160;
+        const w = el.offsetWidth || 300, h = el.offsetHeight || 414;
         const vw = window.innerWidth, vh = window.innerHeight;
         const fromLeft = Math.random() < 0.5;
-        const y = Math.round(vh * (0.15 + Math.random() * 0.55)) - h / 2;
-        const drift = (Math.random() - 0.5) * 80;
-        const from = fromLeft ? -w - 10 : vw + 10;
-        const to = fromLeft ? vw + 10 : -w - 10;
+        const y = Math.round((vh - h) * (0.05 + Math.random() * 0.8));
+        const sx = fromLeft ? 1 : -1;
+        const from = fromLeft ? -w - 4 : vw + 4;
+        const to = fromLeft ? vw + 4 : -w - 4;
+        el.style.opacity = '1';
         const anim = el.animate([
-          { transform: `translate(${from}px, ${y}px) scaleX(${fromLeft ? 1 : -1})`, opacity: 0 },
-          { opacity: 1, offset: 0.08 },
-          { opacity: 1, offset: 0.92 },
-          { transform: `translate(${to}px, ${y + drift}px) scaleX(${fromLeft ? 1 : -1})`, opacity: 0 },
-        ], { duration: 9000 + Math.random() * 5000, easing: 'linear', fill: 'forwards' });
-        anim.onfinish = () => { el.style.opacity = '0'; anim.cancel(); running = false; schedule(); };
+          { transform: `translate(${from}px, ${y}px) scaleX(${sx})` },
+          { transform: `translate(${to}px, ${y}px) scaleX(${sx})` },
+        ], { duration: 2000 + Math.random() * 1000, easing: 'linear', fill: 'forwards' });
+        anim.onfinish = () => { el.style.opacity = '0'; anim.cancel(); running = false; };
       }
       function schedule() {
         if (reduced) return;
         setTimeout(() => {
           if (document.body.classList.contains('theme-halloween') && !running) crawl();
           schedule();
-        }, 25000 + Math.random() * 45000);
+        }, 20000 + Math.random() * 35000);
       }
       schedule();
     })();
