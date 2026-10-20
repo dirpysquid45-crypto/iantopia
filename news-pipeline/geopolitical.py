@@ -441,6 +441,11 @@ def main():
         stories_by_region = pull_feeds()
         output = build_output(stories_by_region)
 
+        story_total = sum(len(r['stories']) for r in output['regions'])
+        if story_total == 0:
+            # Every feed failed this run (DNS, network). Keep yesterday's briefing.
+            print('\n✗ No stories this run; keeping the last good briefing', file=sys.stderr)
+            sys.exit(1)
         with open(OUTPUT_FILE, 'w') as f:
             json.dump(output, f, indent=2)
 
@@ -456,8 +461,7 @@ def main():
             'last_updated': datetime.now().isoformat() + 'Z',
             'note': f'Geopolitical briefing unavailable: {e}'
         }
-        with open(OUTPUT_FILE, 'w') as f:
-            json.dump(output, f, indent=2)
+        # Don't replace the last good briefing with an empty one.
         sys.exit(1)
 
 

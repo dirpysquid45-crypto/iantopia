@@ -93,7 +93,7 @@ def main() -> None:
         "clusters": clusters,
         "unclustered": unclustered[:20],
     }
-    out_path = write_json("clusters.json", output)
+    out_path = write_json("clusters.json", output, keep_if_empty=("clusters", "unclustered"))
     print(f"[cluster] {len(clusters)} cross-outlet clusters, {len(unclustered)} unclustered items -> {out_path}")
 
 

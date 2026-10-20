@@ -1,0 +1,73 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Mahjong Solitaire</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style is:global>
+  :root { --gold:#ffd700; --green:#7dff7d; --muted:#9aa3b5; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:#000; color:#f2f2f2; }
+  body { font-family:'Press Start 2P', ui-monospace, monospace; display:flex; flex-direction:column; overflow:hidden; }
+  header { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; flex:0 0 auto; border-bottom:2px solid #1d1d1d; }
+  a.back { color:var(--gold); border:2px solid var(--gold); background:#000; padding:7px 10px; font-size:9px; text-decoration:none; white-space:nowrap; }
+  #status { font-size:9px; color:var(--muted); text-align:right; min-height:12px; line-height:1.6; }
+  #status.win { color:var(--green); text-shadow:0 0 10px rgba(125,255,125,.6); }
+  iframe { flex:1 1 auto; width:100%; border:0; background:#0b0b0b; }
+  footer { flex:0 0 auto; font-size:8px; color:#5d6577; text-align:center; padding:6px; }
+</style>
+</head>
+<body>
+  <header>
+    <a class="back" href="/puzzles">← Puzzles</a>
+    <div id="status">Solve a board to earn 60 Strubles. Up to 10 a day.</div>
+  </header>
+  <iframe id="game" src="/mah/index.html" title="Mahjong Solitaire" allow="fullscreen"></iframe>
+  <footer>Mahjong solitaire engine: mah by ffalt, MIT License. Source and licence in /mah/LICENSE.txt</footer>
+
+<script is:inline src="/strubles.js?v=3"></script>
+<script is:inline src="/game-stats.js?v=1"></script>
+<script is:inline>
+(() => {
+  // A solved board pays this much, up to DAILY_CAP boards per (UTC) day.
+  const PAY = 60;
+  const DAILY_CAP = 10;
+  const KEY = 'solitaire_payouts_v1';
+  const status = document.getElementById('status');
+  const today = () => new Date().toISOString().slice(0, 10);
+
+  function loadCount() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY) || '{}');
+      return s.day === today() ? s : { day: today(), count: 0 };
+    } catch { return { day: today(), count: 0 }; }
+  }
+
+  // The game's iframe is same-origin, so only our own page's messages count.
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== 'mah-solved') return;
+    const s = loadCount();
+    if (s.count >= DAILY_CAP) {
+      status.className = '';
+      status.textContent = 'Solved! You have reached today’s Strubles limit. Come back tomorrow.';
+      return;
+    }
+    s.count++;
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {}
+    try { Strubles.add(PAY); } catch {}
+    try { GameStats.record('solitaire', 'win', { net: PAY }); } catch {}
+    status.className = 'win';
+    status.textContent = `Solved! +${PAY} Strubles (${DAILY_CAP - s.count} left today)`;
+  });
+})();
+</script>
+</body>
+</html>

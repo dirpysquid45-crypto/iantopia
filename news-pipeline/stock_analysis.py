@@ -88,7 +88,7 @@ def main() -> None:
     # past the guard in fetch_change() instead of silently writing invalid
     # JSON (json.dump's default happily emits a bare NaN token, which
     # JSON.parse on the page's end would throw on).
-    out_path = write_json("stocks.json", output)
+    out_path = write_json("stocks.json", output, keep_if_empty=("movers",))
 
     print(f"[stock_analysis] wrote {len(results)}/{len(WATCHLIST)} symbols to {out_path}")
 

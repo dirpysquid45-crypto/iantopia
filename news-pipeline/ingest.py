@@ -97,7 +97,7 @@ def main() -> None:
         "sources": [f["source"] for f in FEEDS],
         "items": all_items,
     }
-    out_path = write_json("headlines.json", output)
+    out_path = write_json("headlines.json", output, keep_if_empty=("items",))
     print(f"[ingest] wrote {len(all_items)} items to {out_path}")
 
 

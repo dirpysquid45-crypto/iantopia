@@ -129,7 +129,7 @@ def main() -> None:
         "text": text,
         "note": note,
     }
-    out_path = write_json("digest.json", output)
+    out_path = write_json("digest.json", output, keep_if_empty=("text",))
     print(f"[digest] wrote digest.json (available={available}) -> {out_path}")
 
 
