@@ -592,7 +592,7 @@
   // preferred density (handy for fitting more on a small phone screen)
   // survives a reload. Doesn't touch shelf positions, only item size.
   const ZOOM_KEY = 'inventory_item_zoom_v1';
-  const ZOOM_MIN = 0.5, ZOOM_MAX = 1.6, ZOOM_STEP = 0.1;
+  const ZOOM_MIN = 0.25, ZOOM_MAX = 3, ZOOM_STEP = 0.1;
   const zoomResetBtn = $('zoom-reset');
   function applyZoom(scale) {
     const clamped = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));

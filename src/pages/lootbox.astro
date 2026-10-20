@@ -20,7 +20,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <!--
-  is:global is REQUIRED here, not stylistic. Astro scopes <style> by stamping
+  is:global is REQUIRED here, not stylistic. Astro scopes <style>
+ by stamping
   data-astro-cid-* on elements in the template and rewriting selectors to match.
   The reel tiles and reveal artwork are built at runtime via innerHTML, so they
   never receive that attribute and every scoped rule silently skips them —
@@ -29,6 +30,13 @@
   item. This page is a standalone document, so scoping buys nothing anyway.
 -->
 <style is:global>
+  /* Phones: the back link stays pinned while the page scrolls, so it can always
+     be reached. Here it sits at the bottom-left, since the top-left holds the
+     Strubles balance badge. */
+  @media (max-width: 768px) {
+    a.back-home { position: fixed !important; top: auto !important; bottom: 12px !important; left: 10px !important; z-index: 999 !important; background: #000; border: 2px solid #ffd700; padding: 8px 10px; color: #ffd700; font-size: 9px; text-decoration: none; }
+  }
+
   :root{
     --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf;
     --accent:#22d3ee; --gold:#ffd700; --money:#39ff14;
@@ -530,7 +538,7 @@
 
   <main class="wrap">
     <header>
-      <a href="/">← Home</a>
+      <a class="back-home" href="/">← Home</a>
       <h1 id="wing-title">Iantopia Cases</h1>
       <div style="width:86px;"></div>
     </header>

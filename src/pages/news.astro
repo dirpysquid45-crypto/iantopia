@@ -27,6 +27,13 @@
   attribute never lands on them. Same trap documented on every other page.
 -->
 <style is:global>
+  /* Phones: the back link stays pinned at the top while the page scrolls, so
+     it can always be reached. */
+  @media (max-width: 768px) {
+    a.back-home { position: fixed !important; top: 10px !important; left: 10px !important; z-index: 999 !important; background: #000; border: 2px solid #ffd700; padding: 8px 10px; color: #ffd700; font-size: 9px; text-decoration: none; }
+  }
+
+
   :root {
     /* Paper wing — cool newsprint grey, not warm sepia. --paper-accent used
        to be a brick red for headers/kickers; flattened to neutral so the
@@ -248,7 +255,7 @@
 
   <main>
     <header class="masthead">
-      <a href="/" id="home-link">← Home</a>
+      <a class="back-home" href="/" id="home-link">← Home</a>
       <div class="masthead-title-row">
         <img src="/strubles.png" alt="" class="masthead-logo">
         <h1 id="masthead-title">Spooky Iantopia</h1>

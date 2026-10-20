@@ -20,12 +20,19 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 <!--
-  is:global is REQUIRED. Astro scopes <style> by stamping data-astro-cid-* on
+  is:global is REQUIRED. Astro scopes <style>
+ by stamping data-astro-cid-* on
   elements in the template and rewriting selectors to match. The whole board
   is built at runtime via createElement, so it never receives that attribute
   and every scoped rule silently skips it. Same trap as blackjack/lootbox.
 -->
 <style is:global>
+  /* Phones: the back link stays pinned at the top while the page scrolls, so
+     it can always be reached. */
+  @media (max-width: 768px) {
+    a.back-home { position: fixed !important; top: auto !important; bottom: 12px !important; left: 10px !important; z-index: 999 !important; background: #000; border: 2px solid #ffd700; padding: 8px 10px; color: #ffd700; font-size: 9px; text-decoration: none; }
+  }
+
   :root { --bg:#0f1115; --panel:#161c27; --ink:#e9eef9; --muted:#9fb0cf; --gold:#ffd700; --cell: 28px; }
   * { box-sizing:border-box; }
   body {
@@ -383,7 +390,7 @@
 
   <main class="table">
     <header>
-      <a href="/" title="Back to Iantopia">← Home</a>
+      <a class="back-home" href="/" title="Back to Iantopia">← Home</a>
       <h1>MINESWEEPER AT IANTOPIA</h1>
       <div style="display:flex; gap:4px;">
         <a href="/inventory" title="Inventory" style="color:var(--gold); background:#000; border:2px solid var(--gold); padding:4px 6px; text-decoration:none; display:inline-flex; align-items:center;">🎒</a>
