@@ -117,9 +117,7 @@
     </header>
 
     <div id="board-tabs">
-      <button class="board-tab active" type="button" data-board="gdp">🏙️ GDP</button>
-      <button class="board-tab" type="button" data-board="efficiency">⚡ Efficiency</button>
-      <button class="board-tab" type="button" data-board="horse">🐎 Horse Run</button>
+      <button class="board-tab active" type="button" data-board="horse">🐎 Horse Run</button>
       <button class="board-tab" type="button" data-board="mines_beginner">💣 Beginner</button>
       <button class="board-tab" type="button" data-board="mines_intermediate">💣 Intermediate</button>
       <button class="board-tab" type="button" data-board="mines_expert">💣 Expert</button>
@@ -146,31 +144,8 @@
     listEl.innerHTML = '<div class="leaderboard-loading">Loading leaderboard...</div>';
   }
 
-  // Three boards. GDP and Efficiency share a collection (one doc per village,
-  // written by tycoon.astro's maybePushLeaderboardScore) but sort on
-  // different fields: GDP is total village output, Efficiency is that same
-  // output divided by building count, so a lean well-run village can outrank
-  // a sprawling bigger one. Efficiency also requires a minimum village size
-  // (the `qualified` flag) so a single high-output building can't top the
-  // board by itself — see EFFICIENCY_MIN_BUILDINGS in tycoon.astro.
-  // Kept in sync with tycoon.astro's own constant by eye — both are small,
-  // human-read numbers, not a value worth round-tripping over the network.
-  const EFFICIENCY_MIN_BUILDINGS = 3;
+  // Village boards (GDP, Efficiency) are off until tycoon is live.
   const BOARDS = {
-    gdp: {
-      collection: 'leaderboard', field: 'gdp', visitable: true,
-      empty: 'No villages ranked yet — be the first!',
-      fallbackName: 'Anonymous Tycoon',
-      format: (v) => `${Number(v || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}/min`,
-      sub: (d) => `${Number(d.buildings || 0)} building${d.buildings === 1 ? '' : 's'}`,
-    },
-    efficiency: {
-      collection: 'leaderboard', field: 'efficiency', requireQualified: true, visitable: true,
-      empty: `No villages ranked yet — build at least ${EFFICIENCY_MIN_BUILDINGS} buildings to qualify!`,
-      fallbackName: 'Anonymous Tycoon',
-      format: (v) => `${Number(v || 0).toFixed(1)}/bldg`,
-      sub: (d) => `${Number(d.gdp || 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}/min · ${Number(d.buildings || 0)} buildings`,
-    },
     horse: {
       collection: 'horse_leaderboard', field: 'best',
       empty: 'No riders ranked yet — go clear some hurdles!',
@@ -196,7 +171,7 @@
     };
   }
   for (const diff of Object.keys(MINE_DIFFS)) BOARDS['mines_' + diff] = mineBoard(diff);
-  let activeBoard = 'gdp';
+  let activeBoard = 'horse';
   // Firestore field paths like "beginner.w" point into nested maps.
   const fieldValue = (data, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), data);
   const SPECIALTY_ICON = { residential: '🏘️', commercial: '🏬', industrial: '🏭' };
@@ -226,8 +201,8 @@
       // little badge next to its name — see computeSpecialty() in tycoon.astro.
       const badge = data.specialty && SPECIALTY_ICON[data.specialty]
         ? `<span class="specialty-badge" title="${data.specialty[0].toUpperCase()}${data.specialty.slice(1)} specialty">${SPECIALTY_ICON[data.specialty]}</span>` : '';
-      // GDP/Efficiency rows link to a read-only visit of that village; the
-      // horse board has no village behind it, so it stays unclickable.
+      // Rows link to a read-only visit only for boards that have a village
+      // behind them; the horse and minesweeper boards stay unclickable.
       const visitable = board.visitable && !isCurrentUser;
       return `
         <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}${visitable ? ' visitable' : ''}" ${visitable ? `data-uid="${doc.id}"` : ''}>
@@ -282,7 +257,7 @@
   // /leaderboard?board=horse deep-links straight to a tab (the horse game
   // links here); anything unrecognised falls back to the village board.
   const wanted = new URLSearchParams(location.search).get('board');
-  loadBoard(BOARDS[wanted] ? wanted : 'gdp');
+  loadBoard(BOARDS[wanted] ? wanted : 'horse');
 })();
 </script>
 </body>
