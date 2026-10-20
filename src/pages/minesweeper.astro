@@ -1010,6 +1010,20 @@
     }
   }
 
+  // Per-difficulty win/loss for the /leaderboard minesweeper boards. Both
+  // counters are written every game (one stays +0), so a player who has only
+  // ever lost still has a row to show. Signed-out players aren't ranked.
+  function recordMinesLeaderboard(diff, won) {
+    if (!window.CloudSync || !CloudSync.isSignedIn()) return;
+    const user = CloudSync.currentUser;
+    const inc = (n) => firebase.firestore.FieldValue.increment(n);
+    firebase.firestore().collection('minesweeper_leaderboard').doc(user.uid).set({
+      displayName: user.displayName || 'Anonymous Sweeper',
+      [diff]: { w: inc(won ? 1 : 0), l: inc(won ? 0 : 1) },
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true }).catch((err) => console.error('[minesweeper] leaderboard write failed:', err));
+  }
+
   function endGame(won, explodedR, explodedC) {
     gameActive = false;
     stopTimer();
@@ -1019,6 +1033,7 @@
       const pay = won ? Math.round(currentBet * DIFFICULTIES[diffKey].mult) : 0;
       GameStats.record('minesweeper', won ? 'win' : 'loss', { net: pay - currentBet });
     } catch {}
+    recordMinesLeaderboard(diffKey, won);
     if (won) {
       const payout = Math.round(currentBet * DIFFICULTIES[diffKey].mult);
       Strubles.add(payout);

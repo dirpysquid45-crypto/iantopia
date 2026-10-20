@@ -120,6 +120,10 @@
       <button class="board-tab active" type="button" data-board="gdp">🏙️ GDP</button>
       <button class="board-tab" type="button" data-board="efficiency">⚡ Efficiency</button>
       <button class="board-tab" type="button" data-board="horse">🐎 Horse Run</button>
+      <button class="board-tab" type="button" data-board="mines_beginner">💣 Beginner</button>
+      <button class="board-tab" type="button" data-board="mines_intermediate">💣 Intermediate</button>
+      <button class="board-tab" type="button" data-board="mines_expert">💣 Expert</button>
+      <button class="board-tab" type="button" data-board="mines_hormuz">🌊 Hormuz</button>
     </div>
 
     <div id="leaderboard-list">
@@ -174,7 +178,27 @@
       format: (v) => `${Number(v || 0).toLocaleString()} hurdles`,
     },
   };
+  // Minesweeper: one board per difficulty, ranked by boards won. Each player's
+  // doc keeps { beginner: {w, l}, intermediate: {w, l}, expert: {w, l}, hormuz: {w, l} }.
+  const MINE_DIFFS = { beginner: 'Beginner', intermediate: 'Intermediate', expert: 'Expert', hormuz: 'Strait of Hormuz' };
+  function mineBoard(diff) {
+    return {
+      collection: 'minesweeper_leaderboard', field: diff + '.w', visitable: false,
+      empty: `No ${MINE_DIFFS[diff]} boards cleared or lost yet — play one to get on here!`,
+      fallbackName: 'Anonymous Sweeper',
+      format: (v) => `${Number(v || 0).toLocaleString()} won`,
+      sub: (d) => {
+        const r = d[diff] || {};
+        const w = Number(r.w || 0), l = Number(r.l || 0);
+        const pct = w + l ? Math.round((w / (w + l)) * 100) + '%' : '—';
+        return `${l.toLocaleString()} lost · ${pct} win rate`;
+      },
+    };
+  }
+  for (const diff of Object.keys(MINE_DIFFS)) BOARDS['mines_' + diff] = mineBoard(diff);
   let activeBoard = 'gdp';
+  // Firestore field paths like "beginner.w" point into nested maps.
+  const fieldValue = (data, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), data);
   const SPECIALTY_ICON = { residential: '🏘️', commercial: '🏬', industrial: '🏭' };
 
   function renderEmpty() {
@@ -209,7 +233,7 @@
         <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}${visitable ? ' visitable' : ''}" ${visitable ? `data-uid="${doc.id}"` : ''}>
           <div class="leaderboard-rank">#${rank}</div>
           <div class="leaderboard-name">${badge}${name}${visitable ? ' <small class=\"visit-hint\">👁️ visit</small>' : ''}</div>
-          <div class="leaderboard-score">${board.format(data[board.field])}${sub}</div>
+          <div class="leaderboard-score">${board.format(fieldValue(data, board.field))}${sub}</div>
         </div>
       `;
     }).join('');
