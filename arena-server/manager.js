@@ -1,9 +1,9 @@
 const BlackjackGame = require('./blackjack');
 const { BattleshipGame } = require('./battleship');
-const { PongGame } = require('./pong');
+const { AirHockeyGame, MODES: AIRHOCKEY_MODES } = require('./airhockey');
 const BalanceManager = require('./balance');
 
-const GAME_TYPES = new Set(['blackjack', 'battleship', 'pong']);
+const GAME_TYPES = new Set(['blackjack', 'battleship', 'airhockey']);
 const MAX_BET = 1000000;
 const SUGGESTION_STATUSES = new Set(['new', 'public', 'archived']);
 
@@ -100,7 +100,7 @@ class Manager {
 
     switch (msg.type) {
       case 'join_queue':
-        return this.joinQueue(userId, sessionId, msg.bet, msg.gameType || 'blackjack', ws);
+        return this.joinQueue(userId, sessionId, msg.bet, msg.gameType || 'blackjack', ws, msg.mode);
       case 'match_bet':
         return this.matchBet(userId, sessionId, msg.queueId, ws);
       case 'leave_queue':
@@ -254,7 +254,7 @@ class Manager {
     return null;
   }
 
-  async joinQueue(userId, sessionId, bet, gameType, ws) {
+  async joinQueue(userId, sessionId, bet, gameType, ws, mode) {
     const conn = this.connections.get(sessionId);
     if (!conn) return;
     if (!GAME_TYPES.has(gameType)) return this.fail(ws, 'Unknown game');
@@ -262,8 +262,10 @@ class Manager {
     // negative bet was accepted (it passed `balance < bet`) and then "deducted"
     // as a credit, which matched against itself or an accomplice minted money.
     if (!Number.isSafeInteger(bet) || bet < 0 || bet > MAX_BET) return this.fail(ws, 'Invalid bet');
-    // Pong is a friendly game only: nothing is staked, so nothing can be lost or won.
-    if (gameType === 'pong' && bet !== 0) return this.fail(ws, 'Pong is friendly only');
+    // Air hockey is a friendly game only: nothing is staked, so nothing can be lost or won.
+    if (gameType === 'airhockey' && bet !== 0) return this.fail(ws, 'Air hockey is friendly only');
+    // Air hockey players must pick the same mode to be matched.
+    const airMode = gameType === 'airhockey' ? (AIRHOCKEY_MODES.has(mode) ? mode : 'score7') : null;
     const stake = this.stakeError(conn, bet);
     if (stake) return this.fail(ws, stake, 'guest_stake');
 
@@ -281,11 +283,11 @@ class Manager {
 
     const entry = {
       queueId: Math.random().toString(36).slice(2, 10), userId, sessionId, bet, gameType, ws,
-      name: conn.name, guest: conn.guest,
+      name: conn.name, guest: conn.guest, mode: airMode,
     };
     // Match against ANY compatible waiting lobby, not just the first two in the
     // queue: a mismatched pair at the front used to block everyone behind it.
-    const partner = this.queue.find((q) => q.bet === bet && q.gameType === gameType && q.userId !== userId);
+    const partner = this.queue.find((q) => q.bet === bet && q.gameType === gameType && q.mode === airMode && q.userId !== userId);
     if (partner) {
       this.queue = this.queue.filter((q) => q !== partner);
       this.sendTo(ws, { type: 'status', status: 'matched' });
@@ -328,7 +330,7 @@ class Manager {
     this.queue.splice(idx, 1);
     this.broadcastLobbies();
     this.launch(target, {
-      userId, sessionId, bet: target.bet, gameType: target.gameType, ws, name: conn.name, guest: conn.guest,
+      userId, sessionId, bet: target.bet, gameType: target.gameType, ws, name: conn.name, guest: conn.guest, mode: target.mode,
     });
   }
 
@@ -349,8 +351,8 @@ class Manager {
     const opts = { timing: this.opts.timing, db: this.db, makeDeck: this.opts.makeDeck };
     const game = a.gameType === 'battleship'
       ? new BattleshipGame(tableId, a, b, this.balance, opts)
-      : a.gameType === 'pong'
-        ? new PongGame(tableId, a, b, this.balance, opts)
+      : a.gameType === 'airhockey'
+        ? new AirHockeyGame(tableId, a, b, this.balance, Object.assign({ mode: a.mode }, opts))
         : new BlackjackGame(tableId, a, b, this.balance, opts);
     game.closeTable = () => this.tables.delete(tableId);
     this.tables.set(tableId, game);

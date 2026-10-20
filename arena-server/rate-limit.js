@@ -7,7 +7,10 @@ class RateLimit {
     // talks to the arena holds a connection, so this is deliberately more
     // generous than a single player's needs.
     this.maxConnectionsPerIP = opts.maxConnectionsPerIP || 12;
-    this.maxMessagesPerSec = opts.maxMessagesPerSec || 12;
+    // Fast-paced games (air hockey) send paddle moves about 30 times a second,
+    // so the per-connection limit allows that with headroom; still far below
+    // anything a human can type or click.
+    this.maxMessagesPerSec = opts.maxMessagesPerSec || 40;
     this.windowMs = 1000;
   }
 

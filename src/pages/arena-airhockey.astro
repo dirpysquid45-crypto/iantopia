@@ -1,0 +1,403 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Arena Air Hockey</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<meta name="theme-color" content="#000000">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style is:global>
+  :root { --gold:#ffd700; --red:#e0505a; --blue:#3d7bff; --ink:#f2f2f2; --muted:#9aa3b5; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; height:100%; background:#0b0d12; color:var(--ink); }
+  body { font-family:'Press Start 2P', ui-monospace, monospace; overflow:hidden; display:flex; flex-direction:column; }
+  a.back { position:fixed; top:12px; left:12px; z-index:20; color:var(--gold); border:2px solid var(--gold); background:#000; padding:8px 10px; font-size:9px; text-decoration:none; }
+
+  #scoreboard { display:flex; justify-content:center; align-items:center; gap:18px; padding:14px 12px 6px; flex:0 0 auto; font-size:clamp(10px, 2.4vw, 16px); }
+  #scoreboard .side { text-align:center; min-width:120px; }
+  #scoreboard .side small { display:block; font-size:8px; color:var(--muted); margin-bottom:6px; }
+  /* Left is the blue paddle and right the red one, as in the art. */
+  #score-left { color:var(--blue); text-shadow:0 0 12px rgba(61,123,255,.7); }
+  #score-right { color:var(--red); text-shadow:0 0 12px rgba(224,80,90,.7); }
+  #clock { font-size:clamp(10px, 2.2vw, 14px); color:var(--gold); min-width:80px; text-align:center; }
+
+  #stage { flex:1 1 auto; position:relative; display:flex; align-items:center; justify-content:center; min-height:0; padding:4px 8px 8px; }
+  canvas#table { display:block; touch-action:none; max-width:100%; max-height:100%; }
+
+  #lobby, #result { position:fixed; inset:0; z-index:15; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; background:rgba(0,0,0,.92); padding:20px; text-align:center; }
+  #lobby.show, #result.show { display:flex; }
+  #lobby h1, #result h1 { margin:0; font-size:clamp(14px, 3.4vw, 22px); color:var(--gold); text-shadow:0 0 14px rgba(255,215,0,.6); }
+  #result h1.win { color:#7dff7d; text-shadow:0 0 16px rgba(125,255,125,.7); }
+  #result h1.lose { color:var(--muted); text-shadow:none; }
+  #lobby p, #result p { margin:0; font-size:9px; line-height:1.8; color:var(--muted); max-width:420px; }
+  .modes { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:min(360px, 90vw); }
+  .modes label { border:2px solid #333; padding:10px 8px; font-size:9px; cursor:pointer; color:var(--muted); }
+  .modes input { display:none; }
+  .modes input:checked + span { color:#000; }
+  .modes label:has(input:checked) { background:var(--gold); border-color:var(--gold); color:#000; }
+  button.arcade { font-family:inherit; font-size:11px; padding:12px 18px; background:#000; color:var(--gold); border:3px solid var(--gold); cursor:pointer; }
+  button.arcade:hover:not(:disabled) { background:var(--gold); color:#000; }
+  button.arcade:disabled { opacity:.4; cursor:default; }
+  #status { font-size:9px; color:var(--muted); min-height:14px; }
+  #banner { position:fixed; top:0; left:0; right:0; z-index:25; background:rgba(180,30,30,.92); color:#fff; font-size:9px; padding:8px; text-align:center; display:none; }
+  #credit { font-size:7px; color:#5d6577; text-align:center; padding:4px; flex:0 0 auto; }
+  #confetti { position:fixed; inset:0; z-index:30; pointer-events:none; display:none; }
+</style>
+</head>
+<body>
+  <a class="back" href="/arena">← Arena</a>
+  <div id="banner"></div>
+
+  <div id="scoreboard" aria-live="polite">
+    <div class="side"><small id="name-left">Left</small><span id="score-left">0</span></div>
+    <div id="clock"></div>
+    <div class="side"><small id="name-right">Right</small><span id="score-right">0</span></div>
+  </div>
+
+  <div id="stage"><canvas id="table" aria-label="Air hockey table"></canvas></div>
+  <div id="credit">Table and pieces: "Air Hockey" by Matheus Amazonas Cabral de Andrade, CC BY 4.0. Rules ported from the MIT-licensed code.</div>
+
+  <div id="lobby" class="show">
+    <h1>🏒 AIR HOCKEY</h1>
+    <p>1 versus 1, friendly. Nothing is staked. Drag or use the mouse to move your paddle. Get the puck in the goal slot on the other side.</p>
+    <div class="modes" role="radiogroup" aria-label="Match mode">
+      <label><input type="radio" name="mode" value="score7" checked><span>First to 7</span></label>
+      <label><input type="radio" name="mode" value="best5"><span>Best of 5</span></label>
+      <label><input type="radio" name="mode" value="time60"><span>60 seconds</span></label>
+      <label><input type="radio" name="mode" value="endless"><span>Endless</span></label>
+    </div>
+    <button class="arcade" id="btn-find" type="button">Find a match</button>
+    <div id="status"></div>
+  </div>
+
+  <div id="result">
+    <h1 id="result-title">Game over</h1>
+    <p id="result-score"></p>
+    <p id="rematch-note"></p>
+    <button class="arcade" id="btn-rematch" type="button" disabled>Rematch</button>
+    <button class="arcade" id="btn-lobby" type="button">Back to lobby</button>
+  </div>
+
+  <canvas id="confetti"></canvas>
+
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/game-stats.js?v=1"></script>
+<script is:inline src="/cloud-sync.js?v=10"></script>
+<script is:inline src="/arena-client.js?v=1"></script>
+<script is:inline>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const canvas = $('table'), ctx = canvas.getContext('2d');
+  const confettiCanvas = $('confetti'), confettiCtx = confettiCanvas.getContext('2d');
+
+  // Art (CC BY 4.0, see CREDITS.txt in /airhockey/).
+  const IMG = {};
+  for (const [k, src] of [['rink', '/airhockey/rink.webp'], ['puck', '/airhockey/puck.webp'], ['left', '/airhockey/leftplayer.webp'], ['right', '/airhockey/rightplayer.webp'], ['center', '/airhockey/center.webp']]) {
+    IMG[k] = new Image(); IMG[k].src = src;
+  }
+
+  const S = {
+    phase: 'lobby', field: null, yourIndex: 0, mode: 'score7', opponentName: 'Opponent',
+    // Authoritative state from the server (fractions of the table are in field units).
+    puck: { x: 500, y: 500 }, paddles: [{ x: 180, y: 500 }, { x: 820, y: 500 }],
+    // What we draw: the puck and the opponent are smoothed toward the server's
+    // positions; our own paddle follows where we point, straight away.
+    shownPuck: { x: 500, y: 500 }, shownOpp: { x: 820, y: 500 }, mine: { x: 180, y: 500 },
+    target: null, lastMoveSent: 0, lastSentTarget: null,
+    score: [0, 0], clock: null, paused: false, winner: null, rematchSent: false, lastSnapshot: 0,
+  };
+  const keys = { up: false, down: false, left: false, right: false };
+
+  // ------------------------------------------------------------- sound
+  // Synthesized, so there are no sound files to host. Audio starts on the first
+  // tap or key press, because browsers block sound before that.
+  let audio = null;
+  function ac() {
+    if (!audio) { try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
+    if (audio.state === 'suspended') audio.resume();
+    return audio;
+  }
+  function tone(freq, dur, type = 'square', vol = 0.1, when = 0, slideTo = null) {
+    const a = ac(); if (!a) return;
+    const t = a.currentTime + when;
+    const o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + 0.02);
+  }
+  const SFX = {
+    hit: (strength) => tone(380 + strength * 300, 0.07, 'square', 0.08 + strength * 0.06),
+    wall: () => tone(220, 0.05, 'triangle', 0.06),
+    goal: () => tone(330, 0.4, 'sawtooth', 0.12, 0, 110),
+    win: () => { [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.22, 'square', 0.1, i * 0.13)); },
+    lose: () => { [392, 330, 262].forEach((f, i) => tone(f, 0.28, 'triangle', 0.1, i * 0.2)); },
+    start: () => tone(660, 0.12, 'square', 0.08),
+  };
+
+  // ------------------------------------------------------------ confetti
+  function sizeCanvases() {
+    const r = canvas.parentElement.getBoundingClientRect();
+    const side = Math.max(200, Math.min(r.width - 16, r.height - 16));
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = side * dpr; canvas.height = side * dpr;
+    canvas.style.width = side + 'px'; canvas.style.height = side + 'px';
+    confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight;
+  }
+  function confetti() {
+    confettiCanvas.style.display = 'block';
+    const colors = ['#ffd700', '#e0505a', '#3d7bff', '#7dff7d', '#ff4fd8', '#ffffff'];
+    const pieces = Array.from({ length: 180 }, () => ({
+      x: Math.random() * confettiCanvas.width, y: -Math.random() * confettiCanvas.height * 0.4,
+      vx: (Math.random() - 0.5) * 5, vy: 2 + Math.random() * 4, s: 6 + Math.random() * 7,
+      r: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3, c: colors[Math.floor(Math.random() * colors.length)],
+    }));
+    const end = performance.now() + 3600;
+    (function frame(now) {
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+      for (const p of pieces) {
+        p.x += p.vx; p.y += p.vy; p.vy += 0.035; p.r += p.vr;
+        confettiCtx.save(); confettiCtx.translate(p.x, p.y); confettiCtx.rotate(p.r);
+        confettiCtx.fillStyle = p.c; confettiCtx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+        confettiCtx.restore();
+      }
+      if (now < end) requestAnimationFrame(frame); else confettiCanvas.style.display = 'none';
+    })(performance.now());
+  }
+
+  // ------------------------------------------------------------ drawing
+  // Table coordinates are the server's (0..1000). The table is drawn at the
+  // canvas size, so the same numbers work on any screen.
+  function draw() {
+    const W = canvas.width, H = canvas.height;
+    ctx.clearRect(0, 0, W, H);
+    const f = S.field || { w: 1000, h: 1000, puckR: 42, paddleR: 64 };
+    const k = W / f.w;
+    const X = (x) => x * k, Y = (y) => y * k;
+    if (IMG.rink.complete) ctx.drawImage(IMG.rink, 0, 0, W, H);
+    else { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); }
+    if (IMG.center.complete) ctx.drawImage(IMG.center, X(f.w / 2 - 70), Y(f.h / 2 - 70), 140 * k, 140 * k);
+
+    const pr = f.paddleR * k * 2, pk = f.puckR * k * 2;
+    const left = S.yourIndex === 0 ? S.mine : S.shownOpp;
+    const right = S.yourIndex === 0 ? S.shownOpp : S.mine;
+    if (IMG.left.complete) ctx.drawImage(IMG.left, X(left.x) - pr / 2, Y(left.y) - pr / 2, pr, pr);
+    if (IMG.right.complete) ctx.drawImage(IMG.right, X(right.x) - pr / 2, Y(right.y) - pr / 2, pr, pr);
+    if (IMG.puck.complete) ctx.drawImage(IMG.puck, X(S.shownPuck.x) - pk / 2, Y(S.shownPuck.y) - pk / 2, pk, pk);
+  }
+
+  // Each frame: smooth the others toward the server, and keep our own paddle
+  // where we point (the server's copy follows a few tens of milliseconds later).
+  function animate() {
+    const reconcile = 0.25, smooth = 0.35;
+    if (S.phase === 'playing' || S.phase === 'over') {
+      S.shownPuck.x += (S.puck.x - S.shownPuck.x) * smooth;
+      S.shownPuck.y += (S.puck.y - S.shownPuck.y) * smooth;
+      const oppIndex = 1 - S.yourIndex;
+      S.shownOpp.x += (S.paddles[oppIndex].x - S.shownOpp.x) * smooth;
+      S.shownOpp.y += (S.paddles[oppIndex].y - S.shownOpp.y) * smooth;
+      if (S.target) {
+        S.mine.x += (S.target.x - S.mine.x) * 0.6;
+        S.mine.y += (S.target.y - S.mine.y) * 0.6;
+      } else {
+        S.mine.x += (S.paddles[S.yourIndex].x - S.mine.x) * reconcile;
+        S.mine.y += (S.paddles[S.yourIndex].y - S.mine.y) * reconcile;
+      }
+    }
+    draw();
+    requestAnimationFrame(animate);
+  }
+
+  // --------------------------------------------------------------- input
+  // Pointer position over the table, in table units (0..1000).
+  function toTable(clientX, clientY) {
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(1, (clientX - r.left) / r.width)),
+      y: Math.max(0, Math.min(1, (clientY - r.top) / r.height)),
+    };
+  }
+  function setTarget(p) {
+    if (S.phase !== 'playing') return;
+    const f = S.field || { w: 1000, h: 1000 };
+    // Keep the target on our own half, the same limit the server applies.
+    const minX = S.yourIndex === 0 ? f.paddleR : f.w / 2 + f.paddleR;
+    const maxX = S.yourIndex === 0 ? f.w / 2 - f.paddleR : f.w - f.paddleR;
+    S.target = { x: Math.max(minX, Math.min(maxX, p.x * f.w)), y: Math.max(f.paddleR, Math.min(f.h - f.paddleR, p.y * f.h)) };
+  }
+  canvas.addEventListener('pointerdown', (e) => { ac(); canvas.setPointerCapture(e.pointerId); setTarget(toTable(e.clientX, e.clientY)); });
+  canvas.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType !== 'mouse') setTarget(toTable(e.clientX, e.clientY)); });
+  canvas.addEventListener('pointerup', () => {});
+  window.addEventListener('keydown', (e) => {
+    ac();
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = true;
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+    if (e.key.startsWith('Arrow')) e.preventDefault();
+  });
+  window.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = false;
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = false;
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+  });
+
+  // Input is sent at most about 30 times a second, and only when it has changed,
+  // which keeps the connection under the server's per-connection limit.
+  setInterval(() => {
+    if (S.phase !== 'playing') return;
+    const f = S.field || { w: 1000, h: 1000 };
+    const step = 14;
+    if (S.target && (keys.up || keys.down || keys.left || keys.right)) {
+      if (keys.left) S.target.x -= step;
+      if (keys.right) S.target.x += step;
+      if (keys.up) S.target.y -= step;
+      if (keys.down) S.target.y += step;
+      S.target.x = Math.max(0, Math.min(f.w, S.target.x));
+      S.target.y = Math.max(0, Math.min(f.h, S.target.y));
+    } else if (!S.target && (keys.up || keys.down || keys.left || keys.right)) {
+      S.target = { x: S.paddles[S.yourIndex].x, y: S.paddles[S.yourIndex].y };
+    }
+    if (!S.target) return;
+    const now = performance.now();
+    const moved = !S.lastSentTarget || Math.hypot(S.target.x - S.lastSentTarget.x, S.target.y - S.lastSentTarget.y) > 2;
+    if (moved && now - S.lastMoveSent >= 33) {
+      arena.send({ type: 'action', action: 'move', x: S.target.x / f.w, y: S.target.y / f.h });
+      S.lastSentTarget = { x: S.target.x, y: S.target.y };
+      S.lastMoveSent = now;
+    }
+  }, 16);
+
+  // ------------------------------------------------------------- screens
+  function hideOverlays() { $('lobby').classList.remove('show'); $('result').classList.remove('show'); }
+  function showLobby(msg) { $('lobby').classList.add('show'); $('result').classList.remove('show'); $('status').textContent = msg || ''; $('btn-find').disabled = false; }
+  function setScore() { $('score-left').textContent = S.score[0]; $('score-right').textContent = S.score[1]; }
+  function setClock() {
+    const el = $('clock');
+    if (S.mode !== 'time60' || S.clock == null) { el.textContent = S.mode === 'endless' ? 'ENDLESS' : S.mode === 'best5' ? 'BEST OF 5' : S.mode === 'score7' ? 'FIRST TO 7' : ''; return; }
+    const s = Math.ceil(S.clock / 1000);
+    el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
+  function setNames() {
+    const me = window.CloudSync && CloudSync.currentUser ? (CloudSync.currentUser.displayName || 'You') : 'You';
+    $('name-left').textContent = S.yourIndex === 0 ? me : S.opponentName;
+    $('name-right').textContent = S.yourIndex === 0 ? S.opponentName : me;
+  }
+  function banner(text) { const b = $('banner'); if (!text) { b.style.display = 'none'; return; } b.textContent = text; b.style.display = 'block'; }
+
+  function onGameStart(m) {
+    S.phase = 'playing'; S.yourIndex = m.yourIndex; S.opponentName = m.opponentName || 'Opponent';
+    S.field = m.field; S.mode = m.mode || 'score7';
+    S.score = [0, 0]; S.winner = null; S.rematchSent = false; S.target = null; S.lastSentTarget = null;
+    S.puck = { x: m.field.w / 2, y: m.field.h / 2 };
+    S.paddles = [{ x: 180, y: 500 }, { x: 820, y: 500 }];
+    S.shownPuck = { ...S.puck }; S.shownOpp = { ...S.paddles[1 - S.yourIndex] }; S.mine = { ...S.paddles[S.yourIndex] };
+    hideOverlays(); setNames(); setScore(); setClock(); banner('');
+    SFX.start();
+  }
+
+  function onState(m) {
+    S.puck = { x: m.puck[0], y: m.puck[1] };
+    S.paddles = m.paddles.map(([x, y]) => ({ x, y }));
+    S.score = m.score; S.clock = m.clock; S.paused = m.paused; S.lastSnapshot = performance.now();
+    setScore(); setClock();
+    for (const ev of m.events || []) {
+      if (ev === 'hit0' || ev === 'hit1') SFX.hit(0.5);
+      else if (ev === 'wall') SFX.wall();
+      else if (ev === 'goal0' || ev === 'goal1') SFX.goal();
+    }
+  }
+
+  function onOver(m) {
+    S.phase = 'over'; S.winner = m.winner; S.score = m.score; setScore(); setClock();
+    const won = m.winner === S.yourIndex, draw = m.winner === -1;
+    const title = $('result-title');
+    if (draw) { title.textContent = 'Draw'; title.className = ''; }
+    else if (won) { title.textContent = '🏆 YOU WIN'; title.className = 'win'; }
+    else { title.textContent = 'You lost'; title.className = 'lose'; }
+    const reason = m.reason === 'left' ? ' Your opponent left.' : m.reason === 'disconnect' ? ' Your opponent disconnected.' : '';
+    $('result-score').textContent = `Final score ${m.score[S.yourIndex]} to ${m.score[1 - S.yourIndex]}.${reason}`;
+    $('rematch-note').textContent = '';
+    $('btn-rematch').disabled = true;
+    $('result').classList.add('show');
+    if (won) { SFX.win(); confetti(); } else if (!draw) SFX.lose();
+  }
+
+  function resync(m) {
+    S.yourIndex = m.yourIndex; S.opponentName = m.opponentName || 'Opponent'; S.field = m.field; S.mode = m.mode;
+    S.score = m.score; S.clock = m.clock; S.paused = m.paused;
+    S.puck = { x: m.puck[0], y: m.puck[1] }; S.paddles = m.paddles.map(([x, y]) => ({ x, y }));
+    S.shownPuck = { ...S.puck }; S.shownOpp = { ...S.paddles[1 - S.yourIndex] }; S.mine = { ...S.paddles[S.yourIndex] };
+    setNames(); setScore(); setClock();
+    if (m.phase === 'playing') { S.phase = 'playing'; hideOverlays(); }
+    else if (m.phase === 'over') { S.phase = 'over'; onOver({ winner: m.winner, score: m.score, reason: 'resync' }); }
+  }
+
+  // ------------------------------------------------------------- network
+  const arena = ArenaClient.create({
+    game: 'airhockey',
+    canSwitchIdentity: () => S.phase === 'lobby',
+    onState: (state) => {
+      if (state === 'open') banner('');
+      else if (state === 'replaced') banner('This game was opened in another tab. Close that tab, then reload this page.');
+      else banner('Connection lost — reconnecting…');
+    },
+    onMessage: (m) => {
+      switch (m.type) {
+        case 'status':
+          if (m.status === 'queued') { S.phase = 'queued'; $('status').textContent = 'Waiting for a friendly opponent in this mode…'; $('btn-find').disabled = true; }
+          if (m.status === 'matched') { $('status').textContent = 'Matched! Starting…'; }
+          break;
+        case 'game_start': onGameStart(m); break;
+        case 'airhockey_state': onState(m); break;
+        case 'airhockey_over': onOver(m); break;
+        case 'show_rematch_prompt': if (S.phase === 'over') $('btn-rematch').disabled = false; break;
+        case 'rematch_opponent_accepted': $('rematch-note').textContent = `${S.opponentName} wants a rematch!`; break;
+        case 'rematch_declined': $('rematch-note').textContent = `${S.opponentName} left.`; $('btn-rematch').disabled = true; break;
+        case 'rematch_failed': $('rematch-note').textContent = m.message || 'Rematch failed.'; $('btn-rematch').disabled = true; break;
+        case 'ready_for_queue': if (S.phase === 'over') { $('btn-rematch').disabled = true; $('rematch-note').textContent ||= 'The table has closed.'; } break;
+        case 'opponent_away': banner(`${S.opponentName} disconnected — holding the game for ${Math.round((m.graceMs || 30000) / 1000)}s…`); break;
+        case 'opponent_back': banner(''); break;
+        case 'resync': resync(m); break;
+        case 'error': $('status').textContent = m.message || 'Something went wrong.'; $('btn-find').disabled = false; break;
+        default: break;
+      }
+    },
+  });
+  arena.connect();
+
+  $('btn-find').addEventListener('click', () => {
+    ac();
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'score7';
+    $('status').textContent = 'Looking for an opponent…';
+    arena.send({ type: 'join_queue', bet: 0, gameType: 'airhockey', mode });
+  });
+  $('btn-rematch').addEventListener('click', () => {
+    if (S.rematchSent) return;
+    S.rematchSent = true;
+    $('rematch-note').textContent = 'Waiting for your opponent…';
+    arena.send({ type: 'rematch_accept' });
+  });
+  $('btn-lobby').addEventListener('click', () => {
+    arena.send({ type: 'rematch_decline' });
+    arena.send({ type: 'leave_game' });
+    S.phase = 'lobby'; S.score = [0, 0]; setScore();
+    showLobby('');
+  });
+
+  window.addEventListener('resize', sizeCanvases);
+  sizeCanvases();
+  animate();
+})();
+</script>
+</body>
+</html>
