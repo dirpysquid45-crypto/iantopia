@@ -38,8 +38,7 @@
   /* pickers.js only toggles this class on <video id="bg-video">
      (display:none inline) — without this rule the class gets added but
      nothing makes it visible, so video-type backgrounds silently never show. */
-  #bg-video { display: none; }
-  #bg-video.show { display: block; }
+  #bg-video { display: block; position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1; }
 
   /* ---------- Locked ---------- */
   #gate{
@@ -61,7 +60,7 @@
   }
   .gate-box a:hover{ background:#fff; color:#000; }
 
-  #playlist-overlay.open, #bg-overlay.open, #cursor-overlay.open { display:flex !important; }
+  #cursor-overlay.open { display:flex !important; }
   .picker-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.2); color:#fff; font-size:11px; }
   .picker-row:last-child { border-bottom:none; }
 
@@ -78,14 +77,9 @@
     position:absolute; top:100%;
     width:min(560px, 92vw);
     text-align:center;
-    animation:creditRoll 52s linear infinite;
     touch-action:pan-y;
+    will-change:transform;
     text-shadow:0 2px 10px #000, 0 0 22px #000;
-  }
-  #credits:hover, #credits:active{ animation-play-state:paused; }
-  @keyframes creditRoll{
-    0%   { transform:translateY(0); }
-    100% { transform:translateY(calc(-100% - 100vh)); }
   }
   .cr-title{
     font-size:clamp(34px,7vw,62px); font-weight:900; color:#ffe600;
@@ -192,8 +186,7 @@
 <body>
   <a id="home-link" href="/" title="Back to Iantopia">← Home</a>
   <div style="position:fixed; top:20px; right:20px; z-index:40; display:flex; gap:6px;">
-    <button id="now-playing" type="button" title="Music options" style="background:#000; border:2px solid #fff; color:#fff; padding:6px 10px; font-size:11px; cursor:none;">🎵</button>
-    <button id="bg-btn" type="button" title="Change background" style="background:#000; border:2px solid #fff; color:#fff; padding:6px 10px; font-size:11px; cursor:none;">🖼️</button>
+    <button id="sound-btn" type="button" aria-label="Toggle sound" title="Toggle sound" style="background:#000; border:2px solid #fff; color:#fff; padding:6px 10px; font-size:14px; cursor:none;">🔊</button>
     <button id="cursor-btn" type="button" title="Change cursor" style="background:#000; border:2px solid #fff; color:#fff; padding:6px 10px; font-size:11px; cursor:none;">🖱️</button>
   </div>
 
@@ -212,26 +205,6 @@
   </div>
 
   <!-- Pickers -->
-  <div id="playlist-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:50; align-items:center; justify-content:center;">
-    <div style="background:#000; border:2px solid #fff; padding:20px; max-width:300px; max-height:400px; overflow-y:auto; box-shadow:0 0 20px rgba(255,255,255,0.3);">
-      <div style="color:#fff; margin-bottom:12px; font-size:12px; text-transform:uppercase; font-weight:bold;">Music</div>
-      <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(255,255,255,0.3);">
-        <button id="mute-btn" type="button" aria-label="Toggle sound" title="Toggle sound" style="all:unset; cursor:none; font-size:16px; padding:4px 8px; border:1px solid #444; border-radius:8px; background:#111; color:#fff;">🔊</button>
-        <input type="range" id="volume-slider" min="0" max="100" value="30" aria-label="Music volume" />
-      </div>
-      <div id="playlist-list"></div>
-      <button id="playlist-close" style="margin-top:12px; width:100%; background:#fff; color:#000; border:none; padding:6px; cursor:none; font-weight:700;">Close</button>
-    </div>
-  </div>
-
-  <div id="bg-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:50; align-items:center; justify-content:center;">
-    <div style="background:#000; border:2px solid #fff; padding:20px; max-width:300px; max-height:400px; overflow-y:auto; box-shadow:0 0 20px rgba(255,255,255,0.3);">
-      <div style="color:#fff; margin-bottom:12px; font-size:12px; text-transform:uppercase; font-weight:bold;">Backgrounds</div>
-      <div id="bg-list"></div>
-      <button id="bg-close" style="margin-top:12px; width:100%; background:#fff; color:#000; border:none; padding:6px; cursor:none; font-weight:700;">Close</button>
-    </div>
-  </div>
-
   <div id="cursor-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:50; align-items:center; justify-content:center;">
     <div style="background:#000; border:2px solid #fff; padding:20px; max-width:300px; max-height:400px; overflow-y:auto; box-shadow:0 0 20px rgba(255,255,255,0.3);">
       <div style="color:#fff; margin-bottom:12px; font-size:12px; text-transform:uppercase; font-weight:bold;">Cursors</div>
@@ -240,8 +213,8 @@
     </div>
   </div>
 
-  <video id="bg-video" style="position:fixed; top:0; left:0; width:100%; height:100%; object-fit:cover; z-index:-1;" loop></video>
-  <audio id="theme-music" src="/audio/music/home-theme.mp3" preload="none" loop></audio>
+  <video id="bg-video" src="/video/patrick-seahorse.mp4" autoplay muted loop playsinline preload="auto"></video>
+  <div id="unlock-toast" role="status" aria-live="polite" style="display:none; position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:60; background:#000; border:3px solid #ffd700; color:#ffd700; padding:12px 16px; font-size:11px; text-align:center; line-height:1.8; max-width:92vw;"></div>
 
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
@@ -250,8 +223,6 @@
      why every page needs this now, not just home. -->
 <script is:inline src="/game-stats.js?v=1"></script>
 <script is:inline src="/cloud-sync.js?v=12"></script>
-<script is:inline src="/music-library.js?v=13"></script>
-<script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/background-library.js?v=13"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
 <script is:inline src="/case-data.js?v=24"></script>
@@ -437,55 +408,84 @@
 
   // The roll's speed is set from its length, so a long list scrolls at a readable
   // pace instead of flying past. Hover or hold to pause it.
-  (function paceCredits() {
-    const el = document.getElementById('credits');
-    const px = el.scrollHeight + window.innerHeight;
-    el.style.animationDuration = Math.max(52, Math.round(px / 38)) + 's';
-  })();
-
-  // --- Theme music (background loop, tied to the mute control) -----------
-  // This page had the "Music options" button and full playlist UI wired up
-  // via pickers.js, but no actual <audio> element — every track pick was a
-  // silent no-op since pickers.js guards every play() call on the element
-  // existing. Sound simply never worked here at all, on any device.
-  let audioEnabled = true;
-  const themeMusic = document.getElementById('theme-music');
-  const VOLUME_KEY = 'music_volume_v1';
-  const volumeSlider = document.getElementById('volume-slider');
-  const savedVolume = parseFloat(localStorage.getItem(VOLUME_KEY));
-  themeMusic.volume = isFinite(savedVolume) ? savedVolume : 0.3;
-  volumeSlider.value = Math.round(themeMusic.volume * 100);
-  volumeSlider.addEventListener('input', () => {
-    themeMusic.volume = volumeSlider.value / 100;
-    localStorage.setItem(VOLUME_KEY, themeMusic.volume);
-  });
-  window.addEventListener('storage', (e) => {
-    if (e.key === VOLUME_KEY && e.newValue != null) {
-      themeMusic.volume = parseFloat(e.newValue);
-      volumeSlider.value = Math.round(themeMusic.volume * 100);
-    }
-  });
-  function tryPlayTheme() {
-    if (!audioEnabled) return;
-    themeMusic.play().catch(() => {});
+  // --- Credits: a slow roll that you can also scroll through -----------------
+  // The roll moves on its own, slowly. Scrolling the wheel or dragging on touch
+  // moves it too. Reaching the end, either way, finishes the ending and unlocks
+  // the Patrick on a Seahorse background.
+  const SPEED = 38;                     // px per second when it isn't being scrolled
+  const credits = document.getElementById('credits');
+  let offset = 0, last = performance.now(), finished = false, touchY = null;
+  const travel = () => credits.offsetHeight + window.innerHeight;
+  function paint() { credits.style.transform = 'translate3d(0,' + (-offset) + 'px,0)'; }
+  function nudge(px) {
+    if (finished) return;
+    offset = Math.max(0, Math.min(travel(), offset + px));
+    if (offset >= travel()) finish();
   }
-  tryPlayTheme();
-  const unlockTheme = () => {
-    tryPlayTheme();
-    window.removeEventListener('pointerdown', unlockTheme);
-    window.removeEventListener('keydown', unlockTheme);
-  };
-  window.addEventListener('pointerdown', unlockTheme);
-  window.addEventListener('keydown', unlockTheme);
-  const muteBtn = document.getElementById('mute-btn');
-  muteBtn.addEventListener('click', () => {
-    audioEnabled = !audioEnabled;
-    muteBtn.textContent = audioEnabled ? '🔊' : '🔇';
-    if (audioEnabled) tryPlayTheme();
-    else themeMusic.pause();
-  });
+  function frame(now) {
+    const dt = Math.min(0.1, (now - last) / 1000);
+    last = now;
+    if (!finished) nudge(SPEED * dt);
+    paint();
+    if (!finished) requestAnimationFrame(frame);
+  }
+  window.addEventListener('wheel', (e) => { e.preventDefault(); nudge(e.deltaY); }, { passive: false });
+  window.addEventListener('touchstart', (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+  window.addEventListener('touchmove', (e) => {
+    if (touchY == null) return;
+    const y = e.touches[0].clientY;
+    nudge(touchY - y);
+    touchY = y;
+  }, { passive: true });
+  window.addEventListener('touchend', () => { touchY = null; });
 
-  // Initialize pickers
+  // The unlock: a background, and a note saying so.
+  const BG_UNLOCK = 'patrick_seahorse';
+  function toast(text) {
+    const el = document.getElementById('unlock-toast');
+    el.textContent = text;
+    el.style.display = 'block';
+    setTimeout(() => { el.style.display = 'none'; }, 6000);
+  }
+  function finish() {
+    if (finished) return;
+    finished = true;
+    try {
+      const inv = load(INV_KEY, {});
+      inv.backgrounds = Array.isArray(inv.backgrounds) ? inv.backgrounds : [];
+      if (!inv.backgrounds.includes(BG_UNLOCK)) {
+        inv.backgrounds.push(BG_UNLOCK);
+        localStorage.setItem(INV_KEY, JSON.stringify(inv));
+        window.dispatchEvent(new CustomEvent('inventory:changed'));
+        toast('NEW BACKGROUND UNLOCKED: Patrick on a Seahorse. Pick it under Background on the home page.');
+      }
+    } catch {}
+  }
+  requestAnimationFrame(frame);
+
+  // --- Sound: the background video has Fly Me to the Moon in it ---------------
+  // It starts muted (browsers won't play sound before a tap), and the button
+  // turns the sound on and off.
+  const bgVideo = document.getElementById('bg-video');
+  const soundBtn = document.getElementById('sound-btn');
+  const SOUND_KEY = 'ending_sound_v1';
+  let soundOn = localStorage.getItem(SOUND_KEY) !== 'off';
+  function applySound() {
+    bgVideo.muted = !soundOn;
+    soundBtn.textContent = soundOn ? '🔊' : '🔇';
+    if (soundOn) bgVideo.play().catch(() => {});
+  }
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off');
+    applySound();
+  });
+  const startSound = () => { if (soundOn) applySound(); window.removeEventListener('pointerdown', startSound); window.removeEventListener('keydown', startSound); };
+  window.addEventListener('pointerdown', startSound);
+  window.addEventListener('keydown', startSound);
+  applySound();
+
+  // Initialize pickers (the cursor picker is the only one left on this page)
   if (window.initPickers) {
     setTimeout(window.initPickers, 100);
   }

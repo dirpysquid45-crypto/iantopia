@@ -64,6 +64,10 @@ window.BACKGROUND_LIBRARY = {
   // with the wood-sign texture.
   iantopia_wood:    { label: 'Iantopia Wood',      type: 'gif',   src: '/video/iantopia-wood.jpg', position: 'center', theme: 'theme-wood' },
 
+  // Unlocked by finishing the Alternate Ending (see alternate-ending.astro).
+  // The video has Fly Me to the Moon in it.
+  patrick_seahorse: { label: 'Patrick on a Seahorse', type: 'video', src: '/video/patrick-seahorse.mp4', position: 'center' },
+
   // Inventory-page-only backgrounds. `restricted: true` means every picker
   // (pickers.js, and home's and lootbox's own separate copies) skips this
   // entry entirely UNLESS the current page's own PAGE_BG_ALLOWLIST names it
