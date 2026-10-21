@@ -26,6 +26,19 @@
     .status { color:var(--muted); margin:0 0 12px; min-height:1.5em; }
     .status.err { color:var(--bad); }
     .feed { display:flex; flex-direction:column; gap:6px; }
+    .players { margin:0 0 22px; }
+    .ph { font-size:14px; color:var(--gold); margin:14px 0 8px; }
+    .pcount { color:var(--muted); font-size:12px; }
+    .plist { display:flex; flex-direction:column; gap:4px; max-height:360px; overflow-y:auto; }
+    .prow { display:grid; grid-template-columns:minmax(120px,1.4fr) minmax(120px,1.4fr) 110px 70px 80px; gap:10px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; cursor:pointer; font-size:13px; }
+    .prow:hover { border-color:var(--gold); }
+    .prow small { display:block; color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; }
+    .prow .n { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pill { font-size:11px; border-radius:999px; padding:2px 8px; text-align:center; border:1px solid currentColor; }
+    .pill.banned { color:var(--bad); }
+    .pill.warned { color:var(--warn); }
+    .pill.ok { color:var(--ok); }
+    @media (max-width:640px) { .prow { grid-template-columns:1fr 1fr; } }
     .row { display:grid; grid-template-columns: 150px 1fr auto; gap:10px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:9px 12px; cursor:pointer; }
     .row:hover { border-color:var(--gold); }
     .row.punish { border-color:var(--warn); }
@@ -58,6 +71,18 @@
 
     <button id="signin" class="alt" hidden>Sign in with Google</button>
     <div id="status" class="status">Connecting…</div>
+
+    <section class="players" aria-label="Players">
+      <h2 class="ph">Players</h2>
+      <div class="bar">
+        <input id="pfilter" type="text" placeholder="Search name, email, or id" autocomplete="off" aria-label="Search players" />
+        <button id="prefresh" class="alt" disabled>Refresh players</button>
+        <span id="pcount" class="pcount"></span>
+      </div>
+      <div id="players" class="plist"></div>
+    </section>
+
+    <h2 class="ph">Account feed</h2>
     <div id="feed" class="feed"></div>
   </main>
 
@@ -139,6 +164,38 @@
     $('rename').addEventListener('click', () => act('rename'));
     $('backup').addEventListener('click', () => act('backup'));
 
+    // Players: every account, with name, email, balance and status. Click a row
+    // to fill its id into the action box above.
+    let players = [];
+    function renderPlayers() {
+      const q = $('pfilter').value.trim().toLowerCase();
+      const shown = players.filter((p) => !q || [p.name, p.email, p.uid].some((v) => String(v || '').toLowerCase().includes(q)));
+      $('pcount').textContent = shown.length + ' of ' + players.length + ' accounts';
+      const list = $('players');
+      list.replaceChildren();
+      for (const p of shown) {
+        const row = document.createElement('div');
+        row.className = 'prow';
+        row.dataset.uid = p.uid;
+        const who = document.createElement('div');
+        const n = document.createElement('div'); n.className = 'n'; n.textContent = p.name || '(no name)';
+        const id = document.createElement('small'); id.textContent = p.uid;
+        who.append(n, id);
+        const mail = document.createElement('div'); mail.textContent = p.email || '—';
+        const bal = document.createElement('div'); bal.textContent = money(p.balance) + ' · bank ' + p.bankLevel;
+        const st = document.createElement('div'); st.className = 'pill ' + p.status;
+        st.textContent = p.status === 'banned' ? 'BANNED' : p.status === 'warned' ? 'WARNED' : 'OK';
+        if (p.banUntil) st.title = 'Until ' + new Date(p.banUntil).toLocaleString();
+        const seen = document.createElement('div'); seen.style.color = 'var(--muted)'; seen.style.fontSize = '11px';
+        seen.textContent = p.lastSeen ? new Date(p.lastSeen).toLocaleDateString() : '—';
+        row.append(who, mail, bal, st, seen);
+        row.addEventListener('click', () => { $('uid').value = p.uid; setStatus('Account ' + (p.name || p.uid) + ' selected.'); });
+        list.append(row);
+      }
+    }
+    $('pfilter').addEventListener('input', renderPlayers);
+    $('prefresh').addEventListener('click', () => arena.send({ type: 'account_list' }));
+
     const arena = ArenaClient.create({
       game: 'suggest',
       onState: (st) => { if (st === 'closed') setStatus('Disconnected — retrying…', true); },
@@ -148,6 +205,11 @@
           if (msg.guest) { setStatus('Sign in to continue.', true); return; }
           setStatus('Loading…');
           arena.send({ type: 'account_feed' });
+          arena.send({ type: 'account_list' });
+          $('prefresh').disabled = false;
+        } else if (msg.type === 'account_list') {
+          players = msg.players || [];
+          renderPlayers();
         } else if (msg.type === 'account_feed') {
           events = msg.events || [];
           render();

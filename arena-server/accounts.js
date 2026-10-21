@@ -184,6 +184,34 @@ class AccountWatch {
     this.emit({ kind: 'punish', action: 'rename', uid, name, reason: 'admin' });
   }
 
+  // Every account for the admin's player list: name, email, balance, bank
+  // level, and status (banned, warned, or ok). Newest-warned and banned first.
+  async listPlayers() {
+    const snap = await this.db.collection('users').get();
+    const now = this.now();
+    const toMs = (v) => (v && typeof v.toDate === 'function' ? v.toDate().getTime() : v ? new Date(v).getTime() : 0);
+    const rows = [];
+    for (const d of snap.docs) {
+      const x = d.data();
+      const banUntil = toMs(x.ban_until);
+      const warnedAt = toMs(x.cheat_warning_at);
+      const status = banUntil > now ? 'banned' : (warnedAt && now - warnedAt < STRIKE_WINDOW_MS ? 'warned' : 'ok');
+      rows.push({
+        uid: d.id,
+        name: x.displayName || await this.labelFor(d.id),
+        email: x.email || null,
+        balance: balanceOf(x),
+        bankLevel: Number(x.tycoon_bank_level_v1 || 0),
+        status,
+        banUntil: banUntil > now ? new Date(banUntil).toISOString() : null,
+        warnedAt: warnedAt ? new Date(warnedAt).toISOString() : null,
+        lastSeen: Number(x.tycoon_last_seen_v1) || null,
+      });
+    }
+    const rank = { banned: 0, warned: 1, ok: 2 };
+    return rows.sort((a, b) => rank[a.status] - rank[b.status] || b.balance - a.balance);
+  }
+
   async unban(uid) {
     await this.db.collection('bans').doc(uid).delete();
     await this.db.collection('users').doc(uid).set({ ban_until: null }, { merge: true });

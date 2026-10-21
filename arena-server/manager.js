@@ -33,6 +33,19 @@ class Manager {
     this.sendTo(conn.ws, { type: 'account_feed', events: this.accounts.feed });
   }
 
+  // Admin-only list of every account (name, email, balance, status).
+  async accountList(conn) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    if (!this.accounts) return this.fail(conn.ws, 'Account watch is not running', 'unavailable');
+    try {
+      const players = await this.accounts.listPlayers();
+      this.sendTo(conn.ws, { type: 'account_list', players });
+    } catch (e) {
+      console.error('[accounts] list failed:', e.message);
+      this.fail(conn.ws, 'Could not load players', 'unavailable');
+    }
+  }
+
   // Admin actions on one account: reset, ban (hours), unban.
   async accountAction(conn, msg) {
     if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
@@ -162,6 +175,8 @@ class Manager {
         return this.accountFeed(conn);
       case 'account_action':
         return this.accountAction(conn, msg);
+      case 'account_list':
+        return this.accountList(conn);
       case 'action': {
         const game = this.tableBySession(sessionId);
         if (game) await game.handleAction(sessionId, msg.action, { x: msg.x, y: msg.y });
