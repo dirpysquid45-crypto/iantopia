@@ -26,3 +26,9 @@ are listed below):
 To rebuild: clone upstream at the commit above, apply the patch with
 `git apply patch-mah-solved.diff`, run `npm ci`, then the build command above,
 and copy `dist/` into `public/mah/`.
+
+Later changes (also in patch-mah.diff): the music starts with each game; the Oops sound
+is removed; each hint is counted and reported with the solve (the page pays 10% less per
+hint); a back link to Puzzles sits in the bottom-left; the welcome panel uses the wooden
+sign (src/assets/bg/wood-sign.jpg); fullscreen keeps the bamboo backdrop; the top and
+bottom bars are a lighter gradient.

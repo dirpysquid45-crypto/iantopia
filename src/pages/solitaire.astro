@@ -41,6 +41,8 @@
 (() => {
   // A solved board pays this much, up to DAILY_CAP boards per (UTC) day.
   const PAY = 60;
+  // Each hint costs 10% of the reward, so using all ten hints pays nothing.
+  const HINT_CUT = 0.1;
   const DAILY_CAP = 10;
   const KEY = 'solitaire_payouts_v1';
   const status = document.getElementById('status');
@@ -64,10 +66,17 @@
     }
     s.count++;
     try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {}
-    try { Strubles.add(PAY); } catch {}
-    try { GameStats.record('solitaire', 'win', { net: PAY }); } catch {}
-    status.className = 'win';
-    status.textContent = `Solved! +${PAY} Strubles (${DAILY_CAP - s.count} left today)`;
+    const hints = Math.max(0, Math.floor(Number(e.data.hints) || 0));
+    const pay = Math.round(PAY * Math.max(0, 1 - HINT_CUT * hints));
+    if (pay > 0) {
+      try { Strubles.add(pay); } catch {}
+      try { GameStats.record('solitaire', 'win', { net: pay }); } catch {}
+    }
+    status.className = pay > 0 ? 'win' : '';
+    const cut = hints ? ` (${hints} hint${hints === 1 ? '' : 's'}: -${Math.round(HINT_CUT * hints * 100)}%)` : '';
+    status.textContent = pay > 0
+      ? `Solved! +${pay} Strubles${cut} (${DAILY_CAP - s.count} left today)`
+      : `Solved, but the hints used up the reward.${cut}`;
   });
 })();
 </script>

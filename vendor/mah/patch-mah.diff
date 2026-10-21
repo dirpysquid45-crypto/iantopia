@@ -1,12 +1,43 @@
+diff --git a/src/app/app.component.html b/src/app/app.component.html
+index c75ab1d..4fc9337 100644
+--- a/src/app/app.component.html
++++ b/src/app/app.component.html
+@@ -1,3 +1,4 @@
++<a class="mah-back" href="/puzzles" target="_top">← Puzzles</a>
+ @if (!editorVisible()) {
+ 	<app-game-component #gameComponent [hidden]="loading()" [class]="'theme-'+app.settings.theme()"/>
+ }
+diff --git a/src/app/app.component.scss b/src/app/app.component.scss
+index d1fcc31..7d60a51 100644
+--- a/src/app/app.component.scss
++++ b/src/app/app.component.scss
+@@ -3,3 +3,17 @@
+ 	width: 100%;
+ 	height: 100%;
+ }
++
++// Iantopia: a way back to the Puzzles page from inside the game.
++.mah-back {
++	position: fixed;
++	bottom: 60px;
++	left: 8px;
++	z-index: 100;
++	padding: 6px 10px;
++	font-size: 11px;
++	color: #000;
++	background: rgba(255, 255, 255, 0.85);
++	border: 2px solid #000;
++	text-decoration: none;
++}
 diff --git a/src/app/components/controls-bottom/controls-bottom.component.html b/src/app/components/controls-bottom/controls-bottom.component.html
-index c867865..80c68f1 100644
+index c867865..6ea1ef8 100644
 --- a/src/app/components/controls-bottom/controls-bottom.component.html
 +++ b/src/app/components/controls-bottom/controls-bottom.component.html
 @@ -23,6 +23,12 @@
  		<button type="button" class="button" [class.inactive]="!app.settings.sounds()" (click)="app.toggleSound()" title="{{'AUDIO_SOUNDS' | translate}}" [attr.aria-label]="'AUDIO_SOUNDS' | translate" [attr.aria-checked]="app.settings.sounds()" role="menuitemcheckbox">
  			<app-icon-mute/>
  		</button>
-+		<div class="music-control">
++		<div class="music-control" (click)="$event.stopPropagation()" (pointerdown)="$event.stopPropagation()" (touchstart)="$event.stopPropagation()">
 +			<button type="button" class="button" [class.inactive]="!app.settings.music()" (click)="app.toggleMusic()" title="Music" aria-label="Music" [attr.aria-checked]="app.settings.music()" role="menuitemcheckbox">
 +				<span aria-hidden="true">♪</span>
 +			</button>
@@ -37,7 +68,7 @@ index 0dd930c..5f3c5e5 100644
 +	cursor: pointer;
 +}
 diff --git a/src/app/components/game/game-component.component.ts b/src/app/components/game/game-component.component.ts
-index 1550972..9c60555 100644
+index 1550972..977fc48 100644
 --- a/src/app/components/game/game-component.component.ts
 +++ b/src/app/components/game/game-component.component.ts
 @@ -118,7 +118,13 @@ export class GameComponent {
@@ -49,14 +80,14 @@ index 1550972..9c60555 100644
 +			this.triggerConfetti();
 +			// Iantopia patch: tell the page hosting this game (same origin) that a board was solved, so it can pay out.
 +			if (window.parent !== window) {
-+				window.parent.postMessage({ type: 'mah-solved' }, window.location.origin);
++				window.parent.postMessage({ type: 'mah-solved', hints: this.game.hintsUsed }, window.location.origin);
 +			}
 +		};
  		this.game.onChallengeEnd = outcome => {
  			const challenge = outcome.challenge;
  			if (!challenge.dayKey) {
 diff --git a/src/app/model/game.ts b/src/app/model/game.ts
-index d3f0158..1ccbca7 100644
+index d3f0158..f029292 100644
 --- a/src/app/model/game.ts
 +++ b/src/app/model/game.ts
 @@ -2,7 +2,7 @@ import { computed, signal } from '@angular/core';
@@ -64,23 +95,57 @@ index d3f0158..1ccbca7 100644
  import { Clock } from './clock';
  import { GAME_MODE_CHALLENGE, GAME_MODE_EASY, GAME_MODE_EXPERT, type GAME_MODE_ID, GAME_MODE_ID_DEFAULT, RESCUE_SHUFFLE_ATTEMPTS, STATES, isPlayableTileCount } from './consts';
 -import { SOUNDS, Sound } from './sound';
-+import { SOUNDS, SFX_CARD, SFX_OOPS, Sound } from './sound';
++import { SOUNDS, SFX_CARD, Sound } from './sound';
  import type { Stone } from './stone';
  import type { GameStateStore, Layout, StorageProvider } from './types';
  import { type BUILD_MODE_ID, MODE_SOLVABLE } from './builder';
-@@ -95,6 +95,11 @@ export class Game {
+@@ -30,6 +30,8 @@ export interface ChallengeOutcome {
+ }
+ 
+ export class Game {
++	// Iantopia: hints used on the current board, reported when it's solved.
++	hintsUsed = 0;
+ 	clock: Clock = new Clock();
+ 	board: Board = new Board();
+ 	sound: Sound = new Sound();
+@@ -95,6 +97,10 @@ export class Game {
  		if (!stone.hinted()) {
  			this.board.clearHints();
  		}
 +		// Iantopia: a second tile that doesn't match the selected one is a wrong pick.
 +		if (this.board.selected && this.board.selected !== stone) {
-+			this.sound.playFile(SFX_OOPS);
 +			this.wiggleStone(stone);
 +		}
  		this.board.setStoneSelected(this.board.selected === stone ? undefined : stone);
  		this.sound.play(SOUNDS.SELECT);
  		if (this.board.selected && this.ruleMode() === GAME_MODE_EASY) {
-@@ -354,7 +359,7 @@ export class Game {
+@@ -144,6 +150,8 @@ export class Game {
+ 		this.board.clearHints();
+ 		this.board.update();
+ 		this.setState(STATES.run);
++		// Iantopia: the music starts with the game, not only after a pause.
++		this.music.play();
+ 	}
+ 
+ 	toggle(): void {
+@@ -183,6 +191,7 @@ export class Game {
+ 			return;
+ 		}
+ 		this.layoutID = layout.id;
++		this.hintsUsed = 0;
+ 		this.mode.set(gameMode);
+ 		this.buildBoard(layout, buildMode, challengeSetup?.seed);
+ 		this.board.update();
+@@ -197,6 +206,8 @@ export class Game {
+ 		if (!this.allowsHint() || !this.isRunning()) {
+ 			return false;
+ 		}
++		// Iantopia: each hint costs 10% of the solve reward (see solitaire.astro).
++		this.hintsUsed++;
+ 		this.board.hint();
+ 		this.challenge()?.hintUsed();
+ 		this.sound.play(SOUNDS.HINT);
+@@ -354,7 +365,7 @@ export class Game {
  			}
  			this.gameOverLosing();
  		} else {
@@ -200,10 +265,18 @@ index e6516bb..c8ca50f 100644
  	readonly dark = signal(false);
  	readonly tile3d = signal(true);
 diff --git a/src/app/model/sound.ts b/src/app/model/sound.ts
-index b0d77d1..68f1d0c 100644
+index b0d77d1..2c4280e 100644
 --- a/src/app/model/sound.ts
 +++ b/src/app/model/sound.ts
-@@ -26,4 +26,23 @@ export class Sound {
+@@ -21,9 +21,30 @@ export class Sound {
+ 			return;
+ 		}
+ 		try {
+-			zzfx(...sound);
++			// Iantopia: the default effects are a touch quieter (0.6 of the synth's own volume).
++			const [volume = 1, ...rest] = sound;
++			zzfx(volume * 0.6, ...rest);
+ 		} catch {
  			// nope, we ignore platforms which do not support web audio
  		}
  	}
@@ -271,10 +344,10 @@ index 2a05ace..848e6d5 100644
  	<link rel="canonical" href="{{APP_URL}}">
  	<meta name="apple-mobile-web-app-title" content="{{APP_NAME}}">
 diff --git a/src/styles.scss b/src/styles.scss
-index 0820bb2..9ef7efa 100644
+index 0820bb2..47a1c2a 100644
 --- a/src/styles.scss
 +++ b/src/styles.scss
-@@ -81,6 +81,28 @@ html {
+@@ -81,6 +81,53 @@ html {
  	--dialog-background-text-color: #256d02;
  
  	background-color: var(--main-bg-color);
@@ -295,6 +368,31 @@ index 0820bb2..9ef7efa 100644
 +// Iantopia: let the bamboo show through the page body too.
 +body {
 +	background-color: transparent !important;
++}
++
++// Iantopia: the welcome panel sits on the wooden sign.
++app-tutorial .tutorial-welcome {
++	background: url('assets/bg/wood-sign.jpg') center / cover no-repeat !important;
++}
++
++// Iantopia: fullscreen keeps the bamboo backdrop, which browsers otherwise paint black.
++html:fullscreen,
++html:-webkit-full-screen,
++html:fullscreen body {
++	background-image: url('assets/bg/bamboo.jpg') !important;
++	background-size: cover !important;
++	background-position: center !important;
++	background-color: transparent !important;
++}
++
++// Iantopia: the top and bottom bars are a lighter gradient, so the buttons read.
++app-controls-top,
++app-controls-bottom,
++app-stats-bar,
++.controls-top,
++.controls-bottom {
++	background: linear-gradient(to bottom, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.25)) !important;
++	border-color: rgba(0, 0, 0, 0.35) !important;
 +}
 +
 +// Iantopia: let the bamboo show through behind the board.
