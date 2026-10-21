@@ -54,6 +54,10 @@ window.CASE_ITEMS = {
   mus_hellokitty: { label: 'Hello Kitty',                      tier: 'restricted',       emoji: '🎵', type: 'music_unlock', key: 'hello_kitty' },
   mus_girllikeme: { label: 'PinkPantheress – Girl Like Me',    tier: 'classified',       emoji: '🎵', type: 'music_unlock', key: 'girl_like_me' },
   mus_minecraft:  { label: 'Minecraft OST (C418)',             tier: 'restricted',       emoji: '🎵', type: 'music_unlock', key: 'minecraft_ost' },
+  // Music that had no unlock item, so every track can be sold and dropped.
+  mus_avatar:   { label: "The Avatar's Love",                 tier: 'classified',       emoji: '🎵', type: 'music_unlock', key: 'avatars_love' },
+  mus_ghost:    { label: 'Ghost House',                       tier: 'covert',           emoji: '🎃', type: 'music_unlock', key: 'ghost_house' },
+  mus_koronba:  { label: 'Koronba – Ryegen',                  tier: 'restricted',       emoji: '🎵', type: 'music_unlock', key: 'koronba' },
   mus_circus:  { label: 'Circus',                         tier: 'mil_spec',   emoji: '🎪',                                  type: 'music_unlock', key: 'circus' },
   mus_balatro: { label: 'Balatro Main Theme',             tier: 'mil_spec',   emoji: '🃏',                                  type: 'music_unlock', key: 'balatro' },
   mus_desert:  { label: 'Desert (Mario, Bitcrushed)',     tier: 'mil_spec',   emoji: '🏜️',                                  type: 'music_unlock', key: 'mario_desert' },
@@ -255,7 +259,7 @@ window.CASES = {
       covert: 10.0,
       exceedingly_rare: 5.0,
     },
-    items: ['s_2500', 'used_deck', 'bg_puzzle'].concat(
+    items: ['s_2500', 'used_deck'].concat(
       idsByType('music_unlock', 'background_unlock', 'cursor_unlock')
     ),
   },
@@ -309,7 +313,7 @@ window.CASES = {
     // see lootbox.js's oddsFor(), which checks this flag rather than
     // hardcoding this case's key.
     pagodaBuff: true,
-    items: ['bld_shabby', 'bld_office', 'bld_bank', 'bld_park', 'bld_generic', 'bld_sweatshop', 'bld_711', 'bld_pagoda', 'bld_factory', 'bld_skyscraper', 'bld_coal', 'bld_taipei101', 'bld_nuclear', 'bg_wood', 'bg_patrick', 'mus_bladee', 'mus_evian', 'mus_clarity', 'mus_hellokitty', 'mus_girllikeme', 'mus_minecraft', 'bg_puzzle'],
+    items: ['bld_shabby', 'bld_office', 'bld_bank', 'bld_park', 'bld_generic', 'bld_sweatshop', 'bld_711', 'bld_pagoda', 'bld_factory', 'bld_skyscraper', 'bld_coal', 'bld_taipei101', 'bld_nuclear', 'bg_wood', 'bg_patrick', 'mus_bladee', 'mus_evian', 'mus_clarity', 'mus_hellokitty', 'mus_girllikeme', 'mus_minecraft', 'bg_puzzle', 'mus_avatar', 'mus_ghost', 'mus_koronba'],
   },
 };
 

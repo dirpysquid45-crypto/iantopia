@@ -155,15 +155,16 @@ index d3f0158..f029292 100644
  			return true;
  		}
 diff --git a/src/app/model/music.ts b/src/app/model/music.ts
-index a49ac03..195268f 100644
+index a49ac03..8b04d50 100644
 --- a/src/app/model/music.ts
 +++ b/src/app/model/music.ts
-@@ -1,19 +1,85 @@
+@@ -1,19 +1,86 @@
 +// Iantopia: the background music cycles through these tracks in order, looping
 +// back to the first, while a game is running. Music is only audible when the
 +// music setting is on (game.music.enabled) and the game is being played.
 +const TRACKS = [
-+	'assets/music/avatars-love.mp3',
++	// The Avatar's Love is kept in assets/music, but it's an Iantopia unlock now,
++	// not part of the Mahjong playlist (too intense for a quiet game).
 +	'assets/music/fei-yu-yi-jian-mei.mp3',
 +	'assets/music/ninjago-overture.mp3',
 +];

@@ -42,6 +42,8 @@ window.MUSIC_LIBRARY = {
   // halloween_theme background -- see background-library.js's comment.
   ghost_house:         { label: 'Ghost House',                      src: '/audio/music/ghost-house.mp3' },
 
+  avatars_love:        { label: "The Avatar's Love",                 src: '/audio/music/avatars-love.mp3' },
+
   // --- Arena-only free defaults ---
   // koronba has no shop entry (Arena Battleship's page-only free
   // default, via PAGE_FREE_TRACK_KEY); yadakk mirrors it as Arena's hub
