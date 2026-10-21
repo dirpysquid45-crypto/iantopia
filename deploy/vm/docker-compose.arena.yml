@@ -1,0 +1,22 @@
+# The arena server on the VM. Listens on 127.0.0.1 only; host nginx and the
+# Cloudflare Tunnel are the only things that reach it.
+services:
+  arena-server:
+    build: ../../arena-server
+    container_name: iantopia-arena-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4001:4001"
+    volumes:
+      - /srv/iantopia/secrets/service-account-key.json:/app/service-account-key.json:ro
+      # The arena loads shared game files (tycoon-cap.js and friends) from /public.
+      - ../../public:/public:ro
+    env_file:
+      - /srv/iantopia/secrets/arena.env
+    environment:
+      - NODE_ENV=production
+      - PORT=4001
+    deploy:
+      resources:
+        limits:
+          memory: 512M
