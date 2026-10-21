@@ -123,6 +123,35 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
 
+  // A banned account sees a full-screen red notice on every page until the ban
+  // ends. The server sets ban_until on the record; this listens to it live, so
+  // a ban or an unban takes effect without a reload.
+  let banUnsub = null;
+  function watchBan(user) {
+    if (banUnsub) { banUnsub(); banUnsub = null; }
+    if (!user) { showBan(null); return; }
+    banUnsub = db.collection('users').doc(user.uid).onSnapshot((snap) => {
+      const until = snap.exists && snap.data().ban_until ? snap.data().ban_until.toDate() : null;
+      showBan(until && until > new Date() ? until : null);
+    }, () => showBan(null));
+  }
+  function showBan(until) {
+    let el = document.getElementById('ianto-ban-screen');
+    if (!until) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'ianto-ban-screen';
+      el.setAttribute('role', 'alertdialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#b00000;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:"Press Start 2P",ui-monospace,monospace;';
+      el.innerHTML = '<div style="font-size:clamp(28px,8vw,56px);letter-spacing:4px;margin-bottom:24px;">BANNED</div>' +
+        '<div style="font-size:clamp(9px,2.2vw,12px);line-height:2;max-width:520px;">Your account is suspended for suspicious activity.</div>' +
+        '<div id="ianto-ban-until" style="font-size:clamp(8px,2vw,11px);line-height:2;margin-top:18px;"></div>';
+      document.body.appendChild(el);
+    }
+    el.querySelector('#ianto-ban-until').textContent = 'Until ' + until.toLocaleString();
+  }
+
   // The account's sign-in email and display name, stored on the user's record
   // next to their game data so they can be looked up by name. The record is
   // readable only by its owner (see firestore.rules).
@@ -234,6 +263,7 @@
     // Set BEFORE the pull, not after — applyRemoteState()'s reload re-enters
     // this same handler on the next load, and the flag has to already be
     // set by then or it'd pull-and-potentially-reload every time forever.
+    watchBan(user);
     // Keep the email and display name on the record current, even when nothing
     // else has changed (a name or email change, or a first sign-in).
     if (user) {
