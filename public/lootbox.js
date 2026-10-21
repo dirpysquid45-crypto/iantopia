@@ -417,7 +417,9 @@
   }
 
   // Cosmetics, plus the glowing display collectibles (building / terrain / drink figures).
-  const isShopItem = (item) => SHOP_TYPES.includes(item.type) || (item.type === 'item' && !!item.collectible);
+  // Tycoon building collectibles are not for sale: buildings are sold in Real
+  // Estate, so listing their collectible copies in the shop doubled them up.
+  const isShopItem = (item) => !item.buildingCollectible && (SHOP_TYPES.includes(item.type) || (item.type === 'item' && !!item.collectible));
 
   function getShopListings() {
     const I = window.CASE_ITEMS || {};

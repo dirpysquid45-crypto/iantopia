@@ -16,6 +16,9 @@ const STARTING_BALANCE = '100';
 const STRIKE_WINDOW_MS = 7 * 24 * 3600 * 1000;
 const BAN_MS = 24 * 3600 * 1000;
 const FEED_MAX = 300;
+// Resetting the cap: the wallet cap comes from the bank level and the village's
+// buildings (see balance.js capFromData), so a reset clears both.
+const CAP_RESET = { tycoon_bank_level_v1: '0', tycoon_village_v2: JSON.stringify({ v: 2, nextId: 1, name: 'My Village', b: [], tiles: {}, paid: {} }) };
 const ARCHIVE_LOG = 'account_log';        // every feed event, kept forever
 const ARCHIVE_BACKUP = 'account_backups'; // record copies taken before a change
 // Plausibility limits. A balance can rise by at most RATE_LIMIT Strubles in any
@@ -178,7 +181,7 @@ class AccountWatch {
     await this.backup(uid, 'before_ban');
     const until = new Date(this.now() + hours * 3600 * 1000);
     await this.db.collection('bans').doc(uid).set({ until, reason: info.reason || 'admin', at: new Date(this.now()) });
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, ban_until: until }, { merge: true });
+    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, ban_until: until, ...CAP_RESET }, { merge: true });
     for (const col of LEADERBOARDS) await this.db.collection(col).doc(uid).delete();
     const name = info.name || await this.labelFor(uid);
     this.emit({ kind: 'punish', action: 'ban', uid, name, until: until.toISOString(), reason: info.reason || 'admin', from: info.balance, strikes: info.strikes, page: info.page || null, detected: info.detected || null });
@@ -186,7 +189,7 @@ class AccountWatch {
 
   async reset(uid) {
     await this.backup(uid, 'before_admin_reset');
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE }, { merge: true });
+    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, ...CAP_RESET }, { merge: true });
     this.emit({ kind: 'punish', action: 'reset', uid, name: await this.labelFor(uid), reason: 'admin' });
   }
 
@@ -208,7 +211,9 @@ class AccountWatch {
       const x = d.data();
       const banUntil = toMs(x.ban_until);
       const warnedAt = toMs(x.cheat_warning_at);
-      const status = banUntil > now ? 'banned' : (warnedAt && now - warnedAt < STRIKE_WINDOW_MS ? 'warned' : 'ok');
+      const adminWarned = !!(x.admin_warning && x.admin_warning.id && x.admin_warning.id !== x.admin_warning_dismissed);
+      const cheatWarned = !!(warnedAt && now - warnedAt < STRIKE_WINDOW_MS);
+      const status = banUntil > now ? 'banned' : (adminWarned || cheatWarned ? 'warned' : 'ok');
       rows.push({
         uid: d.id,
         name: x.displayName || await this.labelFor(d.id),
@@ -223,6 +228,13 @@ class AccountWatch {
     }
     const rank = { banned: 0, warned: 1, ok: 2 };
     return rows.sort((a, b) => rank[a.status] - rank[b.status] || b.balance - a.balance);
+  }
+
+  // Sends a warning to the player. They see it as a banner until they dismiss it.
+  async warn(uid, text) {
+    const id = Math.random().toString(36).slice(2, 10);
+    await this.db.collection('users').doc(uid).set({ admin_warning: { id, text, at: new Date(this.now()) } }, { merge: true });
+    this.emit({ kind: 'punish', action: 'warn', uid, name: await this.labelFor(uid), reason: 'admin', text });
   }
 
   async unban(uid) {

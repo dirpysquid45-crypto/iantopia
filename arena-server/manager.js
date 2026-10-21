@@ -33,6 +33,13 @@ class Manager {
     this.sendTo(conn.ws, { type: 'account_feed', events: this.accounts.feed });
   }
 
+  // Sends the current player list to every admin connection.
+  async broadcastPlayers() {
+    if (!this.accounts) return;
+    const players = await this.accounts.listPlayers();
+    this.broadcastAdmins({ type: 'account_list', players });
+  }
+
   // Admin-only list of every account (name, email, balance, status).
   async accountList(conn) {
     if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
@@ -59,6 +66,11 @@ class Manager {
         await this.accounts.ban(uid, hours, { reason: 'admin' });
       } else if (msg.action === 'unban') await this.accounts.unban(uid);
       else if (msg.action === 'backup') await this.accounts.backup(uid, 'admin_backup');
+      else if (msg.action === 'warn') {
+        const text = typeof msg.text === 'string' ? msg.text.replace(/[<>&"]/g, '').trim().slice(0, 200) : '';
+        if (!text) return this.fail(conn.ws, 'Write the warning first', 'bad_request');
+        await this.accounts.warn(uid, text);
+      }
       else if (msg.action === 'rename') {
         // Display names: 1 to 40 characters, with HTML characters removed.
         const name = typeof msg.name === 'string' ? msg.name.replace(/[<>&"]/g, '').trim().slice(0, 40) : '';
@@ -66,6 +78,8 @@ class Manager {
         await this.accounts.setName(uid, name);
       }
       else return this.fail(conn.ws, 'Bad request', 'bad_request');
+      // Every admin page shows the new status straight away, not on refresh.
+      this.broadcastPlayers();
     } catch (e) {
       console.error('[accounts] action failed:', e.message);
       return this.fail(conn.ws, e.message, 'refused');

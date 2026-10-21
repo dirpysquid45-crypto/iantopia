@@ -1,7 +1,6 @@
 /* A stack of cards, for the Puzzles and Arena hubs. Each card floats gently at
-   rest. Hovering (or tapping, on phones) spins it once and grows it a little, so
-   it's clearly the one you're pointing at. Float and spin use separate CSS
-   properties (translate and rotate), so they run side by side without fighting.
+   rest, and grows a little when hovered (or tapped, on phones), so it's clearly
+   the one you're pointing at.
    Only transform properties are animated, which keeps the work off the page's
    main paint path. Reduced-motion visitors get the cards without the motion. */
 .card-stack {
@@ -30,20 +29,16 @@
 .card-stack > .stack-card:hover,
 .card-stack > .stack-card.is-open {
   scale: 1.06;
-  animation: cardFloat 3.2s ease-in-out infinite, cardSpin 0.9s cubic-bezier(0.45, 0, 0.3, 1) 1;
-  animation-delay: calc(var(--i, 0) * 350ms), 0ms;
+  animation: cardFloat 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 350ms);
   z-index: 20;
 }
 @keyframes cardFloat {
   0%, 100% { translate: 0 0; }
   50% { translate: 0 -6px; }
 }
-@keyframes cardSpin {
-  from { rotate: 0deg; }
-  to { rotate: 360deg; }
-}
 @media (prefers-reduced-motion: reduce) {
   .card-stack > .stack-card,
   .card-stack > .stack-card:hover,
-  .card-stack > .stack-card.is-open { animation: none; translate: none; rotate: none; }
+  .card-stack > .stack-card.is-open { animation: none; translate: none; }
 }

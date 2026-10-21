@@ -131,9 +131,13 @@
     if (banUnsub) { banUnsub(); banUnsub = null; }
     if (!user) { showBan(null); return; }
     banUnsub = db.collection('users').doc(user.uid).onSnapshot((snap) => {
-      const until = snap.exists && snap.data().ban_until ? snap.data().ban_until.toDate() : null;
+      const d = snap.exists ? snap.data() : {};
+      const until = d.ban_until ? d.ban_until.toDate() : null;
       showBan(until && until > new Date() ? until : null);
-    }, () => showBan(null));
+      // An admin warning stays until the player dismisses it.
+      const warning = d.admin_warning && d.admin_warning.id !== d.admin_warning_dismissed ? d.admin_warning : null;
+      showWarning(warning, user.uid);
+    }, () => { showBan(null); showWarning(null); });
   }
   function showBan(until) {
     let el = document.getElementById('ianto-ban-screen');
@@ -152,6 +156,33 @@
       document.body.appendChild(el);
     }
     el.querySelector('#ianto-ban-until').textContent = 'Until ' + until.toLocaleString();
+  }
+
+  // An admin's warning: a yellow bar across the top until it's dismissed. It
+  // doesn't block the page.
+  function showWarning(w, uid) {
+    let el = document.getElementById('ianto-warning');
+    if (!w) { if (el) el.remove(); return; }
+    if (el && el.dataset.id === w.id) return;
+    if (el) el.remove();
+    el = document.createElement('div');
+    el.id = 'ianto-warning';
+    el.dataset.id = w.id;
+    el.setAttribute('role', 'alert');
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483646;background:#ffd23a;color:#000;display:flex;gap:12px;align-items:center;justify-content:center;padding:10px 14px;font-family:"Press Start 2P",ui-monospace,monospace;font-size:10px;line-height:1.8;text-align:center;';
+    const text = document.createElement('span');
+    text.textContent = 'WARNING FROM THE ADMIN: ' + w.text;
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.textContent = 'OK';
+    ok.style.cssText = 'background:#000;color:#ffd23a;border:2px solid #000;padding:6px 10px;font:inherit;cursor:pointer;flex:0 0 auto;';
+    ok.addEventListener('click', () => {
+      db.collection('users').doc(uid).set({ admin_warning_dismissed: w.id }, { merge: true })
+        .catch((err) => console.error('[cloud-sync] could not dismiss warning:', err.message || err));
+      el.remove();
+    });
+    el.append(text, ok);
+    document.body.appendChild(el);
   }
 
   // The account's sign-in email and display name, stored on the user's record

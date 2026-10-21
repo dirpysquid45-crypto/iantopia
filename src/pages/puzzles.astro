@@ -8,7 +8,7 @@
 <title>Puzzles</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="stylesheet" href="/card-stack.css?v=4">
+<link rel="stylesheet" href="/card-stack.css?v=5">
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -54,5 +54,27 @@
   </div>
   <p class="credit">Mahjong Solitaire engine: mah by ffalt, MIT License.</p>
 <script is:inline src="/card-stack.js?v=1"></script>
+  <!-- The puzzles' music: Hotel Lounge, looping. Browsers wait for a tap before
+       they play sound, so it starts on the first click or key press. -->
+  <audio id="puzzle-music" src="/audio/music/hotel.mp3" loop preload="auto"></audio>
+  <button id="puzzle-sound" type="button" aria-label="Toggle music" title="Toggle music" style="position:fixed; top:12px; right:12px; z-index:20; background:#000; border:2px solid var(--gold); color:var(--gold); padding:6px 10px; font-size:12px; cursor:pointer;">🔊</button>
+  <script is:inline>
+    (function () {
+      const music = document.getElementById('puzzle-music');
+      const btn = document.getElementById('puzzle-sound');
+      const KEY = 'puzzle_music_v1';
+      let on = localStorage.getItem(KEY) !== 'off';
+      music.volume = 0.35;
+      function apply() {
+        btn.textContent = on ? '🔊' : '🔇';
+        if (on) music.play().catch(() => {}); else music.pause();
+      }
+      btn.addEventListener('click', () => { on = !on; localStorage.setItem(KEY, on ? 'on' : 'off'); apply(); });
+      const start = () => { if (on) apply(); window.removeEventListener('pointerdown', start); window.removeEventListener('keydown', start); };
+      window.addEventListener('pointerdown', start);
+      window.addEventListener('keydown', start);
+      apply();
+    })();
+  </script>
 </body>
 </html>

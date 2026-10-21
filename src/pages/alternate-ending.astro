@@ -60,7 +60,6 @@
   }
   .gate-box a:hover{ background:#fff; color:#000; }
 
-  #cursor-overlay.open { display:flex !important; }
   .picker-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,0.2); color:#fff; font-size:11px; }
   .picker-row:last-child { border-bottom:none; }
 
@@ -186,8 +185,9 @@
 <body>
   <a id="home-link" href="/" title="Back to Iantopia">← Home</a>
   <div style="position:fixed; top:20px; right:20px; z-index:40; display:flex; gap:6px;">
-    <button id="sound-btn" type="button" aria-label="Toggle sound" title="Toggle sound" style="background:#000; border:2px solid #fff; color:#fff; padding:6px 10px; font-size:14px; cursor:none;">🔊</button>
-    <button id="cursor-btn" type="button" title="Change cursor" style="background:#000; border:2px solid #fff; color:#fff; padding:6px 10px; font-size:11px; cursor:none;">🖱️</button>
+    <label style="display:flex; align-items:center; gap:6px; background:#000; border:2px solid #fff; padding:6px 10px; color:#fff; font-size:12px;">🔊
+      <input id="bg-volume" type="range" min="0" max="100" step="5" value="50" aria-label="Volume" style="width:90px; accent-color:#fff; cursor:pointer;" />
+    </label>
   </div>
 
   <!-- Shown until the Alternate Ending has actually been pulled from a case -->
@@ -205,14 +205,6 @@
   </div>
 
   <!-- Pickers -->
-  <div id="cursor-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.9); z-index:50; align-items:center; justify-content:center;">
-    <div style="background:#000; border:2px solid #fff; padding:20px; max-width:300px; max-height:400px; overflow-y:auto; box-shadow:0 0 20px rgba(255,255,255,0.3);">
-      <div style="color:#fff; margin-bottom:12px; font-size:12px; text-transform:uppercase; font-weight:bold;">Cursors</div>
-      <div id="cursor-list"></div>
-      <button id="cursor-close" style="margin-top:12px; width:100%; background:#fff; color:#000; border:none; padding:6px; cursor:none; font-weight:700;">Close</button>
-    </div>
-  </div>
-
   <video id="bg-video" src="/video/patrick-seahorse.mp4" autoplay muted loop playsinline preload="auto"></video>
   <div id="unlock-toast" role="status" aria-live="polite" style="display:none; position:fixed; left:50%; bottom:24px; transform:translateX(-50%); z-index:60; background:#000; border:3px solid #ffd700; color:#ffd700; padding:12px 16px; font-size:11px; text-align:center; line-height:1.8; max-width:92vw;"></div>
 
@@ -222,7 +214,7 @@
 <!-- Headless here (no account UI on this page) — see blackjack.astro for
      why every page needs this now, not just home. -->
 <script is:inline src="/game-stats.js?v=1"></script>
-<script is:inline src="/cloud-sync.js?v=12"></script>
+<script is:inline src="/cloud-sync.js?v=13"></script>
 <script is:inline src="/background-library.js?v=13"></script>
 <script is:inline src="/cursor-library.js?v=4"></script>
 <script is:inline src="/case-data.js?v=24"></script>
@@ -463,27 +455,29 @@
   }
   requestAnimationFrame(frame);
 
-  // --- Sound: the background video has Fly Me to the Moon in it ---------------
-  // It starts muted (browsers won't play sound before a tap), and the button
-  // turns the sound on and off.
+  // --- Volume: the background video has Fly Me to the Moon in it ------------
+  // It starts muted (browsers won't play sound before a tap). The slider sets its
+  // volume, and 0 mutes it. The setting is remembered between visits.
   const bgVideo = document.getElementById('bg-video');
-  const soundBtn = document.getElementById('sound-btn');
-  const SOUND_KEY = 'ending_sound_v1';
-  let soundOn = localStorage.getItem(SOUND_KEY) !== 'off';
-  function applySound() {
-    bgVideo.muted = !soundOn;
-    soundBtn.textContent = soundOn ? '🔊' : '🔇';
-    if (soundOn) bgVideo.play().catch(() => {});
+  const volSlider = document.getElementById('bg-volume');
+  const VOL_KEY = 'ending_volume_v1';
+  let vol = parseFloat(localStorage.getItem(VOL_KEY));
+  if (!isFinite(vol)) vol = 0.5;
+  volSlider.value = Math.round(vol * 100);
+  function applyVolume() {
+    bgVideo.volume = vol;
+    bgVideo.muted = vol === 0;
+    if (vol > 0) bgVideo.play().catch(() => {});
   }
-  soundBtn.addEventListener('click', () => {
-    soundOn = !soundOn;
-    localStorage.setItem(SOUND_KEY, soundOn ? 'on' : 'off');
-    applySound();
+  volSlider.addEventListener('input', () => {
+    vol = volSlider.value / 100;
+    localStorage.setItem(VOL_KEY, String(vol));
+    applyVolume();
   });
-  const startSound = () => { if (soundOn) applySound(); window.removeEventListener('pointerdown', startSound); window.removeEventListener('keydown', startSound); };
+  const startSound = () => { if (vol > 0) applyVolume(); window.removeEventListener('pointerdown', startSound); window.removeEventListener('keydown', startSound); };
   window.addEventListener('pointerdown', startSound);
   window.addEventListener('keydown', startSound);
-  applySound();
+  applyVolume();
 
   // Initialize pickers (the cursor picker is the only one left on this page)
   if (window.initPickers) {

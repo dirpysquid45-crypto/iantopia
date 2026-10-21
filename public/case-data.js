@@ -44,6 +44,15 @@ window.CASE_ITEMS = {
   mcchicken:   { label: 'McChicken',                      tier: 'mil_spec',   img: '/assets/items/mcchicken.png',          type: 'item', draggable: true },
   display_shelf: { label: 'Display Shelf',                tier: 'mil_spec',   img: '/assets/decorations/display-shelf.webp', type: 'item', draggable: true, size: 195 },
   smiski_blind_box: { label: 'Smiski Blind Box',          tier: 'mil_spec',   img: '/assets/decorations/smiski-blind-box.png', type: 'item', draggable: true, size: 91 },
+  // Backgrounds and tracks that had no unlock item, so they can be sold and dropped.
+  bg_wood:      { label: 'Background: Iantopia Wood',          tier: 'mil_spec',         emoji: '🪵', type: 'background_unlock', key: 'iantopia_wood' },
+  bg_patrick:   { label: 'Background: Patrick on a Seahorse',  tier: 'exceedingly_rare', emoji: '🐴', type: 'background_unlock', key: 'patrick_seahorse' },
+  mus_bladee:   { label: 'Bladee – Waster',                    tier: 'classified',       emoji: '🎵', type: 'music_unlock', key: 'bladee_waster' },
+  mus_evian:    { label: 'Evian Christ – Yxguden',             tier: 'covert',           emoji: '🎵', type: 'music_unlock', key: 'evian_yxguden' },
+  mus_clarity:  { label: 'Zedd – Clarity ft. Foxes',           tier: 'covert',           emoji: '🎵', type: 'music_unlock', key: 'clarity' },
+  mus_hellokitty: { label: 'Hello Kitty',                      tier: 'restricted',       emoji: '🎵', type: 'music_unlock', key: 'hello_kitty' },
+  mus_girllikeme: { label: 'PinkPantheress – Girl Like Me',    tier: 'classified',       emoji: '🎵', type: 'music_unlock', key: 'girl_like_me' },
+  mus_minecraft:  { label: 'Minecraft OST (C418)',             tier: 'restricted',       emoji: '🎵', type: 'music_unlock', key: 'minecraft_ost' },
   mus_circus:  { label: 'Circus',                         tier: 'mil_spec',   emoji: '🎪',                                  type: 'music_unlock', key: 'circus' },
   mus_balatro: { label: 'Balatro Main Theme',             tier: 'mil_spec',   emoji: '🃏',                                  type: 'music_unlock', key: 'balatro' },
   mus_desert:  { label: 'Desert (Mario, Bitcrushed)',     tier: 'mil_spec',   emoji: '🏜️',                                  type: 'music_unlock', key: 'mario_desert' },
@@ -162,7 +171,7 @@ window.CASE_ITEMS = {
     const name = b.label.replace(/^Building: /, '');
     I['col_' + id.slice(4)] = {
       label: name + ' (Collectible)', tier: b.tier, img: b.img,
-      type: 'item', draggable: true, glow: true, collectible: true, size: 120,
+      type: 'item', draggable: true, glow: true, collectible: true, buildingCollectible: true, size: 120,
     };
   });
   Object.assign(I, {
@@ -299,7 +308,7 @@ window.CASES = {
     // see lootbox.js's oddsFor(), which checks this flag rather than
     // hardcoding this case's key.
     pagodaBuff: true,
-    items: ['bld_shabby', 'bld_office', 'bld_bank', 'bld_park', 'bld_generic', 'bld_sweatshop', 'bld_711', 'bld_pagoda', 'bld_factory', 'bld_skyscraper', 'bld_coal', 'bld_taipei101', 'bld_nuclear'],
+    items: ['bld_shabby', 'bld_office', 'bld_bank', 'bld_park', 'bld_generic', 'bld_sweatshop', 'bld_711', 'bld_pagoda', 'bld_factory', 'bld_skyscraper', 'bld_coal', 'bld_taipei101', 'bld_nuclear', 'bg_wood', 'bg_patrick', 'mus_bladee', 'mus_evian', 'mus_clarity', 'mus_hellokitty', 'mus_girllikeme', 'mus_minecraft'],
   },
 };
 

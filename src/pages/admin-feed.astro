@@ -68,6 +68,8 @@
       <input id="name" type="text" maxlength="40" placeholder="New name" autocomplete="off" aria-label="New display name" />
       <button id="rename" class="alt" disabled>Set name</button>
       <button id="backup" class="alt" disabled>Back up</button>
+      <input id="warn-text" type="text" maxlength="200" placeholder="Warning message" autocomplete="off" aria-label="Warning message" />
+      <button id="warn" class="alt" disabled>Warn</button>
     </div>
 
     <button id="signin" class="alt" hidden>Sign in with Google</button>
@@ -90,7 +92,7 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script is:inline src="/cloud-sync.js?v=12"></script>
+  <script is:inline src="/cloud-sync.js?v=13"></script>
   <script is:inline src="/arena-client.js?v=1"></script>
   <script is:inline>
   (() => {
@@ -144,7 +146,7 @@
 
     function updateButtons() {
       const ok = /^[A-Za-z0-9_-]{1,128}$/.test($('uid').value.trim());
-      ['reset', 'ban', 'unban', 'rename', 'backup'].forEach((id) => { $(id).disabled = !ok; });
+      ['reset', 'ban', 'unban', 'rename', 'backup', 'warn'].forEach((id) => { $(id).disabled = !ok; });
     }
     $('uid').addEventListener('input', updateButtons);
 
@@ -156,7 +158,10 @@
       const name = $('name').value.trim();
       if (action === 'rename' && !name) { setStatus('Type a new name first.', true); return; }
       if (action === 'rename' && !confirm('Set the sign-in display name for ' + uid + ' to "' + name + '"?')) return;
-      arena.send({ type: 'account_action', action, uid, hours, name });
+      const text = $('warn-text').value.trim();
+      if (action === 'warn' && !text) { setStatus('Write the warning first.', true); return; }
+      if (action === 'warn' && !confirm('Send this warning to ' + uid + '?\n\n' + text)) return;
+      arena.send({ type: 'account_action', action, uid, hours, name, text });
     }
     $('signin').addEventListener('click', () => window.CloudSync && CloudSync.signIn());
     $('reset').addEventListener('click', () => act('reset'));
@@ -164,6 +169,7 @@
     $('unban').addEventListener('click', () => act('unban'));
     $('rename').addEventListener('click', () => act('rename'));
     $('backup').addEventListener('click', () => act('backup'));
+    $('warn').addEventListener('click', () => act('warn'));
 
     // Players: every account, with name, email, balance and status. Click a row
     // to fill its id into the action box above.
