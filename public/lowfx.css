@@ -1,0 +1,26 @@
+/* Low graphics mode (see lowfx.js). Everything here is switched on only when
+   <html> has the "lowfx" class. */
+
+/* Background videos, GIF-like motion layers and overlays don't draw at all. */
+html.lowfx video,
+html.lowfx #bg-video,
+html.lowfx #spider-crawler,
+html.lowfx #sakura-overlay { display: none !important; }
+
+/* Backgrounds are a plain colour: no image is decoded or scaled. */
+html.lowfx body { background-image: none !important; background-color: #0b0d12 !important; background-attachment: scroll !important; }
+
+/* No animations, transitions, filters or blur, anywhere. Hover and press states
+   still change, but at once instead of over time. */
+html.lowfx *,
+html.lowfx *::before,
+html.lowfx *::after {
+  animation: none !important;
+  transition: none !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  text-shadow: none !important;
+  will-change: auto !important;
+}
+html.lowfx { scroll-behavior: auto !important; }

@@ -102,7 +102,9 @@ function start() {
 }
 
 function animate() {
-  requestAnimationFrame(animate);
+  // In low graphics mode the cursor redraws about 8 times a second, not every frame.
+  if (document.documentElement.classList.contains('lowfx')) setTimeout(animate, 120);
+  else requestAnimationFrame(animate);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!skin.ready) return;
 

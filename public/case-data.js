@@ -45,6 +45,7 @@ window.CASE_ITEMS = {
   display_shelf: { label: 'Display Shelf',                tier: 'mil_spec',   img: '/assets/decorations/display-shelf.webp', type: 'item', draggable: true, size: 195 },
   smiski_blind_box: { label: 'Smiski Blind Box',          tier: 'mil_spec',   img: '/assets/decorations/smiski-blind-box.png', type: 'item', draggable: true, size: 91 },
   // Backgrounds and tracks that had no unlock item, so they can be sold and dropped.
+  bg_puzzle:    { label: 'Background: Puzzle',                tier: 'restricted',       emoji: '🧩', type: 'background_unlock', key: 'puzzle_gif' },
   bg_wood:      { label: 'Background: Iantopia Wood',          tier: 'mil_spec',         emoji: '🪵', type: 'background_unlock', key: 'iantopia_wood' },
   bg_patrick:   { label: 'Background: Patrick on a Seahorse',  tier: 'exceedingly_rare', emoji: '🐴', type: 'background_unlock', key: 'patrick_seahorse' },
   mus_bladee:   { label: 'Bladee – Waster',                    tier: 'classified',       emoji: '🎵', type: 'music_unlock', key: 'bladee_waster' },
@@ -254,7 +255,7 @@ window.CASES = {
       covert: 10.0,
       exceedingly_rare: 5.0,
     },
-    items: ['s_2500', 'used_deck'].concat(
+    items: ['s_2500', 'used_deck', 'bg_puzzle'].concat(
       idsByType('music_unlock', 'background_unlock', 'cursor_unlock')
     ),
   },
@@ -308,7 +309,7 @@ window.CASES = {
     // see lootbox.js's oddsFor(), which checks this flag rather than
     // hardcoding this case's key.
     pagodaBuff: true,
-    items: ['bld_shabby', 'bld_office', 'bld_bank', 'bld_park', 'bld_generic', 'bld_sweatshop', 'bld_711', 'bld_pagoda', 'bld_factory', 'bld_skyscraper', 'bld_coal', 'bld_taipei101', 'bld_nuclear', 'bg_wood', 'bg_patrick', 'mus_bladee', 'mus_evian', 'mus_clarity', 'mus_hellokitty', 'mus_girllikeme', 'mus_minecraft'],
+    items: ['bld_shabby', 'bld_office', 'bld_bank', 'bld_park', 'bld_generic', 'bld_sweatshop', 'bld_711', 'bld_pagoda', 'bld_factory', 'bld_skyscraper', 'bld_coal', 'bld_taipei101', 'bld_nuclear', 'bg_wood', 'bg_patrick', 'mus_bladee', 'mus_evian', 'mus_clarity', 'mus_hellokitty', 'mus_girllikeme', 'mus_minecraft', 'bg_puzzle'],
   },
 };
 

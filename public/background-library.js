@@ -64,6 +64,9 @@ window.BACKGROUND_LIBRARY = {
   // with the wood-sign texture.
   iantopia_wood:    { label: 'Iantopia Wood',      type: 'gif',   src: '/video/iantopia-wood.jpg', position: 'center', theme: 'theme-wood' },
 
+  // Shop and loot-crate background (case-data.js's bg_puzzle).
+  puzzle_gif: { label: 'Puzzle Background', type: 'gif', src: '/video/puzzle-background.gif', position: 'center' },
+
   // Unlocked by finishing the Alternate Ending (see alternate-ending.astro).
   // The video has Fly Me to the Moon in it.
   patrick_seahorse: { label: 'Patrick on a Seahorse', type: 'video', src: '/video/patrick-seahorse.mp4', position: 'center' },
