@@ -16,7 +16,11 @@ const BalanceManager = require('./balance');
 const { AccountWatch } = require('./accounts');
 // Live feed, cheat detection, and punishments. Needs ADMIN_EMAILS (or
 // ADMIN_UIDS) set in the environment, or nobody can open the admin feed.
-const accounts = new AccountWatch({ db, auth: admin.auth(), balance: new BalanceManager(db) }).start();
+const listFromEnv = (v) => String(v || '').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
+const accounts = new AccountWatch({
+  db, auth: admin.auth(), balance: new BalanceManager(db),
+  admins: { uids: listFromEnv(process.env.ADMIN_UIDS), emails: listFromEnv(process.env.ADMIN_EMAILS) },
+}).start();
 const server = createServer({ port: PORT, db, auth: admin.auth(), accounts });
 console.log(`[Arena Server] Listening on 0.0.0.0:${PORT}`);
 

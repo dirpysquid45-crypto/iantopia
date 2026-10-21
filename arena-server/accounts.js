@@ -28,8 +28,9 @@ const STREAK_LIMIT = 20;
 const LEADERBOARDS = ['leaderboard', 'minesweeper_leaderboard', 'horse_leaderboard'];
 
 class AccountWatch {
-  constructor({ db, auth, balance, now = () => Date.now(), log = console }) {
+  constructor({ db, auth, balance, admins = { uids: [], emails: [] }, now = () => Date.now(), log = console }) {
     this.db = db;
+    this.admins = admins;         // the admin list (ADMIN_UIDS / ADMIN_EMAILS), never banned
     this.auth = auth;
     this.balance = balance; // BalanceManager, for capFromData
     this.now = now;
@@ -137,8 +138,19 @@ class AccountWatch {
     }
   }
 
+  // Admin accounts can't be banned or struck, so an admin's own test or
+  // mistake can't lock them out.
+  async isAdmin(uid) {
+    if (this.admins.uids.includes(String(uid).toLowerCase())) return true;
+    try {
+      const u = await this.auth.getUser(uid);
+      return !!u.email && this.admins.emails.includes(u.email.toLowerCase());
+    } catch { return false; }
+  }
+
   // Records a strike in a transaction, so two snapshots can't count twice.
   async punish(uid, info) {
+    if (await this.isAdmin(uid)) return;
     const now = this.now();
     const ref = this.db.collection('cheat_strikes').doc(uid);
     const count = await this.db.runTransaction(async (tx) => {
@@ -162,6 +174,7 @@ class AccountWatch {
   // Bans an account and resets its balance. Used for second offences and by
   // the admin panel. Also removes the account's leaderboard rows.
   async ban(uid, hours, info = {}) {
+    if (await this.isAdmin(uid)) throw new Error('admin accounts cannot be banned');
     await this.backup(uid, 'before_ban');
     const until = new Date(this.now() + hours * 3600 * 1000);
     await this.db.collection('bans').doc(uid).set({ until, reason: info.reason || 'admin', at: new Date(this.now()) });

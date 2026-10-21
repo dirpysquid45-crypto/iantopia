@@ -68,7 +68,7 @@ class Manager {
       else return this.fail(conn.ws, 'Bad request', 'bad_request');
     } catch (e) {
       console.error('[accounts] action failed:', e.message);
-      this.fail(conn.ws, 'Could not apply that change', 'action_failed');
+      return this.fail(conn.ws, e.message, 'refused');
     }
   }
 
