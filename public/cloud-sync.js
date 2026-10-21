@@ -137,6 +137,8 @@
   }
   function showBan(until) {
     let el = document.getElementById('ianto-ban-screen');
+    // The admin pages stay usable, so an admin who is banned can still unban.
+    if (location.pathname.startsWith('/admin-')) until = null;
     if (!until) { if (el) el.remove(); return; }
     if (!el) {
       el = document.createElement('div');
