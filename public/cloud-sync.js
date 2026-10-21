@@ -122,6 +122,13 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
 
+  // The account's sign-in email and display name, stored on the user's record
+  // next to their game data so they can be looked up by name. The record is
+  // readable only by its owner (see firestore.rules).
+  function profileFields(user) {
+    return { email: user.email || null, displayName: user.displayName || null };
+  }
+
   let currentUser = null;
   let applyingRemote = false; // guards against syncing our own just-applied data straight back up
   let pushTimer = null;
@@ -176,7 +183,7 @@
     } else {
       // First-ever sign-in: don't wipe out progress the user already built
       // up anonymously — that becomes their first cloud save instead.
-      await db.collection('users').doc(uid).set(snapshotLocalState());
+      await db.collection('users').doc(uid).set({ ...snapshotLocalState(), ...profileFields(currentUser) });
     }
   }
 
@@ -196,7 +203,7 @@
     if (!currentUser || applyingRemote || !reconciled) return;
     clearTimeout(pushTimer);
     const doPush = () => {
-      db.collection('users').doc(currentUser.uid).set(snapshotLocalState(), { merge: true }).catch((err) => {
+      db.collection('users').doc(currentUser.uid).set({ ...snapshotLocalState(), ...profileFields(currentUser) }, { merge: true }).catch((err) => {
         console.error('[cloud-sync] push failed:', err);
       });
     };
@@ -226,6 +233,12 @@
     // Set BEFORE the pull, not after — applyRemoteState()'s reload re-enters
     // this same handler on the next load, and the flag has to already be
     // set by then or it'd pull-and-potentially-reload every time forever.
+    // Keep the email and display name on the record current, even when nothing
+    // else has changed (a name or email change, or a first sign-in).
+    if (user) {
+      db.collection('users').doc(user.uid).set(profileFields(user), { merge: true })
+        .catch((err) => console.error('[cloud-sync] profile write failed:', err.message || err));
+    }
     if (user && !sessionStorage.getItem(RECONCILE_KEY)) {
       try { sessionStorage.setItem(RECONCILE_KEY, '1'); } catch {}
       // A failed pull still lets pushes resume (the old behaviour), so an
