@@ -119,6 +119,13 @@ class AccountWatch {
     this.emit({ kind: 'punish', action: 'reset', uid, name: await this.labelFor(uid), reason: 'admin' });
   }
 
+  // Sets the account's sign-in display name, so it shows in Firebase's Users tab.
+  async setName(uid, name) {
+    await this.auth.updateUser(uid, { displayName: name });
+    this.names.delete(uid);
+    this.emit({ kind: 'punish', action: 'rename', uid, name, reason: 'admin' });
+  }
+
   async unban(uid) {
     await this.db.collection('bans').doc(uid).delete();
     await this.db.collection('users').doc(uid).set({ ban_until: null }, { merge: true });

@@ -51,6 +51,8 @@
       <button id="reset" class="alt" disabled>Reset to 100</button>
       <button id="ban" class="bad" disabled>Ban</button>
       <button id="unban" class="alt" disabled>Unban</button>
+      <input id="name" type="text" maxlength="40" placeholder="New name" autocomplete="off" aria-label="New display name" />
+      <button id="rename" class="alt" disabled>Set name</button>
     </div>
 
     <button id="signin" class="alt" hidden>Sign in with Google</button>
@@ -115,7 +117,7 @@
 
     function updateButtons() {
       const ok = /^[A-Za-z0-9_-]{1,128}$/.test($('uid').value.trim());
-      ['reset', 'ban', 'unban'].forEach((id) => { $(id).disabled = !ok; });
+      ['reset', 'ban', 'unban', 'rename'].forEach((id) => { $(id).disabled = !ok; });
     }
     $('uid').addEventListener('input', updateButtons);
 
@@ -124,12 +126,16 @@
       const hours = Math.max(1, Math.min(720, Math.floor(Number($('hours').value) || 24)));
       if (action === 'ban' && !confirm('Ban ' + uid + ' for ' + hours + ' hours? Their balance resets to 100 and leaderboard rows are removed.')) return;
       if (action === 'reset' && !confirm('Reset ' + uid + ' to 100 Strubles?')) return;
-      arena.send({ type: 'account_action', action, uid, hours });
+      const name = $('name').value.trim();
+      if (action === 'rename' && !name) { setStatus('Type a new name first.', true); return; }
+      if (action === 'rename' && !confirm('Set the sign-in display name for ' + uid + ' to "' + name + '"?')) return;
+      arena.send({ type: 'account_action', action, uid, hours, name });
     }
     $('signin').addEventListener('click', () => window.CloudSync && CloudSync.signIn());
     $('reset').addEventListener('click', () => act('reset'));
     $('ban').addEventListener('click', () => act('ban'));
     $('unban').addEventListener('click', () => act('unban'));
+    $('rename').addEventListener('click', () => act('rename'));
 
     const arena = ArenaClient.create({
       game: 'suggest',
