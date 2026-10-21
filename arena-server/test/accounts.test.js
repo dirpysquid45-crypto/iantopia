@@ -128,3 +128,36 @@ test('a second offence within the window bans the account and records the page',
   assert.ok(db.docs.get('bans/u6'), 'a ban record exists, which the rules check');
   assert.ok(db.docs.get('users/u6').ban_until, 'the account shows its ban time');
 });
+
+test('the per-minute rate is the net change, so wins that losses cancel out are not flagged', async () => {
+  const { save, events, tick } = setup();
+  await save('u8', 100);
+  let bal = 100;
+  for (const step of [3000, -2000, 3000]) { bal += step; tick(5000); await save('u8', bal, step > 0 ? { amount: step, page: '/blackjack' } : undefined); }
+  assert.equal(events.filter((e) => e.kind === 'punish').length, 0, 'gross 6000 but net 4000 in a minute');
+});
+
+test('a browser that pushes its pre-reset balance back is put back to 100, with no strike', async () => {
+  const { save, events, db, tick } = setup();
+  await save('u7', 100);
+  tick(5000);
+  await save('u7', 8718, { amount: 8618, page: '/arena-blackjack' });   // flagged as a rate cheat: first offence
+  await save('u7', 100);                                              // the server's reset, as the snapshot reports it
+  tick(20000);
+  await save('u7', 8518);                                             // a stale tab pushes its old balance back
+  assert.equal(events.filter((e) => e.kind === 'punish' && e.action === 'ban').length, 0, 'no second offence');
+  assert.equal(events.filter((e) => e.kind === 'sync_restore').length, 1, 'the restore is recorded');
+  assert.equal(db.docs.get('users/u7').strubles_balance_v1, '100');
+  assert.equal(db.docs.get('cheat_strikes/u7').at.length, 1, 'only the first strike counts');
+});
+
+test('an admin can set a balance by hand, even above the cap, without a strike', async () => {
+  const { watch, events, db, save, tick } = setup();
+  await save('u9', 100);
+  tick(1000);
+  await watch.setBalance('u9', 50000);
+  await save('u9', 50000);
+  assert.equal(events.filter((e) => e.kind === 'punish' && (e.action === 'reset' || e.action === 'ban')).length, 0, 'no strike for an admin change');
+  assert.equal(db.docs.get('users/u9').strubles_balance_v1, '50000');
+  assert.ok(events.some((e) => e.kind === 'punish' && e.action === 'set' && e.to === 50000), 'the change is in the feed');
+});

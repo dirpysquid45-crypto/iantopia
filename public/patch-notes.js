@@ -8,6 +8,20 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: "2026-10-21",
+    title: "Air Hockey, Mahjong Overhaul, Low Graphics & Haunted Fixes",
+    changes: [
+      "MULTIPLAYER AIR HOCKEY: Pong is now air hockey, played live against another player in the Arena. Choose a mode: first to 7 goals, best of 5 (first to 3), a 60-second timed match, or endless. Paddles stay on your half, goals pause the puck to serve, and the rink is drawn in the same pixel style as the rest of the Arena.",
+      "MAHJONG: a pixel font, a bamboo background, black glowing text and a full set of sound effects. Music now starts with the game, cycles through its playlist, and has its own volume control. Each hint costs 10%, and there's a back link to the Puzzles hub.",
+      "NEW MUSIC AND BACKGROUNDS: the Han Palace background and four new tracks are unlockable from the Shop and crates. Four of those tracks are in the Mahjong playlist, and every track can now be unlocked. Avatar's Love is an unlock only, not in Mahjong.",
+      "PUZZLES: the Puzzles hub replaces the old Minesweeper button, and Mahjong Solitaire now pays out in Strubles. The puzzle background is unlockable too, and the Puzzles and Arena cards have a gentle float and a grow on hover.",
+      "HOMEPAGE: the menu cards are stacked and animated, buttons grow and wobble on hover, and the title holds still with a white glow on hover. The Haunted word still switches you to the spooky theme, and that now holds for every account, whatever background you've saved.",
+      "LOW GRAPHICS: the Graphics button in the Background picker switches between Full (the default, and how the game is meant to look) and Low. Low only switches off the most expensive blur and backdrop effects, so it's a small speed-up on slower computers. Animations, hover effects and the mouse cursor keep running in both modes.",
+      "FIXED: the custom cursor no longer lags or jumps in Low mode. The site no longer switches itself to Low based on how it performs; you choose.",
+      "A NOTE ON CONSOLE COMMANDS: the developer console helpers that change balances and game state only work on local development builds. Please don't try to use console commands, scripts or other tools to change your balance or results on the live site. Accounts that gain too fast or win too unusually are reviewed, and anything that's been tampered with can be reset or banned.",
+    ],
+  },
+  {
     date: "2026-10-15",
     title: "Village Specialization, Jobs, Commutes, Random Events & Neighbor Visits",
     changes: [

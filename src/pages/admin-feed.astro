@@ -3,8 +3,8 @@
 <!doctype html>
 <html lang="en">
 <head>
-<link rel="stylesheet" href="/lowfx.css?v=1">
-<script is:inline src="/lowfx.js?v=1"></script>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
@@ -65,6 +65,8 @@
       <input id="uid" type="text" placeholder="Account id (click a row to fill)" autocomplete="off" />
       <input id="hours" type="number" min="1" max="720" value="24" aria-label="Ban hours" />
       <button id="reset" class="alt" disabled>Reset to 100</button>
+      <input id="amount" type="number" min="0" step="1" placeholder="Balance" autocomplete="off" aria-label="New balance" />
+      <button id="setbal" class="alt" disabled>Set balance</button>
       <button id="ban" class="bad" disabled>Ban</button>
       <button id="unban" class="alt" disabled>Unban</button>
       <input id="name" type="text" maxlength="40" placeholder="New name" autocomplete="off" aria-label="New display name" />
@@ -94,7 +96,7 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script is:inline src="/cloud-sync.js?v=13"></script>
+  <script is:inline src="/cloud-sync.js?v=14"></script>
   <script is:inline src="/arena-client.js?v=1"></script>
   <script is:inline>
   (() => {
@@ -122,7 +124,7 @@
       who.append(small);
       const amt = document.createElement('div'); amt.className = 'amt';
       if (isPunish) {
-        amt.textContent = ({ reset: 'RESET', ban: 'BANNED', unban: 'UNBANNED' })[ev.action] + (ev.reason ? ' · ' + ev.reason.replace(/_/g, ' ') : '');
+        amt.textContent = ({ reset: 'RESET', ban: 'BANNED', unban: 'UNBANNED', set: 'SET' })[ev.action] + (ev.action === 'set' ? ' ' + money(ev.from) + ' → ' + money(ev.to) : ev.reason ? ' · ' + ev.reason.replace(/_/g, ' ') : '');
       } else {
         const over = ev.cap != null && ev.balance > ev.cap;
         amt.innerHTML = (ev.prev == null ? '' : money(ev.prev) + ' → ') + '<span class="' + (over ? 'over' : '') + '"></span>';
@@ -148,7 +150,7 @@
 
     function updateButtons() {
       const ok = /^[A-Za-z0-9_-]{1,128}$/.test($('uid').value.trim());
-      ['reset', 'ban', 'unban', 'rename', 'backup', 'warn'].forEach((id) => { $(id).disabled = !ok; });
+      ['reset', 'setbal', 'ban', 'unban', 'rename', 'backup', 'warn'].forEach((id) => { $(id).disabled = !ok; });
     }
     $('uid').addEventListener('input', updateButtons);
 
@@ -157,16 +159,23 @@
       const hours = Math.max(1, Math.min(720, Math.floor(Number($('hours').value) || 24)));
       if (action === 'ban' && !confirm('Ban ' + uid + ' for ' + hours + ' hours? Their balance resets to 100 and leaderboard rows are removed.')) return;
       if (action === 'reset' && !confirm('Reset ' + uid + ' to 100 Strubles?')) return;
+      let amount = null;
+      if (action === 'set_balance') {
+        amount = Number($('amount').value);
+        if (!Number.isInteger(amount) || amount < 0) { setStatus('Type a whole-number balance, 0 or more.', true); return; }
+        if (!confirm('Set ' + uid + "'s balance to " + money(amount) + ' Strubles? Their cap is not changed.')) return;
+      }
       const name = $('name').value.trim();
       if (action === 'rename' && !name) { setStatus('Type a new name first.', true); return; }
       if (action === 'rename' && !confirm('Set the sign-in display name for ' + uid + ' to "' + name + '"?')) return;
       const text = $('warn-text').value.trim();
       if (action === 'warn' && !text) { setStatus('Write the warning first.', true); return; }
       if (action === 'warn' && !confirm('Send this warning to ' + uid + '?\n\n' + text)) return;
-      arena.send({ type: 'account_action', action, uid, hours, name, text });
+      arena.send({ type: 'account_action', action, uid, hours, name, text, amount });
     }
     $('signin').addEventListener('click', () => window.CloudSync && CloudSync.signIn());
     $('reset').addEventListener('click', () => act('reset'));
+    $('setbal').addEventListener('click', () => act('set_balance'));
     $('ban').addEventListener('click', () => act('ban'));
     $('unban').addEventListener('click', () => act('unban'));
     $('rename').addEventListener('click', () => act('rename'));

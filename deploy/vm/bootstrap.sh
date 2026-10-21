@@ -39,7 +39,9 @@ else
 fi
 
 # Site build, in a Node 20 container so the VM doesn't need Node installed
-docker run --rm -v "$REPO":/app -w /app node:20 sh -c "npm ci && npm run build"
+# The build runs as root in the container, so hand dist/ back to this user.
+# Without that, the news pipeline can't copy its JSON into dist/.
+docker run --rm -v "$REPO":/app -w /app node:20 sh -c "npm ci && npm run build && chown -R $(id -u):$(id -g) dist"
 
 # Web server
 sudo cp "$REPO/deploy/vm/nginx.conf" /etc/nginx/sites-available/iantopia

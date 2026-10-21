@@ -21,13 +21,21 @@ const FEED_MAX = 300;
 const CAP_RESET = { tycoon_bank_level_v1: '0', tycoon_village_v2: JSON.stringify({ v: 2, nextId: 1, name: 'My Village', b: [], tiles: {}, paid: {} }) };
 const ARCHIVE_LOG = 'account_log';        // every feed event, kept forever
 const ARCHIVE_BACKUP = 'account_backups'; // record copies taken before a change
-// Plausibility limits. A balance can rise by at most RATE_LIMIT Strubles in any
-// RATE_WINDOW_MS (the most the site's games can pay in a minute at the
-// largest bets), and STREAK_LIMIT gains in a row with no loss between them is
-// flagged as a run of wins nobody has.
+// Plausibility limits. The NET change in a balance may rise by at most
+// RATE_LIMIT Strubles in any RATE_WINDOW_MS (the most the site's games can pay
+// in a minute at the largest bets). Losses count against it, so a run of wins
+// and losses is judged by where the balance actually went. STREAK_LIMIT gains
+// in a row with no loss between them is flagged as a run of wins nobody has.
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT = 5000;
 const STREAK_LIMIT = 20;
+// After a server reset, a browser that still holds the old balance can push it
+// back. For this long, a rise back up to the pre-reset balance is that old
+// money returning, so it's put back to the reset value without a strike.
+const RESET_GRACE_MS = 10 * 60 * 1000;
+// An admin's own balance change is not a cheat, whatever the amount. The watch
+// lets through the save that matches it, for this long after it is made.
+const ADMIN_SET_GRACE_MS = 2 * 60 * 1000;
 const LEADERBOARDS = ['leaderboard', 'minesweeper_leaderboard', 'horse_leaderboard'];
 
 class AccountWatch {
@@ -41,6 +49,8 @@ class AccountWatch {
     this.lastBalance = new Map(); // uid -> last seen balance
     this.gains = new Map();       // uid -> recent gains [{t, amount}] for the rate rule
     this.streaks = new Map();     // uid -> gains in a row with no loss between
+    this.resets = new Map();      // uid -> {at, from, to} for the last server reset
+    this.adminSets = new Map();   // uid -> {at, to} for a balance an admin just set
     this.names = new Map();       // uid -> display label
     this.feed = [];               // newest last, capped at FEED_MAX
     this.listeners = new Set();   // functions called with each new event
@@ -119,17 +129,39 @@ class AccountWatch {
     const page = lastGainOf(data).page;
     this.emit({ kind: 'balance', uid, name, balance, prev: prev === undefined ? null : prev, cap, bankLevel: Number(data.tycoon_bank_level_v1 || 0), page });
     if (prev === undefined || balance === prev) return;
-    if (balance < prev) { this.streaks.set(uid, 0); return; }
 
-    // The balance went up. Check the three rules in order.
+    // The save that follows an admin's own change is not judged.
+    const adminSet = this.adminSets.get(uid);
+    if (adminSet && this.now() - adminSet.at < ADMIN_SET_GRACE_MS && balance === adminSet.to) {
+      this.adminSets.delete(uid);
+      this.streaks.set(uid, 0);
+      return;
+    }
+
+    // Every change goes into the per-minute net, losses included.
     const delta = balance - prev;
     const now = this.now();
-    const info = { balance, prev, cap, name, page, delta };
-    if (balance > cap) return this.punish(uid, { ...info, reason: 'over_cap' });
-
     const recent = (this.gains.get(uid) || []).filter((g) => now - g.t < RATE_WINDOW_MS);
     recent.push({ t: now, amount: delta });
     this.gains.set(uid, recent);
+    if (balance < prev) { this.streaks.set(uid, 0); return; }
+
+    // The balance went up. A browser holding the balance from before a reset
+    // can push it back up. That's the old money returning, not a win: put the
+    // reset value back and record no strike. Only for balances under the cap,
+    // so a repeat over-cap cheat is still a second offence.
+    const reset = this.resets.get(uid);
+    if (reset && now - reset.at < RESET_GRACE_MS && reset.from <= cap && balance > reset.to && balance <= reset.from) {
+      this.lastBalance.set(uid, reset.to);
+      await this.db.collection('users').doc(uid).set({ strubles_balance_v1: String(reset.to), balance_reset_at: new Date(now) }, { merge: true });
+      this.emit({ kind: 'sync_restore', uid, name, from: balance, to: reset.to, page });
+      return;
+    }
+
+    // The balance went up. Check the rules in order.
+    const info = { balance, prev, cap, name, page, delta };
+    if (balance > cap) return this.punish(uid, { ...info, reason: 'over_cap' });
+
     const perMinute = recent.reduce((sum, g) => sum + g.amount, 0);
     if (perMinute > RATE_LIMIT) return this.punish(uid, { ...info, reason: 'rate', perMinute });
 
@@ -170,7 +202,8 @@ class AccountWatch {
       return;
     }
     await this.backup(uid, 'before_cheat_reset');
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, cheat_warning_at: new Date(now) }, { merge: true });
+    this.resets.set(uid, { at: now, from: info.balance, to: Number(STARTING_BALANCE) });
+    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, cheat_warning_at: new Date(now), balance_reset_at: new Date(now) }, { merge: true });
     this.emit({ kind: 'punish', action: 'reset', uid, name: info.name, reason: 'cheat_first_offence', from: info.balance, strikes: count, ...detail });
   }
 
@@ -180,16 +213,34 @@ class AccountWatch {
     if (await this.isAdmin(uid)) throw new Error('admin accounts cannot be banned');
     await this.backup(uid, 'before_ban');
     const until = new Date(this.now() + hours * 3600 * 1000);
+    this.resets.set(uid, { at: this.now(), from: info.balance ?? await this.balanceNow(uid), to: Number(STARTING_BALANCE) });
     await this.db.collection('bans').doc(uid).set({ until, reason: info.reason || 'admin', at: new Date(this.now()) });
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, ban_until: until, ...CAP_RESET }, { merge: true });
+    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, ban_until: until, balance_reset_at: new Date(this.now()), ...CAP_RESET }, { merge: true });
     for (const col of LEADERBOARDS) await this.db.collection(col).doc(uid).delete();
     const name = info.name || await this.labelFor(uid);
     this.emit({ kind: 'punish', action: 'ban', uid, name, until: until.toISOString(), reason: info.reason || 'admin', from: info.balance, strikes: info.strikes, page: info.page || null, detected: info.detected || null });
   }
 
+  async balanceNow(uid) {
+    const snap = await this.db.collection('users').doc(uid).get();
+    return snap.exists ? balanceOf(snap.data()) : 0;
+  }
+
+  // Sets an account's balance by hand, for an admin. The wallet cap stays where
+  // it is, so a balance above the cap is allowed here but not earned.
+  async setBalance(uid, amount) {
+    if (!Number.isSafeInteger(amount) || amount < 0) throw new Error('Balance must be a whole number, 0 or more');
+    const from = await this.balanceNow(uid);
+    await this.backup(uid, 'before_admin_set');
+    this.adminSets.set(uid, { at: this.now(), to: amount });
+    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: String(amount) }, { merge: true });
+    this.emit({ kind: 'punish', action: 'set', uid, name: await this.labelFor(uid), reason: 'admin', from, to: amount });
+  }
+
   async reset(uid) {
     await this.backup(uid, 'before_admin_reset');
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, ...CAP_RESET }, { merge: true });
+    this.resets.set(uid, { at: this.now(), from: await this.balanceNow(uid), to: Number(STARTING_BALANCE) });
+    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, balance_reset_at: new Date(this.now()), ...CAP_RESET }, { merge: true });
     this.emit({ kind: 'punish', action: 'reset', uid, name: await this.labelFor(uid), reason: 'admin' });
   }
 

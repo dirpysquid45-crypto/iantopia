@@ -4,8 +4,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<link rel="stylesheet" href="/lowfx.css?v=1">
-<script is:inline src="/lowfx.js?v=1"></script>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Haunted Iantopia</title>
@@ -1771,14 +1771,20 @@
       // flips it over then takes you to the maze -- the ONE direct route
       // in, the Easter egg this whole image exists for in October. Outside
       // the season it's just the ordinary spin-boost on click, unchanged.
-      const halloween = window.isHalloweenSeason();
-      if (halloween) {
-        document.body.classList.add('theme-halloween');
+      // applyBackground() switches this on and off (window.setHalloweenLook),
+      // so the look follows the background actually in use: the October
+      // default, a saved pick, or the Haunted click. Checking the date once at
+      // load missed everyone whose saved background wasn't the Halloween one.
+      let halloween = false;
+      window.setHalloweenLook = (on) => {
+        halloween = on;
+        document.body.classList.toggle('theme-halloween', on);
         document.querySelectorAll('#flip-card img').forEach((img) => {
-          img.src = '/assets/decorations/job-application-form.png';
-          img.alt = 'Job Application Form';
+          const back = img.closest('.flip-card-back') !== null;
+          img.src = on ? '/assets/decorations/job-application-form.png' : '/Iantopia.webp';
+          img.alt = on ? 'Job Application Form' : (back ? 'Iantopia Image Back' : 'Iantopia Image');
         });
-      }
+      };
 
       const NORMAL_SPEED = 360 / 4000; // deg/ms -- matches the old 4s-per-rotation
       const FAST_SPEED = 360 / 400;    // deg/ms -- matches the old 0.4s-per-rotation
@@ -1949,7 +1955,7 @@
       <!-- Graphics lives with the backgrounds, since it's about how they're drawn. -->
       <div class="graphics-row">
         <span>Graphics</span>
-        <button id="graphics-btn" class="graphics-toggle" type="button" title="Auto, Low or Full">🎛️ Graphics: Auto</button>
+        <button id="graphics-btn" class="graphics-toggle" type="button" title="Low or Full">🎛️ Graphics: Full</button>
       </div>
       <button class="modal-close" id="background-close">Close</button>
     </div>
@@ -2007,13 +2013,13 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script is:inline src="/game-stats.js?v=1"></script>
-<script is:inline src="/cloud-sync.js?v=13"></script>
+<script is:inline src="/cloud-sync.js?v=14"></script>
   <script is:inline src="/music-library.js?v=13"></script>
   <script is:inline src="/music-position.js?v=1"></script>
   <script is:inline src="/background-library.js?v=13"></script>
   <script is:inline src="/pickers.js?v=11"></script>
   <script is:inline src="/cursor-library.js?v=4"></script>
-  <script is:inline src="/patch-notes.js?v=18"></script>
+  <script is:inline src="/patch-notes.js?v=19"></script>
 
   <!-- Timer Script -->
   <script is:inline>
@@ -2687,6 +2693,9 @@
         // background active picks up the same class automatically.
         if (window.BACKGROUND_THEME_CLASSES) document.body.classList.remove(...window.BACKGROUND_THEME_CLASSES);
         if (bg.theme) document.body.classList.add(bg.theme);
+        // The Halloween look is part of the same theme: set it here, after the
+        // class list is cleared, so it survives a background change either way.
+        if (window.setHalloweenLook) window.setHalloweenLook(bg.theme === 'theme-halloween');
       }
       applyBackground(getActiveBgKey());
 

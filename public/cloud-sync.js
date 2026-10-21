@@ -127,11 +127,21 @@
   // ends. The server sets ban_until on the record; this listens to it live, so
   // a ban or an unban takes effect without a reload.
   let banUnsub = null;
+  let resetSeen = null;
   function watchBan(user) {
     if (banUnsub) { banUnsub(); banUnsub = null; }
+    resetSeen = null;
     if (!user) { showBan(null); return; }
     banUnsub = db.collection('users').doc(user.uid).onSnapshot((snap) => {
       const d = snap.exists ? snap.data() : {};
+      // The server resets a balance on a cheat strike, a ban or an admin reset,
+      // and stamps balance_reset_at. A tab still holding the old balance must
+      // take the server's value now, or its next save pushes the old one back.
+      const resetAt = d.balance_reset_at ? d.balance_reset_at.toMillis() : null;
+      if (resetSeen !== null && resetAt !== null && resetAt !== resetSeen) {
+        pullFromCloud(user.uid).catch((err) => console.error('[cloud-sync] pull after reset failed:', err));
+      }
+      resetSeen = resetAt;
       const until = d.ban_until ? d.ban_until.toDate() : null;
       showBan(until && until > new Date() ? until : null);
       // An admin warning stays until the player dismisses it.
