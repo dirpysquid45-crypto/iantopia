@@ -14,18 +14,42 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Each player's own save data. Only the owner reads or writes it.
+    // Save data. The balance is stored as a plain digit string; anything
+    // that isn't a sane number is refused. This is a ceiling only: a
+    // cheater can still write any value under it. Stage 2 (a server-side
+    // ledger) is what makes balances trustworthy.
     match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.size() < 200000
+        && (!('strubles_balance_v1' in request.resource.data)
+            || (request.resource.data.strubles_balance_v1 is string
+                && request.resource.data.strubles_balance_v1.matches('^[0-9]{1,10}$')));
     }
 
     // Public boards: anyone can read, only the owner writes their own row.
+    // Field shapes are checked, and values must be plausible ranges. A
+    // cheater can still post any value inside those ranges.
     match /leaderboard/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.gdp is number && request.resource.data.gdp >= 0
+        && request.resource.data.efficiency is number && request.resource.data.efficiency >= 0
+        && request.resource.data.buildings is number && request.resource.data.buildings >= 0 && request.resource.data.buildings <= 1000
+        && request.resource.data.population is number && request.resource.data.population >= 0 && request.resource.data.population <= 1000000
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 40;
     }
     match /minesweeper_leaderboard/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 40;
+    }
+
+    // Bans are written only by the server (Admin SDK bypasses these rules).
+    // Clients may never read or write them, so a ban can't be lifted from
+    // the browser.
+    match /bans/{uid} {
+      allow read, write: if false;
     }
     match /horse_leaderboard/{uid} {
       allow read: if true;

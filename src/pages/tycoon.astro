@@ -2767,7 +2767,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // Test hook for the browser suites; only exists in dev mode.
-  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood, triggerFire, triggerCaravan, triggerAudit, estimateGDP };
+  if (!TYCOON_DISABLED && window.IANTOPIA_IS_DEV) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood, triggerFire, triggerCaravan, triggerAudit, estimateGDP };
 })();
 </script>
 </body>

@@ -605,7 +605,7 @@
       document.getElementById('rematch-accept').style.display = 'none';
       updateBalance();
     } else if (msg.type === 'balance_update') {
-      Strubles.set(msg.balance);
+      Strubles.setFromServer(msg.balance);
       updateBalance();
     } else if (msg.type === 'rematch_declined') {
       document.getElementById('rematch-status').textContent = 'Opponent declined the rematch.';

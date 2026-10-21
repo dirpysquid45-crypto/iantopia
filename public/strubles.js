@@ -1,4 +1,8 @@
 // strubles.js — site-wide currency helper (persistent via localStorage)
+// Dev detection: true only on a local machine. Read by every page that
+// exposes a debug or test hook. It is a convenience switch, not access
+// control.
+window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 (function () {
   const KEY = "strubles_balance_v1";
   const START = 100; // starting bankroll
@@ -61,9 +65,21 @@
       _save(bal - need);
       return true;
     },
-    // Dev/utility
-    reset(v = START) { return _save(v); },
+    // Applies a balance the arena server already validated (see
+    // arena-server/balance.js). The only path that may set a balance
+    // directly, and only because the server is the authority for it.
+    setFromServer(v) { return _save(v); },
   };
+
+  // Dev-only helpers. These are a convenience gate, not security: anything
+  // the browser runs can be edited, so the real protection is the server
+  // and Firestore rules. Limiting them to localhost keeps them out of
+  // production sessions. Setting a balance here does not carry into the
+  // cloud save, because the Firestore rules cap what the cloud accepts.
+  if (window.IANTOPIA_IS_DEV) {
+    api.set = (v) => _save(v);
+    api.reset = (v = START) => _save(v);
+  }
 
   // Expose
   window.Strubles = Object.assign(window.Strubles || {}, api);

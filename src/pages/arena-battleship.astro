@@ -903,7 +903,7 @@
       case 'game_voided': toLobby(m.reason || 'The game was cancelled. Any stake was returned.'); break;
       case 'opponent_away': $('away-banner').hidden = false; $('away-banner').textContent = `${S.oppName} disconnected — holding the game for ${Math.round((m.graceMs || 30000) / 1000)}s…`; break;
       case 'opponent_back': $('away-banner').hidden = true; toast(`${S.oppName} is back.`, 1800); break;
-      case 'balance_update': try { Strubles.set(m.balance); } catch {} updateBalance(); break;
+      case 'balance_update': try { Strubles.setFromServer(m.balance); } catch {} updateBalance(); break;
       case 'error':
         if (m.code === 'guest_stake') { toast(m.message); setStakeMode(false); }
         else if (m.code === 'busy') toast('You already have a lobby or game open.');
@@ -932,7 +932,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // handle for automated tests
-  window.BattleshipTest = { state: S, arena };
+  if (window.IANTOPIA_IS_DEV) window.BattleshipTest = { state: S, arena };
 })();
 </script>
 </body>
