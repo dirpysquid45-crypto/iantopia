@@ -56,7 +56,14 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
       const cap = (window.TycoonBank && window.TycoonBank.currentCap()) || Infinity;
       if (cur >= cap) return cur;
       const amount = Math.max(0, Number(n) || 0);
-      return _save(Math.min(cur + amount, cap));
+      const next = _save(Math.min(cur + amount, cap));
+      // Where this gain happened. The account watch logs it, so a suspicious run
+      // of wins can be traced to a page. It rides along with the balance in the
+      // cloud save (see SYNC_KEYS in cloud-sync.js).
+      if (next > cur) {
+        safeSet('strubles_last_gain_v1', JSON.stringify({ amount: next - cur, page: location.pathname, at: Date.now() }));
+      }
+      return next;
     },
     spend(n) {
       const need = Math.max(0, Math.floor(Number(n || 0)));

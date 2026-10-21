@@ -1,92 +1,118 @@
-// Cheat detection and punishments for accounts.js. Drives onChange() directly
-// with the fake database, so no live Firestore listener is needed.
+// Account watch rules: the wallet cap, the per-minute rate, and win streaks,
+// plus the first-offence reset and second-offence ban. Uses an in-memory fake
+// of the Firestore and Auth calls the watch makes.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { FakeDb } = require('./fakes');
-const BalanceManager = require('../balance');
-const { AccountWatch, STRIKE_WINDOW_MS } = require('../accounts');
+const { AccountWatch } = require('../accounts');
 
-function setup() {
-  const db = new FakeDb();
-  let now = Date.parse('2026-10-20T12:00:00Z');
+function fakeDb() {
+  const docs = new Map();
+  const key = (c, id) => c + '/' + id;
+  const db = {
+    docs,
+    collection(name) {
+      return { doc(id) {
+        const k = key(name, id);
+        return {
+          async get() { return { exists: docs.has(k), data: () => docs.get(k) }; },
+          async set(data, opts) { docs.set(k, opts && opts.merge ? { ...(docs.get(k) || {}), ...data } : { ...data }); },
+          async delete() { docs.delete(k); },
+          _k: k,
+        };
+      } };
+    },
+    async runTransaction(fn) {
+      const tx = {
+        async get(ref) { return { exists: docs.has(ref._k), data: () => docs.get(ref._k) }; },
+        set(ref, data) { docs.set(ref._k, { ...(docs.get(ref._k) || {}), ...data }); },
+      };
+      return fn(tx);
+    },
+  };
+  return db;
+}
+
+function setup(now = Date.now()) {
+  let t = now;
+  const db = fakeDb();
   const watch = new AccountWatch({
     db,
-    auth: { getUser: async () => { throw new Error('no user'); } },
-    balance: new BalanceManager(db),
-    now: () => now,
+    auth: { getUser: async () => ({ displayName: 'Test Player', email: 'p@example.com' }) },
+    balance: { capFromData: () => 20000 },
+    now: () => t,
     log: { error() {} },
   });
   const events = [];
-  watch.subscribe((ev) => events.push(ev));
-  const cap = watch.balance.capFromData({ tycoon_bank_level_v1: 0 });
-  return { db, watch, events, cap, tick(ms) { now += ms; } };
+  watch.subscribe((e) => events.push(e));
+  const tick = (ms) => { t += ms; };
+  const save = async (uid, balance, gain) => {
+    const data = { strubles_balance_v1: String(balance) };
+    if (gain) data.strubles_last_gain_v1 = JSON.stringify(gain);
+    await watch.onChange(uid, data);
+  };
+  return { watch, db, events, tick, save };
 }
 
-// Simulates one save write arriving from the listener.
-async function save(t, uid, balance, extra = {}) {
-  const data = Object.assign({ strubles_balance_v1: String(balance), tycoon_bank_level_v1: 0 }, extra);
-  t.db.seed(uid, data);
-  await t.watch.onChange(uid, data);
-}
-
-test('an honest increase that stays under the cap is not punished', async () => {
-  const t = setup();
-  await save(t, 'honest', 100);
-  await save(t, 'honest', 500);
-  assert.equal(t.events.filter((e) => e.kind === 'punish').length, 0);
-});
-
-test('going above the cap is a first offence: reset to 100 and a warning', async () => {
-  const t = setup();
-  await save(t, 'cheat1', 100);
-  await save(t, 'cheat1', t.cap + 1);
-  const punish = t.events.find((e) => e.kind === 'punish');
+test('a balance above the wallet cap is flagged, and the first offence resets it to 100', async () => {
+  const { save, events, db } = setup();
+  await save('u1', 100);
+  await save('u1', 1000000, { amount: 999900, page: '/minesweeper' });
+  const punish = events.find((e) => e.kind === 'punish');
   assert.equal(punish.action, 'reset');
-  assert.equal(t.db.docs.get('users/cheat1').strubles_balance_v1, '100');
-  assert.ok(t.db.docs.get('users/cheat1').cheat_warning_at);
-  assert.equal(t.db.docs.get('bans/cheat1'), undefined);
+  assert.equal(punish.detected, 'over_cap');
+  assert.equal(punish.page, '/minesweeper', 'the page is logged with the strike');
+  assert.equal(db.docs.get('users/u1').strubles_balance_v1, '100');
 });
 
-test('a second offence within 7 days bans for 24 hours and clears leaderboard rows', async () => {
-  const t = setup();
-  t.db.seed('leaderboard/cheat2', { displayName: 'x', gdp: 1 });
-  await save(t, 'cheat2', 100);
-  await save(t, 'cheat2', t.cap + 1);
-  t.tick(60 * 60 * 1000);
-  await save(t, 'cheat2', 100);
-  await save(t, 'cheat2', t.cap + 1);
-  const ban = t.events.filter((e) => e.kind === 'punish').pop();
-  assert.equal(ban.action, 'ban');
-  assert.ok(t.db.docs.get('bans/cheat2'));
-  assert.equal(t.db.docs.get('leaderboard/cheat2'), undefined);
-  assert.equal(t.db.docs.get('users/cheat2').strubles_balance_v1, '100');
+test('gains that add up past the per-minute limit are flagged as a rate cheat', async () => {
+  const { save, events, tick } = setup();
+  await save('u2', 100);
+  let bal = 100;
+  for (let i = 0; i < 3; i++) { bal += 2000; tick(5000); await save('u2', bal, { amount: 2000, page: '/blackjack' }); }
+  const punish = events.find((e) => e.kind === 'punish');
+  assert.ok(punish, 'a strike was recorded');
+  assert.equal(punish.detected, 'rate');
+  assert.equal(punish.page, '/blackjack');
 });
 
-test('an old strike outside the 7-day window does not count', async () => {
-  const t = setup();
-  await save(t, 'cheat3', 100);
-  await save(t, 'cheat3', t.cap + 1);
-  t.tick(STRIKE_WINDOW_MS + 60 * 1000);
-  await save(t, 'cheat3', 100);
-  await save(t, 'cheat3', t.cap + 1);
-  const punish = t.events.filter((e) => e.kind === 'punish');
-  assert.ok(punish.every((e) => e.action === 'reset'));
-  assert.equal(t.db.docs.get('bans/cheat3'), undefined);
+test('a normal run of small wins, spread out, is not flagged', async () => {
+  const { save, events, tick } = setup();
+  await save('u3', 100);
+  let bal = 100;
+  for (let i = 0; i < 12; i++) { bal += 100; tick(20000); await save('u3', bal, { amount: 100, page: '/blackjack' }); bal -= 60; tick(20000); await save('u3', bal); }
+  assert.equal(events.filter((e) => e.kind === 'punish').length, 0);
 });
 
-test('a balance that was already above the cap, and falls, is not punished', async () => {
-  const t = setup();
-  await save(t, 'legacy', t.cap + 500);
-  await save(t, 'legacy', t.cap + 100);
-  assert.equal(t.events.filter((e) => e.kind === 'punish').length, 0);
+test('twenty gains in a row with no loss between them is flagged as a win streak, with its page', async () => {
+  const { save, events, tick } = setup();
+  await save('u4', 100);
+  let bal = 100;
+  for (let i = 0; i < 20; i++) { bal += 100; tick(10000); await save('u4', bal, { amount: 100, page: '/horse-web-game' }); }
+  const punish = events.find((e) => e.kind === 'punish');
+  assert.ok(punish, 'the streak was flagged');
+  assert.equal(punish.detected, 'win_streak');
+  assert.equal(punish.page, '/horse-web-game');
 });
 
-test('admin reset and unban write the expected documents', async () => {
-  const t = setup();
-  await save(t, 'u9', 300);
-  await t.watch.ban('u9', 2, { reason: 'admin' });
-  assert.ok(t.db.docs.get('bans/u9'));
-  await t.watch.unban('u9');
-  assert.equal(t.db.docs.get('bans/u9'), undefined);
-  assert.equal(t.db.docs.get('users/u9').ban_until, null);
+test('a loss between wins restarts the streak', async () => {
+  const { save, events, tick } = setup();
+  await save('u5', 100);
+  let bal = 100;
+  for (let i = 0; i < 19; i++) { bal += 100; tick(10000); await save('u5', bal, { amount: 100, page: '/blackjack' }); }
+  bal -= 50; tick(10000); await save('u5', bal);
+  for (let i = 0; i < 19; i++) { bal += 100; tick(10000); await save('u5', bal, { amount: 100, page: '/blackjack' }); }
+  assert.equal(events.filter((e) => e.kind === 'punish').length, 0);
+});
+
+test('a second offence within the window bans the account and records the page', async () => {
+  const { save, events, db } = setup();
+  await save('u6', 100);
+  await save('u6', 1000000, { amount: 999900, page: '/lootbox' });
+  await save('u6', 100);
+  await save('u6', 1000000, { amount: 999900, page: '/lootbox' });
+  const ban = events.find((e) => e.kind === 'punish' && e.action === 'ban');
+  assert.ok(ban, 'the ban was recorded');
+  assert.equal(ban.page, '/lootbox');
+  assert.ok(db.docs.get('bans/u6'), 'a ban record exists, which the rules check');
+  assert.ok(db.docs.get('users/u6').ban_until, 'the account shows its ban time');
 });

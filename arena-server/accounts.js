@@ -16,6 +16,13 @@ const STARTING_BALANCE = '100';
 const STRIKE_WINDOW_MS = 7 * 24 * 3600 * 1000;
 const BAN_MS = 24 * 3600 * 1000;
 const FEED_MAX = 300;
+// Plausibility limits. A balance can rise by at most RATE_LIMIT Strubles in any
+// RATE_WINDOW_MS (the most the site's games can pay in a minute at the
+// largest bets), and STREAK_LIMIT gains in a row with no loss between them is
+// flagged as a run of wins nobody has.
+const RATE_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT = 5000;
+const STREAK_LIMIT = 20;
 const LEADERBOARDS = ['leaderboard', 'minesweeper_leaderboard', 'horse_leaderboard'];
 
 class AccountWatch {
@@ -26,6 +33,8 @@ class AccountWatch {
     this.now = now;
     this.log = log;
     this.lastBalance = new Map(); // uid -> last seen balance
+    this.gains = new Map();       // uid -> recent gains [{t, amount}] for the rate rule
+    this.streaks = new Map();     // uid -> gains in a row with no loss between
     this.names = new Map();       // uid -> display label
     this.feed = [];               // newest last, capped at FEED_MAX
     this.listeners = new Set();   // functions called with each new event
@@ -77,9 +86,28 @@ class AccountWatch {
     this.lastBalance.set(uid, balance);
     const cap = this.balance.capFromData(data);
     const name = await this.labelFor(uid);
-    this.emit({ kind: 'balance', uid, name, balance, prev: prev === undefined ? null : prev, cap, bankLevel: Number(data.tycoon_bank_level_v1 || 0) });
-    if (prev !== undefined && balance > prev && balance > cap) {
-      await this.punish(uid, { balance, prev, cap, name });
+    const page = lastGainOf(data).page;
+    this.emit({ kind: 'balance', uid, name, balance, prev: prev === undefined ? null : prev, cap, bankLevel: Number(data.tycoon_bank_level_v1 || 0), page });
+    if (prev === undefined || balance === prev) return;
+    if (balance < prev) { this.streaks.set(uid, 0); return; }
+
+    // The balance went up. Check the three rules in order.
+    const delta = balance - prev;
+    const now = this.now();
+    const info = { balance, prev, cap, name, page, delta };
+    if (balance > cap) return this.punish(uid, { ...info, reason: 'over_cap' });
+
+    const recent = (this.gains.get(uid) || []).filter((g) => now - g.t < RATE_WINDOW_MS);
+    recent.push({ t: now, amount: delta });
+    this.gains.set(uid, recent);
+    const perMinute = recent.reduce((sum, g) => sum + g.amount, 0);
+    if (perMinute > RATE_LIMIT) return this.punish(uid, { ...info, reason: 'rate', perMinute });
+
+    const streak = (this.streaks.get(uid) || 0) + 1;
+    this.streaks.set(uid, streak);
+    if (streak >= STREAK_LIMIT) {
+      this.streaks.set(uid, 0);
+      return this.punish(uid, { ...info, reason: 'win_streak', streak });
     }
   }
 
@@ -95,12 +123,13 @@ class AccountWatch {
       tx.set(ref, { at: recent });
       return recent.length;
     });
+    const detail = { page: info.page || null, detected: info.reason || 'over_cap', streak: info.streak, perMinute: info.perMinute };
     if (count >= 2) {
-      await this.ban(uid, BAN_MS / 3600000, { reason: 'cheat_second_offence', ...info, strikes: count });
+      await this.ban(uid, BAN_MS / 3600000, { reason: 'cheat_second_offence', ...info, strikes: count, ...detail });
       return;
     }
     await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, cheat_warning_at: new Date(now) }, { merge: true });
-    this.emit({ kind: 'punish', action: 'reset', uid, name: info.name, reason: 'cheat_first_offence', from: info.balance, strikes: count });
+    this.emit({ kind: 'punish', action: 'reset', uid, name: info.name, reason: 'cheat_first_offence', from: info.balance, strikes: count, ...detail });
   }
 
   // Bans an account and resets its balance. Used for second offences and by
@@ -111,7 +140,7 @@ class AccountWatch {
     await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, ban_until: until }, { merge: true });
     for (const col of LEADERBOARDS) await this.db.collection(col).doc(uid).delete();
     const name = info.name || await this.labelFor(uid);
-    this.emit({ kind: 'punish', action: 'ban', uid, name, until: until.toISOString(), reason: info.reason || 'admin', from: info.balance, strikes: info.strikes });
+    this.emit({ kind: 'punish', action: 'ban', uid, name, until: until.toISOString(), reason: info.reason || 'admin', from: info.balance, strikes: info.strikes, page: info.page || null, detected: info.detected || null });
   }
 
   async reset(uid) {
@@ -131,6 +160,16 @@ class AccountWatch {
     await this.db.collection('users').doc(uid).set({ ban_until: null }, { merge: true });
     this.emit({ kind: 'punish', action: 'unban', uid, name: await this.labelFor(uid), reason: 'admin' });
   }
+}
+
+// The browser's last gain: { amount, page, at }, written next to the balance.
+// It is client-reported, so it is used to log where a gain happened, not to
+// decide anything on its own.
+function lastGainOf(data) {
+  try {
+    const g = JSON.parse((data && data.strubles_last_gain_v1) || 'null');
+    return g && typeof g === 'object' ? { amount: Number(g.amount) || 0, page: typeof g.page === 'string' ? g.page.slice(0, 120) : null } : { amount: 0, page: null };
+  } catch { return { amount: 0, page: null }; }
 }
 
 function balanceOf(data) {

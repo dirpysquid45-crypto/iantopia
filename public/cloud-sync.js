@@ -35,6 +35,7 @@
   const SYNC_KEYS = [
     'strubles_inventory_v1',
     'strubles_balance_v1',
+    'strubles_last_gain_v1',
     'strubles_cases_v1',
     'strubles_case_history_v1',
     'strubles_case_stats_v1',
