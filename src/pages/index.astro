@@ -283,6 +283,11 @@
     .button-grid > .big:active {
       transform: scale(0.98);
     }
+    /* A gap between the Patch Notes and Suggest buttons in the top-left corner. */
+    #suggest-btn { margin-top: 14px; }
+    /* The graphics mode row in the Background picker. */
+    .graphics-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0 6px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.15); font-size:12px; }
+    .graphics-toggle { font:inherit; font-size:12px; padding:8px 12px; cursor:pointer; }
     @keyframes buttonWobble {
       0%   { transform: scale(1.05) rotate(0deg); }
       25%  { transform: scale(1.07) rotate(-1.2deg); }
@@ -1852,7 +1857,6 @@
   <button id="inv-btn" title="Inventory">🎒 Inventory</button>
   <button id="bg-btn" title="Change background">🖼️ Background</button>
   <button id="cursor-btn" title="Change cursor">🖱️ Cursor</button>
-  <button id="graphics-btn" title="Graphics: Auto, Low or Full">🎛️ Graphics</button>
   <!-- Revealed only once /never has been pulled from a case. -->
   <a id="ending-link" href="/alternate-ending" title="Alternate Ending" hidden>🎬 Alternate Ending</a>
   <button id="account-btn" title="Save progress with Google">
@@ -1917,6 +1921,11 @@
     <div class="modal-box">
       <h2 id="background-title">Background</h2>
       <div id="background-list"></div>
+      <!-- Graphics lives with the backgrounds, since it's about how they're drawn. -->
+      <div class="graphics-row">
+        <span>Graphics</span>
+        <button id="graphics-btn" class="graphics-toggle" type="button" title="Auto, Low or Full">🎛️ Graphics: Auto</button>
+      </div>
       <button class="modal-close" id="background-close">Close</button>
     </div>
   </div>
