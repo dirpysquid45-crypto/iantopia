@@ -8,246 +8,577 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>Account Feed</title>
+  <title>SENTINEL // Ops Console</title>
   <style is:global>
-    :root { --bg:#0d1119; --panel:#151b28; --line:#2a3245; --ink:#e9eef9; --muted:#8c97ad; --gold:#ffd700; --bad:#ff8080; --ok:#6ddc8b; --warn:#ffb347; }
+    :root {
+      --bg:#050807; --panel:#08100c; --fg:#8cffbf; --dim:#4f7a64; --line:#17392b;
+      --hover:#0c1d15; --amber:#ffb454; --red:#ff6b6b; --cyan:#6fe7ff; --sel:#103322;
+    }
     * { box-sizing:border-box; }
-    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui, sans-serif; padding:calc(16px + env(safe-area-inset-top)) 16px 40px; }
-    main { max-width:1100px; margin:0 auto; }
-    h1 { margin:0 0 4px; font-size:20px; color:var(--gold); }
-    .sub { color:var(--muted); margin:0 0 16px; }
-    .nav { margin-bottom:12px; }
-    .nav a { color:var(--muted); text-decoration:none; border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
-    .bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
-    input { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-width:260px; font:inherit; }
-    input[type=number] { min-width:0; width:90px; }
-    button { background:var(--gold); color:#000; border:0; border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; }
-    button.alt { background:var(--panel); color:var(--ink); border:1px solid var(--line); }
-    button.bad { background:var(--bad); }
-    button:disabled { opacity:.45; cursor:default; }
-    .status { color:var(--muted); margin:0 0 12px; min-height:1.5em; }
-    .status.err { color:var(--bad); }
-    .feed { display:flex; flex-direction:column; gap:6px; }
-    .players { margin:0 0 22px; }
-    .ph { font-size:14px; color:var(--gold); margin:14px 0 8px; }
-    .pcount { color:var(--muted); font-size:12px; }
-    .plist { display:flex; flex-direction:column; gap:4px; max-height:360px; overflow-y:auto; }
-    .prow { display:grid; grid-template-columns:minmax(120px,1.4fr) minmax(120px,1.4fr) 110px 70px 80px; gap:10px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; cursor:pointer; font-size:13px; }
-    .prow:hover { border-color:var(--gold); }
-    .prow.selected { border-color:var(--gold); background:#2a2410; box-shadow:0 0 0 1px var(--gold) inset; }
-    .prow small { display:block; color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; }
-    .prow .n { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .pill { font-size:11px; border-radius:999px; padding:2px 8px; text-align:center; border:1px solid currentColor; }
-    .pill.banned { color:var(--bad); }
-    .pill.warned { color:var(--warn); }
-    .pill.ok { color:var(--ok); }
-    @media (max-width:640px) { .prow { grid-template-columns:1fr 1fr; } }
-    .row { display:grid; grid-template-columns: 150px 1fr auto; gap:10px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:9px 12px; cursor:pointer; }
-    .row:hover { border-color:var(--gold); }
-    .row.punish { border-color:var(--warn); }
-    .row.ban { border-color:var(--bad); }
-    .time { color:var(--muted); font-size:12px; }
-    .who { overflow-wrap:anywhere; }
-    .who small { color:var(--muted); display:block; }
-    .amt { font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
-    .over { color:var(--bad); font-weight:700; }
-    .empty { color:var(--muted); padding:24px; text-align:center; }
-    @media (max-width:640px) { .row { grid-template-columns: 1fr; } .amt { text-align:left; } input { min-width:0; width:100%; } }
+    body {
+      margin:0; background:var(--bg); color:var(--fg);
+      font:13px/1.35 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      padding:calc(10px + env(safe-area-inset-top)) 12px 32px;
+    }
+    /* A faint scanline over the whole console. Decorative only. */
+    body::before {
+      content:""; position:fixed; inset:0; pointer-events:none; z-index:50;
+      background:repeating-linear-gradient(to bottom, rgba(140,255,191,.035) 0 1px, transparent 1px 3px);
+    }
+    main { max-width:1200px; margin:0 auto; }
+    a { color:var(--cyan); }
+    .top { display:flex; flex-wrap:wrap; gap:6px 16px; align-items:baseline; border-bottom:1px solid var(--line); padding-bottom:6px; margin-bottom:8px; }
+    .brand { color:#fff; letter-spacing:.08em; font-weight:700; }
+    .dim { color:var(--dim); }
+    .amber { color:var(--amber); }
+    .red { color:var(--red); }
+    #uplink.down { color:var(--red); }
+    .cursor { display:inline-block; width:.6em; background:var(--fg); animation:blink 1s steps(1) infinite; }
+    @keyframes blink { 50% { opacity:0; } }
+    @media (prefers-reduced-motion: reduce) { .cursor { animation:none; } }
+
+    .cmd { display:flex; flex-wrap:wrap; gap:6px; align-items:center; border:1px solid var(--line); background:var(--panel); padding:8px; margin-bottom:8px; }
+    .prompt { color:var(--dim); white-space:nowrap; }
+    .prompt b { color:var(--fg); font-weight:700; }
+    .in {
+      background:#030604; color:var(--fg); border:1px solid var(--line); padding:4px 6px;
+      font:inherit; min-width:0; border-radius:0;
+    }
+    .in:focus { outline:1px solid var(--fg); }
+    .in.uid { width:260px; }
+    .in.num { width:84px; }
+    .in.wide { width:220px; }
+    .btn {
+      background:transparent; color:var(--fg); border:1px solid var(--line); padding:4px 8px;
+      font:inherit; cursor:pointer; border-radius:0; white-space:nowrap;
+    }
+    .btn:hover:not(:disabled) { border-color:var(--fg); background:var(--hover); }
+    .btn:disabled { opacity:.35; cursor:default; }
+    .btn.danger { color:var(--red); border-color:#4a2424; }
+    .btn.danger:hover:not(:disabled) { border-color:var(--red); }
+    .btn.amber { color:var(--amber); }
+
+    .tabs { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px; }
+    .tabs .btn[aria-selected="true"] { background:var(--fg); color:#000; border-color:var(--fg); }
+    .tabs .btn .k { color:var(--dim); margin-right:4px; }
+    .tabs .btn[aria-selected="true"] .k { color:#000; }
+    .tabs .n { color:var(--dim); margin-left:4px; }
+
+    .win { border:1px solid var(--line); background:var(--panel); }
+    .win > header {
+      display:flex; flex-wrap:wrap; gap:6px 12px; justify-content:space-between; align-items:center;
+      border-bottom:1px dashed var(--line); color:var(--dim); padding:4px 8px;
+    }
+    .win > header b { color:var(--fg); font-weight:700; }
+    .win > .body { max-height:calc(100dvh - 300px); min-height:200px; overflow-y:auto; overscroll-behavior:contain; padding:4px 0; }
+    .empty { color:var(--dim); padding:14px 10px; }
+
+    /* One event per line, columns that line up like a log. Text stays selectable. */
+    .ln {
+      display:grid; grid-template-columns:70px 44px minmax(110px,190px) minmax(0,1fr);
+      gap:0 10px; padding:0 10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      user-select:text; cursor:pointer;
+    }
+    .ln:hover { background:var(--hover); }
+    .ln.sel { background:var(--sel); }
+    .ln .t { color:var(--dim); }
+    .ln .tag { font-weight:700; }
+    .ln .tag.ok { color:var(--fg); }
+    .ln .tag.warn { color:var(--amber); }
+    .ln .tag.bad { color:var(--red); }
+    .ln .tag.info { color:var(--cyan); }
+    .ln .who { overflow:hidden; text-overflow:ellipsis; }
+    .ln .who small { color:var(--dim); margin-left:6px; }
+    .ln .det { overflow:hidden; text-overflow:ellipsis; }
+    .over { color:var(--red); }
+    @media (max-width:720px) {
+      .ln { grid-template-columns:62px 40px 1fr; white-space:normal; }
+      .ln .det { grid-column:1 / -1; padding-left:0; }
+    }
+
+    .thead, .prow, .srow {
+      display:grid; gap:0 10px; padding:0 10px; align-items:center; white-space:nowrap; user-select:text;
+    }
+    .thead { color:var(--dim); border-bottom:1px dashed var(--line); padding-top:4px; padding-bottom:4px; }
+    .prow { grid-template-columns:minmax(120px,1.3fr) minmax(120px,1.3fr) 110px 70px 110px 92px; cursor:pointer; }
+    .prow:hover { background:var(--hover); }
+    .prow.sel { background:var(--sel); }
+    .prow .n { overflow:hidden; text-overflow:ellipsis; }
+    .prow .n small { color:var(--dim); display:block; font-size:11px; overflow:hidden; text-overflow:ellipsis; }
+    .prow .e { overflow:hidden; text-overflow:ellipsis; color:var(--dim); }
+    .st-banned { color:var(--red); }
+    .st-warned { color:var(--amber); }
+    .st-ok { color:var(--fg); }
+    .srow { grid-template-columns:60px minmax(140px,1fr) 130px minmax(120px,1fr) 100px; }
+    .srow .vis-on { color:var(--fg); }
+    .srow .vis-off { color:var(--dim); }
+    @media (max-width:720px) {
+      .prow, .srow, .thead { white-space:normal; }
+      .prow { grid-template-columns:1fr 1fr; }
+      .srow { grid-template-columns:44px 1fr 110px; }
+      .srow > :nth-child(4), .srow > :nth-child(5) { grid-column:2 / -1; }
+      .thead { display:none; }
+    }
+
+    /* Suggestions: the same inbox, laid out as log entries. */
+    .sug { border-bottom:1px dashed var(--line); padding:8px 10px; }
+    .sug.gone { opacity:.35; pointer-events:none; }
+    .sug .h { color:var(--dim); display:flex; flex-wrap:wrap; gap:4px 12px; }
+    .sug .h b { color:var(--fg); }
+    .sug .txt { white-space:pre-wrap; word-break:break-word; margin:4px 0 6px; color:#dfffee; }
+    .sug .acts { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+    .sug .acts label { color:var(--dim); display:flex; gap:4px; align-items:center; }
+
+    .kv { display:grid; grid-template-columns:auto 1fr; gap:4px 12px; padding:10px; }
+    .kv dt { color:var(--dim); }
+    .kv dd { margin:0; }
+    .help { color:var(--dim); padding:6px 10px; border-top:1px dashed var(--line); }
+    .status { margin:8px 0 0; color:var(--dim); min-height:1.4em; }
+    .status.err { color:var(--red); }
+    .status.ok { color:var(--fg); }
+    .hidden { display:none !important; }
+    textarea.raw { width:100%; height:180px; background:#030604; color:var(--fg); border:1px solid var(--line); font:inherit; padding:8px; }
   </style>
 </head>
 <body>
-  <main>
-    <div class="nav"><a href="/admin-suggestions/">← Suggestion inbox</a></div>
-    <h1>Account feed</h1>
-    <p class="sub">Live balance changes and punishments. Click a row to fill in its account.</p>
+<main>
+  <header class="top">
+    <span class="brand">SENTINEL // IANTOPIA OPS</span>
+    <span>NODE <span class="amber">arena-1</span></span>
+    <span>AUTH <span id="auth" class="dim">negotiating</span></span>
+    <span id="uplink" class="dim">UPLINK PENDING</span>
+    <span id="clock" class="dim"></span>
+    <button id="signin" class="btn hidden">[ sign in with google ]</button>
+  </header>
 
-    <div class="bar">
-      <input id="uid" type="text" placeholder="Account id (click a row to fill)" autocomplete="off" />
-      <input id="hours" type="number" min="1" max="720" value="24" aria-label="Ban hours" />
-      <button id="reset" class="alt" disabled>Reset to 100</button>
-      <input id="amount" type="number" min="0" step="1" placeholder="Balance" autocomplete="off" aria-label="New balance" />
-      <button id="setbal" class="alt" disabled>Set balance</button>
-      <button id="ban" class="bad" disabled>Ban</button>
-      <button id="unban" class="alt" disabled>Unban</button>
-      <input id="name" type="text" maxlength="40" placeholder="New name" autocomplete="off" aria-label="New display name" />
-      <button id="rename" class="alt" disabled>Set name</button>
-      <button id="backup" class="alt" disabled>Back up</button>
-      <input id="warn-text" type="text" maxlength="200" placeholder="Warning message" autocomplete="off" aria-label="Warning message" />
-      <button id="warn" class="alt" disabled>Warn</button>
+  <section class="cmd" aria-label="Target and actions">
+    <span class="prompt"><b>ops@sentinel</b>:~$ target</span>
+    <input id="uid" class="in uid" type="text" placeholder="account id (click a line or a player)" autocomplete="off" spellcheck="false" aria-label="Target account id" />
+    <button id="reset" class="btn" disabled>reset</button>
+    <input id="amount" class="in num" type="number" min="0" step="1" placeholder="balance" aria-label="Set balance to" autocomplete="off" />
+    <button id="setbal" class="btn" disabled>set_balance</button>
+    <input id="hours" class="in num" type="number" min="1" max="720" value="24" aria-label="Quarantine hours" />
+    <button id="ban" class="btn danger" disabled>quarantine</button>
+    <button id="unban" class="btn" disabled>release</button>
+    <input id="name" class="in wide" type="text" maxlength="40" placeholder="display name" autocomplete="off" aria-label="New display name" />
+    <button id="rename" class="btn" disabled>rename</button>
+    <button id="backup" class="btn" disabled>snapshot</button>
+    <input id="warn-text" class="in wide" type="text" maxlength="200" placeholder="warning text" autocomplete="off" aria-label="Warning message" />
+    <button id="warn" class="btn amber" disabled>warn</button>
+  </section>
+  <div id="status" class="status" role="status" aria-live="polite">booting console…</div>
+
+  <nav class="tabs" role="tablist" aria-label="Views">
+    <button class="btn" role="tab" data-tab="feed" aria-selected="true"><span class="k">1</span>feed<span class="n" id="n-feed"></span></button>
+    <button class="btn" role="tab" data-tab="players" aria-selected="false"><span class="k">2</span>players<span class="n" id="n-players"></span></button>
+    <button class="btn" role="tab" data-tab="suggest" aria-selected="false"><span class="k">3</span>suggestions<span class="n" id="n-suggest"></span></button>
+    <button class="btn" role="tab" data-tab="scores" aria-selected="false"><span class="k">4</span>scores</button>
+  </nav>
+
+  <!-- FEED -->
+  <section class="win" data-view="feed" aria-label="Account feed">
+    <header>
+      <span><b>ACCOUNT_FEED</b> · live ingest</span>
+      <span class="dim">tags: BAL balance · RST reset · QRN quarantine · UNQ release · SET admin set · WRN warn · REN rename · BKP snapshot · SYNC stale push restored</span>
+    </header>
+    <div id="feed" class="body" tabindex="0"></div>
+    <div class="help">click a line to target its account · drag to select text · keys 1–4 switch views</div>
+  </section>
+
+  <!-- PLAYERS -->
+  <section class="win hidden" data-view="players" aria-label="Player directory">
+    <header>
+      <span><b>PLAYER_DIRECTORY</b> · <span id="pcount" class="dim"></span></span>
+      <span class="cmd" style="border:0;padding:0;background:none">
+        <input id="pfilter" class="in wide" type="text" placeholder="grep name / email / id" autocomplete="off" aria-label="Search players" />
+        <button id="prefresh" class="btn" disabled>refresh</button>
+      </span>
+    </header>
+    <div class="body">
+      <div class="thead prow"><span>NAME / ID</span><span>EMAIL</span><span>BALANCE</span><span>BANK</span><span>STATUS</span><span>LAST_SEEN</span></div>
+      <div id="players"></div>
     </div>
+  </section>
 
-    <button id="signin" class="alt" hidden>Sign in with Google</button>
-    <div id="status" class="status">Connecting…</div>
-
-    <section class="players" aria-label="Players">
-      <h2 class="ph">Players</h2>
-      <div class="bar">
-        <input id="pfilter" type="text" placeholder="Search name, email, or id" autocomplete="off" aria-label="Search players" />
-        <button id="prefresh" class="alt" disabled>Refresh players</button>
-        <span id="pcount" class="pcount"></span>
+  <!-- SUGGESTIONS -->
+  <section class="win hidden" data-view="suggest" aria-label="Suggestion inbox">
+    <header>
+      <span><b>SUGGESTION_INBOX</b> · <span class="dim">private until posted</span></span>
+      <span class="cmd" style="border:0;padding:0;background:none">
+        <button id="sref" class="btn" disabled>refresh</button>
+        <button id="sxlsx" class="btn" disabled>export .xlsx</button>
+        <button id="scsv-toggle" class="btn" disabled>raw csv</button>
+      </span>
+    </header>
+    <nav class="tabs" style="padding:6px 8px 0;margin:0" role="tablist" aria-label="Suggestion states">
+      <button class="btn" role="tab" data-stab="new" aria-selected="true">inbox<span class="n" id="n-new"></span></button>
+      <button class="btn" role="tab" data-stab="public" aria-selected="false">public<span class="n" id="n-public"></span></button>
+      <button class="btn" role="tab" data-stab="archived" aria-selected="false">archive<span class="n" id="n-archived"></span></button>
+    </nav>
+    <div id="csv-panel" class="hidden" style="padding:8px 10px">
+      <div class="cmd" style="border:0;padding:0;background:none">
+        <button id="csv-copy" class="btn">copy</button>
+        <button id="csv-download" class="btn">download .csv</button>
       </div>
-      <div id="players" class="plist"></div>
-    </section>
+      <textarea id="csv-text" class="raw" readonly spellcheck="false" aria-label="Raw CSV"></textarea>
+    </div>
+    <div id="sfeed" class="body"></div>
+  </section>
 
-    <h2 class="ph">Account feed</h2>
-    <div id="feed" class="feed"></div>
-  </main>
+  <!-- SCORES -->
+  <section class="win hidden" data-view="scores" aria-label="Leaderboard scores">
+    <header>
+      <span><b>SCORE_TABLE</b> · every row, public board shows the top 50</span>
+      <span class="cmd" style="border:0;padding:0;background:none">
+        <select id="board" class="in" aria-label="Board"></select>
+        <button id="sc-refresh" class="btn">refresh</button>
+      </span>
+    </header>
+    <div class="body">
+      <div class="thead srow"><span>RANK</span><span>NAME / ID</span><span>SCORE</span><span>DETAIL</span><span>PUBLIC</span></div>
+      <div id="scores"></div>
+    </div>
+  </section>
+</main>
 
-  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
-  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
-  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-  <script is:inline src="/cloud-sync.js?v=14"></script>
-  <script is:inline src="/arena-client.js?v=1"></script>
-  <script is:inline>
-  (() => {
-    const $ = (id) => document.getElementById(id);
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script is:inline src="/cloud-sync.js?v=14"></script>
+<script is:inline src="/arena-client.js?v=1"></script>
+<script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script is:inline>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const VIEWS = ['feed', 'players', 'suggest', 'scores'];
+  const MAX_EVENTS = 300;
+  const PUBLIC_BOARD_LIMIT = 50;
+  const state = { view: 'feed', events: [], players: [], suggestions: [], sTab: 'new', board: 'horse', sel: null };
+
+  // ---- helpers ------------------------------------------------------------
+  const money = (n) => (n == null ? '—' : Number(n).toLocaleString());
+  const stamp = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour12: false }) : '--:--:--');
+  const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString() : '—');
+  const setStatus = (text, kind) => { const s = $('status'); s.textContent = text; s.className = 'status' + (kind ? ' ' + kind : ''); };
+  const text = (el, value) => { el.textContent = value == null ? '' : String(value); return el; };
+  const span = (cls, value) => { const s = document.createElement('span'); if (cls) s.className = cls; return text(s, value); };
+  const valid = (uid) => /^[A-Za-z0-9_-]{1,128}$/.test(uid);
+
+  function setTarget(uid) {
+    $('uid').value = uid || '';
+    updateButtons();
+    document.querySelectorAll('.ln.sel, .prow.sel').forEach((r) => r.classList.remove('sel'));
+    document.querySelectorAll('[data-uid="' + CSS.escape(uid || '') + '"]').forEach((r) => r.classList.add('sel'));
+  }
+  function updateButtons() {
+    const ok = valid($('uid').value.trim());
+    ['reset', 'setbal', 'ban', 'unban', 'rename', 'backup', 'warn'].forEach((id) => { $(id).disabled = !ok; });
+  }
+  // A click that is really the end of a text selection should not change the target.
+  const isSelecting = () => { const s = window.getSelection(); return !!(s && s.toString().length); };
+
+  // ---- views and keys ----------------------------------------------------
+  function show(view) {
+    if (!VIEWS.includes(view)) view = 'feed';
+    state.view = view;
+    document.querySelectorAll('[data-view]').forEach((v) => v.classList.toggle('hidden', v.dataset.view !== view));
+    document.querySelectorAll('[role="tab"][data-tab]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === view)));
+    if (location.hash !== '#' + view) history.replaceState(null, '', '#' + view);
+    if (view === 'scores') loadScores();
+  }
+  document.querySelectorAll('[data-tab]').forEach((t) => t.addEventListener('click', () => show(t.dataset.tab)));
+  document.querySelectorAll('[data-stab]').forEach((t) => t.addEventListener('click', () => {
+    state.sTab = t.dataset.stab;
+    document.querySelectorAll('[data-stab]').forEach((x) => x.setAttribute('aria-selected', String(x === t)));
+    renderSuggestions();
+  }));
+  document.addEventListener('keydown', (e) => {
+    if (e.target.matches('input, textarea, select') || e.ctrlKey || e.metaKey || e.altKey) return;
+    const n = Number(e.key);
+    if (n >= 1 && n <= VIEWS.length) show(VIEWS[n - 1]);
+  });
+  show((location.hash || '#feed').slice(1));
+  setInterval(() => { $('clock').textContent = new Date().toLocaleTimeString([], { hour12: false }); }, 1000);
+
+  // ---- account actions (feed/player bar) ---------------------------------
+  function act(action) {
+    const uid = $('uid').value.trim();
+    const hours = Math.max(1, Math.min(720, Math.floor(Number($('hours').value) || 24)));
+    if (action === 'ban' && !confirm('QUARANTINE ' + uid + ' for ' + hours + ' hours? Balance resets to 100 and leaderboard rows are removed.')) return;
+    if (action === 'reset' && !confirm('RESET ' + uid + ' to 100 Strubles?')) return;
+    let amount = null;
+    if (action === 'set_balance') {
+      amount = Number($('amount').value);
+      if (!Number.isInteger(amount) || amount < 0) { setStatus('balance must be a whole number, 0 or more', 'err'); return; }
+      if (!confirm('SET ' + uid + ' balance to ' + money(amount) + ' Strubles? The wallet cap does not change.')) return;
+    }
+    const name = $('name').value.trim();
+    if (action === 'rename' && !name) { setStatus('enter a display name first', 'err'); return; }
+    if (action === 'rename' && !confirm('Set display name for ' + uid + ' to "' + name + '"?')) return;
+    const warnText = $('warn-text').value.trim();
+    if (action === 'warn' && !warnText) { setStatus('write the warning first', 'err'); return; }
+    if (action === 'warn' && !confirm('Send this warning to ' + uid + '?\n\n' + warnText)) return;
+    arena.send({ type: 'account_action', action, uid, hours, name, text: warnText, amount });
+  }
+  $('reset').addEventListener('click', () => act('reset'));
+  $('setbal').addEventListener('click', () => act('set_balance'));
+  $('ban').addEventListener('click', () => act('ban'));
+  $('unban').addEventListener('click', () => act('unban'));
+  $('rename').addEventListener('click', () => act('rename'));
+  $('backup').addEventListener('click', () => act('backup'));
+  $('warn').addEventListener('click', () => act('warn'));
+  $('uid').addEventListener('input', updateButtons);
+  $('signin').addEventListener('click', () => window.CloudSync && CloudSync.signIn());
+
+  // ---- feed ----------------------------------------------------------------
+  const TAGS = { reset: ['RST', 'warn'], ban: ['QRN', 'bad'], unban: ['UNQ', 'ok'], set: ['SET', 'info'], warn: ['WRN', 'warn'], rename: ['REN', 'info'], backup: ['BKP', 'info'] };
+  function feedLine(ev) {
+    const el = document.createElement('div');
+    el.className = 'ln';
+    el.dataset.uid = ev.uid || '';
+    let tag = ['BAL', 'ok'];
+    let detail = '';
+    if (ev.kind === 'sync_restore') { tag = ['SYNC', 'info']; detail = 'stale push ' + money(ev.from) + ' → ' + money(ev.to) + ' restored, no strike'; }
+    else if (ev.kind === 'backup') { tag = ['BKP', 'info']; detail = ev.reason || 'snapshot'; }
+    else if (ev.kind === 'punish') {
+      tag = TAGS[ev.action] || ['PUN', 'warn'];
+      if (ev.action === 'set') detail = money(ev.from) + ' → ' + money(ev.to);
+      else if (ev.action === 'ban') detail = 'until ' + shortDate(ev.until) + ' · ' + (ev.detected || ev.reason || '').replace(/_/g, ' ');
+      else if (ev.action === 'rename') detail = ev.name || '';
+      else if (ev.action === 'warn') detail = ev.text || '';
+      else detail = (ev.reason || ev.detected || '').replace(/_/g, ' ') + (ev.page ? ' · ' + ev.page : '');
+    } else {
+      const over = ev.cap != null && ev.balance > ev.cap;
+      detail = (ev.prev == null ? '' : money(ev.prev) + ' → ') + money(ev.balance) + (ev.cap != null ? ' / cap ' + money(ev.cap) : '') + (over ? ' OVER_CAP' : '');
+      if (over) tag = ['BAL', 'bad'];
+    }
+    const det = span('det' + (ev.kind === 'balance' && ev.cap != null && ev.balance > ev.cap ? ' over' : ''), detail);
+    const who = document.createElement('span'); who.className = 'who';
+    who.textContent = ev.name || ev.uid || 'unknown';
+    const small = document.createElement('small'); text(small, ev.uid || '');
+    who.append(small);
+    el.append(span('t', stamp(ev.at)), span('tag ' + tag[1], tag[0]), who, det);
+    el.addEventListener('click', () => { if (!isSelecting() && ev.uid) setTarget(ev.uid); });
+    return el;
+  }
+  function renderFeed() {
     const feed = $('feed');
-    const MAX_ROWS = 300;
-    let events = [];
+    feed.replaceChildren();
+    if (!state.events.length) { feed.append(span('empty', 'no account activity yet')); }
+    for (let i = state.events.length - 1; i >= 0; i--) feed.append(feedLine(state.events[i]));
+    $('n-feed').textContent = '(' + state.events.length + ')';
+  }
+  function addEvent(ev) {
+    state.events.push(ev);
+    if (state.events.length > MAX_EVENTS) state.events.shift();
+    const feed = $('feed');
+    const empty = feed.querySelector('.empty');
+    if (empty) empty.remove();
+    feed.prepend(feedLine(ev));
+    while (feed.children.length > MAX_EVENTS) feed.lastElementChild.remove();
+    $('n-feed').textContent = '(' + state.events.length + ')';
+  }
 
-    function setStatus(text, err) {
-      $('status').textContent = text;
-      $('status').classList.toggle('err', !!err);
+  // ---- players ---------------------------------------------------------------
+  function renderPlayers() {
+    const q = $('pfilter').value.trim().toLowerCase();
+    const shown = state.players.filter((p) => !q || [p.name, p.email, p.uid].some((v) => String(v || '').toLowerCase().includes(q)));
+    $('pcount').textContent = shown.length + '/' + state.players.length + ' accounts';
+    $('n-players').textContent = '(' + state.players.length + ')';
+    const list = $('players');
+    list.replaceChildren();
+    if (!shown.length) list.append(span('empty', 'no accounts match'));
+    for (const p of shown) {
+      const row = document.createElement('div');
+      row.className = 'prow';
+      row.dataset.uid = p.uid;
+      if (p.uid === $('uid').value.trim()) row.classList.add('sel');
+      const who = document.createElement('div'); who.className = 'n';
+      who.textContent = p.name || '(no name)';
+      const id = document.createElement('small'); text(id, p.uid);
+      who.append(id);
+      const bal = span('', money(p.balance));
+      const bank = span('dim', 'lvl ' + p.bankLevel);
+      const st = span('st-' + p.status, p.status.toUpperCase());
+      if (p.banUntil) st.title = 'until ' + new Date(p.banUntil).toLocaleString();
+      row.append(who, span('e', p.email || '—'), bal, bank, st, span('dim', shortDate(p.lastSeen)));
+      row.addEventListener('click', () => { if (!isSelecting()) setTarget(p.uid); });
+      list.append(row);
     }
-    const money = (n) => (n == null ? '—' : Number(n).toLocaleString());
+  }
+  $('pfilter').addEventListener('input', renderPlayers);
+  $('prefresh').addEventListener('click', () => arena.send({ type: 'account_list' }));
 
-    function row(ev) {
-      const el = document.createElement('div');
-      const isPunish = ev.kind === 'punish';
-      el.className = 'row' + (isPunish ? (ev.action === 'ban' ? ' ban' : ' punish') : '');
-      el.dataset.uid = ev.uid || '';
-      const time = document.createElement('div'); time.className = 'time';
-      time.textContent = new Date(ev.at).toLocaleTimeString();
-      const who = document.createElement('div'); who.className = 'who';
-      who.textContent = ev.name || ev.uid || 'unknown';
-      const small = document.createElement('small'); small.textContent = ev.uid || '';
-      who.append(small);
-      const amt = document.createElement('div'); amt.className = 'amt';
-      if (isPunish) {
-        amt.textContent = ({ reset: 'RESET', ban: 'BANNED', unban: 'UNBANNED', set: 'SET' })[ev.action] + (ev.action === 'set' ? ' ' + money(ev.from) + ' → ' + money(ev.to) : ev.reason ? ' · ' + ev.reason.replace(/_/g, ' ') : '');
-      } else {
-        const over = ev.cap != null && ev.balance > ev.cap;
-        amt.innerHTML = (ev.prev == null ? '' : money(ev.prev) + ' → ') + '<span class="' + (over ? 'over' : '') + '"></span>';
-        amt.querySelector('span').textContent = money(ev.balance) + (ev.cap != null ? ' / cap ' + money(ev.cap) : '');
-      }
-      el.append(time, who, amt);
-      el.addEventListener('click', () => { if (ev.uid) $('uid').value = ev.uid; updateButtons(); });
-      return el;
+  // ---- suggestions --------------------------------------------------------
+  const csvCell = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  function toCsv() {
+    const head = ['Status', 'Received', 'From', 'Suggestion', 'Page', 'User ID', 'Doc ID'];
+    const lines = state.suggestions.map((r) => [r.status, r.createdAt, r.displayName, r.text, r.page, r.uid, r.id].map(csvCell).join(','));
+    return [head.map(csvCell).join(','), ...lines].join('\r\n');
+  }
+  function refreshCsv() { if (!$('csv-panel').classList.contains('hidden')) $('csv-text').value = toCsv(); }
+  function suggestionCard(r) {
+    const el = document.createElement('article');
+    el.className = 'sug'; el.dataset.id = r.id;
+    const h = document.createElement('div'); h.className = 'h';
+    h.append(span('', '#' + String(r.id).slice(0, 6)), span('', stamp(r.createdAt) + ' ' + shortDate(r.createdAt)));
+    h.append(span('', r.displayName || 'anonymous'), span('', r.page || ''));
+    if (r.status === 'public') h.append(span('vis-on', r.hideName ? 'posted · name hidden' : 'posted'));
+    const body = document.createElement('div'); body.className = 'txt'; text(body, r.text);
+    const acts = document.createElement('div'); acts.className = 'acts';
+    const btn = (label, cls, fn) => { const b = document.createElement('button'); b.className = 'btn' + (cls ? ' ' + cls : ''); text(b, label); b.addEventListener('click', fn); return b; };
+    if (r.status !== 'public') {
+      const hide = document.createElement('input'); hide.type = 'checkbox';
+      const lab = document.createElement('label'); lab.append(hide, 'hide name');
+      acts.append(btn('post', '', () => send(el, { type: 'suggestion_set', id: r.id, status: 'public', hideName: hide.checked })), lab);
+    } else {
+      acts.append(btn('take down', '', () => send(el, { type: 'suggestion_set', id: r.id, status: 'new' })));
     }
-
-    function render() {
-      feed.replaceChildren();
-      if (!events.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No account activity yet.'; feed.append(e); return; }
-      for (let i = events.length - 1; i >= 0; i--) feed.append(row(events[i]));
+    if (r.status !== 'archived') acts.append(btn('archive', '', () => send(el, { type: 'suggestion_set', id: r.id, status: 'archived' })));
+    else acts.append(btn('restore', '', () => send(el, { type: 'suggestion_set', id: r.id, status: 'new' })));
+    acts.append(btn('delete', 'danger', () => { if (confirm('Delete this suggestion permanently? This cannot be undone.')) send(el, { type: 'suggestion_delete', id: r.id }); }));
+    el.append(h, body, acts);
+    return el;
+  }
+  // The card dims until the server confirms, or recovers if the send fails.
+  function send(el, msg) {
+    el.classList.add('gone');
+    if (!arena.send(msg)) { el.classList.remove('gone'); setStatus('not connected, try again', 'err'); }
+  }
+  function renderSuggestions() {
+    const counts = { new: 0, public: 0, archived: 0 };
+    state.suggestions.forEach((r) => { counts[r.status] = (counts[r.status] || 0) + 1; });
+    for (const k of Object.keys(counts)) $('n-' + k).textContent = '(' + counts[k] + ')';
+    $('n-suggest').textContent = '(' + state.suggestions.length + ')';
+    const feed = $('sfeed');
+    feed.replaceChildren();
+    const shown = state.suggestions.filter((r) => r.status === state.sTab);
+    if (!shown.length) { feed.append(span('empty', state.sTab === 'new' ? 'inbox empty' : 'nothing here yet')); }
+    shown.forEach((r) => feed.append(suggestionCard(r)));
+    refreshCsv();
+  }
+  $('sref').addEventListener('click', () => { setStatus('loading suggestions…'); arena.send({ type: 'suggestions_list' }); });
+  $('sxlsx').addEventListener('click', () => {
+    if (!window.XLSX) { setStatus('spreadsheet library did not load, check the connection', 'err'); return; }
+    const wb = XLSX.utils.book_new();
+    for (const [key, name] of [['archived', 'Archive'], ['new', 'Inbox'], ['public', 'Public']]) {
+      const data = state.suggestions.filter((r) => r.status === key)
+        .map((r) => ({ Received: stamp(r.createdAt), From: r.displayName, Suggestion: r.text, Page: r.page, 'User ID': r.uid }));
+      const ws = XLSX.utils.json_to_sheet(data, { header: ['Received', 'From', 'Suggestion', 'Page', 'User ID'] });
+      ws['!cols'] = [{ wch: 20 }, { wch: 18 }, { wch: 80 }, { wch: 16 }, { wch: 30 }];
+      XLSX.utils.book_append_sheet(wb, ws, name);
     }
+    XLSX.writeFile(wb, 'iantopia-suggestions-' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  });
+  $('scsv-toggle').addEventListener('click', () => {
+    const panel = $('csv-panel');
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) $('csv-text').value = toCsv();
+  });
+  $('csv-copy').addEventListener('click', async () => {
+    const t = $('csv-text');
+    try { await navigator.clipboard.writeText(t.value); setStatus('csv copied', 'ok'); }
+    catch { t.select(); document.execCommand('copy'); setStatus('csv copied', 'ok'); }
+  });
+  $('csv-download').addEventListener('click', () => {
+    // BOM so Excel reads UTF-8 (emoji, accents) correctly.
+    const blob = new Blob(['﻿' + toCsv()], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'iantopia-suggestions-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
 
-    function addEvent(ev) {
-      events.push(ev);
-      if (events.length > MAX_ROWS) events.shift();
-      feed.prepend(row(ev));
-      while (feed.children.length > MAX_ROWS) feed.lastElementChild.remove();
-    }
-
-    function updateButtons() {
-      const ok = /^[A-Za-z0-9_-]{1,128}$/.test($('uid').value.trim());
-      ['reset', 'setbal', 'ban', 'unban', 'rename', 'backup', 'warn'].forEach((id) => { $(id).disabled = !ok; });
-    }
-    $('uid').addEventListener('input', updateButtons);
-
-    function act(action) {
-      const uid = $('uid').value.trim();
-      const hours = Math.max(1, Math.min(720, Math.floor(Number($('hours').value) || 24)));
-      if (action === 'ban' && !confirm('Ban ' + uid + ' for ' + hours + ' hours? Their balance resets to 100 and leaderboard rows are removed.')) return;
-      if (action === 'reset' && !confirm('Reset ' + uid + ' to 100 Strubles?')) return;
-      let amount = null;
-      if (action === 'set_balance') {
-        amount = Number($('amount').value);
-        if (!Number.isInteger(amount) || amount < 0) { setStatus('Type a whole-number balance, 0 or more.', true); return; }
-        if (!confirm('Set ' + uid + "'s balance to " + money(amount) + ' Strubles? Their cap is not changed.')) return;
-      }
-      const name = $('name').value.trim();
-      if (action === 'rename' && !name) { setStatus('Type a new name first.', true); return; }
-      if (action === 'rename' && !confirm('Set the sign-in display name for ' + uid + ' to "' + name + '"?')) return;
-      const text = $('warn-text').value.trim();
-      if (action === 'warn' && !text) { setStatus('Write the warning first.', true); return; }
-      if (action === 'warn' && !confirm('Send this warning to ' + uid + '?\n\n' + text)) return;
-      arena.send({ type: 'account_action', action, uid, hours, name, text, amount });
-    }
-    $('signin').addEventListener('click', () => window.CloudSync && CloudSync.signIn());
-    $('reset').addEventListener('click', () => act('reset'));
-    $('setbal').addEventListener('click', () => act('set_balance'));
-    $('ban').addEventListener('click', () => act('ban'));
-    $('unban').addEventListener('click', () => act('unban'));
-    $('rename').addEventListener('click', () => act('rename'));
-    $('backup').addEventListener('click', () => act('backup'));
-    $('warn').addEventListener('click', () => act('warn'));
-
-    // Players: every account, with name, email, balance and status. Click a row
-    // to fill its id into the action box above.
-    let players = [];
-    function renderPlayers() {
-      const q = $('pfilter').value.trim().toLowerCase();
-      const shown = players.filter((p) => !q || [p.name, p.email, p.uid].some((v) => String(v || '').toLowerCase().includes(q)));
-      $('pcount').textContent = shown.length + ' of ' + players.length + ' accounts';
-      const list = $('players');
+  // ---- scores ------------------------------------------------------------
+  const MINE = { beginner: 'Beginner', intermediate: 'Intermediate', expert: 'Expert', hormuz: 'Strait of Hormuz' };
+  const BOARDS = [
+    { key: 'horse', label: 'horse · best hurdles', collection: 'horse_leaderboard', field: 'best', unit: 'hurdles' },
+    ...Object.entries(MINE).map(([d, label]) => ({ key: 'mines_' + d, label: 'mines · ' + label + ' · won', collection: 'minesweeper_leaderboard', field: d + '.w', unit: 'won', diff: d })),
+  ];
+  const pick = (data, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), data);
+  $('board').replaceChildren(...BOARDS.map((b) => { const o = document.createElement('option'); o.value = b.key; text(o, b.label); return o; }));
+  $('board').addEventListener('change', () => { state.board = $('board').value; loadScores(); });
+  $('sc-refresh').addEventListener('click', loadScores);
+  async function loadScores() {
+    const b = BOARDS.find((x) => x.key === state.board) || BOARDS[0];
+    const list = $('scores');
+    list.replaceChildren(span('empty', 'querying ' + b.collection + ' …'));
+    try {
+      const snap = await firebase.firestore().collection(b.collection).orderBy(b.field, 'desc').limit(500).get();
       list.replaceChildren();
-      for (const p of shown) {
+      if (!snap.size) { list.append(span('empty', 'no rows on this board')); return; }
+      snap.docs.forEach((d, i) => {
+        const data = d.data();
+        const score = Number(pick(data, b.field) || 0);
         const row = document.createElement('div');
-        row.className = 'prow';
-        row.dataset.uid = p.uid;
-        if (p.uid === $('uid').value.trim()) row.classList.add('selected');
-        const who = document.createElement('div');
-        const n = document.createElement('div'); n.className = 'n'; n.textContent = p.name || '(no name)';
-        const id = document.createElement('small'); id.textContent = p.uid;
-        who.append(n, id);
-        const mail = document.createElement('div'); mail.textContent = p.email || '—';
-        const bal = document.createElement('div'); bal.textContent = money(p.balance) + ' · bank ' + p.bankLevel;
-        const st = document.createElement('div'); st.className = 'pill ' + p.status;
-        st.textContent = p.status === 'banned' ? 'BANNED' : p.status === 'warned' ? 'WARNED' : 'OK';
-        if (p.banUntil) st.title = 'Until ' + new Date(p.banUntil).toLocaleString();
-        const seen = document.createElement('div'); seen.style.color = 'var(--muted)'; seen.style.fontSize = '11px';
-        seen.textContent = p.lastSeen ? new Date(p.lastSeen).toLocaleDateString() : '—';
-        row.append(who, mail, bal, st, seen);
-        row.addEventListener('click', () => {
-          $('uid').value = p.uid;
-          document.querySelectorAll('.prow.selected').forEach((r) => r.classList.remove('selected'));
-          row.classList.add('selected');
-          updateButtons();
-          setStatus('Selected ' + (p.name || p.uid) + '. Actions are enabled below.');
-        });
+        row.className = 'srow'; row.dataset.uid = d.id;
+        const name = document.createElement('div'); name.textContent = data.displayName || '(no name)';
+        const id = document.createElement('small'); id.className = 'dim'; text(id, d.id); name.append(id);
+        const onBoard = i < PUBLIC_BOARD_LIMIT;
+        const detail = b.diff ? (() => { const r = data[b.diff] || {}; const w = Number(r.w || 0), l = Number(r.l || 0); return money(l) + ' lost · ' + (w + l ? Math.round((w / (w + l)) * 100) + '%' : '—') + ' win'; })() : '';
+        row.append(span('', i + 1), name, span('', money(score) + ' ' + b.unit), span('dim', detail), span(onBoard ? 'vis-on' : 'vis-off', onBoard ? 'public' : 'off board'));
+        row.addEventListener('click', () => { if (!isSelecting()) { setTarget(d.id); show('feed'); } });
         list.append(row);
-      }
+      });
+      setStatus(b.label + ' · ' + snap.size + ' rows loaded', 'ok');
+    } catch (err) {
+      list.replaceChildren(span('empty red', 'query failed: ' + err.message));
+      setStatus('score query failed', 'err');
     }
-    $('pfilter').addEventListener('input', renderPlayers);
-    $('prefresh').addEventListener('click', () => arena.send({ type: 'account_list' }));
+  }
 
-    const arena = ArenaClient.create({
-      game: 'suggest',
-      onState: (st) => { if (st === 'closed') setStatus('Disconnected — retrying…', true); },
-      onMessage: (msg) => {
-        if (msg.type === 'auth_ok') {
-          $('signin').hidden = !msg.guest;
-          if (msg.guest) { setStatus('Sign in to continue.', true); return; }
-          setStatus('Loading…');
-          arena.send({ type: 'account_feed' });
-          arena.send({ type: 'account_list' });
-          $('prefresh').disabled = false;
-        } else if (msg.type === 'account_list') {
-          players = msg.players || [];
-          renderPlayers();
-        } else if (msg.type === 'account_feed') {
-          events = msg.events || [];
-          render();
-          setStatus('Live · ' + events.length + ' events loaded');
-        } else if (msg.type === 'account_event') {
-          addEvent(msg.event);
-          if (msg.event.kind === 'punish') setStatus(msg.event.action.toUpperCase() + ' · ' + (msg.event.name || msg.event.uid));
-        } else if (msg.type === 'error') {
-          setStatus(msg.code === 'forbidden' ? 'This account is not an admin.' : msg.message, true);
-        }
-      },
-    });
-  })();
-  </script>
+  // ---- connection ----------------------------------------------------------
+  const arena = ArenaClient.create({
+    game: 'suggest',
+    onState: (st) => {
+      const up = $('uplink');
+      up.textContent = st === 'closed' ? 'UPLINK DOWN · retrying' : 'UPLINK PENDING';
+      up.classList.toggle('down', st === 'closed');
+      if (st === 'closed') setStatus('uplink lost, retrying…', 'err');
+    },
+    onMessage: (msg) => {
+      if (msg.type === 'auth_ok') {
+        $('signin').classList.toggle('hidden', !msg.guest);
+        if (msg.guest) { $('auth').textContent = 'guest'; setStatus('sign in to continue', 'err'); return; }
+        $('auth').textContent = 'admin';
+        $('uplink').textContent = 'UPLINK LIVE';
+        $('uplink').classList.remove('down');
+        $('prefresh').disabled = false; $('sref').disabled = false; $('sxlsx').disabled = false; $('scsv-toggle').disabled = false;
+        setStatus('live', 'ok');
+        arena.send({ type: 'account_feed' });
+        arena.send({ type: 'account_list' });
+        arena.send({ type: 'suggestions_list' });
+      } else if (msg.type === 'account_feed') {
+        state.events = msg.events || [];
+        renderFeed();
+      } else if (msg.type === 'account_event') {
+        addEvent(msg.event);
+        if (msg.event.kind === 'punish') setStatus(msg.event.action.toUpperCase() + ' · ' + (msg.event.name || msg.event.uid), 'ok');
+      } else if (msg.type === 'account_list') {
+        state.players = msg.players || [];
+        renderPlayers();
+      } else if (msg.type === 'suggestions') {
+        state.suggestions = msg.rows || [];
+        renderSuggestions();
+        $('sxlsx').disabled = !state.suggestions.length;
+        setStatus(state.suggestions.length + ' suggestion' + (state.suggestions.length === 1 ? '' : 's') + ' · synced ' + new Date().toLocaleTimeString([], { hour12: false }), 'ok');
+      } else if (msg.type === 'suggestion_updated') {
+        const r = state.suggestions.find((x) => x.id === msg.id);
+        if (r) { r.status = msg.status; r.hideName = msg.hideName; r.postedAt = msg.postedAt; }
+        renderSuggestions();
+        setStatus(msg.status === 'public' ? 'posted to the public forum' : msg.status === 'archived' ? 'archived to the backlog' : 'moved to the inbox', 'ok');
+      } else if (msg.type === 'suggestion_deleted') {
+        state.suggestions = state.suggestions.filter((x) => x.id !== msg.id);
+        renderSuggestions();
+        setStatus('deleted', 'ok');
+      } else if (msg.type === 'error') {
+        setStatus(msg.code === 'forbidden' ? 'this account is not an admin' : msg.message, 'err');
+        document.querySelectorAll('.sug.gone').forEach((c) => c.classList.remove('gone'));
+      }
+    },
+  });
+})();
+</script>
 </body>
 </html>

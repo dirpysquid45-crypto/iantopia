@@ -23,3 +23,6 @@ art-source/tycoon/
 # Source media: too big for git (the Han Palace video alone is 184 MB).
 art-source/music-sources/
 art-source/video-sources/
+
+# Firestore backups (player data): never commit
+scripts/admin/backups/
