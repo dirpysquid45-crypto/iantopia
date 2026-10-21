@@ -53,6 +53,7 @@
       <button id="unban" class="alt" disabled>Unban</button>
       <input id="name" type="text" maxlength="40" placeholder="New name" autocomplete="off" aria-label="New display name" />
       <button id="rename" class="alt" disabled>Set name</button>
+      <button id="backup" class="alt" disabled>Back up</button>
     </div>
 
     <button id="signin" class="alt" hidden>Sign in with Google</button>
@@ -117,7 +118,7 @@
 
     function updateButtons() {
       const ok = /^[A-Za-z0-9_-]{1,128}$/.test($('uid').value.trim());
-      ['reset', 'ban', 'unban', 'rename'].forEach((id) => { $(id).disabled = !ok; });
+      ['reset', 'ban', 'unban', 'rename', 'backup'].forEach((id) => { $(id).disabled = !ok; });
     }
     $('uid').addEventListener('input', updateButtons);
 
@@ -136,6 +137,7 @@
     $('ban').addEventListener('click', () => act('ban'));
     $('unban').addEventListener('click', () => act('unban'));
     $('rename').addEventListener('click', () => act('rename'));
+    $('backup').addEventListener('click', () => act('backup'));
 
     const arena = ArenaClient.create({
       game: 'suggest',

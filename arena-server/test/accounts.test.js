@@ -11,7 +11,17 @@ function fakeDb() {
   const db = {
     docs,
     collection(name) {
-      return { doc(id) {
+      let orderField = null, limitN = Infinity;
+      const col = {
+        async add(data) { const id = 'auto' + docs.size + '_' + Math.random().toString(36).slice(2); docs.set(key(name, id), { ...data }); return { id }; },
+        orderBy(field) { orderField = field; return col; },
+        limit(n) { limitN = n; return col; },
+        async get() {
+          let rows = [...docs.entries()].filter(([k]) => k.startsWith(name + '/')).map(([, v]) => v);
+          if (orderField) rows = rows.sort((a, b) => String(b[orderField]).localeCompare(String(a[orderField])));
+          return { docs: rows.slice(0, limitN).map((d) => ({ data: () => d })) };
+        },
+        doc(id) {
         const k = key(name, id);
         return {
           async get() { return { exists: docs.has(k), data: () => docs.get(k) }; },
@@ -19,7 +29,9 @@ function fakeDb() {
           async delete() { docs.delete(k); },
           _k: k,
         };
-      } };
+        },
+      };
+      return col;
     },
     async runTransaction(fn) {
       const tx = {

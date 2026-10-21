@@ -45,6 +45,7 @@ class Manager {
         const hours = Math.min(Math.max(Math.floor(Number(msg.hours) || 24), 1), 24 * 30);
         await this.accounts.ban(uid, hours, { reason: 'admin' });
       } else if (msg.action === 'unban') await this.accounts.unban(uid);
+      else if (msg.action === 'backup') await this.accounts.backup(uid, 'admin_backup');
       else if (msg.action === 'rename') {
         // Display names: 1 to 40 characters, with HTML characters removed.
         const name = typeof msg.name === 'string' ? msg.name.replace(/[<>&"]/g, '').trim().slice(0, 40) : '';

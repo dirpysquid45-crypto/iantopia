@@ -16,6 +16,8 @@ const STARTING_BALANCE = '100';
 const STRIKE_WINDOW_MS = 7 * 24 * 3600 * 1000;
 const BAN_MS = 24 * 3600 * 1000;
 const FEED_MAX = 300;
+const ARCHIVE_LOG = 'account_log';        // every feed event, kept forever
+const ARCHIVE_BACKUP = 'account_backups'; // record copies taken before a change
 // Plausibility limits. A balance can rise by at most RATE_LIMIT Strubles in any
 // RATE_WINDOW_MS (the most the site's games can pay in a minute at the
 // largest bets), and STREAK_LIMIT gains in a row with no loss between them is
@@ -43,7 +45,29 @@ class AccountWatch {
   }
 
   // Attaches the live listener. The first snapshot only records baselines.
+  // Reloads the most recent events from the archive, so the feed isn't empty
+  // after a restart.
+  async loadFeed() {
+    try {
+      const snap = await this.db.collection(ARCHIVE_LOG).orderBy('at', 'desc').limit(FEED_MAX).get();
+      const events = snap.docs.map((d) => d.data()).reverse();
+      this.feed = events.concat(this.feed);
+      if (this.feed.length > FEED_MAX) this.feed = this.feed.slice(-FEED_MAX);
+    } catch (e) { this.log.error('[accounts] could not load the archive:', e.message); }
+  }
+
+  // Saves a full copy of an account's record before it is changed, so a reset
+  // or ban can be undone. Kept in the archive, which only the server can read.
+  async backup(uid, reason) {
+    const snap = await this.db.collection('users').doc(uid).get();
+    const data = snap.exists ? snap.data() : null;
+    const at = new Date(this.now());
+    await this.db.collection(ARCHIVE_BACKUP).add({ uid, reason, at, data: data ? JSON.stringify(data) : null });
+    this.emit({ kind: 'backup', uid, name: await this.labelFor(uid), reason });
+  }
+
   start() {
+    this.loadFeed();
     this.unsubscribe = this.db.collection('users').onSnapshot((snap) => {
       if (!this.seeded) {
         this.seeded = true;
@@ -65,6 +89,8 @@ class AccountWatch {
     const ev = Object.assign({ at: new Date(this.now()).toISOString() }, event);
     this.feed.push(ev);
     if (this.feed.length > FEED_MAX) this.feed.shift();
+    // The archive keeps every event, so the feed survives a server rebuild.
+    this.db.collection(ARCHIVE_LOG).add(ev).catch((e) => this.log.error('[accounts] archive write failed:', e.message));
     for (const fn of this.listeners) { try { fn(ev); } catch {} }
     return ev;
   }
@@ -128,6 +154,7 @@ class AccountWatch {
       await this.ban(uid, BAN_MS / 3600000, { reason: 'cheat_second_offence', ...info, strikes: count, ...detail });
       return;
     }
+    await this.backup(uid, 'before_cheat_reset');
     await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, cheat_warning_at: new Date(now) }, { merge: true });
     this.emit({ kind: 'punish', action: 'reset', uid, name: info.name, reason: 'cheat_first_offence', from: info.balance, strikes: count, ...detail });
   }
@@ -135,6 +162,7 @@ class AccountWatch {
   // Bans an account and resets its balance. Used for second offences and by
   // the admin panel. Also removes the account's leaderboard rows.
   async ban(uid, hours, info = {}) {
+    await this.backup(uid, 'before_ban');
     const until = new Date(this.now() + hours * 3600 * 1000);
     await this.db.collection('bans').doc(uid).set({ until, reason: info.reason || 'admin', at: new Date(this.now()) });
     await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, ban_until: until }, { merge: true });
@@ -144,6 +172,7 @@ class AccountWatch {
   }
 
   async reset(uid) {
+    await this.backup(uid, 'before_admin_reset');
     await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE }, { merge: true });
     this.emit({ kind: 'punish', action: 'reset', uid, name: await this.labelFor(uid), reason: 'admin' });
   }
