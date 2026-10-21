@@ -1,0 +1,158 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Account Feed</title>
+  <style is:global>
+    :root { --bg:#0d1119; --panel:#151b28; --line:#2a3245; --ink:#e9eef9; --muted:#8c97ad; --gold:#ffd700; --bad:#ff8080; --ok:#6ddc8b; --warn:#ffb347; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.5 system-ui, sans-serif; padding:calc(16px + env(safe-area-inset-top)) 16px 40px; }
+    main { max-width:1100px; margin:0 auto; }
+    h1 { margin:0 0 4px; font-size:20px; color:var(--gold); }
+    .sub { color:var(--muted); margin:0 0 16px; }
+    .nav { margin-bottom:12px; }
+    .nav a { color:var(--muted); text-decoration:none; border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
+    .bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:14px; }
+    input { background:var(--panel); color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px 10px; min-width:260px; font:inherit; }
+    input[type=number] { min-width:0; width:90px; }
+    button { background:var(--gold); color:#000; border:0; border-radius:8px; padding:9px 14px; font-weight:700; cursor:pointer; }
+    button.alt { background:var(--panel); color:var(--ink); border:1px solid var(--line); }
+    button.bad { background:var(--bad); }
+    button:disabled { opacity:.45; cursor:default; }
+    .status { color:var(--muted); margin:0 0 12px; min-height:1.5em; }
+    .status.err { color:var(--bad); }
+    .feed { display:flex; flex-direction:column; gap:6px; }
+    .row { display:grid; grid-template-columns: 150px 1fr auto; gap:10px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:9px 12px; cursor:pointer; }
+    .row:hover { border-color:var(--gold); }
+    .row.punish { border-color:var(--warn); }
+    .row.ban { border-color:var(--bad); }
+    .time { color:var(--muted); font-size:12px; }
+    .who { overflow-wrap:anywhere; }
+    .who small { color:var(--muted); display:block; }
+    .amt { font-variant-numeric:tabular-nums; text-align:right; white-space:nowrap; }
+    .over { color:var(--bad); font-weight:700; }
+    .empty { color:var(--muted); padding:24px; text-align:center; }
+    @media (max-width:640px) { .row { grid-template-columns: 1fr; } .amt { text-align:left; } input { min-width:0; width:100%; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="nav"><a href="/admin-suggestions/">← Suggestion inbox</a></div>
+    <h1>Account feed</h1>
+    <p class="sub">Live balance changes and punishments. Click a row to fill in its account.</p>
+
+    <div class="bar">
+      <input id="uid" type="text" placeholder="Account id (click a row to fill)" autocomplete="off" />
+      <input id="hours" type="number" min="1" max="720" value="24" aria-label="Ban hours" />
+      <button id="reset" class="alt" disabled>Reset to 100</button>
+      <button id="ban" class="bad" disabled>Ban</button>
+      <button id="unban" class="alt" disabled>Unban</button>
+    </div>
+
+    <button id="signin" class="alt" hidden>Sign in with Google</button>
+    <div id="status" class="status">Connecting…</div>
+    <div id="feed" class="feed"></div>
+  </main>
+
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script is:inline src="/cloud-sync.js?v=10"></script>
+  <script is:inline src="/arena-client.js?v=1"></script>
+  <script is:inline>
+  (() => {
+    const $ = (id) => document.getElementById(id);
+    const feed = $('feed');
+    const MAX_ROWS = 300;
+    let events = [];
+
+    function setStatus(text, err) {
+      $('status').textContent = text;
+      $('status').classList.toggle('err', !!err);
+    }
+    const money = (n) => (n == null ? '—' : Number(n).toLocaleString());
+
+    function row(ev) {
+      const el = document.createElement('div');
+      const isPunish = ev.kind === 'punish';
+      el.className = 'row' + (isPunish ? (ev.action === 'ban' ? ' ban' : ' punish') : '');
+      el.dataset.uid = ev.uid || '';
+      const time = document.createElement('div'); time.className = 'time';
+      time.textContent = new Date(ev.at).toLocaleTimeString();
+      const who = document.createElement('div'); who.className = 'who';
+      who.textContent = ev.name || ev.uid || 'unknown';
+      const small = document.createElement('small'); small.textContent = ev.uid || '';
+      who.append(small);
+      const amt = document.createElement('div'); amt.className = 'amt';
+      if (isPunish) {
+        amt.textContent = ({ reset: 'RESET', ban: 'BANNED', unban: 'UNBANNED' })[ev.action] + (ev.reason ? ' · ' + ev.reason.replace(/_/g, ' ') : '');
+      } else {
+        const over = ev.cap != null && ev.balance > ev.cap;
+        amt.innerHTML = (ev.prev == null ? '' : money(ev.prev) + ' → ') + '<span class="' + (over ? 'over' : '') + '"></span>';
+        amt.querySelector('span').textContent = money(ev.balance) + (ev.cap != null ? ' / cap ' + money(ev.cap) : '');
+      }
+      el.append(time, who, amt);
+      el.addEventListener('click', () => { if (ev.uid) $('uid').value = ev.uid; updateButtons(); });
+      return el;
+    }
+
+    function render() {
+      feed.replaceChildren();
+      if (!events.length) { const e = document.createElement('div'); e.className = 'empty'; e.textContent = 'No account activity yet.'; feed.append(e); return; }
+      for (let i = events.length - 1; i >= 0; i--) feed.append(row(events[i]));
+    }
+
+    function addEvent(ev) {
+      events.push(ev);
+      if (events.length > MAX_ROWS) events.shift();
+      feed.prepend(row(ev));
+      while (feed.children.length > MAX_ROWS) feed.lastElementChild.remove();
+    }
+
+    function updateButtons() {
+      const ok = /^[A-Za-z0-9_-]{1,128}$/.test($('uid').value.trim());
+      ['reset', 'ban', 'unban'].forEach((id) => { $(id).disabled = !ok; });
+    }
+    $('uid').addEventListener('input', updateButtons);
+
+    function act(action) {
+      const uid = $('uid').value.trim();
+      const hours = Math.max(1, Math.min(720, Math.floor(Number($('hours').value) || 24)));
+      if (action === 'ban' && !confirm('Ban ' + uid + ' for ' + hours + ' hours? Their balance resets to 100 and leaderboard rows are removed.')) return;
+      if (action === 'reset' && !confirm('Reset ' + uid + ' to 100 Strubles?')) return;
+      arena.send({ type: 'account_action', action, uid, hours });
+    }
+    $('signin').addEventListener('click', () => window.CloudSync && CloudSync.signIn());
+    $('reset').addEventListener('click', () => act('reset'));
+    $('ban').addEventListener('click', () => act('ban'));
+    $('unban').addEventListener('click', () => act('unban'));
+
+    const arena = ArenaClient.create({
+      game: 'suggest',
+      onState: (st) => { if (st === 'closed') setStatus('Disconnected — retrying…', true); },
+      onMessage: (msg) => {
+        if (msg.type === 'auth_ok') {
+          $('signin').hidden = !msg.guest;
+          if (msg.guest) { setStatus('Sign in to continue.', true); return; }
+          setStatus('Loading…');
+          arena.send({ type: 'account_feed' });
+        } else if (msg.type === 'account_feed') {
+          events = msg.events || [];
+          render();
+          setStatus('Live · ' + events.length + ' events loaded');
+        } else if (msg.type === 'account_event') {
+          addEvent(msg.event);
+          if (msg.event.kind === 'punish') setStatus(msg.event.action.toUpperCase() + ' · ' + (msg.event.name || msg.event.uid));
+        } else if (msg.type === 'error') {
+          setStatus(msg.code === 'forbidden' ? 'This account is not an admin.' : msg.message, true);
+        }
+      },
+    });
+  })();
+  </script>
+</body>
+</html>

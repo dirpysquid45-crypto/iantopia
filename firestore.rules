@@ -33,6 +33,7 @@ service cloud.firestore {
     match /leaderboard/{uid} {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid
+        && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time)
         && request.resource.data.gdp is number && request.resource.data.gdp >= 0
         && request.resource.data.efficiency is number && request.resource.data.efficiency >= 0
         && request.resource.data.buildings is number && request.resource.data.buildings >= 0 && request.resource.data.buildings <= 1000
@@ -42,6 +43,7 @@ service cloud.firestore {
     match /minesweeper_leaderboard/{uid} {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid
+        && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time)
         && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 40;
     }
 
@@ -53,7 +55,8 @@ service cloud.firestore {
     }
     match /horse_leaderboard/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time);
     }
 
     // Village snapshots back the public visit page, so they're readable by

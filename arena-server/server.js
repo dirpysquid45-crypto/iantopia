@@ -11,7 +11,13 @@ admin.initializeApp({
   projectId: 'iantopia',
 });
 
-const server = createServer({ port: PORT, db: admin.firestore(), auth: admin.auth() });
+const db = admin.firestore();
+const BalanceManager = require('./balance');
+const { AccountWatch } = require('./accounts');
+// Live feed, cheat detection, and punishments. Needs ADMIN_EMAILS (or
+// ADMIN_UIDS) set in the environment, or nobody can open the admin feed.
+const accounts = new AccountWatch({ db, auth: admin.auth(), balance: new BalanceManager(db) }).start();
+const server = createServer({ port: PORT, db, auth: admin.auth(), accounts });
 console.log(`[Arena Server] Listening on 0.0.0.0:${PORT}`);
 
 // A rejected promise anywhere must be logged, never fatal: by default Node

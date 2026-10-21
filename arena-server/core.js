@@ -44,13 +44,13 @@ function isAdminToken(decoded, admins) {
 function createServer(options = {}) {
   const {
     port = 4001, host, db, auth, timing, rate, quiet = false, makeDeck,
-    authTimeoutMs = 10000, heartbeatMs = 25000, admins,
+    authTimeoutMs = 10000, heartbeatMs = 25000, admins, accounts,
   } = options;
   const adminList = admins || adminsFromEnv(process.env);
   const log = quiet ? () => {} : (...a) => console.log(...a);
 
   const wss = new WebSocket.Server({ port, host, clientTracking: false, maxPayload: 16 * 1024 });
-  const manager = new Manager(db, auth, { timing, makeDeck });
+  const manager = new Manager(db, auth, { timing, makeDeck, accounts });
   const rateLimit = new RateLimit(rate);
   const sockets = new Set();
 

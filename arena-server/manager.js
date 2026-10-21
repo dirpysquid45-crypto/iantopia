@@ -16,6 +16,40 @@ class Manager {
     this.connections = new Map(); // sessionId -> { userId, ws, guest, name }
     this.queue = [];              // open lobbies
     this.tables = new Map();      // tableId -> game
+    // Account watch (accounts.js): live feed + admin actions. Optional, so
+    // tests that don't need it stay unchanged.
+    this.accounts = opts.accounts || null;
+    if (this.accounts) this.accounts.subscribe((ev) => this.broadcastAdmins({ type: 'account_event', event: ev }));
+  }
+
+  broadcastAdmins(msg) {
+    for (const { ws, admin } of this.connections.values()) if (admin) this.sendTo(ws, msg);
+  }
+
+  // Admin-only live feed of account changes and punishments.
+  accountFeed(conn) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    if (!this.accounts) return this.fail(conn.ws, 'Account watch is not running', 'unavailable');
+    this.sendTo(conn.ws, { type: 'account_feed', events: this.accounts.feed });
+  }
+
+  // Admin actions on one account: reset, ban (hours), unban.
+  async accountAction(conn, msg) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    if (!this.accounts) return this.fail(conn.ws, 'Account watch is not running', 'unavailable');
+    const uid = typeof msg.uid === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(msg.uid) ? msg.uid : null;
+    if (!uid) return this.fail(conn.ws, 'Bad request', 'bad_request');
+    try {
+      if (msg.action === 'reset') await this.accounts.reset(uid);
+      else if (msg.action === 'ban') {
+        const hours = Math.min(Math.max(Math.floor(Number(msg.hours) || 24), 1), 24 * 30);
+        await this.accounts.ban(uid, hours, { reason: 'admin' });
+      } else if (msg.action === 'unban') await this.accounts.unban(uid);
+      else return this.fail(conn.ws, 'Bad request', 'bad_request');
+    } catch (e) {
+      console.error('[accounts] action failed:', e.message);
+      this.fail(conn.ws, 'Could not apply that change', 'action_failed');
+    }
   }
 
   // ---- lookups -----------------------------------------------------------
@@ -117,6 +151,10 @@ class Manager {
         return this.deleteSuggestion(conn, msg);
       case 'suggestions_public':
         return this.publicSuggestions(conn);
+      case 'account_feed':
+        return this.accountFeed(conn);
+      case 'account_action':
+        return this.accountAction(conn, msg);
       case 'action': {
         const game = this.tableBySession(sessionId);
         if (game) await game.handleAction(sessionId, msg.action, { x: msg.x, y: msg.y });
