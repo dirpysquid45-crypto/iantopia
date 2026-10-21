@@ -1,4 +1,4 @@
-# admin-scripts
+# scripts/admin
 
 One-off scripts that need real admin access to Firestore -- something the
 site itself never has (the client SDK loaded on every page, via
@@ -18,7 +18,7 @@ the comment at the top of the script for the exact formula.
 ### Setup
 
 ```bash
-cd admin-scripts
+cd scripts/admin
 npm install
 ```
 
