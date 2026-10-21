@@ -21,6 +21,7 @@ service cloud.firestore {
     match /users/{uid} {
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow create, update: if request.auth != null && request.auth.uid == uid
+        && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time)
         && request.resource.size() < 200000
         && (!('strubles_balance_v1' in request.resource.data)
             || (request.resource.data.strubles_balance_v1 is string
