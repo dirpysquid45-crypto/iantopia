@@ -284,7 +284,12 @@
       transform: scale(0.98);
     }
     /* A gap between the Patch Notes and Suggest buttons in the top-left corner. */
-    #suggest-btn { margin-top: 14px; }
+    /* The top-left button stack: every button the same height, and each one 50px
+       below the last, so the gaps between them are all equal. */
+    #inv-btn, #bg-btn, #cursor-btn, #ending-link, #patch-btn, #suggest-btn {
+      height: 40px !important; box-sizing: border-box !important; margin: 0 !important;
+      display: flex !important; align-items: center !important;
+    }
     /* The graphics mode row in the Background picker. */
     .graphics-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0 6px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.15); font-size:12px; }
     .graphics-toggle { font:inherit; font-size:12px; padding:8px 12px; cursor:pointer; }
@@ -1079,6 +1084,14 @@
        isHalloweenSeason()/getActiveBgKey()/getActiveTrackKey()). Same
        body.theme-X pattern as every theme above; nothing here is reachable
        outside October since nothing ever adds this class then. */
+    /* The Halloween title sits still: the ghost copy behind it doesn't flicker,
+       and the Haunted word only lights up (white) when hovered. */
+    body.theme-halloween .ghost-title h1::before { animation: none; opacity: 0; }
+    body.theme-halloween .haunted-word:hover,
+    body.theme-halloween .haunted-word:focus-visible {
+      text-shadow: 0 0 6px #fff, 0 0 14px #fff, 0 0 24px #fff !important;
+      color: #fff !important;
+    }
     @keyframes halloweenTitleGlow {
       0%, 100% { text-shadow: 0 0 6px #000, 2px 2px 0 #000, -2px 2px 0 #000, 0 0 18px rgba(255,111,0,.7), 0 0 36px rgba(94,23,168,.5); }
       50%      { text-shadow: 0 0 10px #000, 2px 2px 0 #000, -2px 2px 0 #000, 0 0 26px rgba(255,111,0,1), 0 0 52px rgba(94,23,168,.8); }
@@ -1087,7 +1100,7 @@
       color: #ff6f00;
       -webkit-text-stroke: 1.5px #ffffff;
       paint-order: stroke fill;
-      animation: titleScale 0.8s ease-out, halloweenTitleGlow 2.6s ease-in-out infinite 0.8s;
+      animation: titleScale 0.8s ease-out;
     }
     body.theme-halloween .flip-card {
       filter: drop-shadow(0 0 26px rgba(94,23,168,.8)) drop-shadow(0 0 52px rgba(57,255,20,.35));
@@ -1478,7 +1491,7 @@
       cursor: none;
       z-index: 20;
       box-shadow: 0 0 10px rgba(255, 215, 0, 0.35);
-      animation: endingGlow 2.4s ease-in-out infinite;
+      animation: none;
     }
     #ending-link:hover { background: #ffd700; color: #000; }
     #ending-link[hidden] { display: none; }
@@ -1522,7 +1535,7 @@
 
     #suggest-btn {
       position: fixed;
-      top: calc(358px + env(safe-area-inset-top));
+      top: calc(370px + env(safe-area-inset-top));
       left: calc(20px + env(safe-area-inset-left));
       background: rgba(0, 0, 0, 0.6);
       color: #fff;
