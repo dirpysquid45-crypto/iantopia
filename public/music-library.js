@@ -42,6 +42,10 @@ window.MUSIC_LIBRARY = {
   // halloween_theme background -- see background-library.js's comment.
   ghost_house:         { label: 'Ghost House',                      src: '/audio/music/ghost-house.mp3' },
 
+  tian_tian_yue:       { label: 'Tian Tian Yue Yuan – Jackie Chan & Chen Si Si', src: '/audio/music/tian-tian-yue.mp3' },
+  sacred_pool_of_tears: { label: 'Sacred Pool of Tears',              src: '/audio/music/sacred-pool-of-tears.mp3' },
+  oogway_ascends:      { label: 'Oogway Ascends',                    src: '/audio/music/oogway-ascends.mp3' },
+  han_palace:          { label: 'Spring Morning in the Han Palace',  src: '/audio/music/han-palace.mp3' },
   avatars_love:        { label: "The Avatar's Love",                 src: '/audio/music/avatars-love.mp3' },
 
   // --- Arena-only free defaults ---

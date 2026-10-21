@@ -64,6 +64,10 @@ window.BACKGROUND_LIBRARY = {
   // with the wood-sign texture.
   iantopia_wood:    { label: 'Iantopia Wood',      type: 'gif',   src: '/video/iantopia-wood.jpg', position: 'center', theme: 'theme-wood' },
 
+  // Shop and loot-crate background. A looping video, and its theme turns the
+  // homepage buttons red (see body.theme-han in index.astro).
+  han_palace: { label: 'Spring Morning in the Han Palace', type: 'video', src: '/video/han-palace.mp4', position: 'center', theme: 'theme-han' },
+
   // Shop and loot-crate background (case-data.js's bg_puzzle).
   puzzle_gif: { label: 'Puzzle Background', type: 'gif', src: '/video/puzzle-background.gif', position: 'center' },
 

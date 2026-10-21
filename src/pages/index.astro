@@ -283,6 +283,18 @@
     .button-grid > .big:active {
       transform: scale(0.98);
     }
+    /* Han Palace theme: the menu buttons are red and glow. */
+    body.theme-han a.big, body.theme-han button.big {
+      background: #3a0808 !important; border-color: #ff3b3b !important; color: #ffd6d6 !important;
+      box-shadow: 0 0 18px rgba(255, 40, 40, 0.55), inset 0 0 12px rgba(255, 60, 60, 0.25) !important;
+    }
+    body.theme-han a.big:hover, body.theme-han button.big:hover {
+      box-shadow: 0 0 28px rgba(255, 60, 60, 0.9), inset 0 0 14px rgba(255, 80, 80, 0.4) !important;
+    }
+    body.theme-han #inv-btn, body.theme-han #bg-btn, body.theme-han #cursor-btn, body.theme-han #account-btn,
+    body.theme-han #patch-btn, body.theme-han #suggest-btn, body.theme-han #ending-link {
+      border-color: #ff3b3b !important; box-shadow: 0 0 12px rgba(255, 40, 40, 0.5) !important;
+    }
     /* A gap between the Patch Notes and Suggest buttons in the top-left corner. */
     /* The top-left button stack: every button the same height, and each one 50px
        below the last, so the gaps between them are all equal. */

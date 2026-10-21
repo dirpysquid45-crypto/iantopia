@@ -58,6 +58,11 @@ window.CASE_ITEMS = {
   mus_avatar:   { label: "The Avatar's Love",                 tier: 'classified',       emoji: '🎵', type: 'music_unlock', key: 'avatars_love' },
   mus_ghost:    { label: 'Ghost House',                       tier: 'covert',           emoji: '🎃', type: 'music_unlock', key: 'ghost_house' },
   mus_koronba:  { label: 'Koronba – Ryegen',                  tier: 'restricted',       emoji: '🎵', type: 'music_unlock', key: 'koronba' },
+  mus_tian:     { label: 'Tian Tian Yue Yuan',               tier: 'covert',           emoji: '🎵', type: 'music_unlock', key: 'tian_tian_yue' },
+  mus_sacred:   { label: 'Sacred Pool of Tears',              tier: 'covert',           emoji: '🎵', type: 'music_unlock', key: 'sacred_pool_of_tears' },
+  mus_oogway:   { label: 'Oogway Ascends',                    tier: 'classified',       emoji: '🐢', type: 'music_unlock', key: 'oogway_ascends' },
+  mus_han:      { label: 'Spring Morning in the Han Palace',  tier: 'exceedingly_rare', emoji: '🎵', type: 'music_unlock', key: 'han_palace' },
+  bg_han:       { label: 'Background: Han Palace',            tier: 'exceedingly_rare', emoji: '🏯', type: 'background_unlock', key: 'han_palace' },
   mus_circus:  { label: 'Circus',                         tier: 'mil_spec',   emoji: '🎪',                                  type: 'music_unlock', key: 'circus' },
   mus_balatro: { label: 'Balatro Main Theme',             tier: 'mil_spec',   emoji: '🃏',                                  type: 'music_unlock', key: 'balatro' },
   mus_desert:  { label: 'Desert (Mario, Bitcrushed)',     tier: 'mil_spec',   emoji: '🏜️',                                  type: 'music_unlock', key: 'mario_desert' },
@@ -313,7 +318,7 @@ window.CASES = {
     // see lootbox.js's oddsFor(), which checks this flag rather than
     // hardcoding this case's key.
     pagodaBuff: true,
-    items: ['bld_shabby', 'bld_office', 'bld_bank', 'bld_park', 'bld_generic', 'bld_sweatshop', 'bld_711', 'bld_pagoda', 'bld_factory', 'bld_skyscraper', 'bld_coal', 'bld_taipei101', 'bld_nuclear', 'bg_wood', 'bg_patrick', 'mus_bladee', 'mus_evian', 'mus_clarity', 'mus_hellokitty', 'mus_girllikeme', 'mus_minecraft', 'bg_puzzle', 'mus_avatar', 'mus_ghost', 'mus_koronba'],
+    items: ['bld_shabby', 'bld_office', 'bld_bank', 'bld_park', 'bld_generic', 'bld_sweatshop', 'bld_711', 'bld_pagoda', 'bld_factory', 'bld_skyscraper', 'bld_coal', 'bld_taipei101', 'bld_nuclear', 'bg_wood', 'bg_patrick', 'mus_bladee', 'mus_evian', 'mus_clarity', 'mus_hellokitty', 'mus_girllikeme', 'mus_minecraft', 'bg_puzzle', 'mus_avatar', 'mus_ghost', 'mus_koronba', 'mus_tian', 'mus_sacred', 'mus_oogway', 'mus_han', 'bg_han'],
   },
 };
 

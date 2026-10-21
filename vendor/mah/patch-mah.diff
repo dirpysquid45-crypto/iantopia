@@ -155,10 +155,10 @@ index d3f0158..f029292 100644
  			return true;
  		}
 diff --git a/src/app/model/music.ts b/src/app/model/music.ts
-index a49ac03..8b04d50 100644
+index a49ac03..dd539f5 100644
 --- a/src/app/model/music.ts
 +++ b/src/app/model/music.ts
-@@ -1,19 +1,86 @@
+@@ -1,19 +1,90 @@
 +// Iantopia: the background music cycles through these tracks in order, looping
 +// back to the first, while a game is running. Music is only audible when the
 +// music setting is on (game.music.enabled) and the game is being played.
@@ -167,6 +167,10 @@ index a49ac03..8b04d50 100644
 +	// not part of the Mahjong playlist (too intense for a quiet game).
 +	'assets/music/fei-yu-yi-jian-mei.mp3',
 +	'assets/music/ninjago-overture.mp3',
++	'assets/music/tian-tian-yue.mp3',
++	'assets/music/sacred-pool-of-tears.mp3',
++	'assets/music/oogway-ascends.mp3',
++	'assets/music/han-palace.mp3',
 +];
 +
 +const VOLUME_KEY = 'mah_music_volume';
