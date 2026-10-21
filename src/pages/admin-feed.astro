@@ -32,6 +32,7 @@
     .plist { display:flex; flex-direction:column; gap:4px; max-height:360px; overflow-y:auto; }
     .prow { display:grid; grid-template-columns:minmax(120px,1.4fr) minmax(120px,1.4fr) 110px 70px 80px; gap:10px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:8px 10px; cursor:pointer; font-size:13px; }
     .prow:hover { border-color:var(--gold); }
+    .prow.selected { border-color:var(--gold); background:#2a2410; box-shadow:0 0 0 1px var(--gold) inset; }
     .prow small { display:block; color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; }
     .prow .n { font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .pill { font-size:11px; border-radius:999px; padding:2px 8px; text-align:center; border:1px solid currentColor; }
@@ -177,6 +178,7 @@
         const row = document.createElement('div');
         row.className = 'prow';
         row.dataset.uid = p.uid;
+        if (p.uid === $('uid').value.trim()) row.classList.add('selected');
         const who = document.createElement('div');
         const n = document.createElement('div'); n.className = 'n'; n.textContent = p.name || '(no name)';
         const id = document.createElement('small'); id.textContent = p.uid;
@@ -189,7 +191,13 @@
         const seen = document.createElement('div'); seen.style.color = 'var(--muted)'; seen.style.fontSize = '11px';
         seen.textContent = p.lastSeen ? new Date(p.lastSeen).toLocaleDateString() : '—';
         row.append(who, mail, bal, st, seen);
-        row.addEventListener('click', () => { $('uid').value = p.uid; setStatus('Account ' + (p.name || p.uid) + ' selected.'); });
+        row.addEventListener('click', () => {
+          $('uid').value = p.uid;
+          document.querySelectorAll('.prow.selected').forEach((r) => r.classList.remove('selected'));
+          row.classList.add('selected');
+          updateButtons();
+          setStatus('Selected ' + (p.name || p.uid) + '. Actions are enabled below.');
+        });
         list.append(row);
       }
     }
