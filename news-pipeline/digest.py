@@ -22,7 +22,7 @@ import requests
 from common import write_json, OUTPUT_DIR
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
-MODEL = "qwen2.5:7b"
+MODEL = "llama3.2:3b"
 # Generous on purpose: this is a once-daily batch job on a CPU-only host,
 # not a live request, and a cold model load (first call after Ollama has
 # been idle) is slower than steady-state inference.
