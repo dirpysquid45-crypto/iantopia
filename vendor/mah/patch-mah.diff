@@ -67,11 +67,60 @@ index 0dd930cc..5f3c5e50 100644
 +	accent-color: #fff;
 +	cursor: pointer;
 +}
+diff --git a/src/app/components/game/game-component.component.html b/src/app/components/game/game-component.component.html
+index 4979d75d..e25c9085 100644
+--- a/src/app/components/game/game-component.component.html
++++ b/src/app/components/game/game-component.component.html
+@@ -36,7 +36,7 @@
+ 	@if (newgame.visible()) {
+ 		@if (dailyEnabled()) {
+ 			<div class="newgame-tabs" role="tablist">
+-				<button type="button" role="tab" class="newgame-tab" [class.active]="!dailyView()" [attr.aria-selected]="!dailyView()" (click)="showLayoutList()">
++				<button type="button" role="tab" class="newgame-tab" [class.active]="!dailyView() && !layoutLocked()" [attr.aria-selected]="!dailyView() && !layoutLocked()" [disabled]="layoutLocked()" (click)="showLayoutList()">
+ 					{{ 'SELECT_LAYOUT' | translate }}
+ 				</button>
+ 				<button type="button" role="tab" class="newgame-tab" [class.active]="dailyView()" [attr.aria-selected]="dailyView()" (click)="showDailyChallenge()">
+@@ -47,7 +47,7 @@
+ 				</button>
+ 			</div>
+ 		}
+-		@if (dailyView()) {
++		@if (dailyView() || layoutLocked()) {
+ 			<app-daily-challenge (startEvent)="startDailyChallenge($event)"/>
+ 		} @else {
+ 			<app-choose-layout class="choose" (startEvent)="startGame($event)" [gameMode]="app.settings.gameMode()" [buildMode]="app.settings.buildMode()"/>
+@@ -82,7 +82,7 @@
+ 	[pattern]="app.settings.pattern()"
+ 	[blackout]="blackout()"
+ 	[concealed]="concealed()"
+-	[noRotate]="!app.settings.rotateBoard()"
++	[noRotate]="true"
+ 	[noZoom]="!app.settings.zoomBoard()"
+ 	(clickEvent)="stoneClick($event)"
+ />
 diff --git a/src/app/components/game/game-component.component.ts b/src/app/components/game/game-component.component.ts
-index 1550972f..977fc481 100644
+index 1550972f..051152fb 100644
 --- a/src/app/components/game/game-component.component.ts
 +++ b/src/app/components/game/game-component.component.ts
-@@ -118,7 +118,13 @@ export class GameComponent {
+@@ -101,7 +101,8 @@ export class GameComponent {
+ 	readonly tutorial = viewChild.required<DialogComponent>('tutorial');
+ 	readonly app = inject(AppService);
+ 	readonly dailyService = inject(DailyService);
+-	readonly dailyEnabled = computed(() => environment.daily && this.app.settings.showDailyChallenge());
++	// Iantopia patch: the daily is always on in this build, and the other layouts stay locked until today's daily is won.
++	readonly dailyEnabled = computed(() => environment.daily);
+ 	game: Game;
+ 	fullScreenEnabled: boolean = true;
+ 	title: string = '';
+@@ -111,6 +112,7 @@ export class GameComponent {
+ 	readonly showStartScreen = computed(() => this.game.isIdle() && !this.game.message() && !this.anyDialogVisible());
+ 	readonly dailyView = signal(false);
+ 	readonly dailyUnplayed = computed(() => this.dailyEnabled() && !this.dailyService.todayResult());
++	readonly layoutLocked = computed(() => this.dailyEnabled() && this.dailyService.todayResult()?.won !== true);
+ 	readonly blackout = computed(() => this.game.challenge()?.id === CHALLENGE_CODES.CHALLENGE_BLACKOUT);
+ 	readonly concealed = computed(() => this.game.isPaused() && (this.game.challenge()?.hasTimeLimit ?? false));
+ 	private readonly injector = inject(Injector);
+@@ -118,7 +120,13 @@ export class GameComponent {
  
  	constructor() {
  		this.game = this.app.game;
@@ -86,6 +135,80 @@ index 1550972f..977fc481 100644
  		this.game.onChallengeEnd = outcome => {
  			const challenge = outcome.challenge;
  			if (!challenge.dayKey) {
+@@ -131,6 +139,8 @@ export class GameComponent {
+ 		};
+ 		if (this.dailyEnabled()) {
+ 			this.game.expireStaleDaily();
++			// the layout lock reads today's result, and the N key can open the dialog without going through syncDailyState
++			this.dailyService.loadTodayResult();
+ 		}
+ 		this.fullScreenEnabled = this.canFullscreen();
+ 		this.title = `${this.app.name} v${environment.version}`;
+@@ -196,6 +206,9 @@ export class GameComponent {
+ 	}
+ 
+ 	showLayoutList(): void {
++		if (this.layoutLocked()) {
++			return;
++		}
+ 		this.dailyView.set(false);
+ 	}
+ 
+@@ -302,7 +315,7 @@ export class GameComponent {
+ 		const newgame = this.newgame();
+ 		if (newgame.visible()) {
+ 			// escape steps back to the layout list first, and only then closes the dialog
+-			if (this.dailyView()) {
++			if (this.dailyView() && !this.layoutLocked()) {
+ 				this.showLayoutList();
+ 			} else {
+ 				newgame.toggle();
+diff --git a/src/app/components/help/help.component.ts b/src/app/components/help/help.component.ts
+index a4dd2c1d..b61c0c35 100644
+--- a/src/app/components/help/help.component.ts
++++ b/src/app/components/help/help.component.ts
+@@ -61,7 +61,7 @@ export class HelpComponent implements OnInit {
+ 		{ icon: IconSettingsComponent, key: 'S', name: 'SETTINGS' },
+ 		{ icon: IconZenComponent, key: 'Z', name: 'ZEN_MODE' },
+ 		{ icon: IconLogoComponent, key: 'H', name: 'HELP' },
+-		...(environment.daily && this.app.settings.showDailyChallenge() ? [{ icon: IconCalendarComponent, key: 'D', name: 'DAILY_CHALLENGE' }] : [])
++		...(environment.daily ? [{ icon: IconCalendarComponent, key: 'D', name: 'DAILY_CHALLENGE' }] : [])
+ 	]);
+ 
+ 	ngOnInit(): void {
+diff --git a/src/app/components/settings/settings.component.html b/src/app/components/settings/settings.component.html
+index 90255afc..66bd85fd 100644
+--- a/src/app/components/settings/settings.component.html
++++ b/src/app/components/settings/settings.component.html
+@@ -265,28 +265,6 @@
+ 						<span>{{ 'SHOW_CLOCK' | translate }}</span>
+ 					</label>
+ 				</li>
+-				@if (canDaily) {
+-					<li>
+-						<label class="check">
+-							<input
+-								type="checkbox"
+-								[checked]="app.settings.showDailyChallenge()"
+-								(change)="app.settings.showDailyChallenge.set(!app.settings.showDailyChallenge());app.settings.save();"
+-							>
+-							<span>{{ 'SHOW_DAILY_CHALLENGE' | translate }}</span>
+-						</label>
+-					</li>
+-				}
+-				<li>
+-					<label class="check">
+-						<input
+-							type="checkbox"
+-							[checked]="app.settings.rotateBoard()"
+-							(change)="app.settings.rotateBoard.set(!app.settings.rotateBoard());app.settings.save();"
+-						>
+-						<span>{{ 'ROTATE_BOARD' | translate }}</span>
+-					</label>
+-				</li>
+ 				<li>
+ 					<label class="check">
+ 						<input
 diff --git a/src/app/model/game.ts b/src/app/model/game.ts
 index d3f0158b..f029292e 100644
 --- a/src/app/model/game.ts

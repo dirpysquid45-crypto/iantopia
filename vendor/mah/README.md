@@ -32,3 +32,9 @@ is removed; each hint is counted and reported with the solve (the page pays 10% 
 hint); a back link to Puzzles sits in the bottom-left; the welcome panel uses the wooden
 sign (src/assets/bg/wood-sign.jpg); fullscreen keeps the bamboo backdrop; the top and
 bottom bars are a lighter gradient.
+
+Daily and board changes (Oct 22, 2026): the daily challenge is on in this build (`daily: true` in the
+build config). The other layouts stay locked until today's daily is won, and the daily tab is the only
+option until then. The board no longer rotates to portrait, so tiles stay upright on narrow or tall
+windows. The rotate-board and show-daily settings are removed. The build config for this is a local
+`custom-build-config.json` with `"daily": true` (the `.dist` file is the template).
