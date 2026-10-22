@@ -32,7 +32,7 @@ fi
 sudo usermod -aG docker "$USER" || true
 
 # --- Swap, so builds and the digest model don't run out of memory -----------
-if ! swapon --show | grep -q /swapfile; then
+if ! grep -q "^/swapfile " /proc/swaps; then
   if [ ! -f /swapfile ]; then
     sudo fallocate -l "$SWAP_SIZE" /swapfile
     sudo chmod 600 /swapfile
