@@ -319,11 +319,17 @@
     if (full.length) {
       // Positions and contents, read before the rows move, for the flash effect.
       var where = full.slice().reverse().map(function (r) { return r - SKYLINE; });
-      for (var f = 0; f < full.length; f++) {
-        cleared.unshift(this.grid[full[f]].slice());
-        this.grid.splice(full[f], 1);
-        this.grid.unshift(emptyRow());
-      }
+      // Remove every full row in one pass, then put the same number of empty rows on top.
+      // Removing them one at a time shifts the rows above each one, so the next index
+      // would point at the wrong row: a full row was left behind and an ordinary row lost.
+      var gone = {};
+      for (var f = 0; f < full.length; f++) gone[full[f]] = true;
+      cleared = full.slice().reverse().map(function (r) { return this.grid[r].slice(); }, this);
+      var kept = [];
+      for (var y = 0; y < ROWS; y++) if (!gone[y]) kept.push(this.grid[y]);
+      var fresh = [];
+      for (var e = 0; e < full.length; e++) fresh.push(emptyRow());
+      this.grid = fresh.concat(kept);
       this.version++;
       this.combo++;
       var bonus = this.applyClearScore(full.length);

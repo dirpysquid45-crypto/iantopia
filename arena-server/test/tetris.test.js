@@ -402,3 +402,15 @@ test('the default keys: Up rotates clockwise, Down soft-drops, Space slams, C an
   assert.equal(K.actionFor(' '), 'hard');
   assert.equal(K.actionFor('c'), 'hold');
 });
+
+test('several full rows clear together, and the rows above fall by that many', () => {
+  // Three rows full except the right-hand column, which a vertical I fills in one drop.
+  const b = boardWith('I', [[1], [1], [1], [1]], 9, 36);
+  for (const row of [37, 38, 39]) fillRow(b, row, 0, 9);
+  b.grid[35][0] = 'T';
+  b.hardDrop();
+  assert.equal(b.lines, 3);
+  for (const row of b.grid) assert.ok(!row.every(Boolean), 'no full row is left behind');
+  assert.equal(b.grid[38][0], 'T', 'the block above falls past the three cleared rows');
+  assert.equal(b.grid[35][0], null);
+});
