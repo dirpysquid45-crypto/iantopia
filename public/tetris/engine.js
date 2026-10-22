@@ -27,7 +27,7 @@
   // Piece colours (from Flatris). The page draws each piece as a black block with
   // this colour as its outline and glow.
   // J is the blue piece, L the orange one, Z the red one, T the purple one.
-  var COLORS = { I: '#3cc7d6', O: '#fbb414', T: '#5b1b82', J: '#1b3f94', L: '#ffb36b', S: '#95c43d', Z: '#a3111f' };
+  var COLORS = { I: '#3cc7d6', O: '#fbb414', T: '#5b1b82', J: '#1b3f94', L: '#d9480f', S: '#95c43d', Z: '#a3111f' };
 
   var SHAPES = {
     I: [[1, 1, 1, 1]],
@@ -58,6 +58,9 @@
   ];
 
   var LINE_POINTS = { 1: 100, 2: 300, 3: 500, 4: 800 };
+  // Strubles earned per clear, before the combo and level multipliers. The page
+  // turns the total into Strubles at game over (see rewards.js for the caps).
+  var LINE_REWARD = { 1: 0, 2: 1, 3: 2, 4: 5 };
 
   // Fall time per row in seconds. Same curve as Tetrigo's Fall.
   function fallInterval(level) {
@@ -123,6 +126,8 @@
     this.lines = 0;
     this.level = opts.level || 1;
     this.b2b = false;
+    this.combo = 0;            // clears in a row, one lock after another
+    this.rewardPoints = 0;     // Strubles earned so far, before the page's caps
     this.gravity = 0;
     this.softDropping = false;
     this.over = false;
@@ -311,15 +316,20 @@
 
     var cleared = [];
     if (full.length) {
+      // Positions and contents, read before the rows move, for the flash effect.
+      var where = full.slice().reverse().map(function (r) { return r - SKYLINE; });
       for (var f = 0; f < full.length; f++) {
         cleared.unshift(this.grid[full[f]].slice());
         this.grid.splice(full[f], 1);
         this.grid.unshift(emptyRow());
       }
       this.version++;
+      this.combo++;
       var bonus = this.applyClearScore(full.length);
-      this.emit('clear', { lines: full.length, b2b: bonus });
+      this.emit('clear', { lines: full.length, b2b: bonus, combo: this.combo, rows: where, cells: cleared });
       if (this.onLock) this.onLock(cleared);
+    } else {
+      this.combo = 0;
     }
 
     // Lock-out: the whole piece locked above the skyline.
@@ -329,6 +339,15 @@
     }
     this.spawnNext();
   };
+
+  // Strubles for one clear: the line base, plus 1 for each clear beyond the first in
+  // a combo, times 1.5 for a back-to-back Tetris, times a level factor (up to 2x).
+  function clearReward(lines, combo, backToBack, level) {
+    var base = LINE_REWARD[lines] + (combo > 1 ? combo - 1 : 0);
+    var b2b = backToBack ? 1.5 : 1;
+    var levelFactor = Math.min(2, 1 + 0.1 * (level - 1));
+    return base * b2b * levelFactor;
+  }
 
   // Returns true when the back-to-back bonus applied.
   Board.prototype.applyClearScore = function (n) {
@@ -341,6 +360,7 @@
       this.b2b = false;
     }
     this.score += Math.round(pts) * this.level;
+    this.rewardPoints += clearReward(n, this.combo, bonus, this.level);
     this.lines += n;
     var before = this.level;
     while (this.lines >= this.level * 5) this.level++;
@@ -388,7 +408,7 @@
 
   return {
     COLS: COLS, ROWS: ROWS, SKYLINE: SKYLINE, TYPES: TYPES, COLORS: COLORS, SHAPES: SHAPES,
-    LINE_POINTS: LINE_POINTS, PREVIEW: PREVIEW,
+    LINE_POINTS: LINE_POINTS, LINE_REWARD: LINE_REWARD, PREVIEW: PREVIEW, clearReward: clearReward,
     Board: Board, rotateCells: rotateCells, fallInterval: fallInterval, mulberry32: mulberry32, fits: fits
   };
 });

@@ -3,6 +3,10 @@
  * charged or refunded. The shared ArenaGame handles the connection grace period,
  * the rematch window and table cleanup.
  *
+ * Staked matches: each player's stake is charged when the match starts (the
+ * shared ArenaGame does this), and the winner takes the pot less a 5% rake,
+ * the same as blackjack and battleship. Friendly matches (bet 0) pay nothing.
+ *
  * Each player runs their own board on the shared engine (public/tetris/engine.js),
  * so moves feel instant. The server does the match rules:
  *   - both players get the same seed, so they get the same pieces in the same order
@@ -64,6 +68,7 @@ class TetrisGame extends ArenaGame {
   constructor(tableId, playerA, playerB, balance, opts = {}) {
     super(tableId, playerA, playerB, balance, opts);
     this.gameType = 'tetris';
+    this.rake = 0.05;   // 5% rake on staked games only
     this.resetForRematch();
   }
 
@@ -80,7 +85,7 @@ class TetrisGame extends ArenaGame {
     for (let i = 0; i < 2; i++) {
       this.send(i, {
         type: 'game_start', gameType: 'tetris', yourIndex: i, opponentName: this.players[1 - i].name,
-        friendly: true, bet: 0, isRematch, seed: this.seed,
+        friendly: this.friendly, bet: this.bet, isRematch, seed: this.seed,
       });
     }
   }
@@ -113,8 +118,20 @@ class TetrisGame extends ArenaGame {
     this.phase = 'over';
     this.winner = winner;
     this.reason = reason;
-    this.broadcast({ type: 'tetris_over', winner, reason, scores: this.scores });
+    // The pot is both stakes. The winner gets it less the rake, and the result says how much.
+    const pot = this.bet * 2;
+    const payout = this.friendly ? 0 : pot - Math.floor(pot * this.rake);
+    this.broadcast({ type: 'tetris_over', winner, reason, scores: this.scores, payout });
     this.beginRematchWindow();
+    if (payout > 0) this.payWinner(winner, payout);
+  }
+
+  async payWinner(winner, payout) {
+    try {
+      this.pushBalance(winner, await this.balance.creditPayout(this.players[winner].userId, payout));
+    } catch (e) {
+      console.error('[tetris] payout failed:', e.message);
+    }
   }
 
   forfeitIndex(i, reason) {

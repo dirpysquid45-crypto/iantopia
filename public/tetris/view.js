@@ -3,13 +3,22 @@
 // block with a coloured outline that glows.
 //
 // window.TetrisView:
-//   createBoard(canvas)  -> { draw(board, opts) }   the player's own well
-//   createRows(canvas)   -> { draw(rows) }          the opponent's well (snapshot strings)
-//   createPreview(canvas)-> { draw(types) }         hold / next boxes
-//   resize(canvas)       -> sizes the canvas bitmap to its CSS box (device pixels)
+//   createBoard(canvas)   -> { draw(board, opts), flash(info) }   the player's own well
+//   createRows(canvas)    -> { draw(rows) }                       the opponent's well (snapshot strings)
+//   createPreview(canvas) -> { draw(types) }                      hold / next boxes
+//   resize(canvas)        -> sizes the canvas bitmap to its CSS box (device pixels)
+//
+// opts for board.draw:
+//   ghost   (default true)  the landing spot, drawn as stacked outlines
+//   onion   (default true)  faint trail of the falling piece's last positions
+//   effects (default true)  row flashes after a clear
 (function () {
   var E = window.TetrisEngine;
   var COLS = E.COLS, SKYLINE = E.SKYLINE, ROWS = E.ROWS, VISIBLE = ROWS - SKYLINE;
+
+  var FLASH_MS = 380;        // a line clear blinks this long
+  var TETRIS_FLASH_MS = 600; // a Tetris also flashes the whole board
+  var TRAIL_LENGTH = 4;      // how many earlier positions the onion skin keeps
 
   function resize(canvas) {
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -20,18 +29,18 @@
   }
 
   // One block: black body, coloured outline, outer glow. Ghosts are a dim outline with no glow.
-  function drawBlock(ctx, x, y, s, type, ghost) {
+  function drawBlock(ctx, x, y, s, type, alpha, glow) {
     var color = E.COLORS[type] || '#ffffff';
     var inset = Math.max(1, s * 0.1);
     ctx.save();
-    if (!ghost) {
+    if (alpha === undefined || alpha >= 1) {
       ctx.fillStyle = '#000';
       ctx.fillRect(x, y, s, s);
     }
-    ctx.globalAlpha = ghost ? 0.45 : 1;
+    ctx.globalAlpha = alpha === undefined ? 1 : alpha;
     ctx.strokeStyle = color;
     ctx.lineWidth = Math.max(1.5, s * 0.1);
-    if (!ghost) {
+    if (glow) {
       ctx.shadowColor = color;
       ctx.shadowBlur = s * 0.5;
     }
@@ -50,13 +59,20 @@
     ctx.stroke();
   }
 
-  // The stack is cached on an offscreen canvas and only redrawn when the grid changes.
+  // Blink: on for 60ms, off for 60ms, so a row visibly flickers.
+  function blinkOn(elapsed) { return Math.floor(elapsed / 60) % 2 === 0; }
+
+  // The board view. The stack is cached on an offscreen canvas and only redrawn
+  // when the grid changes; the active piece, ghost, onion trail and flashes are
+  // drawn every frame.
   function createBoard(canvas) {
     var ctx = canvas.getContext('2d');
     var layer = document.createElement('canvas');
     var layerCtx = layer.getContext('2d');
     var cachedVersion = -1;
     var cachedSize = '';
+    var flashes = [];       // { rows: [visible row index], cells: [[letters]], start, ms, tetris }
+    var trail = [];         // recent active-piece positions, newest last
 
     function drawStack(board) {
       var s = canvas.width / COLS;
@@ -67,43 +83,115 @@
       for (var r = SKYLINE; r < ROWS; r++) {
         var row = board.grid[r];
         for (var c = 0; c < COLS; c++) {
-          if (row[c]) drawBlock(layerCtx, c * s, (r - SKYLINE) * s, s, row[c], false);
+          if (row[c]) drawBlock(layerCtx, c * s, (r - SKYLINE) * s, s, row[c], undefined, true);
         }
       }
       cachedVersion = board.version;
       cachedSize = key;
     }
 
+    // Keeps the last few positions of the falling piece (onion skin). A new piece is
+    // a new object, so the trail restarts with it; a move or rotation adds the old spot.
+    var trailOwner = null, lastState = null;
+    function stateOf(a) { return { type: a.type, cells: a.cells, x: a.x, y: a.y, dir: a.dir }; }
+    function updateTrail(a) {
+      if (!a) { trail = []; trailOwner = null; lastState = null; return; }
+      if (a !== trailOwner) { trail = []; trailOwner = a; lastState = stateOf(a); return; }
+      var now = stateOf(a);
+      if (now.x === lastState.x && now.y === lastState.y && now.dir === lastState.dir) return;
+      trail.push(lastState);
+      if (trail.length > TRAIL_LENGTH) trail.shift();
+      lastState = now;
+    }
+
+    function drawShape(ctx2, cells, x, y, s, type, alpha, glow) {
+      for (var r = 0; r < cells.length; r++) {
+        for (var c = 0; c < cells[r].length; c++) {
+          var vr = y + r - SKYLINE;
+          if (cells[r][c] && vr >= 0) drawBlock(ctx2, (x + c) * s, vr * s, s, type, alpha, glow);
+        }
+      }
+    }
+
     return {
+      // Starts the flash for a line clear. `info` is the engine's clear event.
+      flash: function (info) {
+        if (!info || !info.rows || !info.rows.length) return;
+        flashes.push({
+          rows: info.rows, cells: info.cells || [], start: performance.now(),
+          ms: info.lines >= 4 ? TETRIS_FLASH_MS : FLASH_MS, tetris: info.lines >= 4
+        });
+        if (flashes.length > 6) flashes.shift();
+      },
       draw: function (board, opts) {
         opts = opts || {};
+        var showGhost = opts.ghost !== false;
+        var showOnion = opts.onion !== false;
+        var showEffects = opts.effects !== false;
         resize(canvas);
         var s = canvas.width / COLS;
         if (!board) {
           // No game yet (the versus lobby): an empty well.
           drawGrid(ctx, canvas.width, canvas.height, s);
+          updateTrail(null);
           return;
         }
         drawStack(board);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(layer, 0, 0);
+        var now = performance.now();
+
+        // Row flashes: each cleared row blinks in its place, and a Tetris washes the board.
+        if (showEffects && flashes.length) {
+          flashes = flashes.filter(function (f) { return now - f.start < f.ms; });
+          flashes.forEach(function (f) {
+            var elapsed = now - f.start;
+            if (!blinkOn(elapsed)) return;
+            f.rows.forEach(function (vr, i) {
+              if (vr < 0 || vr >= VISIBLE) return;
+              var cells = f.cells[i] || [];
+              for (var c = 0; c < COLS; c++) {
+                if (!cells[c]) continue;
+                drawBlock(ctx, c * s, vr * s, s, cells[c], undefined, true);
+              }
+              ctx.save();
+              ctx.globalAlpha = f.tetris ? 0.55 : 0.4;
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, vr * s, canvas.width, s);
+              ctx.restore();
+            });
+            if (f.tetris) {
+              ctx.save();
+              ctx.globalAlpha = 0.12;
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(0, 0, canvas.width, canvas.height);
+              ctx.restore();
+            }
+          });
+        }
+
         if (board.active && !board.over) {
           var a = board.active;
-          if (opts.ghost !== false) {
+          if (showOnion) {
+            updateTrail(a);
+            // Older positions fade out: 0.22, 0.14, 0.08, 0.04.
+            var fades = [0.22, 0.14, 0.08, 0.04];
+            for (var t = trail.length - 1, k = 0; t >= 0 && k < fades.length; t--, k++) {
+              var old = trail[t];
+              drawShape(ctx, old.cells, old.x, old.y, s, old.type, fades[k], false);
+            }
+          } else {
+            updateTrail(null);
+          }
+          if (showGhost) {
             var gy = board.ghostY();
-            for (var r = 0; r < a.cells.length; r++) {
-              for (var c = 0; c < a.cells[r].length; c++) {
-                var gr = gy + r - SKYLINE;
-                if (a.cells[r][c] && gr >= 0) drawBlock(ctx, (a.x + c) * s, gr * s, s, a.type, true);
-              }
-            }
+            // The landing spot as stacked outlines: a faint outer layer and a brighter inner one.
+            drawShape(ctx, a.cells, a.x, gy, s, a.type, 0.2, false);
+            drawShape(ctx, a.cells, a.x, gy, s, a.type, 0.38, false);
           }
-          for (var rr = 0; rr < a.cells.length; rr++) {
-            for (var cc = 0; cc < a.cells[rr].length; cc++) {
-              var vr = a.y + rr - SKYLINE;
-              if (a.cells[rr][cc] && vr >= 0) drawBlock(ctx, (a.x + cc) * s, vr * s, s, a.type, false);
-            }
-          }
+          drawShape(ctx, a.cells, a.x, a.y, s, a.type, undefined, true);
+        } else {
+          updateTrail(null);
         }
       }
     };
@@ -121,7 +209,7 @@
         for (var r = 0; r < rows.length && r < VISIBLE; r++) {
           for (var c = 0; c < COLS; c++) {
             var ch = rows[r].charAt(c);
-            if (ch && ch !== '.') drawBlock(ctx, c * s, r * s, s, ch, false);
+            if (ch && ch !== '.') drawBlock(ctx, c * s, r * s, s, ch, undefined, true);
           }
         }
       }
@@ -146,7 +234,7 @@
           var oy = i * slotH + (slotH - rows * s) / 2;
           for (var r = 0; r < rows; r++) {
             for (var c = 0; c < cols; c++) {
-              if (shape[r][c]) drawBlock(ctx, ox + c * s, oy + r * s, s, type, false);
+              if (shape[r][c]) drawBlock(ctx, ox + c * s, oy + r * s, s, type, undefined, true);
             }
           }
         });

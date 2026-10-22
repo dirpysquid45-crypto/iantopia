@@ -297,15 +297,29 @@ function fakeWs() {
   return { readyState: 1, sent, send: (d) => sent.push(JSON.parse(d)) };
 }
 
-test('Tetris is friendly only: a staked lobby is refused', () => {
-  const m = new Manager(new FakeDb(), null, {});
-  const ws = fakeWs();
-  m.connections.set('s1', { userId: 'u1', ws, guest: false, name: 'Ann' });
-  m.handleMessage('u1', 's1', { type: 'join_queue', bet: 50, gameType: 'tetris' });
-  const err = ws.sent.find((x) => x.type === 'error');
-  assert.ok(err, 'an error is sent');
-  assert.match(err.message, /friendly only/);
-  assert.equal(m.queue.length, 0);
+test('a staked Tetris match charges both stakes, and the winner takes the pot less the 5% rake', async () => {
+  const charged = [], paid = [];
+  const balance = {
+    getBalance: async () => 1000,
+    deductBet: async (uid, amt) => { charged.push([uid, amt]); return 1000 - amt; },
+    creditPayout: async (uid, amt) => { paid.push([uid, amt]); return 1000 + amt; },
+    refundBet: async () => 1000,
+  };
+  const m = new Manager(new FakeDb(), null, { balance });
+  const wa = fakeWs(), wb = fakeWs();
+  m.connections.set('s1', { userId: 'u1', ws: wa, guest: false, name: 'Ann' });
+  m.connections.set('s2', { userId: 'u2', ws: wb, guest: false, name: 'Ben' });
+  await m.handleMessage('u1', 's1', { type: 'join_queue', bet: 100, gameType: 'tetris' });
+  await m.handleMessage('u2', 's2', { type: 'join_queue', bet: 100, gameType: 'tetris' });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(charged.sort(), [['u1', 100], ['u2', 100]], 'both stakes charged at the start');
+  // Ben tops out, so Ann wins the 200 pot less 5%.
+  await m.handleMessage('u2', 's2', { type: 'action', action: 'topout', score: 10, lines: 0 });
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(paid, [['u1', 190]]);
+  const over = wa.sent.find((x) => x.type === 'tetris_over');
+  assert.equal(over.payout, 190, 'the result tells both players the payout');
+  for (const t of m.tables.values()) t.close();
 });
 
 test('two friendly Tetris lobbies pair up and both start with the same seed', async () => {
@@ -322,4 +336,70 @@ test('two friendly Tetris lobbies pair up and both start with the same seed', as
   assert.equal(sa.gameType, 'tetris');
   assert.equal(sa.seed, sb.seed);
   for (const t of m.tables.values()) t.close();
+});
+
+// ---------------- engine: combos and Strubles points ----------------
+
+test('a combo counts clears in a row, and a lock with no clear ends it', () => {
+  const b = boardWith('O', [[1, 1], [1, 1]], 0, 38);
+  fillRow(b, 39, 2, 10);
+  b.hardDrop();                        // first clear
+  assert.equal(b.combo, 1);
+  // Second clear: an O at the bottom-left again, the row below fills in one go.
+  fillRow(b, 39, 2, 10);
+  b.active.type = 'O'; b.active.cells = [[1, 1], [1, 1]]; b.active.x = 0; b.active.y = 38;
+  b.hardDrop();
+  assert.equal(b.combo, 2);
+  // A lock that clears nothing ends the combo.
+  b.active.type = 'O'; b.active.cells = [[1, 1], [1, 1]]; b.active.x = 6; b.active.y = 0;
+  b.hardDrop();
+  assert.equal(b.combo, 0);
+});
+
+test('clear events carry the rows, their contents, and the combo for the flash effect', () => {
+  let event = null;
+  const b = boardWith('O', [[1, 1], [1, 1]], 0, 38);
+  b.onEvent = (name, data) => { if (name === 'clear') event = data; };
+  fillRow(b, 39, 2, 10, 'Z');
+  b.hardDrop();
+  assert.equal(event.lines, 1);
+  assert.deepEqual(event.rows, [19], 'the bottom visible row is 19');
+  assert.equal(event.cells[0][9], 'Z', 'the cleared row keeps its colours');
+  assert.equal(event.combo, 1);
+});
+
+test('reward points: a single pays nothing, a Tetris pays 5, combos and back-to-back add to it', () => {
+  assert.equal(E.clearReward(1, 1, false, 1), 0);
+  assert.equal(E.clearReward(4, 1, false, 1), 5);
+  assert.equal(E.clearReward(1, 3, false, 1), 2, 'combo of 3 adds 2');
+  assert.equal(E.clearReward(4, 2, true, 1), 9, 'back-to-back Tetris is 1.5x');
+  assert.equal(E.clearReward(4, 1, false, 11), 10, 'level factor caps at 2x');
+});
+
+test('the board adds up reward points as lines clear, and a plain game earns nothing', () => {
+  const b = boardWith('I', [[1], [1], [1], [1]], 0, 36);
+  for (let y = 36; y < 40; y++) fillRow(b, y, 1, 10, 'S');
+  b.hardDrop();
+  assert.equal(b.rewardPoints, 5, 'one Tetris from a fresh board');
+  const plain = new E.Board({ seed: 5 });
+  assert.equal(plain.rewardPoints, 0);
+});
+
+// ---------------- keys: the default is arrows rotate ----------------
+
+test('the default keys: Up and Down rotate, S soft-drops, Space slams, C and Shift hold', () => {
+  const keysSrc = fs.readFileSync(path.join(__dirname, '../../public/tetris/keys.js'), 'utf8');
+  const store = new Map();
+  const win = { addEventListener() {}, dispatchEvent() {} };
+  const ctx = {
+    window: win, localStorage: { getItem: (k) => store.get(k) || null, setItem: (k, v) => store.set(k, v) },
+    document: { querySelectorAll: () => [] }, CustomEvent: function () {},
+  };
+  new Function('window', 'localStorage', 'document', 'CustomEvent', keysSrc)(win, ctx.localStorage, ctx.document, ctx.CustomEvent);
+  const K = win.TetrisKeys;
+  assert.equal(K.actionFor('ArrowUp'), 'rotcw');
+  assert.equal(K.actionFor('ArrowDown'), 'rotccw');
+  assert.equal(K.actionFor('s'), 'soft');
+  assert.equal(K.actionFor(' '), 'hard');
+  assert.equal(K.actionFor('c'), 'hold');
 });

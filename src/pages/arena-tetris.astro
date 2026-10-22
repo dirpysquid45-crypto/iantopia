@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/tetris/tetris.css?v=2">
+<link rel="stylesheet" href="/tetris/tetris.css?v=3">
 <style is:global>
   #banner { position:fixed; top:0; left:0; right:0; z-index:25; background:rgba(180,30,30,.92); color:#fff; font-size:8px; padding:8px; text-align:center; display:none; }
 </style>
@@ -44,18 +44,31 @@
       <div class="stage" id="stage">
         <canvas id="board" role="img" aria-label="Your board"></canvas>
 
-        <div class="overlay show" id="lobby" role="dialog" aria-labelledby="lobby-title">
-          <h2 id="lobby-title">TETRIS 1v1</h2>
-          <p>Friendly, nothing staked.<br>Clear rows to send them to your opponent's well.</p>
-          <div id="find-row">
-            <button class="btn" id="btn-find" type="button">Find a match</button>
+        <div class="overlay settings show" id="lobby" role="dialog" aria-labelledby="lobby-title">
+          <div class="settings-panel">
+            <h2 id="lobby-title">TETRIS 1v1</h2>
+            <p class="lobby-blurb">Clear rows to send them to your opponent's well. Play friendly, or stake Strubles: the winner takes the pot less a 5% rake.</p>
+            <div class="stake-row">
+              <button type="button" id="seg-friendly" class="seg-btn on">Friendly · free</button>
+              <button type="button" id="seg-stake" class="seg-btn">For Strubles</button>
+            </div>
+            <input type="number" id="bet-input" class="bet-input" min="100" step="100" inputmode="numeric" placeholder="Stake (min 100)" hidden />
+            <p class="lobby-blurb" id="balance-line"></p>
+            <div id="find-row">
+              <button class="btn" id="btn-find" type="button">Find a match</button>
+            </div>
+            <div id="waiting" hidden>
+              <p id="wait-text">Waiting for an opponent…</p>
+              <button class="btn" id="cancel-wait" type="button">Cancel</button>
+            </div>
+            <p id="status"></p>
+            <h3 class="settings-h">Open lobbies</h3>
+            <div id="lobby-rows"></div>
+            <p class="lobby-blurb" id="lobby-empty">No open lobbies yet.</p>
+            <button class="btn" id="btn-settings" type="button">Settings</button>
+            <p class="credit">Rules from Tetrigo (GPL-3.0). Piece colours from Flatris (MIT). Sounds: PC / Computer, Tetris Zone.</p>
+            <a href="/arena" class="frame-back">← Back to Arena</a>
           </div>
-          <div id="waiting" hidden>
-            <p id="wait-text">Waiting for an opponent…</p>
-            <button class="btn" id="cancel-wait" type="button">Cancel</button>
-          </div>
-          <p id="status"></p>
-          <p class="credit">Rules from Tetrigo (GPL-3.0). Piece colours from Flatris (MIT).</p>
         </div>
 
         <div class="overlay" id="result" role="dialog" aria-labelledby="result-title">
@@ -65,6 +78,7 @@
           <button class="btn" id="btn-rematch" type="button" disabled>Rematch</button>
           <button class="btn" id="btn-lobby" type="button">Back to lobby</button>
         </div>
+
       </div>
 
       <div class="side">
@@ -74,25 +88,41 @@
     </div>
 
     <div class="pad" role="group" aria-label="Touch controls">
-      <button type="button" data-action="left" aria-label="Move left" aria-keyshortcuts="ArrowLeft A">◀<small>A</small></button>
-      <button type="button" data-action="right" aria-label="Move right" aria-keyshortcuts="ArrowRight D">▶<small>D</small></button>
-      <button type="button" data-action="rotccw" aria-label="Rotate counter-clockwise" aria-keyshortcuts="Q Z">⟲<small>Q</small></button>
-      <button type="button" data-action="rotcw" aria-label="Rotate clockwise" aria-keyshortcuts="R X">⟳<small>R</small></button>
-      <button type="button" data-action="soft" aria-label="Soft drop, hold to fall faster" aria-keyshortcuts="ArrowDown S">▼<small>S</small></button>
-      <button type="button" data-action="hard" aria-label="Slam, hard drop" aria-keyshortcuts="Space">⤓<small>SPACE</small></button>
-      <button type="button" data-action="hold" aria-label="Hold piece" aria-keyshortcuts="ArrowUp">HOLD<small>↑</small></button>
+      <div class="pad-row">
+        <button type="button" class="key left" data-action="left" aria-label="Move left"><span class="icon">◀</span><span class="cap">LEFT</span><span class="hint" data-hint="left"></span></button>
+        <button type="button" class="key right" data-action="right" aria-label="Move right"><span class="icon">▶</span><span class="cap">RIGHT</span><span class="hint" data-hint="right"></span></button>
+        <button type="button" class="key rotccw" data-action="rotccw" aria-label="Rotate counter-clockwise"><span class="icon">⟲</span><span class="cap">ROTATE</span><span class="hint" data-hint="rotccw"></span></button>
+        <button type="button" class="key rotcw" data-action="rotcw" aria-label="Rotate clockwise"><span class="icon">⟳</span><span class="cap">ROTATE</span><span class="hint" data-hint="rotcw"></span></button>
+      </div>
+      <div class="pad-row three">
+        <button type="button" class="key soft" data-action="soft" aria-label="Soft drop, hold to fall faster"><span class="icon">▼</span><span class="cap">SOFT</span><span class="hint" data-hint="soft"></span></button>
+        <button type="button" class="key hard" data-action="hard" aria-label="Slam, hard drop"><span class="icon">⤓</span><span class="cap">SLAM</span><span class="hint" data-hint="hard"></span></button>
+        <button type="button" class="key hold" data-action="hold" aria-label="Hold piece"><span class="icon">⬒</span><span class="cap">HOLD</span><span class="hint" data-hint="hold"></span></button>
+      </div>
     </div>
   </div>
+
+  <div class="overlay settings" id="settings-overlay" role="dialog" aria-labelledby="settings-title">
+      <div class="settings-panel">
+        <h2 id="settings-title">SETTINGS</h2>
+        <div id="settings-body"></div>
+        <button class="btn" id="btn-settings-done" type="button">Done</button>
+      </div>
+    </div>
 
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script is:inline src="/game-stats.js?v=1"></script>
   <script is:inline src="/cloud-sync.js?v=14"></script>
+  <script is:inline src="/tycoon-cap.js?v=1"></script>
+  <script is:inline src="/tycoon-bank.js?v=2"></script>
+  <script is:inline src="/strubles.js?v=3"></script>
   <script is:inline src="/arena-client.js?v=1"></script>
   <script is:inline src="/tetris/engine.js?v=1"></script>
-  <script is:inline src="/tetris/view.js?v=1"></script>
-  <script is:inline src="/tetris/controls.js?v=2"></script>
+  <script is:inline src="/tetris/view.js?v=2"></script>
+  <script is:inline src="/tetris/keys.js?v=1"></script>
+  <script is:inline src="/tetris/controls.js?v=3"></script>
   <script is:inline src="/tetris/sfx.js?v=1"></script>
   <script is:inline>
     (() => {
@@ -116,6 +146,11 @@
         if (!muted && S.phase === 'playing') SFX.startMusic();
       });
       syncSoundButton();
+
+      TetrisKeys.mountSettings($('settings-body'));
+      $('btn-settings').addEventListener('click', () => { show('lobby', false); show('settings-overlay', true); $('btn-settings-done').focus(); });
+      let stakeMode = false;
+      $('btn-settings-done').addEventListener('click', () => { show('settings-overlay', false); show('lobby', S.phase === 'lobby'); });
 
       // phase: lobby | playing | dead (we topped out, waiting for the result) | over
       const S = { phase: 'lobby', board: null, yourIndex: 0, opponentName: 'Opponent', seed: 0, rematchSent: false, netPaused: false, reported: false, lastSnapshot: 0 };
@@ -141,13 +176,13 @@
         return new E.Board({
           seed,
           onLock: (rows) => arena.send({ type: 'action', action: 'cleared', rows }),
-          onEvent: SFX.onEngineEvent,
+          onEvent: (name, data) => { if (name === 'clear') boardView.flash(data); SFX.onEngineEvent(name, data); },
         });
       }
 
       function startGame(m) {
         S.phase = 'playing'; S.yourIndex = m.yourIndex; S.opponentName = m.opponentName || 'Opponent';
-        S.seed = m.seed; S.rematchSent = false; S.netPaused = false; S.reported = false;
+        S.seed = m.seed; S.bet = m.bet || 0; S.rematchSent = false; S.netPaused = false; S.reported = false;
         S.board = newBoard(m.seed);
         $('opp-name').textContent = S.opponentName;
         SFX.play('start');
@@ -196,7 +231,7 @@
       function render(now) {
         const b = S.board;
         if (b) {
-          boardView.draw(b, { ghost: true });
+          boardView.draw(b, TetrisKeys.look());
           holdView.draw(b.held ? [b.held] : []);
           nextView.draw(b.preview());
           $('score').textContent = b.score;
@@ -236,7 +271,11 @@
           : m.reason === 'disconnect' ? 'Your opponent disconnected.' : '';
         const mine = (m.scores && m.scores[S.yourIndex]) || { score: 0, lines: 0 };
         const theirs = (m.scores && m.scores[1 - S.yourIndex]) || { score: 0, lines: 0 };
-        $('result-score').textContent = `You ${mine.score} points, ${mine.lines} lines. ${S.opponentName}: ${theirs.score} points, ${theirs.lines} lines. ${reason}`;
+        let stakeLine = '';
+        if (S.bet > 0) {
+          stakeLine = won ? ` +${(m.payout || 0).toLocaleString()} Strubles.` : ` −${S.bet.toLocaleString()} Strubles.`;
+        }
+        $('result-score').textContent = `You ${mine.score} points, ${mine.lines} lines. ${S.opponentName}: ${theirs.score} points, ${theirs.lines} lines. ${reason}${stakeLine}`;
         $('rematch-note').textContent = '';
         $('btn-rematch').disabled = true;
         show('result', true);
@@ -258,6 +297,7 @@
               if (m.status === 'matched') setWaiting(true, 'Matched! Starting…');
               break;
             case 'game_start': startGame(m); break;
+            case 'lobby_update': renderLobbies(m.lobbies); break;
             case 'tetris_garbage':
               if (S.phase === 'playing' && S.board) {
                 S.board.receiveRows(m.rows);
@@ -297,12 +337,62 @@
       });
       arena.connect();
 
+      // Stake or friendly. A stake is checked here too, so the server's refusals are
+      // rarely the first news a player gets.
+      function stakeValue() { return stakeMode ? Number($('bet-input').value) : 0; }
+      function setStakeMode(on) {
+        stakeMode = !!on;
+        $('seg-friendly').classList.toggle('on', !stakeMode);
+        $('seg-stake').classList.toggle('on', stakeMode);
+        $('bet-input').hidden = !stakeMode;
+        $('balance-line').textContent = stakeMode ? `Balance: ${Strubles.get().toLocaleString()} Strubles` : '';
+        $('btn-find').textContent = stakeMode ? 'Find a stake match' : 'Find a match';
+      }
+      function stakeProblem(bet) {
+        if (!stakeMode) return null;
+        if (arena.me.guest) return 'Sign in to play for Strubles. Guests play friendly.';
+        if (!Number.isInteger(bet) || bet < 100) return 'A stake must be at least 100 Strubles.';
+        if (bet > Strubles.get()) return "You don't have that many Strubles.";
+        return null;
+      }
+      $('seg-friendly').addEventListener('click', () => setStakeMode(false));
+      $('seg-stake').addEventListener('click', () => setStakeMode(true));
       $('btn-find').addEventListener('click', () => {
+        const bet = stakeValue();
+        const problem = stakeProblem(bet);
+        if (problem) { $('status').textContent = problem; return; }
+        $('status').textContent = '';
         $('btn-find').disabled = true;
         SFX.startMusic();
-        setWaiting(true, 'Looking for an opponent…');
-        arena.send({ type: 'join_queue', bet: 0, gameType: 'tetris' });
+        setWaiting(true, bet ? `Looking for a ${bet.toLocaleString()} Strubles opponent…` : 'Looking for an opponent…');
+        arena.send({ type: 'join_queue', bet, gameType: 'tetris' });
       });
+
+      // Open lobbies: the server lists every waiting table; Tetris ones are shown here.
+      function renderLobbies(lobbies) {
+        const box = $('lobby-rows');
+        const tetris = (lobbies || []).filter((l) => l.gameType === 'tetris');
+        box.textContent = '';
+        tetris.forEach((l) => {
+          const row = document.createElement('div');
+          row.className = 'lobby-row';
+          const label = document.createElement('span');
+          label.textContent = `${l.name || 'Player'} · ${l.bet ? l.bet.toLocaleString() + ' Strubles' : 'friendly'}`;
+          row.appendChild(label);
+          const take = document.createElement('button');
+          take.type = 'button';
+          take.textContent = l.bet ? 'Take' : 'Join';
+          take.addEventListener('click', () => {
+            if (l.bet && arena.me.guest) { $('status').textContent = 'Sign in to play for Strubles.'; return; }
+            if (l.bet && l.bet > Strubles.get()) { $('status').textContent = "You don't have enough Strubles for that lobby."; return; }
+            $('status').textContent = '';
+            arena.send({ type: 'match_bet', queueId: l.queueId });
+          });
+          row.appendChild(take);
+          box.appendChild(row);
+        });
+        $('lobby-empty').hidden = tetris.length > 0;
+      }
       $('cancel-wait').addEventListener('click', () => {
         arena.send({ type: 'leave_queue' });
         setWaiting(false);

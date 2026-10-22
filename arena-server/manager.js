@@ -6,7 +6,7 @@ const BalanceManager = require('./balance');
 
 const GAME_TYPES = new Set(['blackjack', 'battleship', 'airhockey', 'tetris']);
 // Games with no stakes: nothing can be lost or won, so a bet is refused.
-const FRIENDLY_ONLY = new Set(['airhockey', 'tetris']);
+const FRIENDLY_ONLY = new Set(['airhockey']);
 const MAX_BET = 1000000;
 const SUGGESTION_STATUSES = new Set(['new', 'public', 'archived']);
 
@@ -347,7 +347,7 @@ class Manager {
     // negative bet was accepted (it passed `balance < bet`) and then "deducted"
     // as a credit, which matched against itself or an accomplice minted money.
     if (!Number.isSafeInteger(bet) || bet < 0 || bet > MAX_BET) return this.fail(ws, 'Invalid bet');
-    // Air hockey and Tetris are friendly only: nothing is staked, so nothing can be lost or won.
+    // Air hockey is friendly only: nothing is staked, so nothing can be lost or won. Tetris can be staked.
     if (FRIENDLY_ONLY.has(gameType) && bet !== 0) return this.fail(ws, 'That game is friendly only');
     // Air hockey players must pick the same mode to be matched.
     const airMode = gameType === 'airhockey' ? (AIRHOCKEY_MODES.has(mode) ? mode : 'score7') : null;

@@ -71,7 +71,9 @@
   button.action-btn.accent:hover:not(:disabled) { background:#2f9aa1; }
   button.action-btn:not(:disabled) { animation: neonBtnPulse 2s ease-in-out infinite; }
   button.action-btn:disabled { opacity:.5; cursor:not-allowed; animation:none; }
-  .bet-section { background:rgba(0,0,0,.4); border:2px solid var(--gold); padding:15px; }
+  /* The lobby: a big panel that stretches down, so the open lobbies have room. */
+  .bet-section { margin-top:64px; width:min(680px, 94vw); min-height:min(640px, 78vh); display:flex; flex-direction:column; gap:12px; background:rgba(0,0,0,.45); border:3px solid var(--gold); box-shadow:0 0 24px rgba(255,215,0,.25), inset 0 0 30px rgba(0,0,0,.6); padding:22px; }
+  #lobby-list { flex:1; min-height:160px; }
   .bet-input { background:#000; border:2px solid var(--gold); color:var(--gold); padding:8px; font-family:inherit; font-size:11px; width:100%; margin-bottom:10px; }
   .seg-btn { flex:1; background:#000; color:#9fb0cf; border:2px solid #555; padding:12px 6px; font-family:inherit; font-size:9px; min-height:44px; cursor:pointer; }
   .seg-btn.on { background:var(--gold); color:#000; border-color:var(--gold); }
@@ -87,8 +89,9 @@
   }
   #find-match { animation: neonBtnPulse 2s ease-in-out infinite; }
   .status { font-size:9px; color:var(--muted); margin:10px 0; }
-  .back-link { position:fixed; top:20px; left:20px; color:var(--gold); text-decoration:none; border:2px solid #000; padding:6px 10px; background:#000; font-size:9px; font-weight:700; z-index:10; transition:background 0.2s; }
-  .back-link:hover { background:var(--gold); color:#000; }
+  /* Back button: a framed button at the foot of the lobby, out of the Strubles counter's way. */
+  .frame-back { display:block; text-align:center; color:var(--gold); text-decoration:none; background:#000; border:3px solid var(--gold); box-shadow:0 0 0 3px #000, 0 0 0 6px rgba(255,215,0,.35); padding:12px 16px; font-size:10px; font-weight:700; margin-top:auto; transition:background .2s, color .2s; }
+  .frame-back:hover { background:var(--gold); color:#000; }
 
   #strubles-badge { position:fixed; top:20px; right:20px; display:flex; align-items:center; gap:8px; background:#000; padding:8px 12px; border:3px solid #ffd700; font-weight:700; z-index:10; font-size:11px; color:var(--gold); }
   #strubles-badge img { width:24px; height:24px; }
@@ -142,8 +145,6 @@
 </style>
 </head>
 <body>
-  <a href="/arena" class="back-link">← Arena</a>
-
   <div id="strubles-badge">
     <img src="/strubles.png" alt="Struble">
     <span id="bal">0</span>
@@ -153,10 +154,6 @@
   <div id="bj-celebration"><span>YOU WIN!</span></div>
 
   <main>
-    <div class="top-bar">
-      <div class="balance">Balance: <span id="balance">0</span> Strubles</div>
-    </div>
-
     <div id="net-banner" style="display:none; background:#7a5a10; color:#fff; font-size:9px; line-height:1.7; padding:8px 10px; text-align:center; margin-bottom:10px;"></div>
     <div id="bet-section" class="bet-section">
       <div class="status" id="who">Connecting…</div>
@@ -178,6 +175,7 @@
         <div id="lobby-rows"></div>
         <div id="lobby-empty">No open lobbies yet — be the first to place a bet.</div>
       </div>
+      <a href="/arena" class="frame-back">← Back to Arena</a>
     </div>
 
     <div id="game-section" class="table" style="display:none;">
@@ -355,7 +353,6 @@
 
   function updateBalance() {
     const bal = Strubles.get().toLocaleString();
-    document.getElementById('balance').textContent = bal;
     document.getElementById('bal').textContent = bal;
   }
 
