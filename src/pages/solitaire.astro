@@ -72,7 +72,7 @@
     const hints = Math.max(0, Math.floor(Number(e.data.hints) || 0));
     const pay = Math.round(PAY * Math.max(0, 1 - HINT_CUT * hints));
     if (pay > 0) {
-      try { Strubles.add(pay); } catch {}
+      try { Strubles.add(pay, undefined, 'solitaire'); } catch {}
       try { GameStats.record('solitaire', 'win', { net: pay }); } catch {}
     }
     status.className = pay > 0 ? 'win' : '';

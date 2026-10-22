@@ -314,7 +314,7 @@
         // table the duplicate-refund fallback below uses instead of the
         // item's own (much bigger) face amount.
         const amount = isFullyComplete() ? (POST_COMPLETION_PAYOUT[item.tier] || 0) : (item.amount || 0);
-        Strubles.add(amount);
+        Strubles.add(amount, undefined, 'lootbox');
         result.unlocked = true;
         break;
       }

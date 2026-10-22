@@ -697,7 +697,7 @@
     });
     localStorage.setItem(LAST_SEEN_KEY, String(now));
     if (TYCOON_DISABLED) return changed;
-    if (earned > 0) { try { Strubles.add(earned); } catch {} }
+    if (earned > 0) { try { Strubles.add(earned, undefined, 'tycoon'); } catch {} }
     village.b.forEach((slot) => {
       if (slot.status === 'complete' && slot.taxDebt > 0 && Strubles.spend(slot.taxDebt)) {
         slot.taxDebt = 0;
@@ -988,7 +988,7 @@
 
   function triggerCaravan() {
     const bonus = Math.round(Math.max(150, estimateGDP() * (2 + Math.random() * 3)));
-    try { Strubles.add(bonus); } catch {}
+    try { Strubles.add(bonus, undefined, 'tycoon'); } catch {}
     toast(`🚚 A trade caravan passed through! +${bonus.toLocaleString()} Strubles`);
     return true;
   }

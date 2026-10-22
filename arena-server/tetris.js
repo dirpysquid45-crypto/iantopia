@@ -10,9 +10,9 @@
  * Each player runs their own board on the shared engine (public/tetris/engine.js),
  * so moves feel instant. The server does the match rules:
  *   - both players get the same seed, so they get the same pieces in the same order
- *   - rows a player clears go to the opponent (Flatris's versus transfer), with one
- *     hole punched in each row so the receiver can clear it; the server does the
- *     punching, so a client can't choose the hole
+ *   - every line a player clears sends one grey garbage line to the opponent, with
+ *     one hole in it so the receiver can clear it. The server builds the lines, so a
+ *     client can't choose their contents or their hole
  *   - the opponent sees a small snapshot of the board, relayed as is for display
  *   - a top-out, a leave or a dropped connection that is not restored ends the match
  *
@@ -27,28 +27,18 @@ const ArenaGame = require('./game-base');
 const COLS = 10;
 const VISIBLE = 20;
 const MAX_ROWS_PER_CLEAR = 4;
-const CELL_RE = /^[IOTSZJL]$/;
-const SNAPSHOT_ROW_RE = /^[.IOTSZJL]{10}$/;
+const SNAPSHOT_ROW_RE = /^[.IOTSZJLG]{10}$/;
 
-// Cleared rows, as the client sends them: arrays of 10 piece letters. Returns null if invalid.
-function validClearedRows(rows) {
-  if (!Array.isArray(rows) || rows.length < 1 || rows.length > MAX_ROWS_PER_CLEAR) return null;
-  for (const row of rows) {
-    if (!Array.isArray(row) || row.length !== COLS) return null;
-    for (const cell of row) {
-      if (typeof cell !== 'string' || !CELL_RE.test(cell)) return null;
-    }
-  }
-  return rows;
+// The number of lines a clear sent: 1 to 4. Returns null if it isn't one of those.
+function validLines(n) {
+  return Number.isInteger(n) && n >= 1 && n <= MAX_ROWS_PER_CLEAR ? n : null;
 }
 
-// Takes full rows and punches one random hole in each, so they can be cleared on arrival.
-function toGarbage(rows) {
-  return rows.map((row) => {
-    const copy = row.slice();
-    copy[crypto.randomInt(COLS)] = null;
-    return copy;
-  });
+// One grey garbage line: full, with a single random hole so it can be cleared.
+function greyLine() {
+  const row = Array(COLS).fill('G');
+  row[crypto.randomInt(COLS)] = null;
+  return row;
 }
 
 // A snapshot of the visible board: exactly 20 strings of 10 characters.
@@ -99,10 +89,11 @@ class TetrisGame extends ArenaGame {
     const other = 1 - i;
 
     if (action === 'cleared') {
-      const rows = validClearedRows(msg.rows);
-      if (!rows) return;
-      this.scores[i].lines += rows.length;
-      this.send(other, { type: 'tetris_garbage', rows: toGarbage(rows) });
+      const lines = validLines(msg.lines);
+      if (!lines) return;
+      this.scores[i].lines += lines;
+      const rows = Array.from({ length: lines }, greyLine);
+      this.send(other, { type: 'tetris_garbage', rows });
     } else if (action === 'board') {
       const rows = validSnapshot(msg.rows);
       if (!rows) return;
@@ -149,4 +140,4 @@ class TetrisGame extends ArenaGame {
   }
 }
 
-module.exports = { TetrisGame, validClearedRows, validSnapshot, toGarbage };
+module.exports = { TetrisGame, validLines, validSnapshot, greyLine };

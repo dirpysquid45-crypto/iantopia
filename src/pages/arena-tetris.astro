@@ -119,9 +119,9 @@
   <script is:inline src="/tycoon-bank.js?v=2"></script>
   <script is:inline src="/strubles.js?v=3"></script>
   <script is:inline src="/arena-client.js?v=1"></script>
-  <script is:inline src="/tetris/engine.js?v=1"></script>
+  <script is:inline src="/tetris/engine.js?v=4"></script>
   <script is:inline src="/tetris/view.js?v=2"></script>
-  <script is:inline src="/tetris/keys.js?v=1"></script>
+  <script is:inline src="/tetris/keys.js?v=2"></script>
   <script is:inline src="/tetris/controls.js?v=3"></script>
   <script is:inline src="/tetris/sfx.js?v=1"></script>
   <script is:inline>
@@ -175,7 +175,7 @@
       function newBoard(seed) {
         return new E.Board({
           seed,
-          onLock: (rows) => arena.send({ type: 'action', action: 'cleared', rows }),
+          onLock: (rows) => arena.send({ type: 'action', action: 'cleared', lines: rows.length }),
           onEvent: (name, data) => { if (name === 'clear') boardView.flash(data); SFX.onEngineEvent(name, data); },
         });
       }

@@ -7,25 +7,37 @@ rules_version = '2';
 // Deploy with:  firebase deploy --only firestore:rules
 // or paste this file into Firebase console > Firestore > Rules.
 //
-// Trust model: clients still write their own documents directly (the game
-// has no server-side validation for these yet). These rules stop anyone
-// from writing someone else's document, and keep private data private.
+// Trust model: players write their own save data directly, but the Strubles
+// balance and anything that moves money is written only by the arena server
+// (arena-server/wallet.js), so a browser can't change a balance. These rules
+// stop anyone from writing someone else's document, and keep private data private.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // Each player's own save data. Only the owner reads or writes it.
-    // Save data. The balance is stored as a plain digit string; anything
-    // that isn't a sane number is refused. This is a ceiling only: a
-    // cheater can still write any value under it. Stage 2 (a server-side
-    // ledger) is what makes balances trustworthy.
+    // The wallet is server-owned: the balance, the claims and the gain record are
+    // written only by the arena server (Admin SDK), so a browser can't write them
+    // or change them. Everything else in the save is the player's own.
     match /users/{uid} {
+      function serverOwned(k) {
+        return request.resource.data.get(k, null) == resource.data.get(k, null);
+      }
+      function noServerFields(d) {
+        return !('strubles_balance_v1' in d) && !('wallet_claims' in d) && !('wallet_seen' in d)
+          && !('strubles_last_gain_v1' in d) && !('wallet_last_op' in d) && !('wallet_rounds' in d) && !('wallet_budget' in d) && !('balance_reset_at' in d) && !('ban_until' in d)
+          && !('cheat_warning_at' in d) && !('admin_warning' in d);
+      }
       allow read, delete: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid
+      allow create: if request.auth != null && request.auth.uid == uid
         && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time)
         && request.resource.size() < 200000
-        && (!('strubles_balance_v1' in request.resource.data)
-            || (request.resource.data.strubles_balance_v1 is string
-                && request.resource.data.strubles_balance_v1.matches('^[0-9]{1,10}$')));
+        && noServerFields(request.resource.data);
+      allow update: if request.auth != null && request.auth.uid == uid
+        && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time)
+        && request.resource.size() < 200000
+        && serverOwned('strubles_balance_v1') && serverOwned('wallet_claims') && serverOwned('wallet_seen')
+        && serverOwned('strubles_last_gain_v1') && serverOwned('wallet_last_op') && serverOwned('wallet_rounds') && serverOwned('wallet_budget') && serverOwned('balance_reset_at') && serverOwned('ban_until')
+        && serverOwned('cheat_warning_at') && serverOwned('admin_warning');
     }
 
     // Public boards: anyone can read, only the owner writes their own row.

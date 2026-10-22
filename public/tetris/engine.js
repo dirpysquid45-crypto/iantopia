@@ -27,7 +27,8 @@
   // Piece colours (from Flatris). The page draws each piece as a black block with
   // this colour as its outline and glow.
   // J is the blue piece, L the orange one, Z the red one, T the purple one.
-  var COLORS = { I: '#3cc7d6', O: '#fbb414', T: '#5b1b82', J: '#1b3f94', L: '#d9480f', S: '#95c43d', Z: '#a3111f' };
+  // G is grey garbage: a line sent by an opponent's clear.
+  var COLORS = { G: '#7b8496', I: '#3cc7d6', O: '#fbb414', T: '#5b1b82', J: '#1b3f94', L: '#d9480f', S: '#95c43d', Z: '#a3111f' };
 
   var SHAPES = {
     I: [[1, 1, 1, 1]],

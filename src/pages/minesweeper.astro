@@ -543,6 +543,8 @@
   let gameActive = false;
   let flagMode = false;
   let currentBet = 0;
+  // The wallet round for this game's bet. Saved with the game, so a resumed game still pays out.
+  let currentRound = null;
   let flagCount = 0;
   let revealedSafeCount = 0;
   let timerInterval = null;
@@ -908,7 +910,7 @@
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
         diffKey, rows, cols, mineTotal, landTotal, firstClickDone,
-        currentBet, flagCount, revealedSafeCount, elapsed, board,
+        currentBet, currentRound, flagCount, revealedSafeCount, elapsed, board,
       }));
     } catch {}
   }
@@ -923,7 +925,7 @@
     diffKey = saved.diffKey;
     rows = saved.rows; cols = saved.cols;
     mineTotal = saved.mineTotal; landTotal = saved.landTotal;
-    firstClickDone = saved.firstClickDone; currentBet = saved.currentBet;
+    firstClickDone = saved.firstClickDone; currentBet = saved.currentBet; currentRound = saved.currentRound || null;
     flagCount = saved.flagCount; revealedSafeCount = saved.revealedSafeCount;
     board = saved.board;
     gameActive = true;
@@ -1045,10 +1047,13 @@
     recordMinesLeaderboard(diffKey, won);
     if (won) {
       const payout = Math.round(currentBet * DIFFICULTIES[diffKey].mult);
-      Strubles.add(payout);
+      Strubles.settle('minesweeper', currentRound, payout);
+      currentRound = null;
       setStatus(`✓ Cleared the board! +${payout} Strubles`, 'win');
       playVictorySequence();
     } else {
+      Strubles.settle('minesweeper', currentRound, 0);
+      currentRound = null;
       setStatus(`💥 Boom. Lost ${currentBet} Strubles.`, 'lose');
       playSfx('minesweeper-mine-hit');
       showExplosion();
@@ -1259,10 +1264,14 @@
 
   async function newGame() {
     const bet = Math.max(1, Math.floor(Number(betInput.value) || 0));
-    if (!Strubles.spend(bet)) {
+    // Starting over forfeits the game in progress: it settles at 0 first.
+    if (gameActive) { Strubles.settle('minesweeper', currentRound, 0); currentRound = null; }
+    const round = Strubles.stake('minesweeper', bet);
+    if (!round) {
       setStatus('Not enough Strubles for that bet.', 'lose');
       return;
     }
+    currentRound = round;
     currentBet = bet;
     playSfx('minesweeper-start');
     const diff = DIFFICULTIES[diffKey];
@@ -1283,7 +1292,8 @@
         landMask = cleanupMask(await sampleHormuzMask(rows, cols));
       } catch {
         setStatus('Could not load the map — refund issued.', 'lose');
-        Strubles.add(bet);
+        Strubles.settle('minesweeper', currentRound, bet);
+        currentRound = null;
         gameActive = false;
         newGameBtn.disabled = false;
         return;

@@ -1,6 +1,11 @@
+const http = require('http');
 const WebSocket = require('ws');
 const Manager = require('./manager');
 const RateLimit = require('./rate-limit');
+const { Wallet } = require('./wallet');
+
+const WALLET_BODY_MAX = 16 * 1024;
+const WALLET_OPS_MAX = 50;
 
 // Addresses that can only be our own reverse proxy / docker network.
 function isPrivateAddress(addr) {
@@ -49,8 +54,79 @@ function createServer(options = {}) {
   const adminList = admins || adminsFromEnv(process.env);
   const log = quiet ? () => {} : (...a) => console.log(...a);
 
-  const wss = new WebSocket.Server({ port, host, clientTracking: false, maxPayload: 16 * 1024 });
   const manager = new Manager(db, auth, { timing, makeDeck, accounts });
+  const wallet = new Wallet(db, manager.balance);
+
+  // One HTTP server carries both the game socket (ws) and the wallet routes
+  // (/wallet and /wallet/ops). nginx sends /arena-ws/ and /arena-api/ here.
+  const httpServer = http.createServer((req, res) => {
+    handleWallet(req, res).catch(() => { if (!res.headersSent) sendJson(res, 500, { error: 'server' }); });
+  });
+  const wss = new WebSocket.Server({ server: httpServer, clientTracking: false, maxPayload: 16 * 1024 });
+  httpServer.on('listening', () => wss.emit('listening'));
+  httpServer.listen(port, host);
+
+  function sendJson(res, status, body) {
+    res.statusCode = status;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify(body));
+  }
+  function bearer(req) {
+    const h = String(req.headers.authorization || '');
+    return h.startsWith('Bearer ') ? h.slice(7) : null;
+  }
+  // Only a signed-in account has a wallet. Guests keep their own local currency.
+  async function signedInUid(req) {
+    const token = bearer(req);
+    if (!token) return null;
+    try { return (await auth.verifyIdToken(token)).uid; } catch { return null; }
+  }
+  function readBody(req) {
+    return new Promise((resolve, reject) => {
+      let size = 0;
+      const chunks = [];
+      req.on('data', (c) => {
+        size += c.length;
+        if (size > WALLET_BODY_MAX) { reject(new Error('too large')); req.destroy(); return; }
+        chunks.push(c);
+      });
+      req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+      req.on('error', reject);
+    });
+  }
+  // Local development only: the page and the arena are on different ports there, so
+  // the browser needs CORS. Production is same-origin through nginx, so no origin
+  // other than this machine is ever allowed.
+  const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+  function allowLocalOrigin(req, res) {
+    const origin = String(req.headers.origin || '');
+    if (!LOCAL_ORIGIN.test(origin)) return;
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  }
+  async function handleWallet(req, res) {
+    allowLocalOrigin(req, res);
+    if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
+    const path = new URL(req.url, 'http://x').pathname;
+    if (path !== '/wallet' && path !== '/wallet/ops') return sendJson(res, 404, { error: 'not_found' });
+    const uid = await signedInUid(req);
+    if (!uid) return sendJson(res, 401, { error: 'sign_in' });
+    if (path === '/wallet' && req.method === 'GET') {
+      return sendJson(res, 200, await wallet.read(uid));
+    }
+    if (path === '/wallet/ops' && req.method === 'POST') {
+      let body;
+      try { body = JSON.parse(await readBody(req)); } catch { return sendJson(res, 400, { error: 'bad_json' }); }
+      const ops = body && Array.isArray(body.ops) ? body.ops : null;
+      if (!ops || ops.length < 1 || ops.length > WALLET_OPS_MAX) return sendJson(res, 400, { error: 'bad_ops' });
+      const results = await wallet.applyBatch(uid, ops);
+      const last = results.length ? results[results.length - 1] : null;
+      return sendJson(res, 200, { results, balance: last && last.balance !== undefined ? last.balance : null });
+    }
+    return sendJson(res, 405, { error: 'method' });
+  }
   const rateLimit = new RateLimit(rate);
   const sockets = new Set();
 
@@ -149,12 +225,15 @@ function createServer(options = {}) {
 
   return {
     wss, manager,
-    address: () => wss.address(),
+    address: () => httpServer.address(),
     close: () => new Promise((resolve) => {
       clearInterval(heartbeat);
       manager.shutdown();
       for (const ws of sockets) { try { ws.terminate(); } catch {} }
-      wss.close(() => resolve());
+      wss.close(() => {
+        httpServer.closeAllConnections && httpServer.closeAllConnections();
+        httpServer.close(() => resolve());
+      });
     }),
   };
 }

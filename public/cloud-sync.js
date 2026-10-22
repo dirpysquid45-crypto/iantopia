@@ -34,8 +34,9 @@
   // *_theme_pos_v1 keys (exact mid-track playback position).
   const SYNC_KEYS = [
     'strubles_inventory_v1',
-    'strubles_balance_v1',
-    'strubles_last_gain_v1',
+    // strubles_balance_v1 and strubles_last_gain_v1 are not synced from the browser:
+    // the server's wallet writes them (see arena-server/wallet.js), and the rules refuse
+    // a browser write that touches them.
     'strubles_cases_v1',
     'strubles_case_history_v1',
     'strubles_case_stats_v1',
@@ -140,6 +141,7 @@
       const resetAt = d.balance_reset_at ? d.balance_reset_at.toMillis() : null;
       if (resetSeen !== null && resetAt !== null && resetAt !== resetSeen) {
         pullFromCloud(user.uid).catch((err) => console.error('[cloud-sync] pull after reset failed:', err));
+        if (window.Strubles && window.Strubles.refresh) window.Strubles.refresh();
       }
       resetSeen = resetAt;
       const until = d.ban_until ? d.ban_until.toDate() : null;

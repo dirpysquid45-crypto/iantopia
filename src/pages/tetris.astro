@@ -99,12 +99,11 @@
   <script is:inline src="/tycoon-cap.js?v=1"></script>
   <script is:inline src="/tycoon-bank.js?v=2"></script>
   <script is:inline src="/strubles.js?v=3"></script>
-  <script is:inline src="/tetris/engine.js?v=3"></script>
+  <script is:inline src="/tetris/engine.js?v=4"></script>
   <script is:inline src="/tetris/view.js?v=2"></script>
-  <script is:inline src="/tetris/keys.js?v=1"></script>
+  <script is:inline src="/tetris/keys.js?v=2"></script>
   <script is:inline src="/tetris/controls.js?v=3"></script>
   <script is:inline src="/tetris/sfx.js?v=1"></script>
-  <script is:inline src="/tetris/rewards.js?v=1"></script>
   <script is:inline>
     (() => {
       const $ = (id) => document.getElementById(id);
@@ -197,12 +196,15 @@
         const s = board.score;
         if (s > best) { best = s; saveBest(best); $('best').textContent = best; }
         $('over-text').textContent = `Score ${s}, ${board.lines} lines, level ${board.level}.`;
-        // Strubles for the Tetris play, paid once here (see rewards.js for the caps).
-        const pay = TetrisRewards.settle(board.rewardPoints);
-        if (pay > 0) { try { Strubles.add(pay, 'earn'); } catch {} }
-        $('over-pay').textContent = pay > 0
-          ? `+${pay} Strubles · ${TetrisRewards.left()} left today`
-          : (board.rewardPoints > 0 ? `Daily Tetris pay is used up for today.` : '');
+        // Strubles for the Tetris play. The server applies the per-game and daily caps.
+        $('over-pay').textContent = board.rewardPoints > 0 ? 'Counting Strubles…' : '';
+        if (board.rewardPoints > 0) {
+          Strubles.tetris(board.rewardPoints, (applied) => {
+            $('over-pay').textContent = applied > 0
+              ? `+${applied} Strubles`
+              : 'No Strubles this time: sign in to earn, or the daily Tetris pay is used up.';
+          });
+        }
         show('over-overlay', true);
         $('btn-again').focus();
       }

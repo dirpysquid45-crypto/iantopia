@@ -223,3 +223,20 @@ test('a stake the server refunds (failed match) is matched to its save and not f
   await save('u7', 12000);                                   // server put the stake back
   assert.equal(events.filter((e) => e.kind === 'punish').length, 0);
 });
+
+test('an admin balance set is stamped as a reset, so open tabs pull it instead of pushing the old balance back', async () => {
+  const { watch, db, events } = setup();
+  await db.collection('users').doc('u8').set({ strubles_balance_v1: '5000' }, { merge: true });
+  await watch.setBalance('u8', 9000);
+  assert.equal(db.docs.get('users/u8').strubles_balance_v1, '9000');
+  assert.ok(db.docs.get('users/u8').balance_reset_at, 'the reset stamp is set');
+  assert.ok(events.some((e) => e.action === 'set' && e.to === 9000));
+});
+
+test('a daily prize the server rolled is not judged as a rate cheat, even on top of other gains', async () => {
+  const { events, save } = setup();
+  await save('u9', 1000);
+  await save('u9', 1100, { amount: 100, kind: 'earn' });
+  await save('u9', 6100, { amount: 5000, kind: 'grant' });   // the daily prize, on top of gains
+  assert.equal(events.filter((e) => e.kind === 'punish').length, 0, 'no strike');
+});

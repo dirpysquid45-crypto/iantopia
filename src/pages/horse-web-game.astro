@@ -1159,7 +1159,7 @@
           const beforeBal = Strubles.get();
           const cap = (window.TycoonBank && window.TycoonBank.currentCap()) || Infinity;
           try {
-            Strubles.add(c.value);
+            Strubles.add(c.value, undefined, 'horse');
             const afterBal = Strubles.get();
             if (afterBal === beforeBal && beforeBal >= cap) {
               console.warn(`[Horse] Coin +${c.value} blocked by wallet cap (${beforeBal}/${cap}). Upgrade your Bank to continue earning.`);

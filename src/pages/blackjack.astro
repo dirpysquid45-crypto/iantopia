@@ -531,6 +531,8 @@
   let deck = [];
   let playerHands = [[]];
   let handBets = [0];
+  // One wallet round per hand: the stake that is settled when the hand ends.
+  let handRounds = [];
   let handDone = [false];
   let activeHand = 0;
   let hasSplit = false;
@@ -778,12 +780,13 @@
     updateActiveHighlight();
   }
 
-  function settle(result, bet){
+  // Closes one hand's round with what it pays (0 for a loss).
+  function settle(result, bet, round){
     let payout = 0;
     if (result === 'win') payout = bet * 2;
     else if (result === 'blackjack') payout = Math.floor(bet * 2.5);
     else if (result === 'push') payout = bet;
-    if (payout) Strubles.add(payout);
+    Strubles.settle('blackjack', round, payout);
     try { GameStats.record('blackjack', result === 'push' ? 'push' : 'win', { net: payout - bet }); } catch {}
     syncBalance();
     if (result === 'win' || result === 'blackjack') playRandomSound('chips-stack', 6);
@@ -822,7 +825,9 @@
     const bet = Math.max(1, Math.floor(Number(betInput.value || 0)));
     const bal = Strubles.get();
     if (bet > bal) { statusEl.textContent = "Not enough Strubles for that bet."; return; }
-    if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles."; return; }
+    const round = Strubles.stake('blackjack', bet);
+    if (!round) { statusEl.textContent = "Not enough Strubles."; return; }
+    handRounds = [round];
     syncBalance();
 
     deck = makeDeck();
@@ -858,11 +863,11 @@
       // A dealer 21 built up via hits loses to a natural player blackjack.
       const dealerNatural = dealer.length === 2 && dv === 21;
       if (dealerNatural) {
-        settle('push', bet);
+        settle('push', bet, handRounds[0]);
         playRandomSound('chips-handle', 6);
         endRound('Push (both blackjack).');
       } else {
-        settle('blackjack', bet);
+        settle('blackjack', bet, handRounds[0]);
         celebrateBlackjack();
         endRound('Blackjack! You win 🎉');
       }
@@ -913,7 +918,7 @@
     const hand = playerHands[activeHand];
     if (hand.length !== 2) return;
     const bet = handBets[activeHand];
-    if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles to double down."; return; }
+    if (!Strubles.stake('blackjack', bet, handRounds[activeHand])) { statusEl.textContent = "Not enough Strubles to double down."; return; }
     handBets[activeHand] = bet * 2;
     syncBalance();
     hand.push(drawCard());
@@ -934,7 +939,9 @@
     const hand = playerHands[0];
     if (hand.length !== 2 || !canSplitPair(hand[0].v, hand[1].v)) return;
     const bet = handBets[0];
-    if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles to split."; return; }
+    const splitRound = Strubles.stake('blackjack', bet);
+    if (!splitRound) { statusEl.textContent = "Not enough Strubles to split."; return; }
+    handRounds[1] = splitRound;
     syncBalance();
 
     const isAceSplit = hand[0].v === 'A';
@@ -989,18 +996,20 @@
       const bet = handBets[i];
       const tag = hasSplit ? `H${i + 1}: ` : '';
       if (pv > 21) {
+        settle('loss', bet, handRounds[i]);
         try { GameStats.record('blackjack', 'loss', { net: -bet }); } catch {}
         messages.push(`${tag}Bust 💀`);
       } else if (dv > 21) {
-        settle('win', bet); anyWin = true; messages.push(`${tag}Dealer busts — Win 🎉`);
+        settle('win', bet, handRounds[i]); anyWin = true; messages.push(`${tag}Dealer busts — Win 🎉`);
       } else if (dv > pv) {
+        settle('loss', bet, handRounds[i]);
         try { GameStats.record('blackjack', 'loss', { net: -bet }); } catch {}
         messages.push(`${tag}Dealer wins 😔`);
       } else if (dv < pv) {
-        settle('win', bet); anyWin = true; messages.push(`${tag}Win 🎉`);
+        settle('win', bet, handRounds[i]); anyWin = true; messages.push(`${tag}Win 🎉`);
       } else {
         // House rule: ties pay the player instead of pushing.
-        settle('win', bet); anyWin = true; messages.push(`${tag}Push pays out — Win 🎉`);
+        settle('win', bet, handRounds[i]); anyWin = true; messages.push(`${tag}Push pays out — Win 🎉`);
       }
     });
     if (!anyWin) playRandomSound('card-slide', 8);

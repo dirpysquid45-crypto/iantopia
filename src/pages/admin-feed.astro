@@ -107,6 +107,16 @@
     .prow .n small { color:var(--dim); display:block; font-size:11px; overflow:hidden; text-overflow:ellipsis; }
     .prow .e { overflow:hidden; text-overflow:ellipsis; color:var(--dim); }
     .st-banned { color:var(--red); }
+    .pdetail { margin:10px 12px; padding:12px; border:1px solid var(--line, #2a2f3a); background:rgba(255,255,255,.02); }
+    .pdetail[hidden] { display:none; }
+    .pdetail h3 { margin:0 0 8px; font-size:14px; font-weight:600; }
+    .pdetail dl { display:grid; grid-template-columns:max-content 1fr; gap:4px 14px; margin:0; font-size:13px; }
+    .pdetail dt { color:var(--dim); }
+    .pdetail dd { margin:0; overflow-wrap:anywhere; }
+    .pdetail .recent { margin-top:10px; font-size:12px; }
+    .pdetail .recent div { padding:2px 0; border-top:1px solid rgba(255,255,255,.05); }
+    .prow .bal small { display:block; color:var(--dim); font-size:11px; }
+    .ffilter { margin-left:10px; }
     .st-warned { color:var(--amber); }
     .st-ok { color:var(--fg); }
     .srow { grid-template-columns:60px minmax(140px,1fr) 130px minmax(120px,1fr) 100px; }
@@ -181,6 +191,7 @@
   <section class="win" data-view="feed" aria-label="Account feed">
     <header>
       <span><b>ACCOUNT_FEED</b> · live ingest</span>
+      <input id="ffilter" class="in wide ffilter" type="text" placeholder="filter: name, id, page, action" autocomplete="off" aria-label="Filter the feed" />
       <span class="dim">tags: BAL balance · RST reset · BAN ban · UNQ release · RES restore · UNW unwarn · SET admin set · WRN warn · REN rename · BKP snapshot · SYNC stale push restored</span>
     </header>
     <div id="feed" class="body" tabindex="0"></div>
@@ -197,6 +208,7 @@
       </span>
     </header>
     <div class="body">
+      <div id="pdetail" class="pdetail" hidden></div>
       <div class="thead prow"><span>NAME / ID</span><span>EMAIL</span><span>BALANCE</span><span>BANK</span><span>STATUS</span><span>LAST_SEEN</span></div>
       <div id="players"></div>
     </div>
@@ -261,6 +273,15 @@
   const money = (n) => (n == null ? '—' : Number(n).toLocaleString());
   const stamp = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour12: false }) : '--:--:--');
   const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString() : '—');
+  // "5m ago", "3h ago", "2d ago" for a timestamp in milliseconds; "—" if none.
+  const ago = (ms) => {
+    if (!ms) return '—';
+    const m = Math.round((Date.now() - Number(ms)) / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + 'm ago';
+    if (m < 60 * 48) return Math.round(m / 60) + 'h ago';
+    return Math.round(m / 1440) + 'd ago';
+  };
   const setStatus = (text, kind) => { const s = $('status'); s.textContent = text; s.className = 'status' + (kind ? ' ' + kind : ''); };
   const text = (el, value) => { el.textContent = value == null ? '' : String(value); return el; };
   const span = (cls, value) => { const s = document.createElement('span'); if (cls) s.className = cls; return text(s, value); };
@@ -269,6 +290,7 @@
   function setTarget(uid) {
     $('uid').value = uid || '';
     updateButtons();
+    if (typeof renderPlayerDetail === 'function') renderPlayerDetail(uid);
     document.querySelectorAll('.ln.sel, .prow.sel').forEach((r) => r.classList.remove('sel'));
     document.querySelectorAll('[data-uid="' + CSS.escape(uid || '') + '"]').forEach((r) => r.classList.add('sel'));
   }
@@ -340,6 +362,13 @@
   $('signin').addEventListener('click', () => window.CloudSync && CloudSync.signIn());
 
   // ---- feed ----------------------------------------------------------------
+  const OP_LABELS = { win: 'WIN', refund: 'REFUND', spend: 'SPEND', tetris: 'TETRIS PAY', daily: 'DAILY PRIZE', starter: 'STARTER' };
+  // Text a feed row can be searched by.
+  function feedText(ev) {
+    return [ev.name, ev.uid, ev.action, ev.kind, ev.text, ev.page, ev.reason, ev.op && ev.op.kind, ev.op && ev.op.page, ev.detected].filter(Boolean).join(' ').toLowerCase();
+  }
+  const feedMatches = (ev) => { const q = $('ffilter').value.trim().toLowerCase(); return !q || feedText(ev).includes(q); };
+  $('ffilter').addEventListener('input', () => renderFeed());
   const TAGS = { reset: ['RST', 'warn'], ban: ['BAN', 'bad'], unban: ['UNQ', 'ok'], restore: ['RES', 'ok'], unwarn: ['UNW', 'ok'], set: ['SET', 'info'], warn: ['WRN', 'warn'], rename: ['REN', 'info'], backup: ['BKP', 'info'] };
   function feedLine(ev) {
     const el = document.createElement('div');
@@ -358,7 +387,11 @@
       else detail = (ev.reason || ev.detected || '').replace(/_/g, ' ') + (ev.page ? ' · ' + ev.page : '');
     } else {
       const over = ev.cap != null && ev.balance > ev.cap;
-      detail = (ev.prev == null ? '' : money(ev.prev) + ' → ') + money(ev.balance) + (ev.cap != null ? ' / cap ' + money(ev.cap) : '') + (over ? ' OVER_CAP' : '');
+      const change = ev.prev == null ? null : ev.balance - ev.prev;
+      const why = ev.op && OP_LABELS[ev.op.kind];
+      detail = (change == null || change === 0 ? '' : (change > 0 ? '+' : '−') + money(Math.abs(change)) + '  ')
+        + (why ? why + (ev.op.page ? ' · ' + ev.op.page : '') + '  ' : '')
+        + 'balance ' + money(ev.balance) + (ev.cap != null ? ' / ' + money(ev.cap) : '') + (over ? '  OVER_CAP' : '');
       if (over) tag = ['BAL', 'bad'];
     }
     const det = span('det' + (ev.kind === 'balance' && ev.cap != null && ev.balance > ev.cap ? ' over' : ''), detail);
@@ -373,13 +406,15 @@
   function renderFeed() {
     const feed = $('feed');
     feed.replaceChildren();
-    if (!state.events.length) { feed.append(span('empty', 'no account activity yet')); }
-    for (let i = state.events.length - 1; i >= 0; i--) feed.append(feedLine(state.events[i]));
-    $('n-feed').textContent = '(' + state.events.length + ')';
+    const shown = state.events.filter(feedMatches);
+    if (!shown.length) { feed.append(span('empty', state.events.length ? 'nothing matches that filter' : 'no account activity yet')); }
+    for (let i = shown.length - 1; i >= 0; i--) feed.append(feedLine(shown[i]));
+    $('n-feed').textContent = '(' + shown.length + (shown.length !== state.events.length ? ' of ' + state.events.length : '') + ')';
   }
   function addEvent(ev) {
     state.events.push(ev);
     if (state.events.length > MAX_EVENTS) state.events.shift();
+    if (!feedMatches(ev)) { $('n-feed').textContent = '(' + state.events.length + ')'; return; }
     const feed = $('feed');
     const empty = feed.querySelector('.empty');
     if (empty) empty.remove();
@@ -389,11 +424,55 @@
   }
 
   // ---- players ---------------------------------------------------------------
+  // One player at a time, in full: the record, the status, and their last feed events.
+  function renderPlayerDetail(uid) {
+    const box = $('pdetail');
+    const p = uid && state.players.find((x) => x.uid === uid);
+    if (!p) { box.hidden = true; box.replaceChildren(); return; }
+    box.hidden = false;
+    box.replaceChildren();
+    const h = document.createElement('h3'); h.textContent = p.name || '(no name)';
+    const dl = document.createElement('dl');
+    const rows = [
+      ['Account ID', p.uid],
+      ['Email', p.email || '—'],
+      ['Status', p.status.toUpperCase() + (p.banUntil ? ' until ' + new Date(p.banUntil).toLocaleString() : '') + (p.warnedAt ? ' · warned ' + new Date(p.warnedAt).toLocaleString() : '')],
+      ['Balance', money(p.balance) + ' Strubles'],
+      ['Wallet cap', money(p.cap)],
+      ['Bank level', String(p.bankLevel)],
+      ['Last seen', p.lastSeen ? new Date(p.lastSeen).toLocaleString() + ' (' + ago(p.lastSeen) + ')' : '—'],
+    ];
+    rows.forEach(([k, v]) => {
+      const dt = document.createElement('dt'); dt.textContent = k;
+      const dd = document.createElement('dd'); dd.textContent = v;
+      dl.append(dt, dd);
+    });
+    box.append(h, dl);
+    const recent = state.events.filter((e) => e.uid === uid).slice(-8).reverse();
+    const r = document.createElement('div'); r.className = 'recent';
+    const rh = document.createElement('div'); rh.textContent = 'Recent activity';
+    rh.style.color = 'var(--dim)';
+    r.append(rh);
+    if (!recent.length) { const none = document.createElement('div'); none.textContent = 'nothing in the feed yet'; r.append(none); }
+    recent.forEach((e) => {
+      const line = document.createElement('div');
+      const change = e.kind === 'balance' && e.prev != null ? e.balance - e.prev : 0;
+      const moved = change ? (change > 0 ? '+' : '−') + money(Math.abs(change)) + '  ' : '';
+      const label = e.kind === 'balance'
+        ? moved + (e.op && OP_LABELS[e.op.kind] ? OP_LABELS[e.op.kind] + ' ' : '') + 'balance ' + money(e.balance)
+        : (e.action ? e.action.toUpperCase() : e.kind) + (e.text ? ' · ' + e.text : '') + (e.reason ? ' · ' + String(e.reason).replace(/_/g, ' ') : '');
+      line.textContent = stamp(e.at) + '  ' + label;
+      r.append(line);
+    });
+    box.append(r);
+  }
+
   function renderPlayers() {
     const q = $('pfilter').value.trim().toLowerCase();
     const shown = state.players.filter((p) => !q || [p.name, p.email, p.uid].some((v) => String(v || '').toLowerCase().includes(q)));
     $('pcount').textContent = shown.length + '/' + state.players.length + ' accounts';
     $('n-players').textContent = '(' + state.players.length + ')';
+    renderPlayerDetail($('uid').value.trim());
     const list = $('players');
     list.replaceChildren();
     if (!shown.length) list.append(span('empty', 'no accounts match'));
@@ -406,11 +485,14 @@
       who.textContent = p.name || '(no name)';
       const id = document.createElement('small'); text(id, p.uid);
       who.append(id);
-      const bal = span('', money(p.balance));
+      const bal = document.createElement('div'); bal.className = 'bal';
+      bal.textContent = money(p.balance);
+      const cap = document.createElement('small'); cap.textContent = 'cap ' + money(p.cap);
+      bal.append(cap);
       const bank = span('dim', 'lvl ' + p.bankLevel);
       const st = span('st-' + p.status, p.status.toUpperCase());
       if (p.banUntil) st.title = 'until ' + new Date(p.banUntil).toLocaleString();
-      row.append(who, span('e', p.email || '—'), bal, bank, st, span('dim', shortDate(p.lastSeen)));
+      row.append(who, span('e', p.email || '—'), bal, bank, st, span('dim', ago(p.lastSeen)));
       row.addEventListener('click', () => { if (!isSelecting()) setTarget(p.uid); });
       list.append(row);
     }

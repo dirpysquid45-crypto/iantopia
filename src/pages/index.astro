@@ -2084,14 +2084,6 @@
         const d = new Date();
         return `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
       };
-      Strubles.canDailyClaim ??= () =>
-        localStorage.getItem("daily") !== todayUTC();
-      Strubles.dailyClaim ??= (amt) => {
-        if (!Strubles.canDailyClaim()) return false;
-        Strubles.add(amt);
-        localStorage.setItem("daily", todayUTC());
-        return true;
-      };
 
       function updateUI() {
         amtEl.textContent = Strubles.get();
@@ -2182,7 +2174,6 @@
         dailyWinTier.classList.add('show');
         dailyReelClose.classList.add('show');
 
-        Strubles.dailyClaim(winner.amt);
         updateUI();
       }
 
@@ -2200,8 +2191,18 @@
           dailyWinTier.classList.remove('show');
           dailyReelClose.classList.remove('show');
           dailyReelOverlay.classList.add('open');
-          const winner = pickDailyTier();
-          requestAnimationFrame(() => playDailyReel(winner));
+          // The server rolls the prize and records the day's claim. The reel
+          // plays the tier it returns, so the browser can't choose a bigger one.
+          Strubles.dailyClaim((amount) => {
+            const winner = DAILY_TIERS.find((t) => t.amt === amount);
+            if (!winner) {
+              dailyReelOverlay.classList.remove('open');
+              dailyBtn.disabled = !Strubles.canDailyClaim();
+              updateUI();
+              return;
+            }
+            requestAnimationFrame(() => playDailyReel(winner));
+          });
         });
       }
 

@@ -145,7 +145,7 @@ class AccountWatch {
     // fields about once a second, and each of those saves used to log the same
     // balance again.
     if (prev === undefined || balance !== prev) {
-      this.emit({ kind: 'balance', uid, name, balance, prev: prev === undefined ? null : prev, cap, bankLevel: Number(data.tycoon_bank_level_v1 || 0), page });
+      this.emit({ kind: 'balance', uid, name, balance, prev: prev === undefined ? null : prev, cap, bankLevel: Number(data.tycoon_bank_level_v1 || 0), page, op: lastOpOf(data, this.now()) });
     }
     if (prev === undefined || balance === prev) return;
 
@@ -162,7 +162,11 @@ class AccountWatch {
     const delta = balance - prev;
     const now = this.now();
     if (delta < 0) this.noteDebit(uid, -delta, now);
-    const refund = delta > 0 && (this.takeServerRefund(uid, delta, now) || this.takeRefundAllowance(uid, delta, now, lastGainOf(data).kind));
+    // Refunds, and grants the server rolled itself (the daily prize, the starter), are
+    // not wins: they stay out of the rate and streak checks. The cap still applies.
+    const refund = delta > 0 && (this.takeServerRefund(uid, delta, now)
+      || this.takeRefundAllowance(uid, delta, now, lastGainOf(data).kind)
+      || lastGainOf(data).kind === 'grant');
     const recent = (this.gains.get(uid) || []).filter((g) => now - g.t < RATE_WINDOW_MS);
     if (!refund) recent.push({ t: now, amount: delta });
     this.gains.set(uid, recent);
@@ -296,7 +300,10 @@ class AccountWatch {
     const from = await this.balanceNow(uid);
     await this.backup(uid, 'before_admin_set');
     this.adminSets.set(uid, { at: this.now(), to: amount });
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: String(amount) }, { merge: true });
+    // Treat it like a reset: the open tabs see balance_reset_at change and pull the new
+    // value, and a stale push of the old balance is put back (see onChange).
+    this.resets.set(uid, { at: this.now(), from, to: amount });
+    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: String(amount), balance_reset_at: new Date(this.now()) }, { merge: true });
     this.emit({ kind: 'punish', action: 'set', uid, name: await this.labelFor(uid), reason: 'admin', from, to: amount });
   }
 
@@ -334,6 +341,7 @@ class AccountWatch {
         email: x.email || null,
         balance: balanceOf(x),
         bankLevel: Number(x.tycoon_bank_level_v1 || 0),
+        cap: this.balance.capFromData(x),
         status,
         banUntil: banUntil > now ? new Date(banUntil).toISOString() : null,
         warnedAt: warnedAt ? new Date(warnedAt).toISOString() : null,
@@ -405,8 +413,17 @@ function toMsAny(v) {
 function lastGainOf(data) {
   try {
     const g = JSON.parse((data && data.strubles_last_gain_v1) || 'null');
-    return g && typeof g === 'object' ? { amount: Number(g.amount) || 0, page: typeof g.page === 'string' ? g.page.slice(0, 120) : null, kind: g.kind === 'refund' ? 'refund' : 'earn' } : { amount: 0, page: null, kind: 'earn' };
+    return g && typeof g === 'object' ? { amount: Number(g.amount) || 0, page: typeof g.page === 'string' ? g.page.slice(0, 120) : null, kind: g.kind === 'refund' || g.kind === 'grant' ? g.kind : 'earn' } : { amount: 0, page: null, kind: 'earn' };
   } catch { return { amount: 0, page: null, kind: 'earn' }; }
+}
+
+// The last wallet operation (see wallet.js): its kind, amount and page, if it is recent.
+function lastOpOf(data, now) {
+  try {
+    const o = JSON.parse((data && data.wallet_last_op) || 'null');
+    if (!o || typeof o !== 'object' || now - (Number(o.at) || 0) > 15000) return null;
+    return { kind: String(o.kind || '').slice(0, 20), amount: Number(o.amount) || 0, page: typeof o.page === 'string' ? o.page.slice(0, 120) : null };
+  } catch { return null; }
 }
 
 function balanceOf(data) {

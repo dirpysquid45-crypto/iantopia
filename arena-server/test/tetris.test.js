@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
-const { TetrisGame, validClearedRows, validSnapshot } = require('../tetris');
+const { TetrisGame, validLines, validSnapshot } = require('../tetris');
 const Manager = require('../manager');
 const { FakeDb } = require('./fakes');
 
@@ -165,16 +165,13 @@ test('the visible rows are the same as the engine grid below the skyline', () =>
 
 // ---------------- server: validation ----------------
 
-test('cleared rows: must be 1 to 4 full rows of piece letters', () => {
-  const full = Array(10).fill('I');
-  assert.ok(validClearedRows([full]));
-  assert.ok(validClearedRows([full, full, full, full]));
-  assert.equal(validClearedRows([]), null, 'no rows');
-  assert.equal(validClearedRows([full, full, full, full, full]), null, 'more than four');
-  assert.equal(validClearedRows([Array(9).fill('I')]), null, 'short row');
-  assert.equal(validClearedRows([[...Array(9).fill('I'), '.']]), null, 'a gap is not a cleared row');
-  assert.equal(validClearedRows([Array(10).fill('X')]), null, 'not a piece');
-  assert.equal(validClearedRows('nope'), null);
+test('a clear sends 1 to 4 lines; anything else is refused', () => {
+  assert.equal(validLines(1), 1);
+  assert.equal(validLines(4), 4);
+  assert.equal(validLines(0), null, 'no lines');
+  assert.equal(validLines(5), null, 'more than a Tetris');
+  assert.equal(validLines('2'), null, 'not a number');
+  assert.equal(validLines(1.5), null);
 });
 
 test('snapshot: exactly 20 rows of 10 cells', () => {
@@ -211,22 +208,23 @@ test('both players get the same seed and their own index', () => {
   assert.equal(sa.friendly, true);
 });
 
-test('cleared rows go to the opponent, each with one hole, and never back to the sender', () => {
+test('each cleared line sends one grey garbage line to the opponent, with one hole, and never back to the sender', () => {
   const { g, a, b } = newMatch();
-  const full = Array(10).fill('L');
-  g.handleAction('s1', 'cleared', { rows: [full, full] });
+  g.handleAction('s1', 'cleared', { lines: 2 });
   const garbage = last(b, 'tetris_garbage');
-  assert.equal(garbage.rows.length, 2);
+  assert.equal(garbage.rows.length, 2, 'two lines cleared, two garbage lines');
   for (const row of garbage.rows) {
     assert.equal(row.filter((c) => c === null).length, 1, 'exactly one hole');
+    assert.equal(row.filter((c) => c === 'G').length, 9, 'the rest is grey');
   }
   assert.equal(last(a, 'tetris_garbage'), undefined, 'the sender gets nothing back');
 });
 
 test('a bad cleared message is refused and nothing is relayed', () => {
   const { g, b } = newMatch();
-  g.handleAction('s1', 'cleared', { rows: [Array(10).fill('X')] });
-  g.handleAction('s1', 'cleared', { rows: 'nope' });
+  g.handleAction('s1', 'cleared', { lines: 0 });
+  g.handleAction('s1', 'cleared', { lines: 9 });
+  g.handleAction('s1', 'cleared', { rows: [['I']] });
   assert.equal(last(b, 'tetris_garbage'), undefined);
 });
 
@@ -385,9 +383,9 @@ test('the board adds up reward points as lines clear, and a plain game earns not
   assert.equal(plain.rewardPoints, 0);
 });
 
-// ---------------- keys: the default is arrows rotate ----------------
+// ---------------- keys: the default is guideline ----------------
 
-test('the default keys: Up and Down rotate, S soft-drops, Space slams, C and Shift hold', () => {
+test('the default keys: Up rotates clockwise, Down soft-drops, Space slams, C and Shift hold', () => {
   const keysSrc = fs.readFileSync(path.join(__dirname, '../../public/tetris/keys.js'), 'utf8');
   const store = new Map();
   const win = { addEventListener() {}, dispatchEvent() {} };
@@ -398,7 +396,8 @@ test('the default keys: Up and Down rotate, S soft-drops, Space slams, C and Shi
   new Function('window', 'localStorage', 'document', 'CustomEvent', keysSrc)(win, ctx.localStorage, ctx.document, ctx.CustomEvent);
   const K = win.TetrisKeys;
   assert.equal(K.actionFor('ArrowUp'), 'rotcw');
-  assert.equal(K.actionFor('ArrowDown'), 'rotccw');
+  assert.equal(K.actionFor('ArrowDown'), 'soft');
+  assert.equal(K.actionFor('z'), 'rotccw');
   assert.equal(K.actionFor('s'), 'soft');
   assert.equal(K.actionFor(' '), 'hard');
   assert.equal(K.actionFor('c'), 'hold');

@@ -1,5 +1,5 @@
 // Keyboard bindings for the Tetris pages: presets, a rebinding panel, and the
-// saved choice (per browser, under localStorage key tetris_keys_v1).
+// saved choice (per browser, under localStorage key tetris_keys_v2).
 //
 // window.TetrisKeys:
 //   ACTIONS                 [id, label] for each game action, in panel order
@@ -9,7 +9,7 @@
 //   keyLabel(key)           how a key is written on screen ("↑", "Space", "A")
 //   mountPanel(el, onDone)  fills an element with the preset buttons and the rebinding list
 (function () {
-  var STORE = 'tetris_keys_v1';
+  var STORE = 'tetris_keys_v2';
 
   var ACTIONS = [
     ['left', 'Move left'],
@@ -24,18 +24,18 @@
 
   // Presets. The first is the default. "Arrows rotate" puts rotation on Up and Down.
   var PRESETS = {
-    arrows: {
-      title: 'Arrows rotate (default)',
-      bindings: {
-        left: ['ArrowLeft', 'a'], right: ['ArrowRight', 'd'], soft: ['s'], hard: [' '],
-        hold: ['c', 'Shift'], rotcw: ['ArrowUp', 'x'], rotccw: ['ArrowDown', 'z'], pause: ['p', 'Escape']
-      }
-    },
     guideline: {
-      title: 'Guideline (Tetris Wiki)',
+      title: 'Guideline',
       bindings: {
         left: ['ArrowLeft', 'a'], right: ['ArrowRight', 'd'], soft: ['ArrowDown', 's'], hard: [' '],
         hold: ['c', 'Shift'], rotcw: ['ArrowUp', 'x'], rotccw: ['z', 'Control'], pause: ['Escape', 'p']
+      }
+    },
+    arrows: {
+      title: 'Arrows rotate',
+      bindings: {
+        left: ['ArrowLeft', 'a'], right: ['ArrowRight', 'd'], soft: ['s'], hard: [' '],
+        hold: ['c', 'Shift'], rotcw: ['ArrowUp', 'x'], rotccw: ['ArrowDown', 'z'], pause: ['p', 'Escape']
       }
     },
     classic: {
@@ -46,7 +46,7 @@
       }
     }
   };
-  var DEFAULT = 'arrows';
+  var DEFAULT = 'guideline';
 
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
 

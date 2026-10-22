@@ -89,7 +89,7 @@ class Manager {
       }
       else return this.fail(conn.ws, 'Bad request', 'bad_request');
       // Every admin page shows the new status straight away, not on refresh.
-      this.broadcastPlayers();
+      this.broadcastPlayers().catch((e) => console.error('[accounts] refresh failed:', e.message));
     } catch (e) {
       console.error('[accounts] action failed:', e.message);
       return this.fail(conn.ws, e.message, 'refused');
@@ -355,6 +355,7 @@ class Manager {
     if (stake) return this.fail(ws, stake, 'guest_stake');
 
     if (bet > 0) {
+      if (await BalanceManager.isBanned(this.db, userId, Date.now())) return this.fail(ws, 'This account is under a ban', 'banned');
       let balance;
       try { balance = await this.balance.getBalance(userId); }
       catch (e) { return this.fail(ws, 'Could not check your balance'); }
@@ -400,6 +401,7 @@ class Manager {
     if (target.userId === userId) return this.fail(ws, "You can't match your own lobby");
     const stake = this.stakeError(conn, target.bet);
     if (stake) return this.fail(ws, stake, 'guest_stake');
+    if (target.bet > 0 && await BalanceManager.isBanned(this.db, userId, Date.now())) return this.fail(ws, 'This account is under a ban', 'banned');
     if (target.bet > 0) {
       let balance;
       try { balance = await this.balance.getBalance(userId); }

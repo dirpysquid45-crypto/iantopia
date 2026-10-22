@@ -119,6 +119,17 @@ class BalanceManager {
   }
 }
 
+// An account under a ban (bans/{uid}, written by the server) can't stake or move
+// money until the ban runs out. Used by the arena's stake path and the wallet.
+async function isBanned(db, userId, now = Date.now()) {
+  if (isGuestId(userId)) return false;
+  const snap = await db.collection('bans').doc(userId).get();
+  if (!snap.exists) return false;
+  const until = snap.data().until;
+  const ms = until && typeof until.toDate === 'function' ? until.toDate().getTime() : until ? new Date(until).getTime() : 0;
+  return ms > now;
+}
+BalanceManager.isBanned = isBanned;
 BalanceManager.isGuestId = isGuestId;
 BalanceManager.credits = credits;
 module.exports = BalanceManager;
