@@ -29,8 +29,9 @@ button { font-family: inherit; }
   padding: 10px max(16px, env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   max-width: 980px;
   margin: 0 auto;
+  /* The width each side box takes up beside the board, used to size the board. */
+  --side-w: 64px;
 }
-
 
 /* Header: back link, title and sound toggle on one row, the score line under it. */
 .top {
@@ -108,10 +109,15 @@ button { font-family: inherit; }
 /* The board: the frame is 1:2, the canvas fills it. */
 .stage {
   position: relative;
-  /* Full height of the row, but never wider than the screen allows beside the side boxes. */
-  height: min(100%, calc((100vw - 200px) * 2));
-  min-height: 0;
-  aspect-ratio: 1 / 2;
+  /* The board is as wide as the row leaves room for beside the side boxes, or as tall as the
+     screen allows, whichever is smaller, and twice as tall as it is wide. Older Safari ignores
+     aspect-ratio and 100dvh, which left the board at zero width; each of those declarations
+     is therefore preceded by a plain fallback that those browsers can use. */
+  width: calc(100vw - 2 * var(--side-w) - 48px);
+  width: min(calc(100vw - 2 * var(--side-w) - 48px), calc((100dvh - 290px) / 2));
+  height: calc((100vw - 2 * var(--side-w) - 48px) * 2);
+  height: calc(min(calc(100vw - 2 * var(--side-w) - 48px), calc((100dvh - 290px) / 2)) * 2);
+  min-width: 160px;
   max-width: 100%;
   border: 3px solid var(--gold);
   background: #000;
@@ -255,7 +261,6 @@ button { font-family: inherit; }
 /* On phones the side boxes shrink, and the pad gets a little tighter. */
 @media (max-width: 640px) {
   .main { gap: 8px; }
-  .stage { height: min(100%, calc((100vw - 150px) * 2)); }
   .side { max-width: 90px; gap: 8px; }
   .box { padding: 6px; font-size: 6px; }
   .box canvas { height: 48px; }
