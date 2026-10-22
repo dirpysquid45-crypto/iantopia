@@ -108,11 +108,11 @@ test('endless mode never ends on score', () => {
 
 test('a paddle hit sends the puck back, and a moving paddle adds speed', () => {
   const { g } = newGame();
-  // Left paddle at the puck's height, swinging right into it: its target is to
-  // the right, so it moves about 22 px in one step (about 2600 px a second).
-  g.paddles[0] = { x: 300, y: H / 2, vx: 0, vy: 0 };
-  g.targets[0] = { x: 420, y: H / 2 };
-  g.puck = { x: 420, y: H / 2, vx: 0, vy: 0 };
+  // Left paddle just behind the puck, swinging right into it: its target is past
+  // the puck, so it moves about 38 units in one step (about 4550 units a second).
+  g.paddles[0] = { x: 380, y: H / 2, vx: 0, vy: 0 };
+  g.targets[0] = { x: 450, y: H / 2 };
+  g.puck = { x: 430, y: H / 2, vx: 0, vy: 0 };
   g.step(1 / 120);
   assert.ok(g.puck.vx > 0, 'puck is moving right, away from the paddle');
   assert.ok(g.events.includes('hit0'), 'a hit was recorded for the sound');
@@ -145,7 +145,35 @@ test('a snapshot is compact and carries the events since the last one', () => {
   g.events.push('wall');
   g.broadcastState();
   const snap = a.sent.filter((m) => m.type === 'airhockey_state').pop();
-  assert.ok(Array.isArray(snap.puck) && snap.puck.length === 2);
+  assert.ok(Array.isArray(snap.puck) && snap.puck.length === 4, 'position and velocity');
   assert.ok(snap.events.includes('wall'));
   assert.equal(g.events.length, 0, 'events are cleared once sent');
 });
+
+test('the table is the regulation 7 ft by 4 ft ratio, with the goal centred across the width', () => {
+  assert.equal(W / H, 1.75);
+  assert.equal((GOAL_TOP + GOAL_BOTTOM) / 2, H / 2, 'goal slot is centred');
+  assert.ok(GOAL_BOTTOM - GOAL_TOP < H * 0.2, 'the goal is a slot, not a whole side');
+});
+
+test('paddles are pushed out of the centre circle while a serve is waiting', () => {
+  const { g } = newGame();
+  g.servePuck();                        // paused, puck at the centre
+  g.paddles[0] = { x: W / 2 - 20, y: H / 2, vx: 0, vy: 0 };
+  g.targets[0] = { x: W / 2 - 20, y: H / 2 };
+  g.step(1 / 120);
+  const d = Math.hypot(g.paddles[0].x - W / 2, g.paddles[0].y - H / 2);
+  assert.ok(d >= PUCK_R + PADDLE_R - 0.001, 'the paddle is clear of the puck');
+  clearTimeout(g.pauseTimer);
+});
+
+test('a puck only scores once its whole edge is past the line', () => {
+  const { g } = newGame();
+  g.puck = { x: -PUCK_R + 4, y: H / 2, vx: 0, vy: 0 };      // centre just short of the full crossing, at rest
+  run(g, 20);
+  assert.deepEqual(g.score, [0, 0], 'not yet a goal');
+  g.puck = { x: -PUCK_R - 4, y: H / 2, vx: -500, vy: 0 };   // fully across
+  g.step(1 / 120);
+  assert.deepEqual(g.score, [0, 1]);
+});
+

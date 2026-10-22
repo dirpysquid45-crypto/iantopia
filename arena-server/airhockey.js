@@ -17,21 +17,28 @@
 
 const ArenaGame = require('./game-base');
 
-const W = 1000;                   // logical table width (left goal at x=0, right goal at x=W)
-const H = 1000;                   // logical table height
-const PUCK_R = 42;
-const PADDLE_R = 64;
-const GOAL_TOP = H * 0.29;        // goal slot runs vertically across these fractions of the height
-const GOAL_BOTTOM = H * 0.71;
+// The table is the real size ratio: a regulation 7 ft by 4 ft table, so the length
+// (goal to goal, along x) is 1.75 times the width. One unit is about 1.22 mm, which
+// makes the width 1000 units and the length 1750.
+const W = 1750;                   // logical table length (left goal at x=0, right goal at x=W)
+const H = 1000;                   // logical table width
+const PUCK_R = 25;                // 60 mm puck
+const PADDLE_R = 34;              // about 83 mm striker
+const GOAL_WIDTH = 135;           // about 165 mm goal slot, centred across the width
+const GOAL_TOP = (H - GOAL_WIDTH) / 2;
+const GOAL_BOTTOM = (H + GOAL_WIDTH) / 2;
 const RESTITUTION_WALL = 0.86;
 const RESTITUTION_PADDLE = 0.92;
 const PADDLE_IMPART = 0.55;       // how much of the paddle's own speed a hit gives the puck
-const PADDLE_MAX_SPEED = 2600;    // px per second the paddle follows its target
-const PUCK_MAX_SPEED = 2200;
+const PADDLE_MAX_SPEED = 4550;    // units per second the paddle follows its target
+const PUCK_MAX_SPEED = 3850;
 const PUCK_DRAG = 0.35;           // per-second exponential slow-down (a light table, not ice)
 const SIM_HZ = 120;
 const SNAPSHOT_HZ = 60;
+const SOLVE_PASSES = 3;           // collision passes per step, so a puck pinned between a paddle and a wall settles
 const SERVE_PAUSE_MS = 900;       // pause after a goal before the puck is put back in play
+const SERVE_SPEED = 910;          // units per second the puck is served at
+const HOME_X = 175;               // where each paddle starts, on its own side of the centre line
 const SCORE_TO = 7;               // score-to mode
 const BEST_OF_WINS = 3;           // best of 5 goals: the first to 3 goals wins
 const CLOCK_MS = 60000;           // time mode
@@ -60,8 +67,8 @@ class AirHockeyGame extends ArenaGame {
     this.score = [0, 0];
     this.winner = null;
     this.clockMs = CLOCK_MS;
-    this.paddles = [{ x: 180, y: H / 2, vx: 0, vy: 0 }, { x: W - 180, y: H / 2, vx: 0, vy: 0 }];
-    this.targets = [{ x: 180, y: H / 2 }, { x: W - 180, y: H / 2 }];
+    this.paddles = [{ x: HOME_X, y: H / 2, vx: 0, vy: 0 }, { x: W - HOME_X, y: H / 2, vx: 0, vy: 0 }];
+    this.targets = [{ x: HOME_X, y: H / 2 }, { x: W - HOME_X, y: H / 2 }];
     this.puck = { x: W / 2, y: H / 2, vx: 0, vy: 0 };
     this.serveTowards = Math.random() < 0.5 ? 0 : 1;
     this.paused = false;   // a goal pause, not a disconnect
@@ -112,8 +119,8 @@ class AirHockeyGame extends ArenaGame {
     this.pauseTimer = setTimeout(() => {
       this.paused = false;
       const angle = (Math.random() * 0.5 - 0.25);
-      this.puck.vx = dir * 520 * Math.cos(angle);
-      this.puck.vy = 520 * Math.sin(angle);
+      this.puck.vx = dir * SERVE_SPEED * Math.cos(angle);
+      this.puck.vy = SERVE_SPEED * Math.sin(angle);
       this.lastTime = Date.now();
     }, SERVE_PAUSE_MS);
   }
@@ -146,7 +153,7 @@ class AirHockeyGame extends ArenaGame {
       p.vy = (ny - p.y) / dt;
       p.x = nx; p.y = ny;
     }
-    if (this.paused) return;
+    if (this.paused) { this.keepClearOfCentre(); return; }
     this.clockMs -= dt * 1000;
     if (this.mode === 'time60' && this.clockMs <= 0) {
       this.clockMs = 0;
@@ -162,15 +169,33 @@ class AirHockeyGame extends ArenaGame {
     puck.x += puck.vx * dt;
     puck.y += puck.vy * dt;
 
+    // Paddle and wall contacts can push the puck into each other, so they are
+    // re-solved a few times; after the first pass most contacts are already clear.
     this.collideWalls();
-    for (let i = 0; i < 2; i++) this.collidePaddle(i);
-    // A paddle hit can push the puck past an edge, so the walls are checked again.
-    this.collideWalls();
+    for (let pass = 0; pass < SOLVE_PASSES; pass++) {
+      for (let i = 0; i < 2; i++) this.collidePaddle(i);
+      this.collideWalls();
+    }
+    // A puck pressed against a wall can be pushed back into a paddle; the paddle gives way.
+    for (let i = 0; i < 2; i++) this.separatePaddle(i);
 
     // Goal: the puck has fully crossed an edge inside the goal slot.
     const inSlot = puck.y > GOAL_TOP && puck.y < GOAL_BOTTOM;
-    if (inSlot && puck.x < -PUCK_R * 0.5) return this.pointTo(1);
-    if (inSlot && puck.x > W + PUCK_R * 0.5) return this.pointTo(0);
+    if (inSlot && puck.x < -PUCK_R) return this.pointTo(1);
+    if (inSlot && puck.x > W + PUCK_R) return this.pointTo(0);
+  }
+
+  // During a serve the puck sits in the middle, so paddles are pushed back out of its circle.
+  keepClearOfCentre() {
+    const minDist = PUCK_R + PADDLE_R;
+    const cx = W / 2, cy = H / 2;
+    for (const p of this.paddles) {
+      const dx = p.x - cx, dy = p.y - cy, d = Math.hypot(dx, dy);
+      if (d > 0 && d < minDist) {
+        p.x = cx + (dx / d) * minDist;
+        p.y = cy + (dy / d) * minDist;
+      }
+    }
   }
 
   collideWalls() {
@@ -188,12 +213,25 @@ class AirHockeyGame extends ArenaGame {
     if (p.y + PUCK_R > H) { p.y = H - PUCK_R; p.vy = -Math.abs(p.vy) * RESTITUTION_WALL; this.events.push('wall'); }
   }
 
+  // A paddle can't sit on the puck. If a wall has pushed the puck into a paddle,
+  // the paddle is moved back out (kept on its own half and inside the table).
+  separatePaddle(i) {
+    const p = this.paddles[i], puck = this.puck;
+    const minDist = PUCK_R + PADDLE_R;
+    const dx = p.x - puck.x, dy = p.y - puck.y, d = Math.hypot(dx, dy);
+    if (d === 0 || d >= minDist) return;
+    const minX = i === 0 ? PADDLE_R : HALF + PADDLE_R;
+    const maxX = i === 0 ? HALF - PADDLE_R : W - PADDLE_R;
+    p.x = Math.max(minX, Math.min(maxX, puck.x + (dx / d) * minDist));
+    p.y = Math.max(PADDLE_R, Math.min(H - PADDLE_R, puck.y + (dy / d) * minDist));
+  }
+
   collidePaddle(i) {
     const p = this.paddles[i], puck = this.puck;
     const dx = puck.x - p.x, dy = puck.y - p.y;
     const dist = Math.hypot(dx, dy);
     const minDist = PUCK_R + PADDLE_R;
-    if (dist >= minDist || dist === 0) return;
+    if (dist >= minDist - 1e-6 || dist === 0) return;
     // Push the puck out along the contact normal, then bounce it off the paddle.
     const nx = dx / dist, ny = dy / dist;
     puck.x = p.x + nx * minDist;
@@ -261,8 +299,8 @@ class AirHockeyGame extends ArenaGame {
     const msg = {
       type: 'airhockey_state',
       t: Date.now(),
-      puck: [round(this.puck.x), round(this.puck.y)],
-      paddles: this.paddles.map((p) => [round(p.x), round(p.y)]),
+      puck: [round(this.puck.x), round(this.puck.y), round(this.puck.vx), round(this.puck.vy)],
+      paddles: this.paddles.map((p) => [round(p.x), round(p.y), round(p.vx), round(p.vy)]),
       score: this.score.slice(),
       clock: Math.max(0, Math.round(this.clockMs)),
       paused: this.paused,
