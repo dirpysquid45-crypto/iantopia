@@ -8,6 +8,20 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: "2026-10-22",
+    title: "Air Hockey Goes Vertical, Blackjack Splits, Raining Money Overlay & Jade Han Palace",
+    changes: [
+      "AIR HOCKEY: the table is vertical now, with your own goal at the bottom of the screen, which suits a phone. While you look for an opponent, the lobby holds you in a waiting room with a Cancel button, the same as the Blackjack lobby.",
+      "AIR HOCKEY: fixed the table edges. The puck only passes a goal when its whole edge is inside the opening, so a corner post always bounces it, and it can't end up outside the table after a hit.",
+      "BLACKJACK: any two cards worth ten (10, J, Q, K) can be split, not just a matching pair. The action buttons sit in one row.",
+      "MAHJONG: the music starts on your first tap or key press in the game, since browsers don't let sound start before that. The music button still mutes it.",
+      "RAINING MONEY: the rain is now an overlay you can switch on over any background, so it no longer replaces your background. Turn it on or off in the Background picker.",
+      "PICKERS: the background you've chosen and the track that's playing show a green outline.",
+      "SPRING MORNING IN THE HAN PALACE: the menu buttons and the timer use a jade texture, with green glows.",
+      "PHONES: the horse game's balance sits in the top-right corner. The shop's Home link is back in the top-left, with the balance under it. Back links are easier to tap.",
+    ],
+  },
+  {
     date: "2026-10-21",
     title: "Air Hockey, Mahjong Overhaul, Low Graphics & Haunted Fixes",
     changes: [
