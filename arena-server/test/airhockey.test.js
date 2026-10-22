@@ -3,7 +3,7 @@
 // so the tests don't depend on real time.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { AirHockeyGame, W, H, PUCK_R, PADDLE_R, GOAL_TOP, GOAL_BOTTOM } = require('../airhockey');
+const { AirHockeyGame, W, H, PUCK_R, PADDLE_R, GOAL_TOP, GOAL_BOTTOM, CORNER_R } = require('../airhockey');
 
 function fakePlayer(name, sessionId) {
   const sent = [];
@@ -177,3 +177,24 @@ test('a puck only scores once its whole edge is past the line', () => {
   assert.deepEqual(g.score, [0, 1]);
 });
 
+
+test('the rounded corners turn a puck back, so it never goes past the arc', () => {
+  const { g } = newGame();
+  // Fired hard into the top-left corner, from inside the table.
+  g.puck = { x: 30, y: 30, vx: -2000, vy: -2000 };
+  for (let i = 0; i < 60; i++) {
+    g.step(1 / 120);
+    if (g.puck.x < CORNER_R && g.puck.y < CORNER_R) {
+      const d = Math.hypot(g.puck.x - CORNER_R, g.puck.y - CORNER_R);
+      assert.ok(d <= CORNER_R - PUCK_R + 0.5, `step ${i}: the puck is inside the rounded corner`);
+    }
+  }
+  assert.ok(g.puck.x >= PUCK_R - 0.5 && g.puck.y >= PUCK_R - 0.5, 'and inside the table');
+});
+
+test('a paddle target is kept inside the rounded corner', () => {
+  const { g, a } = newGame();
+  g.handleAction('s1', 'move', { x: 0, y: 0 });   // the top-left corner of the table
+  const d = Math.hypot(g.targets[0].x - CORNER_R, g.targets[0].y - CORNER_R);
+  assert.ok(d <= CORNER_R - PADDLE_R + 0.5, 'the mallet stops on the arc');
+});

@@ -29,6 +29,14 @@ const PADDLE_R = 70;              // a big mallet, easy to hit with a finger
 const GOAL_WIDTH = 360;           // a wide goal slot, centred across the width
 const GOAL_TOP = (H - GOAL_WIDTH) / 2;
 const GOAL_BOTTOM = (H + GOAL_WIDTH) / 2;
+const CORNER_R = 120;             // the four corners of the table are rounded with this radius
+// The corner arcs: centre, and which way the table lies from it (-1 or 1 on each axis).
+const CORNERS = [
+  { cx: CORNER_R, cy: CORNER_R, sx: -1, sy: -1 },
+  { cx: W - CORNER_R, cy: CORNER_R, sx: 1, sy: -1 },
+  { cx: CORNER_R, cy: H - CORNER_R, sx: -1, sy: 1 },
+  { cx: W - CORNER_R, cy: H - CORNER_R, sx: 1, sy: 1 },
+];
 const RESTITUTION_WALL = 0.86;
 const RESTITUTION_PADDLE = 0.92;
 const PADDLE_IMPART = 0.55;       // how much of the paddle's own speed a hit gives the puck
@@ -48,6 +56,19 @@ const MODES = new Set(['score7', 'best5', 'time60', 'endless']);
 
 // Mid-table line on the goal side, where each side's paddle is allowed to go.
 const HALF = W / 2;
+
+// If a circle of radius r centred at (x, y) has gone past a rounded corner, returns
+// the corner's centre, the outward normal from it, and how far in the centre must stay.
+function cornerHit(x, y, r) {
+  for (const c of CORNERS) {
+    const dx = x - c.cx, dy = y - c.cy;
+    if (dx * c.sx <= 0 || dy * c.sy <= 0) continue;   // not in this corner's square
+    const d = Math.hypot(dx, dy), limit = CORNER_R - r;
+    if (d <= limit) return null;
+    return { cx: c.cx, cy: c.cy, nx: dx / d, ny: dy / d, limit };
+  }
+  return null;
+}
 
 class AirHockeyGame extends ArenaGame {
   constructor(tableId, playerA, playerB, balance, opts = {}) {
@@ -83,7 +104,7 @@ class AirHockeyGame extends ArenaGame {
       this.send(i, {
         type: 'game_start', gameType: 'airhockey', yourIndex: i, opponentName: this.players[1 - i].name,
         friendly: true, bet: 0, isRematch, mode: this.mode,
-        field: { w: W, h: H, puckR: PUCK_R, paddleR: PADDLE_R, goalTop: GOAL_TOP, goalBottom: GOAL_BOTTOM },
+        field: { w: W, h: H, puckR: PUCK_R, paddleR: PADDLE_R, cornerR: CORNER_R, goalTop: GOAL_TOP, goalBottom: GOAL_BOTTOM },
       });
     }
     this.lastTime = Date.now();
@@ -107,10 +128,13 @@ class AirHockeyGame extends ArenaGame {
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     const minX = i === 0 ? PADDLE_R : HALF + PADDLE_R;
     const maxX = i === 0 ? HALF - PADDLE_R : W - PADDLE_R;
-    this.targets[i] = {
+    const target = {
       x: Math.max(minX, Math.min(maxX, x * W)),
       y: Math.max(PADDLE_R, Math.min(H - PADDLE_R, y * H)),
     };
+    const hit = cornerHit(target.x, target.y, PADDLE_R);
+    if (hit) { target.x = hit.cx + hit.nx * hit.limit; target.y = hit.cy + hit.ny * hit.limit; }
+    this.targets[i] = target;
   }
 
   servePuck() {
@@ -213,6 +237,17 @@ class AirHockeyGame extends ArenaGame {
     }
     if (p.y - PUCK_R < 0) { p.y = PUCK_R; p.vy = Math.abs(p.vy) * RESTITUTION_WALL; this.events.push('wall'); }
     if (p.y + PUCK_R > H) { p.y = H - PUCK_R; p.vy = -Math.abs(p.vy) * RESTITUTION_WALL; this.events.push('wall'); }
+    // The rounded corners: a puck that has reached one is turned back along the arc.
+    const hit = cornerHit(p.x, p.y, PUCK_R);
+    if (hit) {
+      p.x = hit.cx + hit.nx * hit.limit; p.y = hit.cy + hit.ny * hit.limit;
+      const vn = p.vx * hit.nx + p.vy * hit.ny;
+      if (vn > 0) {
+        p.vx -= (1 + RESTITUTION_WALL) * vn * hit.nx;
+        p.vy -= (1 + RESTITUTION_WALL) * vn * hit.ny;
+      }
+      this.events.push('wall');
+    }
   }
 
   // A paddle can't sit on the puck. If a wall has pushed the puck into a paddle,
@@ -322,7 +357,7 @@ class AirHockeyGame extends ArenaGame {
       mode: this.mode, phase: this.phase, winner: this.winner, score: this.score.slice(),
       puck: [round(this.puck.x), round(this.puck.y)], paddles: this.paddles.map((p) => [round(p.x), round(p.y)]),
       clock: Math.max(0, Math.round(this.clockMs)), paused: this.paused,
-      field: { w: W, h: H, puckR: PUCK_R, paddleR: PADDLE_R, goalTop: GOAL_TOP, goalBottom: GOAL_BOTTOM },
+      field: { w: W, h: H, puckR: PUCK_R, paddleR: PADDLE_R, cornerR: CORNER_R, goalTop: GOAL_TOP, goalBottom: GOAL_BOTTOM },
     });
   }
 
@@ -335,4 +370,4 @@ class AirHockeyGame extends ArenaGame {
 
 function round(v) { return Math.round(v * 10) / 10; }
 
-module.exports = { AirHockeyGame, MODES, W, H, PUCK_R, PADDLE_R, GOAL_TOP, GOAL_BOTTOM };
+module.exports = { AirHockeyGame, MODES, W, H, PUCK_R, PADDLE_R, CORNER_R, GOAL_TOP, GOAL_BOTTOM };
