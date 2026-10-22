@@ -51,6 +51,12 @@ window.initPickers = function() {
   const bgList = document.getElementById('bg-list');
   const bgClose = document.getElementById('bg-close');
   if (bgBtn && bgOverlay) {
+    // The chosen background and the playing track show a green outline.
+    function paintRow(row, active) {
+      row.style.background = active ? 'rgba(76, 255, 122, 0.14)' : '';
+      row.style.boxShadow = active ? 'inset 0 0 0 2px #4cff7a' : '';
+      row.style.color = active ? '#4cff7a' : '';
+    }
     function renderBgPicker() {
       bgList.innerHTML = '';
       // A page can restrict itself to a fixed subset of BG_LIB (e.g. the
@@ -66,6 +72,8 @@ window.initPickers = function() {
       keys.forEach((key) => {
         const bg = BG_LIB[key];
         if (!bg) return;
+        // Raining Money is an overlay, not a background: it has its own row below.
+        if (key === 'raining_money') return;
         // `restricted` backgrounds (the inventory shelf variants) only ever
         // show up on a page whose OWN allowlist names them explicitly —
         // otherwise they'd leak into every other page's picker just for
@@ -91,6 +99,7 @@ window.initPickers = function() {
         const indicator = document.createElement('span');
         indicator.style.marginLeft = 'auto';
         indicator.textContent = localStorage.getItem(ACTIVE_BG_KEY) === key ? '✓' : '';
+        paintRow(row, localStorage.getItem(ACTIVE_BG_KEY) === key);
         row.appendChild(label);
         row.appendChild(indicator);
         row.addEventListener('click', () => {
@@ -104,12 +113,34 @@ window.initPickers = function() {
         });
         bgList.appendChild(row);
       });
+      // Raining Money layers over whichever background is chosen, so it has its own on/off row.
+      if (window.MoneyRain && loadInventory().backgrounds?.includes('raining_money')) {
+        const on = window.MoneyRain.isOn();
+        const moneyRow = document.createElement('div');
+        moneyRow.className = 'picker-row';
+        moneyRow.style.cursor = 'pointer';
+        const moneyLabel = document.createElement('span');
+        moneyLabel.textContent = '🌧️ Raining Money (over any background)';
+        const moneyState = document.createElement('span');
+        moneyState.style.marginLeft = 'auto';
+        moneyState.textContent = on ? 'ON' : 'OFF';
+        moneyRow.appendChild(moneyLabel);
+        moneyRow.appendChild(moneyState);
+        paintRow(moneyRow, on);
+        moneyRow.addEventListener('click', () => {
+          window.MoneyRain.set(!on);
+          renderBgPicker();
+        });
+        bgList.appendChild(moneyRow);
+      }
     }
     // "Default" resolves to whatever this specific page declared as its own
     // look (window.PAGE_DEFAULT_BG — e.g. minesweeper's drone footage,
     // blackjack's casino entrance), not the shared library's Taipei entry,
     // so picking "Default" here restores THIS page's default, not home's.
     function applyBg(key) {
+      // A saved Raining Money choice becomes the overlay on the page's own default.
+      if (key === 'raining_money') { if (window.MoneyRain) window.MoneyRain.set(true); key = 'default'; }
       const bg = (key === 'default' && window.PAGE_DEFAULT_BG) || BG_LIB[key] || BG_LIB.default || {};
       // A page can redirect where the image itself actually lands via
       // window.PAGE_BG_TARGET (an element) — the inventory room uses this
@@ -230,6 +261,7 @@ window.initPickers = function() {
         const indicator = document.createElement('span');
         indicator.style.marginLeft = 'auto';
         indicator.textContent = getActiveTrackKey() === key ? '▶' : '';
+        paintRow(row, getActiveTrackKey() === key);
         row.appendChild(label);
         row.appendChild(indicator);
         row.addEventListener('click', () => {

@@ -32,11 +32,10 @@
   item. This page is a standalone document, so scoping buys nothing anyway.
 -->
 <style is:global>
-  /* Phones: the back link stays pinned while the page scrolls, so it can always
-     be reached. Here it sits at the bottom-left, since the top-left holds the
-     Strubles balance badge. */
+  /* Phones: Home is pinned top-left with a 44px tap target, and the Strubles
+     balance stacks directly under it (see .badge below). */
   @media (max-width: 768px) {
-    a.back-home { position: fixed !important; top: auto !important; bottom: 12px !important; left: 10px !important; z-index: 999 !important; background: #000; border: 2px solid #ffd700; padding: 8px 10px; color: #ffd700; font-size: 9px; text-decoration: none; }
+    a.back-home { position: fixed !important; top: calc(10px + env(safe-area-inset-top)) !important; bottom: auto !important; left: calc(10px + env(safe-area-inset-left)) !important; z-index: 999 !important; background: #000; border: 2px solid #ffd700; padding: 12px 14px !important; min-height: 44px; box-sizing: border-box; color: #ffd700; font-size: 12px; text-decoration: none; }
   }
 
   :root{
@@ -97,6 +96,9 @@
     box-shadow:0 0 10px rgba(255,215,0,.3); font-size:12px;
   }
   .badge img{ width:28px; height:28px; }
+  @media (max-width: 768px) {
+    .badge{ top:calc(64px + env(safe-area-inset-top)); left:calc(10px + env(safe-area-inset-left)); }
+  }
   .top-actions{
     position:fixed; top:calc(15px + env(safe-area-inset-top)); right:calc(20px + env(safe-area-inset-right));
     z-index:30; display:flex; gap:6px;

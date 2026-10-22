@@ -164,6 +164,8 @@ class AirHockeyGame extends ArenaGame {
 
     this.collideWalls();
     for (let i = 0; i < 2; i++) this.collidePaddle(i);
+    // A paddle hit can push the puck past an edge, so the walls are checked again.
+    this.collideWalls();
 
     // Goal: the puck has fully crossed an edge inside the goal slot.
     const inSlot = puck.y > GOAL_TOP && puck.y < GOAL_BOTTOM;
@@ -173,11 +175,13 @@ class AirHockeyGame extends ArenaGame {
 
   collideWalls() {
     const p = this.puck;
-    // Side walls, with the goal slot left open on each side.
-    if (p.x - PUCK_R < 0 && !(p.y > GOAL_TOP && p.y < GOAL_BOTTOM)) {
+    // Side walls, with the goal slot left open on each side. The puck only gets
+    // through when its whole edge is inside the slot, so a corner post bounces it.
+    const throughSlot = p.y - PUCK_R >= GOAL_TOP && p.y + PUCK_R <= GOAL_BOTTOM;
+    if (p.x - PUCK_R < 0 && !throughSlot) {
       p.x = PUCK_R; p.vx = Math.abs(p.vx) * RESTITUTION_WALL; this.events.push('wall');
     }
-    if (p.x + PUCK_R > W && !(p.y > GOAL_TOP && p.y < GOAL_BOTTOM)) {
+    if (p.x + PUCK_R > W && !throughSlot) {
       p.x = W - PUCK_R; p.vx = -Math.abs(p.vx) * RESTITUTION_WALL; this.events.push('wall');
     }
     if (p.y - PUCK_R < 0) { p.y = PUCK_R; p.vy = Math.abs(p.vy) * RESTITUTION_WALL; this.events.push('wall'); }

@@ -75,6 +75,10 @@
       <label><input type="radio" name="mode" value="endless"><span>Endless</span></label>
     </div>
     <button class="arcade" id="btn-find" type="button">Find a match</button>
+    <div id="waiting" hidden>
+      <p id="wait-text">Waiting for an opponent…</p>
+      <button class="arcade" id="cancel-wait" type="button">Cancel</button>
+    </div>
     <div id="status"></div>
   </div>
 
@@ -176,24 +180,39 @@
   }
 
   // ------------------------------------------------------------ drawing
-  // Table coordinates are the server's (0..1000). The table is drawn at the
-  // canvas size, so the same numbers work on any screen.
+  // The table is shown with your own goal at the bottom of the screen, so it reads
+  // as a vertical table on a phone. Player 0 sees it turned one way, player 1 the
+  // other. Positions are converted between the server's table and the screen.
+  const FIELD_DEFAULT = { w: 1000, h: 1000, puckR: 42, paddleR: 64 };
+  function toScreen(p) {
+    const f = S.field || FIELD_DEFAULT;
+    return S.yourIndex === 0 ? { x: p.y, y: f.w - p.x } : { x: f.h - p.y, y: p.x };
+  }
+  function toTable(s) {
+    const f = S.field || FIELD_DEFAULT;
+    return S.yourIndex === 0 ? { x: f.w - s.y, y: s.x } : { x: s.y, y: f.h - s.x };
+  }
   function draw() {
-    const W = canvas.width, H = canvas.height;
-    ctx.clearRect(0, 0, W, H);
-    const f = S.field || { w: 1000, h: 1000, puckR: 42, paddleR: 64 };
-    const k = W / f.w;
-    const X = (x) => x * k, Y = (y) => y * k;
-    if (IMG.rink.complete) ctx.drawImage(IMG.rink, 0, 0, W, H);
-    else { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); }
-    if (IMG.center.complete) ctx.drawImage(IMG.center, X(f.w / 2 - 70), Y(f.h / 2 - 70), 140 * k, 140 * k);
-
+    const C = canvas.width;
+    ctx.clearRect(0, 0, C, C);
+    const f = S.field || FIELD_DEFAULT;
+    const k = C / f.w;
+    // Rink and centre spot, turned so the player's own goal is at the bottom.
+    ctx.save();
+    if (S.yourIndex === 0) ctx.setTransform(0, -k, k, 0, 0, f.w * k);
+    else ctx.setTransform(0, k, -k, 0, f.h * k, 0);
+    if (IMG.rink.complete) ctx.drawImage(IMG.rink, 0, 0, f.w, f.h);
+    else { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, f.w, f.h); }
+    if (IMG.center.complete) ctx.drawImage(IMG.center, f.w / 2 - 70, f.h / 2 - 70, 140, 140);
+    ctx.restore();
+    // Pieces are drawn upright, at their turned positions.
     const pr = f.paddleR * k * 2, pk = f.puckR * k * 2;
-    const left = S.yourIndex === 0 ? S.mine : S.shownOpp;
-    const right = S.yourIndex === 0 ? S.shownOpp : S.mine;
-    if (IMG.left.complete) ctx.drawImage(IMG.left, X(left.x) - pr / 2, Y(left.y) - pr / 2, pr, pr);
-    if (IMG.right.complete) ctx.drawImage(IMG.right, X(right.x) - pr / 2, Y(right.y) - pr / 2, pr, pr);
-    if (IMG.puck.complete) ctx.drawImage(IMG.puck, X(S.shownPuck.x) - pk / 2, Y(S.shownPuck.y) - pk / 2, pk, pk);
+    const mine = toScreen(S.mine), opp = toScreen(S.shownOpp), puck = toScreen(S.shownPuck);
+    const myImg = S.yourIndex === 0 ? IMG.left : IMG.right;
+    const oppImg = S.yourIndex === 0 ? IMG.right : IMG.left;
+    if (oppImg.complete) ctx.drawImage(oppImg, opp.x * k - pr / 2, opp.y * k - pr / 2, pr, pr);
+    if (myImg.complete) ctx.drawImage(myImg, mine.x * k - pr / 2, mine.y * k - pr / 2, pr, pr);
+    if (IMG.puck.complete) ctx.drawImage(IMG.puck, puck.x * k - pk / 2, puck.y * k - pk / 2, pk, pk);
   }
 
   // Each frame: smooth the others toward the server, and keep our own paddle
@@ -219,24 +238,27 @@
   }
 
   // --------------------------------------------------------------- input
-  // Pointer position over the table, in table units (0..1000).
-  function toTable(clientX, clientY) {
+  // Pointer position over the table, converted from the turned screen to table units.
+  function pointerToTable(clientX, clientY) {
     const r = canvas.getBoundingClientRect();
-    return {
-      x: Math.max(0, Math.min(1, (clientX - r.left) / r.width)),
-      y: Math.max(0, Math.min(1, (clientY - r.top) / r.height)),
-    };
+    const f = S.field || FIELD_DEFAULT;
+    const sx = Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * f.w;
+    const sy = Math.max(0, Math.min(1, (clientY - r.top) / r.height)) * f.h;
+    return toTable({ x: sx, y: sy });
+  }
+  // Keep a table point on our own half, the same limit the server applies.
+  function clampToHalf(p) {
+    const f = S.field || FIELD_DEFAULT;
+    const minX = S.yourIndex === 0 ? f.paddleR : f.w / 2 + f.paddleR;
+    const maxX = S.yourIndex === 0 ? f.w / 2 - f.paddleR : f.w - f.paddleR;
+    return { x: Math.max(minX, Math.min(maxX, p.x)), y: Math.max(f.paddleR, Math.min(f.h - f.paddleR, p.y)) };
   }
   function setTarget(p) {
     if (S.phase !== 'playing') return;
-    const f = S.field || { w: 1000, h: 1000 };
-    // Keep the target on our own half, the same limit the server applies.
-    const minX = S.yourIndex === 0 ? f.paddleR : f.w / 2 + f.paddleR;
-    const maxX = S.yourIndex === 0 ? f.w / 2 - f.paddleR : f.w - f.paddleR;
-    S.target = { x: Math.max(minX, Math.min(maxX, p.x * f.w)), y: Math.max(f.paddleR, Math.min(f.h - f.paddleR, p.y * f.h)) };
+    S.target = clampToHalf(p);
   }
-  canvas.addEventListener('pointerdown', (e) => { ac(); canvas.setPointerCapture(e.pointerId); setTarget(toTable(e.clientX, e.clientY)); });
-  canvas.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType !== 'mouse') setTarget(toTable(e.clientX, e.clientY)); });
+  canvas.addEventListener('pointerdown', (e) => { ac(); canvas.setPointerCapture(e.pointerId); setTarget(pointerToTable(e.clientX, e.clientY)); });
+  canvas.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType !== 'mouse') setTarget(pointerToTable(e.clientX, e.clientY)); });
   canvas.addEventListener('pointerup', () => {});
   window.addEventListener('keydown', (e) => {
     ac();
@@ -257,17 +279,19 @@
   // which keeps the connection under the server's per-connection limit.
   setInterval(() => {
     if (S.phase !== 'playing') return;
-    const f = S.field || { w: 1000, h: 1000 };
+    const f = S.field || FIELD_DEFAULT;
     const step = 14;
-    if (S.target && (keys.up || keys.down || keys.left || keys.right)) {
-      if (keys.left) S.target.x -= step;
-      if (keys.right) S.target.x += step;
-      if (keys.up) S.target.y -= step;
-      if (keys.down) S.target.y += step;
-      S.target.x = Math.max(0, Math.min(f.w, S.target.x));
-      S.target.y = Math.max(0, Math.min(f.h, S.target.y));
-    } else if (!S.target && (keys.up || keys.down || keys.left || keys.right)) {
-      S.target = { x: S.paddles[S.yourIndex].x, y: S.paddles[S.yourIndex].y };
+    if (keys.up || keys.down || keys.left || keys.right) {
+      // Arrow keys move on the screen, so they are turned into table moves too.
+      if (!S.target) S.target = { x: S.paddles[S.yourIndex].x, y: S.paddles[S.yourIndex].y };
+      const sc = toScreen(S.target);
+      if (keys.left) sc.x -= step;
+      if (keys.right) sc.x += step;
+      if (keys.up) sc.y -= step;
+      if (keys.down) sc.y += step;
+      sc.x = Math.max(0, Math.min(f.w, sc.x));
+      sc.y = Math.max(0, Math.min(f.h, sc.y));
+      S.target = clampToHalf(toTable(sc));
     }
     if (!S.target) return;
     const now = performance.now();
@@ -281,7 +305,16 @@
 
   // ------------------------------------------------------------- screens
   function hideOverlays() { $('lobby').classList.remove('show'); $('result').classList.remove('show'); }
-  function showLobby(msg) { $('lobby').classList.add('show'); $('result').classList.remove('show'); $('status').textContent = msg || ''; $('btn-find').disabled = false; }
+  // The waiting room: while a match is being looked for, the modes and the find
+  // button give way to a waiting row with Cancel, and it stays until a game starts.
+  function setWaiting(on, text) {
+    $('waiting').style.display = on ? 'block' : 'none';
+    $('wait-text').textContent = text || '';
+    $('btn-find').style.display = on ? 'none' : '';
+    document.querySelector('.modes').style.display = on ? 'none' : '';
+  }
+  function showLobby(msg) {
+    setWaiting(false); $('lobby').classList.add('show'); $('result').classList.remove('show'); $('status').textContent = msg || ''; $('btn-find').disabled = false; }
   function setScore() { $('score-left').textContent = S.score[0]; $('score-right').textContent = S.score[1]; }
   function setClock() {
     const el = $('clock');
@@ -356,8 +389,8 @@
     onMessage: (m) => {
       switch (m.type) {
         case 'status':
-          if (m.status === 'queued') { S.phase = 'queued'; $('status').textContent = 'Waiting for a friendly opponent in this mode…'; $('btn-find').disabled = true; }
-          if (m.status === 'matched') { $('status').textContent = 'Matched! Starting…'; }
+          if (m.status === 'queued') { S.phase = 'queued'; setWaiting(true, 'Waiting for a friendly opponent in this mode…'); }
+          if (m.status === 'matched') { setWaiting(true, 'Matched! Starting…'); }
           break;
         case 'game_start': onGameStart(m); break;
         case 'airhockey_state': onState(m); break;
@@ -370,7 +403,7 @@
         case 'opponent_away': banner(`${S.opponentName} disconnected — holding the game for ${Math.round((m.graceMs || 30000) / 1000)}s…`); break;
         case 'opponent_back': banner(''); break;
         case 'resync': resync(m); break;
-        case 'error': $('status').textContent = m.message || 'Something went wrong.'; $('btn-find').disabled = false; break;
+        case 'error': setWaiting(false); $('status').textContent = m.message || 'Something went wrong.'; $('btn-find').disabled = false; break;
         default: break;
       }
     },
@@ -380,8 +413,14 @@
   $('btn-find').addEventListener('click', () => {
     ac();
     const mode = document.querySelector('input[name="mode"]:checked')?.value || 'score7';
-    $('status').textContent = 'Looking for an opponent…';
+    setWaiting(true, 'Looking for an opponent…');
     arena.send({ type: 'join_queue', bet: 0, gameType: 'airhockey', mode });
+  });
+  $('cancel-wait').addEventListener('click', () => {
+    arena.send({ type: 'leave_queue' });
+    S.phase = 'lobby';
+    setWaiting(false);
+    $('status').textContent = '';
   });
   $('btn-rematch').addEventListener('click', () => {
     if (S.rematchSent) return;

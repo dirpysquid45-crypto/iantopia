@@ -269,6 +269,9 @@
   .status { margin-top:14px; font-weight:400; font-size:11px; color:#fff; }
 
   .controls { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center; }
+  /* The six round buttons always sit in one row, sharing the width equally. */
+  .actions { display:flex; gap:8px; width:100%; flex-wrap:nowrap; }
+  .actions button { flex:1 1 0; min-width:0; }
   button {
     all:unset; cursor:none; padding:12px 24px; border-radius:0; border:3px solid #333;
     background:#4a6fa5; color:#fff; font-weight:400; font-size:11px;
@@ -430,12 +433,14 @@
         <button id="bet-plus">+</button>
       </div>
 
-      <button id="btn-deal"   class="primary">Deal</button>
-      <button id="btn-hit"    class="accent"  disabled>Hit</button>
-      <button id="btn-stand"  class="accent"  disabled>Stand</button>
-      <button id="btn-double" class="accent"  disabled>Double</button>
-      <button id="btn-split"  class="accent"  disabled>Split</button>
-      <button id="btn-restart" class="danger" disabled>Restart</button>
+      <div class="actions">
+        <button id="btn-deal"   class="primary">Deal</button>
+        <button id="btn-hit"    class="accent"  disabled>Hit</button>
+        <button id="btn-stand"  class="accent"  disabled>Stand</button>
+        <button id="btn-double" class="accent"  disabled>Double</button>
+        <button id="btn-split"  class="accent"  disabled>Split</button>
+        <button id="btn-restart" class="danger" disabled>Restart</button>
+      </div>
     </div>
 
     <div class="status" id="status">Welcome! Set a bet and press Deal.</div>
@@ -515,7 +520,7 @@
   window.PAGE_FREE_TRACK_KEY = 'balatro';
 </script>
 <script is:inline src="/pickers.js?v=11"></script>
-
+<script is:inline src="/money-rain.js?v=1"></script>
 <script is:inline>
 (() => {
   const suits  = ['♠','♥','♦','♣'];
@@ -754,7 +759,7 @@
     const bal = Strubles.get();
     btnDouble.disabled = !(isFirstDecision && bal >= bet);
     const canSplit = isFirstDecision && !hasSplit && playerHands.length === 1 &&
-                      hand[0].v === hand[1].v && bal >= bet;
+                      canSplitPair(hand[0].v, hand[1].v) && bal >= bet;
     btnSplit.disabled = !canSplit;
   }
 
@@ -919,10 +924,15 @@
     advanceOrResolve();
   }
 
+  // Any two cards worth ten can be split (10, J, Q, K), not only a matching pair.
+  const TEN_VALUES = new Set(['10', 'J', 'Q', 'K']);
+  function canSplitPair(a, b) {
+    return a === b || (TEN_VALUES.has(a) && TEN_VALUES.has(b));
+  }
   function split(){
     if (!inRound || hasSplit || playerHands.length !== 1) return;
     const hand = playerHands[0];
-    if (hand.length !== 2 || hand[0].v !== hand[1].v) return;
+    if (hand.length !== 2 || !canSplitPair(hand[0].v, hand[1].v)) return;
     const bet = handBets[0];
     if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles to split."; return; }
     syncBalance();

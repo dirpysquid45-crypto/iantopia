@@ -21,6 +21,9 @@
   body { font-family:'Press Start 2P', ui-monospace, monospace; display:flex; flex-direction:column; overflow:hidden; }
   header { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 12px; flex:0 0 auto; border-bottom:2px solid #1d1d1d; }
   a.back { color:var(--gold); border:2px solid var(--gold); background:#000; padding:7px 10px; font-size:9px; text-decoration:none; white-space:nowrap; }
+  @media (max-width:768px) {
+    a.back { min-height:44px; box-sizing:border-box; padding:12px 14px; font-size:12px; }
+  }
   #status { font-size:9px; color:var(--muted); text-align:right; min-height:12px; line-height:1.6; }
   #status.win { color:var(--green); text-shadow:0 0 10px rgba(125,255,125,.6); }
   iframe { flex:1 1 auto; width:100%; border:0; background:#0b0b0b; }
