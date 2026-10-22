@@ -22,9 +22,11 @@ const ArenaGame = require('./game-base');
 // makes the width 1000 units and the length 1750.
 const W = 1750;                   // logical table length (left goal at x=0, right goal at x=W)
 const H = 1000;                   // logical table width
-const PUCK_R = 25;                // 60 mm puck
-const PADDLE_R = 34;              // about 83 mm striker
-const GOAL_WIDTH = 135;           // about 165 mm goal slot, centred across the width
+// The puck, mallets and goals are bigger than regulation so they read on a phone
+// screen and are easy to hit with a thumb. The table ratio above is unchanged.
+const PUCK_R = 42;                // a large puck, so it reads on a small screen
+const PADDLE_R = 70;              // a big mallet, easy to hit with a finger
+const GOAL_WIDTH = 360;           // a wide goal slot, centred across the width
 const GOAL_TOP = (H - GOAL_WIDTH) / 2;
 const GOAL_BOTTOM = (H + GOAL_WIDTH) / 2;
 const RESTITUTION_WALL = 0.86;

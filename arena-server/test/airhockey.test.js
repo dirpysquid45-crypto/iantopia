@@ -153,7 +153,7 @@ test('a snapshot is compact and carries the events since the last one', () => {
 test('the table is the regulation 7 ft by 4 ft ratio, with the goal centred across the width', () => {
   assert.equal(W / H, 1.75);
   assert.equal((GOAL_TOP + GOAL_BOTTOM) / 2, H / 2, 'goal slot is centred');
-  assert.ok(GOAL_BOTTOM - GOAL_TOP < H * 0.2, 'the goal is a slot, not a whole side');
+  assert.ok(GOAL_BOTTOM - GOAL_TOP < H * 0.5, 'the goal is a slot, not a whole side');
 });
 
 test('paddles are pushed out of the centre circle while a serve is waiting', () => {

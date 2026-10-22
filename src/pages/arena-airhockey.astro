@@ -19,9 +19,10 @@
   * { box-sizing:border-box; }
   html, body { margin:0; height:100%; background:#0b0d12; color:var(--ink); }
   body { font-family:'Press Start 2P', ui-monospace, monospace; overflow:hidden; display:flex; flex-direction:column; }
-  a.back { position:fixed; top:12px; left:12px; z-index:20; color:var(--gold); border:2px solid var(--gold); background:#000; padding:8px 10px; font-size:9px; text-decoration:none; }
+  /* Sits below the status bar and any notch when the site runs as an installed app. */
+  a.back { position:fixed; top:calc(env(safe-area-inset-top, 0px) + 44px); left:12px; z-index:20; color:var(--gold); border:2px solid var(--gold); background:#000; padding:8px 10px; font-size:9px; text-decoration:none; }
 
-  #scoreboard { display:flex; justify-content:center; align-items:center; gap:18px; padding:14px 12px 6px; flex:0 0 auto; font-size:clamp(10px, 2.4vw, 16px); }
+  #scoreboard { display:flex; justify-content:center; align-items:center; gap:18px; padding:calc(env(safe-area-inset-top, 0px) + 80px) 12px 6px; flex:0 0 auto; font-size:clamp(10px, 2.4vw, 16px); }
   #scoreboard .side { text-align:center; min-width:120px; }
   #scoreboard .side small { display:block; font-size:8px; color:var(--muted); margin-bottom:6px; }
   /* Left is the blue paddle and right the red one, as in the art. */
@@ -106,12 +107,12 @@
 
   // Art (CC BY 4.0, see CREDITS.txt in /airhockey/).
   const IMG = {};
-  for (const [k, src] of [['puck', '/airhockey/puck.webp'], ['left', '/airhockey/leftplayer.webp'], ['right', '/airhockey/rightplayer.webp'], ['struble', '/airhockey/struble-grey.png']]) {
+  for (const [k, src] of [['puck', '/airhockey/puck.webp'], ['left', '/airhockey/leftplayer.webp'], ['right', '/airhockey/rightplayer.webp']]) {
     IMG[k] = new Image(); IMG[k].src = src;
   }
 
   const S = {
-    phase: 'lobby', field: null, yourIndex: 0, mode: 'score7', opponentName: 'Opponent',
+    phase: 'lobby', field: null, landscape: false, yourIndex: 0, mode: 'score7', opponentName: 'Opponent',
     // Authoritative state from the server (fractions of the table are in field units).
     puck: { x: 875, y: 500, vx: 0, vy: 0 }, paddles: [{ x: 175, y: 500, vx: 0, vy: 0 }, { x: 1575, y: 500, vx: 0, vy: 0 }],
     // What we draw: the puck and the opponent are drawn where the last snapshot
@@ -150,17 +151,24 @@
   };
 
   // ------------------------------------------------------------ confetti
-  // The table is taller than it is wide (your goal at the bottom), so the canvas
-  // takes the table's ratio rather than a square.
+  // The table is long (goal to goal is 1.75 times its width), so it is shown either
+  // upright, with your goal at the bottom (a phone), or sideways, with the goals at
+  // the left and right (a laptop). Whichever shows the table bigger is used.
+  function screenDims(f) {
+    return S.landscape ? { w: f.w, h: f.h } : { w: f.h, h: f.w };
+  }
   function sizeCanvases() {
     const r = canvas.parentElement.getBoundingClientRect();
     const f = S.field || FIELD_DEFAULT;
-    const ratio = f.w / f.h;
-    const width = Math.min(Math.max(160, r.width - 16), Math.max(200, r.height - 16) / ratio);
-    const height = width * ratio;
+    const availW = Math.max(160, r.width - 16), availH = Math.max(200, r.height - 16);
+    const upright = Math.min(availW / f.h, availH / f.w);   // CSS px per table unit
+    const sideways = Math.min(availW / f.w, availH / f.h);
+    S.landscape = sideways > upright;
+    const scale = S.landscape ? sideways : upright;
+    const d = screenDims(f);
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
-    canvas.style.width = width + 'px'; canvas.style.height = height + 'px';
+    canvas.width = Math.round(d.w * scale * dpr); canvas.height = Math.round(d.h * scale * dpr);
+    canvas.style.width = d.w * scale + 'px'; canvas.style.height = d.h * scale + 'px';
     confettiCanvas.width = window.innerWidth; confettiCanvas.height = window.innerHeight;
   }
   function confetti() {
@@ -185,21 +193,24 @@
   }
 
   // ------------------------------------------------------------ drawing
-  // The table is shown with your own goal at the bottom of the screen, so it reads
-  // as a vertical table on a phone. Player 0 sees it turned one way, player 1 the
-  // other. Positions are converted between the server's table and the screen.
-  const FIELD_DEFAULT = { w: 1750, h: 1000, puckR: 25, paddleR: 34, goalTop: 432.5, goalBottom: 567.5 };
+  // Positions are converted between the server's table and the screen. Upright, the
+  // table is turned so your own goal is at the bottom; player 0 sees it turned one
+  // way, player 1 the other. Sideways, the table is drawn as it is, with the blue
+  // goal on the left and the red goal on the right.
+  const FIELD_DEFAULT = { w: 1750, h: 1000, puckR: 42, paddleR: 70, goalTop: 320, goalBottom: 680 };
   function toScreen(p) {
     const f = S.field || FIELD_DEFAULT;
+    if (S.landscape) return { x: p.x, y: p.y };
     return S.yourIndex === 0 ? { x: p.y, y: f.w - p.x } : { x: f.h - p.y, y: p.x };
   }
   function toTable(s) {
     const f = S.field || FIELD_DEFAULT;
+    if (S.landscape) return { x: s.x, y: s.y };
     return S.yourIndex === 0 ? { x: f.w - s.y, y: s.x } : { x: s.y, y: f.h - s.x };
   }
-  // The table, from the same numbers the server uses: a white rink inside a blue
-  // wall, with a goal slot at each end (blue on the left, red on the right). It is
-  // drawn here, not from the square art, so the goals sit where the puck is stopped.
+  // The table, from the same numbers the server uses: a white rink with a slate
+  // wall, and a goal at each end. Each goal is a band in its owner's colour with a
+  // black slot where the puck goes in, so it reads whichever colour you are.
   function drawRink(f) {
     const top = f.goalTop, bottom = f.goalBottom;
     ctx.fillStyle = '#ffffff';
@@ -216,21 +227,27 @@
       }
     }
     ctx.fill();
-    ctx.strokeStyle = '#3d7bff';
+    // The walls are a neutral slate, so the coloured goals are the only blue and red at the ends.
+    ctx.strokeStyle = '#2b3442';
     ctx.lineWidth = 16;
     ctx.strokeRect(8, 8, f.w - 16, f.h - 16);
+    const depth = 40, slot = 8;
     ctx.fillStyle = '#3d7bff';
-    ctx.fillRect(0, top, 14, bottom - top);
+    ctx.fillRect(0, top, depth, bottom - top);
     ctx.fillStyle = '#e0505a';
-    ctx.fillRect(f.w - 14, top, 14, bottom - top);
+    ctx.fillRect(f.w - depth, top, depth, bottom - top);
+    ctx.fillStyle = '#0b0d12';
+    ctx.fillRect(0, top, slot, bottom - top);
+    ctx.fillRect(f.w - slot, top, slot, bottom - top);
   }
   function draw() {
     const f = S.field || FIELD_DEFAULT;
-    const k = canvas.width / f.h;   // pixels per unit; the screen is f.h wide and f.w tall
+    const k = canvas.width / screenDims(f).w;   // pixels per unit of the screen
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // Rink, turned so the player's own goal is at the bottom.
+    // Rink, turned so the player's own goal is at the bottom when upright.
     ctx.save();
-    if (S.yourIndex === 0) ctx.setTransform(0, -k, k, 0, 0, f.w * k);
+    if (S.landscape) ctx.setTransform(k, 0, 0, k, 0, 0);
+    else if (S.yourIndex === 0) ctx.setTransform(0, -k, k, 0, 0, f.w * k);
     else ctx.setTransform(0, k, -k, 0, f.h * k, 0);
     drawRink(f);
     // The halfway line, across the table at the centre of its length.
@@ -238,11 +255,17 @@
     ctx.lineWidth = 6;
     ctx.beginPath(); ctx.moveTo(f.w / 2, 0); ctx.lineTo(f.w / 2, f.h); ctx.stroke();
     ctx.restore();
-    // The grey struble sits in the middle, drawn upright on the screen.
-    if (IMG.struble.complete) {
-      const sh = f.h * 0.3 * k, sw = sh * IMG.struble.naturalWidth / IMG.struble.naturalHeight;
-      ctx.drawImage(IMG.struble, (f.h * k) / 2 - sw / 2, (f.w * k) / 2 - sh / 2, sw, sh);
+    // Each goal is labelled, since on a blue side the colours alone don't say which is yours.
+    const ownX = S.yourIndex === 0 ? 0 : f.w;
+    ctx.save();
+    ctx.font = `${Math.round(36 * k)}px "Press Start 2P", ui-monospace, monospace`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#1d2433';
+    for (const [goalX, text] of [[ownX, 'YOUR GOAL'], [f.w - ownX, 'THEIR GOAL']]) {
+      const p = toScreen({ x: goalX === 0 ? 100 : f.w - 100, y: f.h / 2 });
+      ctx.fillText(text, p.x * k, p.y * k);
     }
+    ctx.restore();
     // Pieces are drawn upright, at their turned positions.
     const pr = f.paddleR * k * 2, pk = f.puckR * k * 2;
     const mine = toScreen(S.mine), opp = toScreen(S.shownOpp), puck = toScreen(S.shownPuck);
@@ -283,8 +306,9 @@
   function pointerToTable(clientX, clientY) {
     const r = canvas.getBoundingClientRect();
     const f = S.field || FIELD_DEFAULT;
-    const sx = Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * f.h;
-    const sy = Math.max(0, Math.min(1, (clientY - r.top) / r.height)) * f.w;
+    const d = screenDims(f);
+    const sx = Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * d.w;
+    const sy = Math.max(0, Math.min(1, (clientY - r.top) / r.height)) * d.h;
     return toTable({ x: sx, y: sy });
   }
   // Keep a table point on our own half, the same limit the server applies.
@@ -330,8 +354,9 @@
       if (keys.right) sc.x += step;
       if (keys.up) sc.y -= step;
       if (keys.down) sc.y += step;
-      sc.x = Math.max(0, Math.min(f.h, sc.x));
-      sc.y = Math.max(0, Math.min(f.w, sc.y));
+      const d = screenDims(f);
+      sc.x = Math.max(0, Math.min(d.w, sc.x));
+      sc.y = Math.max(0, Math.min(d.h, sc.y));
       S.target = clampToHalf(toTable(sc));
     }
     if (!S.target) return;
