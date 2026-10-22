@@ -27,8 +27,13 @@
   @media (max-width:768px) {
     a.back { top:calc(10px + env(safe-area-inset-top)); left:calc(10px + env(safe-area-inset-left)); min-height:44px; box-sizing:border-box; padding:12px 14px; font-size:12px; }
   }
-  h1 { margin:0 0 6px; text-align:center; font-size:clamp(14px, 3.4vw, 20px); color:var(--gold); text-shadow:0 0 14px rgba(255,215,0,.5); }
-  .sub { text-align:center; font-size:9px; color:var(--muted); margin:0 0 28px; line-height:1.8; }
+  /* The title box holds the heading and its subtext. It fades and drops in once, then its outline glows softly. */
+  .title-box { width:min(100%, 520px); margin:0 auto 28px; padding:12px 18px; background:#000; border:3px solid #fff; text-align:center; animation:titleIn .7s cubic-bezier(.2,.8,.2,1) both, titleGlow 3.2s ease-in-out .7s infinite alternate; }
+  @keyframes titleIn { from { opacity:0; transform:translateY(-14px) scale(.96); } to { opacity:1; transform:none; } }
+  @keyframes titleGlow { from { box-shadow:0 0 0 rgba(255,255,255,0); } to { box-shadow:0 0 18px rgba(255,255,255,.35); } }
+  @media (prefers-reduced-motion: reduce) { .title-box { animation:none; } }
+  h1 { margin:0 0 8px; text-align:center; font-size:clamp(14px, 3.4vw, 20px); color:var(--gold); text-shadow:0 0 14px rgba(255,215,0,.5); }
+  .sub { text-align:center; font-size:9px; color:var(--muted); margin:0; line-height:1.8; }
   .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px; max-width:880px; margin:0 auto; }
   .card { border:3px solid var(--gold); background:rgba(0,0,0,.6); padding:20px; text-align:center; }
   .card h2 { margin:0 0 12px; font-size:13px; color:var(--gold); }
@@ -38,13 +43,19 @@
   .card.new { border-color:#39ff14; }
   .card.new h2 { color:#39ff14; }
   .card.new a { background:#39ff14; }
+  .card.tetris { border-color:#3d7bff; }
+  .card.tetris h2 { color:#3d7bff; }
+  .card.tetris a { background:#3d7bff; }
+  .card.tetris a:hover { background:#6b9dff; }
   .credit { text-align:center; font-size:8px; color:#5d6577; margin:28px 0 0; }
 </style>
 </head>
 <body>
   <a class="back" href="/">← Iantopia</a>
-  <h1>🧩 PUZZLES</h1>
-  <p class="sub">Brain teasers and games of skill. Some pay Strubles.</p>
+  <div class="title-box">
+    <h1>🧩 PUZZLES</h1>
+    <p class="sub">Brain teasers and games of skill. Some pay Strubles.</p>
+  </div>
   <div class="card-stack" style="--stack-h: 200px">
     <div class="card stack-card" style="--i: 0">
       <h2>💣 Minesweeper</h2>
@@ -55,6 +66,11 @@
       <h2>🀄 Mahjong Solitaire</h2>
       <p>Match the free tiles until the board is clear. Solve a board to earn Strubles, up to 10 boards a day.</p>
       <a href="/solitaire">Play Now</a>
+    </div>
+    <div class="card stack-card new tetris" style="--i: 2">
+      <h2>🧱 Tetris</h2>
+      <p>Stack the falling blocks and clear lines. Hold a piece, rotate with the touch buttons or the keys. Solo, no Strubles.</p>
+      <a href="/tetris">Play Now</a>
     </div>
   </div>
   <p class="credit">Mahjong Solitaire engine: mah by ffalt, MIT License.</p>

@@ -1,9 +1,12 @@
 const BlackjackGame = require('./blackjack');
 const { BattleshipGame } = require('./battleship');
 const { AirHockeyGame, MODES: AIRHOCKEY_MODES } = require('./airhockey');
+const { TetrisGame } = require('./tetris');
 const BalanceManager = require('./balance');
 
-const GAME_TYPES = new Set(['blackjack', 'battleship', 'airhockey']);
+const GAME_TYPES = new Set(['blackjack', 'battleship', 'airhockey', 'tetris']);
+// Games with no stakes: nothing can be lost or won, so a bet is refused.
+const FRIENDLY_ONLY = new Set(['airhockey', 'tetris']);
 const MAX_BET = 1000000;
 const SUGGESTION_STATUSES = new Set(['new', 'public', 'archived']);
 
@@ -33,17 +36,21 @@ class Manager {
     this.sendTo(conn.ws, { type: 'account_feed', events: this.accounts.feed });
   }
 
-  // Sends the current player list to every admin connection.
+  // Sends the current player list to the admins who have it open. The list is
+  // large, so nobody is sent it unless they asked for it.
   async broadcastPlayers() {
     if (!this.accounts) return;
     const players = await this.accounts.listPlayers();
-    this.broadcastAdmins({ type: 'account_list', players });
+    for (const conn of this.connections.values()) {
+      if (conn.admin && conn.wantsPlayers) this.sendTo(conn.ws, { type: 'account_list', players });
+    }
   }
 
   // Admin-only list of every account (name, email, balance, status).
   async accountList(conn) {
     if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
     if (!this.accounts) return this.fail(conn.ws, 'Account watch is not running', 'unavailable');
+    conn.wantsPlayers = true;
     try {
       const players = await this.accounts.listPlayers();
       this.sendTo(conn.ws, { type: 'account_list', players });
@@ -65,6 +72,8 @@ class Manager {
         const hours = Math.min(Math.max(Math.floor(Number(msg.hours) || 24), 1), 24 * 30);
         await this.accounts.ban(uid, hours, { reason: 'admin' });
       } else if (msg.action === 'unban') await this.accounts.unban(uid);
+      else if (msg.action === 'unwarn') await this.accounts.unwarn(uid);
+      else if (msg.action === 'restore') await this.accounts.restore(uid);
       else if (msg.action === 'backup') await this.accounts.backup(uid, 'admin_backup');
       else if (msg.action === 'set_balance') await this.accounts.setBalance(uid, Number(msg.amount));
       else if (msg.action === 'warn') {
@@ -194,7 +203,8 @@ class Manager {
         return this.accountList(conn);
       case 'action': {
         const game = this.tableBySession(sessionId);
-        if (game) await game.handleAction(sessionId, msg.action, { x: msg.x, y: msg.y });
+        // The whole message goes through: air hockey reads x and y, Tetris reads its rows.
+        if (game) await game.handleAction(sessionId, msg.action, msg);
         return;
       }
       case 'place_ships': {
@@ -337,8 +347,8 @@ class Manager {
     // negative bet was accepted (it passed `balance < bet`) and then "deducted"
     // as a credit, which matched against itself or an accomplice minted money.
     if (!Number.isSafeInteger(bet) || bet < 0 || bet > MAX_BET) return this.fail(ws, 'Invalid bet');
-    // Air hockey is a friendly game only: nothing is staked, so nothing can be lost or won.
-    if (gameType === 'airhockey' && bet !== 0) return this.fail(ws, 'Air hockey is friendly only');
+    // Air hockey and Tetris are friendly only: nothing is staked, so nothing can be lost or won.
+    if (FRIENDLY_ONLY.has(gameType) && bet !== 0) return this.fail(ws, 'That game is friendly only');
     // Air hockey players must pick the same mode to be matched.
     const airMode = gameType === 'airhockey' ? (AIRHOCKEY_MODES.has(mode) ? mode : 'score7') : null;
     const stake = this.stakeError(conn, bet);
@@ -428,7 +438,9 @@ class Manager {
       ? new BattleshipGame(tableId, a, b, this.balance, opts)
       : a.gameType === 'airhockey'
         ? new AirHockeyGame(tableId, a, b, this.balance, Object.assign({ mode: a.mode }, opts))
-        : new BlackjackGame(tableId, a, b, this.balance, opts);
+        : a.gameType === 'tetris'
+          ? new TetrisGame(tableId, a, b, this.balance, opts)
+          : new BlackjackGame(tableId, a, b, this.balance, opts);
     game.closeTable = () => this.tables.delete(tableId);
     this.tables.set(tableId, game);
     try {

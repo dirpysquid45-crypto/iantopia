@@ -158,8 +158,10 @@
     <input id="amount" class="in num" type="number" min="0" step="1" placeholder="balance" aria-label="Set balance to" autocomplete="off" />
     <button id="setbal" class="btn" disabled>set_balance</button>
     <input id="hours" class="in num" type="number" min="1" max="720" value="24" aria-label="Quarantine hours" />
-    <button id="ban" class="btn danger" disabled>quarantine</button>
+    <button id="ban" class="btn danger" disabled>ban</button>
     <button id="unban" class="btn" disabled>release</button>
+    <button id="restore" class="btn" disabled>release &amp; restore</button>
+    <button id="unwarn" class="btn" disabled>unwarn</button>
     <input id="name" class="in wide" type="text" maxlength="40" placeholder="display name" autocomplete="off" aria-label="New display name" />
     <button id="rename" class="btn" disabled>rename</button>
     <button id="backup" class="btn" disabled>snapshot</button>
@@ -179,7 +181,7 @@
   <section class="win" data-view="feed" aria-label="Account feed">
     <header>
       <span><b>ACCOUNT_FEED</b> · live ingest</span>
-      <span class="dim">tags: BAL balance · RST reset · QRN quarantine · UNQ release · SET admin set · WRN warn · REN rename · BKP snapshot · SYNC stale push restored</span>
+      <span class="dim">tags: BAL balance · RST reset · BAN ban · UNQ release · RES restore · UNW unwarn · SET admin set · WRN warn · REN rename · BKP snapshot · SYNC stale push restored</span>
     </header>
     <div id="feed" class="body" tabindex="0"></div>
     <div class="help">click a line to target its account · drag to select text · keys 1–4 switch views</div>
@@ -272,12 +274,14 @@
   }
   function updateButtons() {
     const ok = valid($('uid').value.trim());
-    ['reset', 'setbal', 'ban', 'unban', 'rename', 'backup', 'warn'].forEach((id) => { $(id).disabled = !ok; });
+    ['reset', 'setbal', 'ban', 'unban', 'restore', 'unwarn', 'rename', 'backup', 'warn'].forEach((id) => { $(id).disabled = !ok; });
   }
   // A click that is really the end of a text selection should not change the target.
   const isSelecting = () => { const s = window.getSelection(); return !!(s && s.toString().length); };
 
   // ---- views and keys ----------------------------------------------------
+  // Set once the socket exists: loads a big list when its tab opens.
+  let onTabOpen = null;
   function show(view) {
     if (!VIEWS.includes(view)) view = 'feed';
     state.view = view;
@@ -285,6 +289,7 @@
     document.querySelectorAll('[role="tab"][data-tab]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === view)));
     if (location.hash !== '#' + view) history.replaceState(null, '', '#' + view);
     if (view === 'scores') loadScores();
+    if (onTabOpen) onTabOpen(view);
   }
   document.querySelectorAll('[data-tab]').forEach((t) => t.addEventListener('click', () => show(t.dataset.tab)));
   document.querySelectorAll('[data-stab]').forEach((t) => t.addEventListener('click', () => {
@@ -304,7 +309,9 @@
   function act(action) {
     const uid = $('uid').value.trim();
     const hours = Math.max(1, Math.min(720, Math.floor(Number($('hours').value) || 24)));
-    if (action === 'ban' && !confirm('QUARANTINE ' + uid + ' for ' + hours + ' hours? Balance resets to 100 and leaderboard rows are removed.')) return;
+    if (action === 'ban' && !confirm('BAN ' + uid + ' for ' + hours + ' hours? Balance resets to 100 and leaderboard rows are removed.')) return;
+    if (action === 'restore' && !confirm('RELEASE ' + uid + ' and restore the balance and bank from before the ban? Leaderboard rows are not restored.')) return;
+    if (action === 'unwarn' && !confirm('Remove the warning from ' + uid + '? The ban and balance are not changed.')) return;
     if (action === 'reset' && !confirm('RESET ' + uid + ' to 100 Strubles?')) return;
     let amount = null;
     if (action === 'set_balance') {
@@ -324,6 +331,8 @@
   $('setbal').addEventListener('click', () => act('set_balance'));
   $('ban').addEventListener('click', () => act('ban'));
   $('unban').addEventListener('click', () => act('unban'));
+  $('restore').addEventListener('click', () => act('restore'));
+  $('unwarn').addEventListener('click', () => act('unwarn'));
   $('rename').addEventListener('click', () => act('rename'));
   $('backup').addEventListener('click', () => act('backup'));
   $('warn').addEventListener('click', () => act('warn'));
@@ -331,7 +340,7 @@
   $('signin').addEventListener('click', () => window.CloudSync && CloudSync.signIn());
 
   // ---- feed ----------------------------------------------------------------
-  const TAGS = { reset: ['RST', 'warn'], ban: ['QRN', 'bad'], unban: ['UNQ', 'ok'], set: ['SET', 'info'], warn: ['WRN', 'warn'], rename: ['REN', 'info'], backup: ['BKP', 'info'] };
+  const TAGS = { reset: ['RST', 'warn'], ban: ['BAN', 'bad'], unban: ['UNQ', 'ok'], restore: ['RES', 'ok'], unwarn: ['UNW', 'ok'], set: ['SET', 'info'], warn: ['WRN', 'warn'], rename: ['REN', 'info'], backup: ['BKP', 'info'] };
   function feedLine(ev) {
     const el = document.createElement('div');
     el.className = 'ln';
@@ -531,6 +540,8 @@
   // ---- connection ----------------------------------------------------------
   const arena = ArenaClient.create({
     game: 'suggest',
+    // The lists are large, and a slow uplink can hold a pong behind them for a while.
+    pongMs: 30000,
     onState: (st) => {
       const up = $('uplink');
       up.textContent = st === 'closed' ? 'UPLINK DOWN · retrying' : 'UPLINK PENDING';
@@ -546,9 +557,10 @@
         $('uplink').classList.remove('down');
         $('prefresh').disabled = false; $('sref').disabled = false; $('sxlsx').disabled = false; $('scsv-toggle').disabled = false;
         setStatus('live', 'ok');
+        // The feed is small. The player and suggestion lists are large, so they
+        // load when their tab is opened (see show()), not on every connect.
         arena.send({ type: 'account_feed' });
-        arena.send({ type: 'account_list' });
-        arena.send({ type: 'suggestions_list' });
+        onTabOpen(state.view);
       } else if (msg.type === 'account_feed') {
         state.events = msg.events || [];
         renderFeed();
@@ -578,6 +590,11 @@
       }
     },
   });
+  onTabOpen = (view) => {
+    if (!arena.isOpen()) return;
+    if (view === 'players') arena.send({ type: 'account_list' });
+    if (view === 'suggest') arena.send({ type: 'suggestions_list' });
+  };
 })();
 </script>
 </body>

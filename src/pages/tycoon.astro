@@ -2138,7 +2138,7 @@
   // Puts back money spent (spent > 0), or pays back a refund that was received
   // (spent < 0). Returns an error string if a refund can't be repaid.
   function reverseMoney(spent) {
-    if (spent > 0) { try { Strubles.add(spent); } catch {} return null; }
+    if (spent > 0) { try { Strubles.add(spent, 'refund'); } catch {} return null; }
     if (spent < 0 && !Strubles.spend(-spent)) return `Need ${(-spent).toLocaleString()} Strubles to undo that`;
     return null;
   }
@@ -2213,7 +2213,7 @@
     const refund = existing ? refundForTile(tx, ty, existing) : 0;
     const net = cost - refund;
     if (net > 0 && !Strubles.spend(net)) { brushMsg(`Need ${net.toLocaleString()} Strubles`, true); return; }
-    if (net < 0) Strubles.add(-net);
+    if (net < 0) Strubles.add(-net, 'refund');
     if (!strokeLog) strokeLog = { tiles: [], spent: 0 };
     strokeLog.tiles.push(tileSnapshot(tx, ty)); strokeLog.spent += net;
     setTileType(tx, ty, 'road');
@@ -2272,7 +2272,7 @@
       return;
     }
     if (plan.net > 0 && !Strubles.spend(plan.net)) { brushMsg(`Need ${plan.net.toLocaleString()} Strubles`, true); return; }
-    if (plan.net < 0) Strubles.add(-plan.net);
+    if (plan.net < 0) Strubles.add(-plan.net, 'refund');
     const before = plan.changes.map(([x, y]) => tileSnapshot(x, y));
     plan.changes.forEach(([x, y, type, paid]) => { setTileType(x, y, type); setPaid(x, y, paid); });
     const n = plan.changes.length;
@@ -2446,7 +2446,7 @@
     const copy = JSON.parse(JSON.stringify(s));
     const removedAt = Date.now();
     village.b = village.b.filter((x) => x.id !== manageId);
-    if (refund > 0) { try { Strubles.add(refund); } catch {} }
+    if (refund > 0) { try { Strubles.add(refund, 'refund'); } catch {} }
     pushUndo(`remove ${def.label}`, () => {
       if (village.b.length >= slotCap()) return 'No free building slot to put it back';
       if (placementIssue(copy.key, copy.x, copy.y)) return 'Its old spot is no longer free';

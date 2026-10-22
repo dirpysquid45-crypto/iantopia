@@ -21,6 +21,11 @@ function loadCap() {
   return mod.exports;
 }
 const Cap = loadCap();
+const { EventEmitter } = require('events');
+// Credits the server makes outside a game's own payout, announced after they
+// commit, so the account watch can tell a refund from a win.
+const credits = new EventEmitter();
+credits.setMaxListeners(0);
 
 const isGuestId = (userId) => typeof userId === 'string' && userId.startsWith('guest_');
 
@@ -102,15 +107,18 @@ class BalanceManager {
     assertAmount(amount);
     if (amount === 0 || isGuestId(userId)) return null;
     const ref = this.db.collection('users').doc(userId);
-    return this.db.runTransaction(async (tx) => {
+    const next = await this.db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const balance = snap.exists ? Number(snap.data().strubles_balance_v1 || 0) : 0;
       const next = balance + amount;
       tx.set(ref, { strubles_balance_v1: String(next) }, { merge: true });
       return next;
     });
+    credits.emit('refund', { uid: userId, amount });
+    return next;
   }
 }
 
 BalanceManager.isGuestId = isGuestId;
+BalanceManager.credits = credits;
 module.exports = BalanceManager;

@@ -12,14 +12,17 @@ function fakeDb() {
     docs,
     collection(name) {
       let orderField = null, limitN = Infinity;
+      const wheres = [];
       const col = {
+        where(field, op, val) { wheres.push([field, val]); return col; },
         async add(data) { const id = 'auto' + docs.size + '_' + Math.random().toString(36).slice(2); docs.set(key(name, id), { ...data }); return { id }; },
         orderBy(field) { orderField = field; return col; },
         limit(n) { limitN = n; return col; },
         async get() {
-          let rows = [...docs.entries()].filter(([k]) => k.startsWith(name + '/')).map(([, v]) => v);
-          if (orderField) rows = rows.sort((a, b) => String(b[orderField]).localeCompare(String(a[orderField])));
-          return { docs: rows.slice(0, limitN).map((d) => ({ data: () => d })) };
+          let rows = [...docs.entries()].filter(([k]) => k.startsWith(name + '/')).map(([k, v]) => ({ id: k.slice(name.length + 1), v }));
+          for (const [field, val] of wheres) rows = rows.filter((r) => r.v[field] === val);
+          if (orderField) rows = rows.sort((a, b) => String(b.v[orderField]).localeCompare(String(a.v[orderField])));
+          return { docs: rows.slice(0, limitN).map((r) => ({ id: r.id, data: () => r.v })) };
         },
         doc(id) {
         const k = key(name, id);
@@ -160,4 +163,63 @@ test('an admin can set a balance by hand, even above the cap, without a strike',
   assert.equal(events.filter((e) => e.kind === 'punish' && (e.action === 'reset' || e.action === 'ban')).length, 0, 'no strike for an admin change');
   assert.equal(db.docs.get('users/u9').strubles_balance_v1, '50000');
   assert.ok(events.some((e) => e.kind === 'punish' && e.action === 'set' && e.to === 50000), 'the change is in the feed');
+});
+
+test('a save that leaves the balance as it was adds no feed row (the tycoon page saves about once a second)', async () => {
+  const { save, events } = setup();
+  await save('u1', 1515);
+  for (let i = 0; i < 5; i++) await save('u1', 1515);
+  assert.equal(events.filter((e) => e.kind === 'balance').length, 1, 'only the first sighting is logged');
+});
+
+test('unwarn clears the warning and the strike history, and leaves the ban alone', async () => {
+  const { watch, db, save, tick } = setup();
+  await save('u2', 100);
+  await save('u2', 20001, null);               // over the cap: first offence, warned
+  tick(10);
+  await db.collection('users').doc('u2').set({ admin_warning: { id: 'w1', text: 'hi' } }, { merge: true });
+  assert.equal((await watch.listPlayers()).find((r) => r.uid === 'u2').status, 'warned');
+  await watch.unwarn('u2');
+  const row = (await watch.listPlayers()).find((r) => r.uid === 'u2');
+  assert.equal(row.status, 'ok');
+  assert.equal(db.docs.has('cheat_strikes/u2'), false);
+});
+
+test('restore releases a ban and puts back the balance and bank level from before the ban', async () => {
+  const { watch, db, save } = setup();
+  await db.collection('users').doc('u3').set({ strubles_balance_v1: '5000', tycoon_bank_level_v1: '3' }, { merge: true });
+  await save('u3', 5000);
+  await watch.ban('u3', 24, { reason: 'admin' });
+  assert.equal(db.docs.get('users/u3').strubles_balance_v1, '100', 'the ban reset the balance');
+  await watch.restore('u3');
+  assert.equal(db.docs.get('users/u3').strubles_balance_v1, '5000');
+  assert.equal(db.docs.get('users/u3').tycoon_bank_level_v1, '3');
+  assert.equal(db.docs.has('bans/u3'), false);
+  assert.equal(db.docs.get('users/u3').ban_until, null);
+});
+
+test('a refund of money the player just paid is not flagged, even when it is over the per-minute limit', async () => {
+  const { events, save } = setup();
+  await save('u5', 12000);
+  await save('u5', 2000);                                    // paid 10,000 for a case
+  await save('u5', 12000, { amount: 10000, kind: 'refund' }); // duplicate refunded
+  assert.equal(events.filter((e) => e.kind === 'punish').length, 0, 'no strike, no reset');
+});
+
+test('a refund bigger than what was paid is judged as a win, so it can still be flagged', async () => {
+  const { db, events, save } = setup();
+  await save('u6', 15000);
+  await save('u6', 5000);                                    // paid 10,000
+  await save('u6', 28000, { amount: 23000, kind: 'refund' }); // claims 23,000 back
+  assert.ok(events.some((e) => e.kind === 'punish' && (e.reason === 'cheat_first_offence' || e.detected === 'rate')), 'flagged as a rate cheat');
+});
+
+test('a stake the server refunds (failed match) is matched to its save and not flagged', async () => {
+  const BalanceManager = require('../balance');
+  const { events, save } = setup();
+  await save('u7', 12000);
+  await save('u7', 2000);                                    // stake of 10,000 taken
+  BalanceManager.credits.emit('refund', { uid: 'u7', amount: 10000 });
+  await save('u7', 12000);                                   // server put the stake back
+  assert.equal(events.filter((e) => e.kind === 'punish').length, 0);
 });

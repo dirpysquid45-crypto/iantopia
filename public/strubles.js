@@ -51,7 +51,10 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
     // -- this only ever stops NEW earnings from pushing past the cap,
     // never reduces what's already there. Falls back to no cap at all if
     // tycoon-bank.js isn't loaded on a given page.
-    add(n) {
+    // kind: 'refund' when money is paid back for something the player already paid
+    // (a duplicate, a removed building, an undone purchase). The account watch does
+    // not count those as wins.
+    add(n, kind) {
       const cur = _load();
       const cap = (window.TycoonBank && window.TycoonBank.currentCap()) || Infinity;
       if (cur >= cap) return cur;
@@ -61,7 +64,7 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
       // of wins can be traced to a page. It rides along with the balance in the
       // cloud save (see SYNC_KEYS in cloud-sync.js).
       if (next > cur) {
-        safeSet('strubles_last_gain_v1', JSON.stringify({ amount: next - cur, page: location.pathname, at: Date.now() }));
+        safeSet('strubles_last_gain_v1', JSON.stringify({ amount: next - cur, page: location.pathname, at: Date.now(), kind: kind === 'refund' ? 'refund' : 'earn' }));
       }
       return next;
     },

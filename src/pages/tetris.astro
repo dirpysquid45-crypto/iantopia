@@ -1,0 +1,211 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>Tetris at Iantopia</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<meta name="theme-color" content="#050608">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tetris/tetris.css?v=2">
+</head>
+<body>
+  <div class="tetris-app">
+    <header class="top">
+      <a class="back" href="/puzzles">← Puzzles</a>
+      <h1>Tetris at Iantopia</h1>
+      <button class="sound" id="sound-btn" type="button" aria-pressed="false" aria-label="Sound on">🔊</button>
+
+      <div class="hud" aria-live="off">
+        <div class="stat"><small>SCORE</small><b id="score">0</b></div>
+        <div class="stat"><small>LINES</small><b id="lines">0</b></div>
+        <div class="stat"><small>LEVEL</small><b id="level">1</b></div>
+        <div class="stat"><small>BEST</small><b id="best">0</b></div>
+      </div>
+    </header>
+
+    <div class="main">
+      <div class="side">
+        <div class="box"><span>HOLD</span><canvas id="hold-canvas" aria-label="Held piece"></canvas></div>
+      </div>
+
+      <div class="stage" id="stage">
+        <canvas id="board" role="img" aria-label="Your board"></canvas>
+
+        <div class="overlay show" id="start-overlay" role="dialog" aria-labelledby="start-title">
+          <h2 id="start-title">TETRIS</h2>
+          <p>Touch: use the buttons below.<br>Keys: A D move · S soft drop · Space slam<br>↑ hold · R Q rotate · P pause</p>
+          <button class="btn" id="btn-start" type="button">Start</button>
+          <p class="credit">Rules from Tetrigo (GPL-3.0). Piece colours from Flatris (MIT). Sounds: PC / Computer, Tetris Zone.</p>
+        </div>
+
+        <div class="overlay" id="pause-overlay" role="dialog" aria-labelledby="pause-title">
+          <h2 id="pause-title">PAUSED</h2>
+          <button class="btn" id="btn-resume" type="button">Resume</button>
+        </div>
+
+        <div class="overlay" id="over-overlay" role="dialog" aria-labelledby="over-title">
+          <h2 id="over-title">GAME OVER</h2>
+          <p id="over-text"></p>
+          <button class="btn" id="btn-again" type="button">Play again</button>
+        </div>
+      </div>
+
+      <div class="side">
+        <div class="box next"><span>NEXT</span><canvas id="next-canvas" aria-label="Upcoming pieces"></canvas></div>
+      </div>
+    </div>
+
+    <div class="pad" role="group" aria-label="Touch controls">
+      <button type="button" data-action="left" aria-label="Move left" aria-keyshortcuts="ArrowLeft A">◀<small>A</small></button>
+      <button type="button" data-action="right" aria-label="Move right" aria-keyshortcuts="ArrowRight D">▶<small>D</small></button>
+      <button type="button" data-action="rotccw" aria-label="Rotate counter-clockwise" aria-keyshortcuts="Q Z">⟲<small>Q</small></button>
+      <button type="button" data-action="rotcw" aria-label="Rotate clockwise" aria-keyshortcuts="R X">⟳<small>R</small></button>
+      <button type="button" data-action="soft" aria-label="Soft drop, hold to fall faster" aria-keyshortcuts="ArrowDown S">▼<small>S</small></button>
+      <button type="button" data-action="hard" aria-label="Slam, hard drop" aria-keyshortcuts="Space">⤓<small>SPACE</small></button>
+      <button type="button" data-action="hold" aria-label="Hold piece" aria-keyshortcuts="ArrowUp">HOLD<small>↑</small></button>
+      <button type="button" data-action="pause" aria-label="Pause" aria-keyshortcuts="P Escape">❚❚<small>P</small></button>
+    </div>
+  </div>
+
+  <script is:inline src="/tetris/engine.js?v=2"></script>
+  <script is:inline src="/tetris/view.js?v=1"></script>
+  <script is:inline src="/tetris/controls.js?v=2"></script>
+  <script is:inline src="/tetris/sfx.js?v=1"></script>
+  <script is:inline>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const BEST_KEY = 'tetris_best_v1';
+      const E = window.TetrisEngine;
+      const SFX = window.TetrisSound;
+
+      const boardView = TetrisView.createBoard($('board'));
+      const holdView = TetrisView.createPreview($('hold-canvas'));
+      const nextView = TetrisView.createPreview($('next-canvas'));
+
+      let board = null;
+      let state = 'ready';      // ready | playing | paused | over
+      let last = performance.now();
+
+      function loadBest() { try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch { return 0; } }
+      function saveBest(n) { try { localStorage.setItem(BEST_KEY, String(n)); } catch {} }
+      let best = loadBest();
+      $('best').textContent = best;
+
+      function show(id, on) { $(id).classList.toggle('show', on); }
+      function hideAll() { ['start-overlay', 'pause-overlay', 'over-overlay'].forEach((id) => show(id, false)); }
+
+      function syncSoundButton() {
+        const muted = SFX.isMuted();
+        $('sound-btn').textContent = muted ? '🔇' : '🔊';
+        $('sound-btn').setAttribute('aria-pressed', String(muted));
+        $('sound-btn').setAttribute('aria-label', muted ? 'Sound off' : 'Sound on');
+      }
+      $('sound-btn').addEventListener('click', () => {
+        const muted = SFX.toggleMute();
+        syncSoundButton();
+        if (!muted && state === 'playing') SFX.startMusic();
+      });
+      syncSoundButton();
+
+      function newGame() {
+        board = new E.Board({ seed: Math.floor(Math.random() * 2147483647) + 1, onEvent: SFX.onEngineEvent });
+        state = 'playing';
+        hideAll();
+        SFX.play('start');
+        SFX.startMusic();
+      }
+
+      function pause() {
+        if (state !== 'playing') return;
+        state = 'paused';
+        controls.releaseAll();
+        SFX.stopMusic();
+        show('pause-overlay', true);
+        $('btn-resume').focus();
+      }
+      function resume() {
+        if (state !== 'paused') return;
+        state = 'playing';
+        hideAll();
+        SFX.startMusic();
+        last = performance.now();
+      }
+
+      function gameOver() {
+        state = 'over';
+        controls.releaseAll();
+        const s = board.score;
+        if (s > best) { best = s; saveBest(best); $('best').textContent = best; }
+        $('over-text').textContent = `Score ${s}, ${board.lines} lines, level ${board.level}.`;
+        show('over-overlay', true);
+        $('btn-again').focus();
+      }
+
+      function onAction(name) {
+        if (state === 'paused') { if (name === 'pause') resume(); return; }
+        if (state !== 'playing' || !board) return;
+        switch (name) {
+          case 'left': if (board.move(-1)) SFX.play('move'); break;
+          case 'right': if (board.move(1)) SFX.play('move'); break;
+          case 'rotcw': SFX.play(board.rotate(true) ? 'rotate' : 'rotatefail'); break;
+          case 'rotccw': SFX.play(board.rotate(false) ? 'rotate' : 'rotatefail'); break;
+          case 'hard': board.hardDrop(); break;
+          case 'hold': if (board.holdPiece()) SFX.play('hold'); break;
+          case 'pause': pause(); return;
+          default: break;
+        }
+        if (board.over) gameOver();
+      }
+
+      const controls = TetrisControls.attach({
+        pad: document.querySelector('.pad'),
+        onAction,
+        onSoft: (on) => {
+          if (!board || state !== 'playing') return;
+          board.setSoftDrop(on);
+          if (on) SFX.play('softdrop', 0.35);
+        },
+      });
+
+      function render() {
+        if (!board) return;
+        boardView.draw(board, { ghost: true });
+        holdView.draw(board.held ? [board.held] : []);
+        nextView.draw(board.preview());
+        $('score').textContent = board.score;
+        $('lines').textContent = board.lines;
+        $('level').textContent = board.level;
+      }
+
+      function frame(now) {
+        const dt = (now - last) / 1000;
+        last = now;
+        if (state === 'playing' && board) {
+          board.tick(dt);
+          if (board.over) gameOver();
+        }
+        render();
+        requestAnimationFrame(frame);
+      }
+
+      $('btn-start').addEventListener('click', () => { newGame(); });
+      $('btn-resume').addEventListener('click', resume);
+      $('btn-again').addEventListener('click', () => { newGame(); });
+
+      // Leaving the tab stops the game, so a phone's lock screen doesn't lose a piece mid-fall.
+      document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+      requestAnimationFrame((t) => { last = t; render(); requestAnimationFrame(frame); });
+      $('btn-start').focus();
+    })();
+  </script>
+</body>
+</html>

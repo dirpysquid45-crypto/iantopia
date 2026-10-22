@@ -296,7 +296,7 @@
           // per-tier DUPLICATE_REFUND table every other type uses.
           result.duplicate = true;
           result.refund = Math.round((caseCost || 0) * 0.1);
-          if (result.refund) Strubles.add(result.refund);
+          if (result.refund) Strubles.add(result.refund, 'refund');
         } else {
           inv.buildings.push(key);
           state.inv = inv;
@@ -384,7 +384,7 @@
     if (result.duplicate) {
       const refundTable = isFullyComplete() ? POST_COMPLETION_PAYOUT : DUPLICATE_REFUND;
       result.refund = refundTable[item.tier] || 0;
-      if (result.refund) Strubles.add(result.refund);
+      if (result.refund) Strubles.add(result.refund, 'refund');
     }
     return result;
   }
