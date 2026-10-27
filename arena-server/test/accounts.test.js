@@ -140,18 +140,16 @@ test('the per-minute rate is the net change, so wins that losses cancel out are 
   assert.equal(events.filter((e) => e.kind === 'punish').length, 0, 'gross 6000 but net 4000 in a minute');
 });
 
-test('a browser that pushes its pre-reset balance back is put back to 100, with no strike', async () => {
-  const { save, events, db, tick } = setup();
+test('a real win after a reset is kept, not pulled back to 100', async () => {
+  const { save, events, tick } = setup();
   await save('u7', 100);
   tick(5000);
   await save('u7', 8718, { amount: 8618, page: '/arena-blackjack' });   // flagged as a rate cheat: first offence
   await save('u7', 100);                                              // the server's reset, as the snapshot reports it
   tick(20000);
-  await save('u7', 8518);                                             // a stale tab pushes its old balance back
+  await save('u7', 118, { amount: 18, page: '/horse-web-game' });     // a genuine win, a few seconds later
+  assert.equal(events.filter((e) => e.kind === 'sync_restore').length, 0, 'nothing is pulled back');
   assert.equal(events.filter((e) => e.kind === 'punish' && e.action === 'ban').length, 0, 'no second offence');
-  assert.equal(events.filter((e) => e.kind === 'sync_restore').length, 1, 'the restore is recorded');
-  assert.equal(db.docs.get('users/u7').strubles_balance_v1, '100');
-  assert.equal(db.docs.get('cheat_strikes/u7').at.length, 1, 'only the first strike counts');
 });
 
 test('an admin can set a balance by hand, even above the cap, without a strike', async () => {
@@ -163,6 +161,24 @@ test('an admin can set a balance by hand, even above the cap, without a strike',
   assert.equal(events.filter((e) => e.kind === 'punish' && (e.action === 'reset' || e.action === 'ban')).length, 0, 'no strike for an admin change');
   assert.equal(db.docs.get('users/u9').strubles_balance_v1, '50000');
   assert.ok(events.some((e) => e.kind === 'punish' && e.action === 'set' && e.to === 50000), 'the change is in the feed');
+});
+
+test('an admin gift adds to the balance without a strike, and is in the feed', async () => {
+  const { watch, events, db, save, tick } = setup();
+  await db.collection('users').doc('u10').set({ strubles_balance_v1: '1200' }, { merge: true });
+  tick(1000);
+  await watch.gift('u10', 3000);
+  assert.equal(db.docs.get('users/u10').strubles_balance_v1, '4200');
+  await save('u10', 4200);
+  assert.equal(events.filter((e) => e.kind === 'punish' && (e.action === 'reset' || e.action === 'ban')).length, 0, 'no strike for a gift');
+  assert.ok(events.some((e) => e.kind === 'punish' && e.action === 'gift' && e.amount === 3000 && e.from === 1200 && e.to === 4200), 'the gift is in the feed');
+});
+
+test('a gift must be a whole number from 1 up', async () => {
+  const { watch } = setup();
+  await assert.rejects(watch.gift('u11', 0));
+  await assert.rejects(watch.gift('u11', -5));
+  await assert.rejects(watch.gift('u11', 2.5));
 });
 
 test('a save that leaves the balance as it was adds no feed row (the tycoon page saves about once a second)', async () => {
