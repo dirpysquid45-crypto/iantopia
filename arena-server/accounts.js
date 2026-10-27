@@ -1,4 +1,5 @@
 const BalanceManager = require('./balance');
+const { balanceOf } = BalanceManager;
 // Server-side account watch: a live feed of every save change, cheat
 // detection, and the punishments. Runs with the Admin SDK, so it doesn't
 // depend on anything the browser sends.
@@ -166,11 +167,12 @@ class AccountWatch {
     const delta = balance - prev;
     const now = this.now();
     if (delta < 0) this.noteDebit(uid, -delta, now);
-    // Refunds, and grants the server rolled itself (the daily prize, the starter), are
-    // not wins: they stay out of the rate and streak checks. The cap still applies.
+    // Refunds, grants the server rolled itself (the daily prize, the starter), and
+    // payouts the server settled itself (a game it ran), are not client wins: they stay out
+    // of the rate and streak checks. The cap still applies.
     const refund = delta > 0 && (this.takeServerRefund(uid, delta, now)
       || this.takeRefundAllowance(uid, delta, now, lastGainOf(data).kind)
-      || lastGainOf(data).kind === 'grant');
+      || lastGainOf(data).kind === 'grant' || lastGainOf(data).kind === 'settled');
     const recent = (this.gains.get(uid) || []).filter((g) => now - g.t < RATE_WINDOW_MS);
     if (!refund) recent.push({ t: now, amount: delta });
     this.gains.set(uid, recent);
@@ -280,7 +282,7 @@ class AccountWatch {
 
   async balanceNow(uid) {
     const snap = await this.db.collection('users').doc(uid).get();
-    return snap.exists ? balanceOf(snap.data()) : 0;
+    return balanceOf(snap.exists ? snap.data() : {});
   }
 
   // Sets an account's balance by hand, for an admin. The wallet cap stays where
@@ -317,7 +319,7 @@ class AccountWatch {
     const ref = this.db.collection('users').doc(uid);
     return this.db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
-      const before = snap.exists ? balanceOf(snap.data()) : 0;
+      const before = balanceOf(snap.exists ? snap.data() : {});
       const after = before + amount;
       this.adminSets.set(uid, { at: this.now(), to: after });
       tx.set(ref, { strubles_balance_v1: String(after), balance_reset_at: new Date(this.now()) }, { merge: true });
@@ -459,7 +461,7 @@ function toMsAny(v) {
 function lastGainOf(data) {
   try {
     const g = JSON.parse((data && data.strubles_last_gain_v1) || 'null');
-    return g && typeof g === 'object' ? { amount: Number(g.amount) || 0, page: typeof g.page === 'string' ? g.page.slice(0, 120) : null, kind: g.kind === 'refund' || g.kind === 'grant' ? g.kind : 'earn' } : { amount: 0, page: null, kind: 'earn' };
+    return g && typeof g === 'object' ? { amount: Number(g.amount) || 0, page: typeof g.page === 'string' ? g.page.slice(0, 120) : null, kind: ['refund', 'grant', 'settled'].includes(g.kind) ? g.kind : 'earn' } : { amount: 0, page: null, kind: 'earn' };
   } catch { return { amount: 0, page: null, kind: 'earn' }; }
 }
 
@@ -472,9 +474,5 @@ function lastOpOf(data, now) {
   } catch { return null; }
 }
 
-function balanceOf(data) {
-  const n = Number((data && data.strubles_balance_v1) || 0);
-  return Number.isFinite(n) ? n : 0;
-}
 
 module.exports = { AccountWatch, STARTING_BALANCE, STRIKE_WINDOW_MS, BAN_MS };

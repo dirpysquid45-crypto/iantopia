@@ -104,25 +104,18 @@ class TetrisGame extends ArenaGame {
     }
   }
 
-  finish(winner, reason) {
+  // The pot is both stakes. The winner gets it less the rake. The credit lands
+  // before the result is announced, so the result reports what was really paid.
+  async finish(winner, reason) {
     if (this.phase !== 'playing') return;
     this.phase = 'over';
     this.winner = winner;
     this.reason = reason;
-    // The pot is both stakes. The winner gets it less the rake, and the result says how much.
     const pot = this.bet * 2;
     const payout = this.friendly ? 0 : pot - Math.floor(pot * this.rake);
-    this.broadcast({ type: 'tetris_over', winner, reason, scores: this.scores, payout });
+    const won = payout > 0 ? await this.payPlayer(winner, payout, 'win') : { applied: 0, paid: true };
+    this.broadcast({ type: 'tetris_over', winner, reason, scores: this.scores, payout: won.applied, ...(won.paid ? {} : { unpaid: true }) });
     this.beginRematchWindow();
-    if (payout > 0) this.payWinner(winner, payout);
-  }
-
-  async payWinner(winner, payout) {
-    try {
-      this.pushBalance(winner, await this.balance.creditPayout(this.players[winner].userId, payout));
-    } catch (e) {
-      console.error('[tetris] payout failed:', e.message);
-    }
   }
 
   forfeitIndex(i, reason) {

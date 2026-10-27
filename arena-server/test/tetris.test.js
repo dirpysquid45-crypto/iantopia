@@ -300,8 +300,10 @@ test('a staked Tetris match charges both stakes, and the winner takes the pot le
   const balance = {
     getBalance: async () => 1000,
     deductBet: async (uid, amt) => { charged.push([uid, amt]); return 1000 - amt; },
-    creditPayout: async (uid, amt) => { paid.push([uid, amt]); return 1000 + amt; },
-    refundBet: async () => 1000,
+    creditPayout: async (uid, amt) => { paid.push([uid, amt]); return { balance: 1000 + amt, applied: amt }; },
+    payOut: async (uid, amt) => { paid.push([uid, amt]); return { balance: 1000 + amt, applied: amt, paid: true }; },
+    refundStake: async () => ({ balance: 1000, applied: 0, paid: true }),
+    refundBet: async () => ({ balance: 1000, applied: 0 }),
   };
   const m = new Manager(new FakeDb(), null, { balance });
   const wa = fakeWs(), wb = fakeWs();

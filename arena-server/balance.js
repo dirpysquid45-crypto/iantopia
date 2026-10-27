@@ -27,7 +27,20 @@ const { EventEmitter } = require('events');
 const credits = new EventEmitter();
 credits.setMaxListeners(0);
 
+const PAYOUT_TRIES = 3;
+const PAID_IDS_KEEP = 50;
+
 const isGuestId = (userId) => typeof userId === 'string' && userId.startsWith('guest_');
+
+// The starting balance, for an account whose balance field has never been written.
+// The wallet and the browser show this same number, so every read of a balance uses it.
+const START_BALANCE = 100;
+function balanceOf(data) {
+  const raw = data ? data.strubles_balance_v1 : undefined;
+  if (raw === undefined || raw === null) return START_BALANCE;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : START_BALANCE;
+}
 
 // A stake must be a non-negative whole number. Anything else is refused here
 // as well as in the manager, because this is the last line before money moves:
@@ -46,9 +59,7 @@ class BalanceManager {
   async getBalance(userId) {
     if (isGuestId(userId)) return 0;
     const doc = await this.db.collection('users').doc(userId).get();
-    if (!doc.exists) return 0;
-    const data = doc.data();
-    return Number(data.strubles_balance_v1 || 0);
+    return balanceOf(doc.exists ? doc.data() : {});
   }
 
   async getWalletCap(userId) {
@@ -78,7 +89,7 @@ class BalanceManager {
     const ref = this.db.collection('users').doc(userId);
     return this.db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
-      const balance = snap.exists ? Number(snap.data().strubles_balance_v1 || 0) : 0;
+      const balance = balanceOf(snap.exists ? snap.data() : {});
       if (balance < amount) throw new Error('Insufficient balance');
       const next = balance - amount;
       tx.set(ref, { strubles_balance_v1: String(next) }, { merge: true });
@@ -86,36 +97,114 @@ class BalanceManager {
     });
   }
 
-  async creditPayout(userId, amount) {
+  // Credits a game's winnings. The wallet cap can clip them, so the result says how
+  // much was actually credited. The gain is recorded as 'settled': the server ran the
+  // game, so the account watch doesn't judge it as a client win. A payout with an id
+  // is applied once, so a retry after a dropped reply can't pay twice.
+  async creditPayout(userId, amount, id) {
     assertAmount(amount);
-    if (amount === 0 || isGuestId(userId)) return null;
+    if (amount === 0 || isGuestId(userId)) return { balance: null, applied: 0 };
     const ref = this.db.collection('users').doc(userId);
+    const now = Date.now();
     return this.db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const data = snap.exists ? snap.data() : {};
-      const balance = Number(data.strubles_balance_v1 || 0);
-      const next = Math.min(balance + amount, this.capFromData(data));
-      tx.set(ref, { strubles_balance_v1: String(next) }, { merge: true });
-      return next;
+      const seen = Array.isArray(data.paid_ids_v1) ? data.paid_ids_v1 : [];
+      const prior = id ? seen.find((x) => x.id === id) : null;
+      if (prior) return { balance: balanceOf(data), applied: prior.applied };
+      const bal = balanceOf(data);
+      // A balance already above the cap keeps what it has; the payout can only fill the room.
+      const applied = Math.max(0, Math.min(amount, this.capFromData(data) - bal));
+      const write = { strubles_balance_v1: String(bal + applied) };
+      if (id) write.paid_ids_v1 = [...seen, { id, applied }].slice(-PAID_IDS_KEEP);
+      if (applied > 0) {
+        write.strubles_last_gain_v1 = JSON.stringify({ amount: applied, page: null, at: now, kind: 'settled' });
+      }
+      tx.set(ref, write, { merge: true });
+      return { balance: bal + applied, applied };
     });
   }
 
-  // Returns a bet that was deducted but whose game never started. Deliberately
-  // NOT capped by the wallet cap: it is the player's own money coming back, and
-  // capping it could make a failed match cost them Strubles.
-  async refundBet(userId, amount) {
+  // Money back for a stake. Not capped: it is the player's own money coming back.
+  // Applied once per id, like creditPayout.
+  async refundBet(userId, amount, id) {
     assertAmount(amount);
-    if (amount === 0 || isGuestId(userId)) return null;
+    if (amount === 0 || isGuestId(userId)) return { balance: null, applied: 0 };
     const ref = this.db.collection('users').doc(userId);
-    const next = await this.db.runTransaction(async (tx) => {
+    const out = await this.db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
-      const balance = snap.exists ? Number(snap.data().strubles_balance_v1 || 0) : 0;
-      const next = balance + amount;
-      tx.set(ref, { strubles_balance_v1: String(next) }, { merge: true });
-      return next;
+      const data = snap.exists ? snap.data() : {};
+      const seen = Array.isArray(data.paid_ids_v1) ? data.paid_ids_v1 : [];
+      const prior = id ? seen.find((x) => x.id === id) : null;
+      if (prior) return { balance: balanceOf(data), applied: prior.applied, duplicate: true };
+      const next = balanceOf(data) + amount;
+      const write = { strubles_balance_v1: String(next) };
+      if (id) write.paid_ids_v1 = [...seen, { id, applied: amount }].slice(-PAID_IDS_KEEP);
+      tx.set(ref, write, { merge: true });
+      return { balance: next, applied: amount };
     });
-    credits.emit('refund', { uid: userId, amount });
-    return next;
+    if (!out.duplicate) credits.emit('refund', { uid: userId, amount });
+    return out;
+  }
+
+  // Runs a credit, retrying a few times. If every try fails, the payout is kept in
+  // failed_payouts so an admin can pay it, and the result says it wasn't paid, so
+  // nothing is announced as won that isn't in the balance.
+  async retried(label, record, attempt) {
+    let lastError = null;
+    for (let n = 0; n < PAYOUT_TRIES; n++) {
+      try {
+        return { ...(await attempt()), paid: true };
+      } catch (e) {
+        lastError = e;
+        await new Promise((resolve) => setTimeout(resolve, 150 * (n + 1)));
+      }
+    }
+    console.error(`[${label}] failed after ${PAYOUT_TRIES} tries:`, lastError && lastError.message);
+    try {
+      await this.db.collection('failed_payouts').add({ ...record, error: String(lastError && lastError.message), at: new Date() });
+    } catch (e) {
+      console.error(`[${label}] could not record the failed credit:`, e.message);
+    }
+    return { balance: null, applied: 0, paid: false };
+  }
+
+  // Payouts that never landed, newest first. Paid ones are left out.
+  async listFailedPayouts(limit = 200) {
+    const snap = await this.db.collection('failed_payouts').get();
+    const iso = (t) => (t && typeof t.toDate === 'function' ? t.toDate() : t instanceof Date ? t : new Date(t || 0)).toISOString();
+    return snap.docs
+      .map((d) => ({ docId: d.id, ...d.data() }))
+      .filter((r) => !r.resolved)
+      .sort((a, b) => iso(b.at).localeCompare(iso(a.at)))
+      .slice(0, limit)
+      .map((r) => ({
+        docId: r.docId, kind: r.kind, userId: r.userId, amount: r.amount, game: r.game || null,
+        reason: r.reason || null, error: r.error || null, at: iso(r.at),
+      }));
+  }
+
+  // Pays a failed payout by hand, once. It uses the id the first try carried, so if that
+  // try had actually landed, nothing is paid twice.
+  async resolveFailedPayout(docId, by) {
+    const ref = this.db.collection('failed_payouts').doc(docId);
+    const snap = await ref.get();
+    if (!snap.exists) throw new Error('No such payout');
+    const rec = snap.data();
+    if (rec.resolved) throw new Error('That payout is already paid');
+    const r = rec.kind === 'refund'
+      ? await this.refundBet(rec.userId, rec.amount, rec.id)
+      : await this.creditPayout(rec.userId, rec.amount, rec.id);
+    await ref.set({ resolved: true, resolvedAt: new Date(), resolvedBy: by, resolvedApplied: r.applied }, { merge: true });
+    return r;
+  }
+
+  payOut(userId, amount, meta) {
+    return this.retried('payout', { kind: 'payout', userId, amount, ...meta }, () => this.creditPayout(userId, amount, meta.id));
+  }
+
+  refundStake(userId, amount, meta) {
+    return this.retried('refund', { kind: 'refund', userId, amount, ...meta }, () => this.refundBet(userId, amount, meta.id));
   }
 }
 
@@ -131,5 +220,7 @@ async function isBanned(db, userId, now = Date.now()) {
 }
 BalanceManager.isBanned = isBanned;
 BalanceManager.isGuestId = isGuestId;
+BalanceManager.balanceOf = balanceOf;
+BalanceManager.START_BALANCE = START_BALANCE;
 BalanceManager.credits = credits;
 module.exports = BalanceManager;

@@ -323,7 +323,7 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script is:inline src="/game-stats.js?v=1"></script>
 <script is:inline src="/cloud-sync.js?v=14"></script>
-<script is:inline src="/strubles.js?v=3"></script>
+<script is:inline src="/strubles.js?v=4"></script>
 <script is:inline src="/music-library.js?v=13"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline>window.PAGE_FREE_TRACK_KEY = 'koronba';</script>
@@ -811,7 +811,7 @@
     $('result-sub').textContent = reason === 'left' || reason === 'disconnect' ? (won ? `${S.oppName} left the game.` : 'You left the game.')
       : reason === 'timeout' ? (won ? `${S.oppName} ran out of time.` : 'You ran out of time.')
       : won ? `You sank ${S.oppName}'s whole fleet.` : `${S.oppName} sank your whole fleet.`;
-    $('result-pay').textContent = msg.friendly ? 'Friendly game — no Strubles at stake.' : (won && mine.payout > 0 ? `+${mine.payout.toLocaleString()} Strubles` : (won ? '' : `−${S.bet.toLocaleString()} Strubles`));
+    $('result-pay').textContent = msg.friendly ? 'Friendly game — no Strubles at stake.' : (won && mine.unpaid ? 'Couldn’t credit this just now. It is saved and will be paid.' : won && mine.payout > 0 ? `+${mine.payout.toLocaleString()} Strubles` : (won ? '' : `−${S.bet.toLocaleString()} Strubles`));
     $('rematch-note').textContent = ''; $('btn-rematch').disabled = true; $('btn-rematch').textContent = '↻ Rematch';
     $('result-card').hidden = false; $('firebar').hidden = true;
     showPhaseKeep(); renderTurn(); paintBoards();

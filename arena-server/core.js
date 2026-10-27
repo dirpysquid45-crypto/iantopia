@@ -85,10 +85,12 @@ function createServer(options = {}) {
   function readBody(req) {
     return new Promise((resolve, reject) => {
       let size = 0;
+      let tooLarge = false;
       const chunks = [];
       req.on('data', (c) => {
         size += c.length;
-        if (size > WALLET_BODY_MAX) { reject(new Error('too large')); req.destroy(); return; }
+        // Keep reading and drop the bytes, so the 413 reply can still be sent.
+        if (size > WALLET_BODY_MAX) { if (!tooLarge) { tooLarge = true; reject(new Error('too large')); } return; }
         chunks.push(c);
       });
       req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
@@ -118,7 +120,12 @@ function createServer(options = {}) {
     }
     if (path === '/wallet/ops' && req.method === 'POST') {
       let body;
-      try { body = JSON.parse(await readBody(req)); } catch { return sendJson(res, 400, { error: 'bad_json' }); }
+      let raw;
+      try { raw = await readBody(req); } catch (e) {
+        if (e.message === 'too large') { res.setHeader('Connection', 'close'); return sendJson(res, 413, { error: 'too_large' }); }
+        return sendJson(res, 400, { error: 'bad_json' });
+      }
+      try { body = JSON.parse(raw); } catch { return sendJson(res, 400, { error: 'bad_json' }); }
       const ops = body && Array.isArray(body.ops) ? body.ops : null;
       if (!ops || ops.length < 1 || ops.length > WALLET_OPS_MAX) return sendJson(res, 400, { error: 'bad_ops' });
       const results = await wallet.applyBatch(uid, ops);

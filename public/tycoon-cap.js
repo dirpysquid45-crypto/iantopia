@@ -28,7 +28,10 @@
     2: { cost: 15000, gain: 25000 },
     3: { cost: 40000, gain: 40000 },
   };
-  const COST_FRACTION = 0.6; // level n costs 60% of the cap at level n-1 — always affordable with room to spare
+  // Level n costs a fraction of the cap at level n-1, so it is always affordable
+  // with room to spare. The fraction starts at 60% at level 4 and rises 2 points
+  // per level to 70% at level 9, so the top levels cost more to reach.
+  const costFraction = (n) => Math.min(0.7, 0.6 + 0.02 * (n - 4));
   const GAIN_MULT = 1.2;     // and grows the cap by 1.2x what it cost — still a worthwhile upgrade
   const ROUND_TO = 1000;
   const round = (n) => Math.round(n / ROUND_TO) * ROUND_TO;
@@ -44,7 +47,7 @@
       const prevCap = levelCache[i - 1].cap;
       let cost, gain;
       if (LEVELS[i]) { cost = LEVELS[i].cost; gain = LEVELS[i].gain; }
-      else { cost = round(prevCap * COST_FRACTION); gain = round(cost * GAIN_MULT); }
+      else { cost = round(prevCap * costFraction(i)); gain = round(cost * GAIN_MULT); }
       levelCache.push({ cost, gain, cap: prevCap + gain });
     }
     return levelCache[n];

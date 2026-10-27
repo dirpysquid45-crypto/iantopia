@@ -113,6 +113,111 @@
   .bank-buy-row { margin-top:16px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
   .bank-buy-row p { margin:0; font-size:10px; color:var(--ink); line-height:1.7; }
 
+  /* Bank teller window. Checkered marble floor, a wood counter with a brass
+     rail, a pixel teller behind it and two service windows on the counter. */
+  .modal.bank-modal { width:min(680px,94vw); max-height:88vh; padding:0; background:#120a05; box-shadow:0 0 0 2px #000, 0 0 26px rgba(255,215,0,.35); }
+  .bank-sign {
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:12px 14px; border-bottom:4px solid #000;
+    background:repeating-linear-gradient(90deg,#1f6b3a 0 14px,#185630 14px 28px);
+  }
+  .bank-sign h2 { margin:0; font-size:13px; font-weight:400; color:var(--gold); text-shadow:2px 2px 0 #000; letter-spacing:1px; }
+  .bank-hall {
+    --fig-cs:8px; /* one pixel of the teller art on screen */
+    position:relative; padding:18px 16px 0;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,.35)),
+      conic-gradient(#2c1d12 25%, #3a2615 0 50%, #2c1d12 0 75%, #3a2615 0) 0 0 / 28px 28px;
+    border-bottom:2px solid #000;
+  }
+  .bank-teller { display:flex; align-items:flex-end; gap:14px; }
+  /* The teller is two canvases: the head breathes (one art pixel down and
+     back, in steps so it stays crisp), the body stays put. The figure's
+     bottom edge is the counter's top edge, so he stands on the counter. */
+  .bank-figure {
+    --px:8px; /* one art pixel on screen */
+    position:relative; flex:none; width:96px;
+    filter:drop-shadow(3px 3px 0 #000);
+  }
+  .bank-figure canvas { display:block; width:96px; image-rendering:pixelated; image-rendering:crisp-edges; }
+  #bank-teller-head { height:56px; position:relative; z-index:1; animation:bank-breathe 3.2s steps(1,end) infinite; }
+  #bank-teller-body { height:48px; }
+  @keyframes bank-breathe {
+    0%, 49% { transform:translateY(0); }
+    50%, 100% { transform:translateY(var(--px)); }
+  }
+  @media (prefers-reduced-motion: reduce) { #bank-teller-head { animation:none; } }
+  .bank-bubble {
+    position:relative; flex:1; margin:0 0 50px; padding:10px 12px; /* clears the arm and bill on the counter */
+    background:#fff8e1; color:#1a0f08; border:3px solid #000; box-shadow:3px 3px 0 #000;
+    font-size:9px; line-height:1.8;
+  }
+  .bank-bubble::before {
+    content:''; position:absolute; left:-12px; bottom:14px; width:0; height:0;
+    border-top:7px solid transparent; border-bottom:7px solid transparent; border-right:9px solid #000;
+  }
+  .bank-bubble::after {
+    content:''; position:absolute; left:-6px; bottom:15px; width:0; height:0;
+    border-top:5px solid transparent; border-bottom:5px solid transparent; border-right:7px solid #fff8e1;
+  }
+  .bank-counter {
+    position:relative; height:44px; margin:0 -16px;
+    border-top:6px solid #d9a243; border-bottom:4px solid #000;
+    background:
+      linear-gradient(90deg, rgba(0,0,0,.18) 1px, transparent 1px) 0 0 / 46px 100%,
+      repeating-linear-gradient(176deg, rgba(255,220,160,.07) 0 2px, transparent 2px 7px),
+      repeating-linear-gradient(90deg, #8b5530 0 46px, #74442a 46px 48px);
+    box-shadow:inset 0 -6px 0 rgba(0,0,0,.35);
+  }
+  /* The arm is drawn flush against his right shoulder, on the same pixel grid
+     as the figure, so it stays attached. Only the bill moves: it slides in
+     under the hand once in a while, as if being counted. */
+  .bank-arm, .bank-bill {
+    position:absolute; bottom:44px; /* the counter's height: sits on the counter top */
+    width:calc(var(--fig-cs) * 6); height:calc(var(--fig-cs) * 5);
+    image-rendering:pixelated; image-rendering:crisp-edges; pointer-events:none;
+  }
+  .bank-arm { left:calc(16px + var(--fig-cs) * 11); z-index:2; }
+  .bank-bill {
+    left:calc(16px + var(--fig-cs) * 15); width:calc(var(--fig-cs) * 10); opacity:0;
+    animation:bank-count 14s steps(1,end) infinite;
+  }
+  @keyframes bank-count {
+    0%, 79% { opacity:0; transform:translateX(0); }
+    80% { opacity:1; transform:translateX(calc(var(--fig-cs) * 3)); }
+    81% { transform:translateX(calc(var(--fig-cs) * 2)); }
+    82% { transform:translateX(var(--fig-cs)); }
+    83%, 84% { transform:translateX(0); }
+    85%, 100% { opacity:0; transform:translateX(0); }
+  }
+  @media (prefers-reduced-motion: reduce) { .bank-bill { animation:none; opacity:0; } }
+  .bank-counter::before {
+    content:''; position:absolute; left:0; right:0; top:0; height:4px;
+    background:linear-gradient(#ffe9a8,#c58a2b); border-bottom:2px solid #000;
+  }
+  .bank-balance {
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    margin:0; padding:10px 14px; background:#000; border-bottom:2px solid #ffd700;
+    font-size:10px; color:var(--muted);
+  }
+  .bank-balance b { color:var(--gold); font-weight:400; font-size:12px; }
+  .bank-windows {
+    display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:14px;
+    background:#1b110a; max-height:none;
+  }
+  .bank-window {
+    margin:0; padding:12px; background:#0a0a0a; border:3px solid #ffd700;
+    box-shadow:inset 0 0 0 2px #000, 3px 3px 0 #000; min-width:0;
+  }
+  .bank-window h3 { margin:0 0 8px; font-size:11px; font-weight:400; color:var(--gold); }
+  .bank-note { margin:0 0 10px; font-size:9px; line-height:1.7; color:var(--muted); }
+  .bank-window .bank-cap-row { font-size:9px; gap:6px; }
+  .bank-window .bank-buy-row { flex-direction:column; align-items:stretch; margin-top:12px; }
+  .bank-window .bank-buy-row p { font-size:9px; }
+  .bank-action { width:100%; text-align:center; }
+  .bank-gate { margin:10px 0 0; font-size:8px; line-height:1.8; color:#ffb36b; }
+  @media (max-width:520px) { .bank-windows { grid-template-columns:1fr; } .bank-teller { gap:10px; } .bank-figure { width:72px; --px:6px; } .bank-figure canvas { width:72px; } #bank-teller-head { height:42px; } #bank-teller-body { height:36px; } .bank-hall { --fig-cs:6px; } }
+
   /* ---------- The village stage (Phaser canvas lives in here) ---------- */
   #game-stage {
     position:relative; flex:1 1 auto; min-height:300px;
@@ -144,6 +249,17 @@
   #brush-bar.open { display:flex; }
   #brush-bar-text { font-size:9px; color:var(--gold); line-height:1.6; }
   #brush-bar-text.bad { color:#ff6b6b; }
+  /* One-tap brush palette. The active brush is filled gold, so it reads at a glance. */
+  #brush-palette { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; width:100%; }
+  .brush-chip {
+    display:inline-flex; align-items:center; gap:6px; background:#000; color:var(--gold);
+    border:2px solid var(--gold); padding:6px 8px; font-size:9px; font-family:inherit; font-weight:700;
+    cursor:none; touch-action:manipulation; line-height:1;
+  }
+  .brush-chip i { display:inline-block; width:12px; height:12px; border:1px solid #ffe9a8; }
+  .brush-chip:hover { background:rgba(255,215,0,.2); }
+  .brush-chip.active { background:var(--gold); color:#000; }
+  .brush-chip.active i { border-color:#000; }
   .bar-btn {
     background:#000; color:var(--gold); border:3px solid var(--gold); padding:12px 14px;
     font-size:11px; font-weight:700; cursor:none; font-family:inherit; touch-action:manipulation;
@@ -178,8 +294,10 @@
   .picker-row:last-child { border-bottom:none; }
   .picker-row:hover { background:rgba(255,215,0,.08); }
   .row-icon { font-size:26px; width:40px; text-align:center; flex-shrink:0; }
+  /* Same colour the zone is painted on the map, so the panel explains it. */
+  .zone-swatch { width:40px; height:24px; flex-shrink:0; border:2px solid #ffe9a8; box-shadow:inset 0 0 0 2px rgba(0,0,0,.35); }
   .picker-row .row-info, .guide-row .row-info { flex:1; line-height:1.6; }
-  .row-info small { color:var(--muted); display:block; font-size:8px; }
+  .row-info small { color:var(--muted); display:block; font-size:8px; line-height:1.8; }
   .row-info small.row-desc { font-style:italic; margin-top:3px; }
   .picker-empty { color:var(--muted); font-size:10px; padding:10px 0; line-height:1.8; text-align:center; }
   .picker-group { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin:14px 0 4px; }
@@ -190,7 +308,8 @@
      art (hence image-rendering) where there is no PNG. */
   .row-img { width:44px; height:44px; object-fit:contain; flex-shrink:0; }
   .row-img.pix { image-rendering:pixelated; }
-  .zone-chip { display:inline-block; padding:0 5px; border:1px solid currentColor; border-radius:2px; text-transform:uppercase; font-size:7px; letter-spacing:.5px; }
+  /* Press Start 2P is drawn on an 8px grid, so 8px is the smallest size that stays crisp. */
+  .zone-chip { display:inline-block; padding:0 5px; border:1px solid currentColor; border-radius:2px; text-transform:uppercase; font-size:8px; letter-spacing:.5px; }
   .zone-residential { color:#7db6ff; } .zone-commercial { color:#ffb457; } .zone-industrial { color:#c99bf0; }
 
   .guide-row {
@@ -214,7 +333,7 @@
     /* On a phone the map sat below the fold: a three-line stats bar and three
        rows of wrapped buttons used the whole first screen. One swipeable row
        of buttons and a compact stats bar give the map the space back. */
-    #stats-bar { font-size:7px; gap:4px 10px; padding:6px 8px; margin-bottom:8px; line-height:1.5; }
+    #stats-bar { font-size:8px; gap:6px 12px; padding:6px 8px; margin-bottom:8px; line-height:1.6; }
     #cta-row { flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; gap:8px; margin-bottom:8px; padding-bottom:4px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
     #cta-row::-webkit-scrollbar { display:none; }
     .cta { font-size:9px; padding:9px 10px; white-space:nowrap; flex:0 0 auto; border-width:2px; }
@@ -278,12 +397,21 @@
     <div id="game-stage">
       <div id="toast" role="status"></div>
       <div id="brush-bar">
+        <div id="brush-palette" role="group" aria-label="Brushes">
+          <button class="brush-chip" data-brush="residential" type="button" title="Residential (1 or R)" aria-label="Residential"><i style="background:#2f6fd0"></i>Res</button>
+          <button class="brush-chip" data-brush="commercial" type="button" title="Commercial (2 or C)" aria-label="Commercial"><i style="background:#e08a1f"></i>Com</button>
+          <button class="brush-chip" data-brush="industrial" type="button" title="Industrial (3 or I)" aria-label="Industrial"><i style="background:#7b3fa0"></i>Ind</button>
+          <button class="brush-chip" data-brush="road" type="button" title="Road (4 or D)" aria-label="Road">🛣️</button>
+          <button class="brush-chip" data-brush="water" type="button" title="Water (5 or W)" aria-label="Water">💧</button>
+          <button class="brush-chip" data-brush="erase" type="button" title="Erase (6 or E)" aria-label="Erase">🧽</button>
+        </div>
         <span id="brush-bar-text"></span>
         <button class="bar-btn" id="brush-undo" type="button" disabled>↩ Undo</button>
         <button class="bar-btn no" id="brush-done" type="button">✕ Done</button>
       </div>
       <div id="place-bar">
         <span id="place-bar-text"></span>
+        <button class="bar-btn" id="place-zone" type="button" style="display:none;">🗺️ Paint zoning</button>
         <button class="bar-btn ok" id="place-confirm" type="button">✓ Place</button>
         <button class="bar-btn no" id="place-cancel" type="button">✕ Cancel</button>
       </div>
@@ -347,29 +475,57 @@
 
   <!-- Bank: current wallet cap (Bank level + Taipei bonus, itemized) and the next level's cost -->
   <div class="overlay" id="bank-overlay">
-    <div class="modal">
-      <div class="modal-head">
-        <h2>Bank</h2>
+    <div class="modal bank-modal">
+      <div class="bank-sign">
+        <h2>Iantopia Bank</h2>
         <button class="btn" id="bank-close" type="button">Close</button>
       </div>
-      <p style="font-size:10px; color:var(--muted); line-height:1.7; margin:0 0 14px;">Strubles earned past your wallet cap don't accrue — spend down below the cap, or raise it here.</p>
-      <div id="bank-cap-breakdown"></div>
-      <p id="bank-gate" style="display:none; font-size:9px; line-height:1.8; color:#ffb36b; margin:12px 0 0;">
-        🏦 Raising the wallet cap needs a completed Bank building. Win one from the Lootbox or buy one in the Shop's Real Estate section, then zone 2×2 commercial land and build it.
-      </p>
-      <div class="bank-buy-row">
-        <p id="bank-next-info"></p>
-        <button class="btn" id="bank-buy" type="button">Upgrade</button>
+
+      <!-- The teller stands behind the counter. Two services, both paid in
+           Strubles: the wallet cap (a Bank building is needed) and land slots. -->
+      <div class="bank-hall">
+        <div class="bank-teller">
+          <div class="bank-figure" role="img" aria-label="Bank teller">
+            <canvas id="bank-teller-head" width="12" height="7" aria-hidden="true"></canvas>
+            <canvas id="bank-teller-body" width="12" height="6" aria-hidden="true"></canvas>
+          </div>
+          <p class="bank-bubble" id="bank-say"></p>
+        </div>
+        <canvas class="bank-arm" id="bank-arm" width="6" height="5" aria-hidden="true"></canvas>
+        <canvas class="bank-bill" id="bank-bill" width="10" height="5" aria-hidden="true"></canvas>
+        <div class="bank-counter"></div>
       </div>
 
-      <!-- Building slots used to be their own button and modal. Both are
-           "spend Strubles to raise a ceiling", so they live together now. -->
-      <h2 style="font-size:12px; color:var(--gold); font-weight:400; margin:22px 0 10px; padding-top:16px; border-top:1px solid rgba(255,215,0,.25);">Building Slots</h2>
-      <p style="font-size:10px; color:var(--muted); line-height:1.7; margin:0 0 14px;">How many buildings your village can hold. Each new slot costs about half again as much as the last.</p>
-      <div id="expand-info-breakdown"></div>
-      <div class="bank-buy-row">
-        <p id="expand-next-info"></p>
-        <button class="btn" id="expand-buy" type="button">Purchase</button>
+      <div class="bank-balance">
+        <span>Your Strubles</span>
+        <b id="bank-bal">0</b>
+      </div>
+
+      <div class="bank-windows">
+        <section class="bank-window">
+          <h3>Wallet Cap</h3>
+          <p class="bank-note">Strubles earned past your cap don't accrue. Raise the cap here.</p>
+          <div id="bank-cap-breakdown"></div>
+          <p id="bank-gate" class="bank-gate" style="display:none;">
+            🏦 Raising the cap needs a completed Bank building. Win one from the Lootbox or buy one in the Shop's Real Estate section, then zone 2×2 commercial land and build it.
+          </p>
+          <div class="bank-buy-row">
+            <p id="bank-next-info"></p>
+            <button class="btn bank-action" id="bank-buy" type="button">Upgrade</button>
+          </div>
+        </section>
+
+        <!-- Building slots used to be their own button and modal. Both are
+             "spend Strubles to raise a ceiling", so they live together now. -->
+        <section class="bank-window">
+          <h3>Land Slots</h3>
+          <p class="bank-note">How many buildings your village can hold. Each new slot costs about a third more than the last.</p>
+          <div id="expand-info-breakdown"></div>
+          <div class="bank-buy-row">
+            <p id="expand-next-info"></p>
+            <button class="btn bank-action" id="expand-buy" type="button">Buy slot</button>
+          </div>
+        </section>
       </div>
     </div>
   </div>
@@ -426,9 +582,10 @@
 <script is:inline src="/tycoon-buildings.js?v=14"></script>
 <script is:inline src="/tycoon-art.js?v=5"></script>
 <script is:inline src="/cursor.js?v=3"></script>
-<script is:inline src="/tycoon-cap.js?v=1"></script>
+<script is:inline src="/tycoon-cap.js?v=2"></script>
+<script is:inline src="/tycoon-economy.js?v=1"></script>
 <script is:inline src="/tycoon-bank.js?v=2"></script>
-<script is:inline src="/strubles.js?v=3"></script>
+<script is:inline src="/strubles.js?v=4"></script>
 <script is:inline>
   // What the page shows until a background is picked, and what "default" in
   // the picker resets to.
@@ -462,12 +619,9 @@
   const MAX_PER_TYPE = window.TYCOON_MAX_PER_TYPE || 5;
   const MAX_CONCURRENT = window.TYCOON_MAX_CONCURRENT_BUILDS || 3;
   const RARITY = window.CASE_RARITIES || {};
-  // Building slots. The first one used to cost 200,000 and each tripled the
-  // last -- ten times the base wallet cap, so it could never be bought at all.
-  // Now 1,500 and 1.5x per slot, which lands the first six well inside the
-  // base 20,000 cap and makes the later ones a genuine late-game spend.
-  const EXPAND_BASE_COST = 1500;
-  const EXPAND_GROWTH = 1.5;
+  // Every cost and pacing rule below (slots, permits, build time, upkeep,
+  // rookie catch-up) lives in tycoon-economy.js, so the numbers are testable.
+  const E = window.TycoonEconomy;
 
   // Footprint lives on the definition (tycoon-buildings.js), the one source of
   // truth for every building stat.
@@ -480,7 +634,7 @@
 
   function slotsOwned() { return Math.max(0, Number(localStorage.getItem(SLOTS_KEY)) || 0); }
   function slotCap() { return BASE_SLOTS + slotsOwned(); }
-  function expandCostForSlot(n) { return n <= 0 ? 0 : Math.round((EXPAND_BASE_COST * Math.pow(EXPAND_GROWTH, n - 1)) / 10) * 10; }
+  function expandCostForSlot(n) { return E.slotCost(n); }
 
   // Village state: { v:2, nextId, b:[...buildings], tiles:{tx_ty: type} }
   // tiles map: "x_y" -> "residential"/"commercial"/"industrial"/"road"/"water"
@@ -636,6 +790,27 @@
     return avail;
   }
   const hasBank = () => village.b.some((s) => s.key === 'bank' && s.status === 'complete');
+  // Upkeep per day for a building, scaled up for a big village (tycoon-economy.js).
+  const dailyUpkeepOf = (def) => def.cost * (def.upkeepPct || 0) * E.upkeepMultiplier(village.b.length);
+
+  // A new village gets a starter kit once: two Shabby Apartments and a Generic
+  // Building, so the first income lands in the first session without waiting on
+  // a lootbox. The flag lives on the village, so it syncs with the account.
+  const FOUNDER_KIT = { shabby_apartment: 2, generic_building: 1 };
+  function grantFounderKit() {
+    if (village.founderKit || village.b.length) return;
+    village.founderKit = true;
+    const inv = loadJSON(INV_KEY, {});
+    inv.buildings = Array.isArray(inv.buildings) ? inv.buildings : [];
+    const have = ownedCounts();
+    Object.keys(FOUNDER_KIT).forEach((key) => {
+      const n = Math.min(FOUNDER_KIT[key], Math.max(0, MAX_PER_TYPE - (have[key] || 0)));
+      for (let i = 0; i < n; i++) inv.buildings.push(key);
+    });
+    saveJSON(INV_KEY, inv);
+    saveVillage();
+    try { window.dispatchEvent(new Event('inventory:changed')); } catch {}
+  }
   const buildingCount = () => village.b.filter((s) => s.status === 'building').length;
 
   // ---------- Economy tick ----------
@@ -654,6 +829,7 @@
       if (!def) return;
       if (slot.status === 'building' && now >= slot.completesAt) {
         slot.status = 'complete';
+        village.completedEver = (village.completedEver || 0) + 1;
         slot.lastProductionAt = slot.completesAt;
         slot.lastTaxAt = slot.completesAt;
         slot.taxDebt = slot.taxDebt || 0;
@@ -684,7 +860,7 @@
             changed = true;
           }
         }
-        const dailyUpkeep = def.cost * (def.upkeepPct || 0);
+        const dailyUpkeep = dailyUpkeepOf(def);
         const elapsedTax = Math.max(0, now - slot.lastTaxAt) / 60000;
         const perMin = dailyUpkeep / 1440;
         const taxOwed = perMin > 0 ? Math.floor(elapsedTax * perMin) : 0;
@@ -697,7 +873,11 @@
     });
     localStorage.setItem(LAST_SEEN_KEY, String(now));
     if (TYCOON_DISABLED) return changed;
-    if (earned > 0) { try { Strubles.add(earned, undefined, 'tycoon'); } catch {} }
+    if (earned > 0) {
+      try { Strubles.add(earned, undefined, 'tycoon'); } catch {}
+      village.lifetimeEarned = (village.lifetimeEarned || 0) + earned;
+      changed = true;
+    }
     village.b.forEach((slot) => {
       if (slot.status === 'complete' && slot.taxDebt > 0 && Strubles.spend(slot.taxDebt)) {
         slot.taxDebt = 0;
@@ -951,6 +1131,7 @@
     if (touchesTile(s, 'industrial')) p *= 1 + INDUSTRIAL_BONUS;
     if (specialty && def.zone === specialty.type) p *= 1 + specialty.bonus;
     if (s.taxDebt > 0) p *= 0.5;
+    p *= E.rookieMultiplier(village.lifetimeEarned);
     return p * moodMultiplier(mood);
   }
 
@@ -1026,7 +1207,10 @@
     return id ? (bById.get(id) || null) : null;
   }
 
-  function syncBalance() { try { $('bal').textContent = Strubles.get().toLocaleString(); } catch {} }
+  function syncBalance() {
+    try { $('bal').textContent = Strubles.get().toLocaleString(); } catch {}
+    try { $('bank-bal').textContent = Strubles.get().toLocaleString(); } catch {}
+  }
   function fmtDuration(min) {
     if (min >= 1440) return (min / 1440).toFixed(min % 1440 === 0 ? 0 : 1) + 'd';
     if (min >= 60) return (min / 60).toFixed(min % 60 === 0 ? 0 : 1) + 'h';
@@ -1057,6 +1241,9 @@
   let selectedId = null;
   // Placement mode: { key, moveId|null, tx, ty, restore|null }
   let placing = null;
+  // Set while the player paints the zoning a building needs. Done (or Escape)
+  // brings them back to placing that same building on the same tile.
+  let zoningFor = null;   // { key, tx, ty } or null
   let layer, ghostG, gridG;
 
   // Ground layers and building sprites. Everything static is composed once and
@@ -1610,7 +1797,7 @@
       } else {
         sp.setVisible(!moving);
         totalProduction += productionFor(s, mood, specialty);
-        totalUpkeep += def.cost * (def.upkeepPct || 0);
+        totalUpkeep += dailyUpkeepOf(def);
         const connected = roadOk(s);
         if (connected) onRoadCount++;
         if (!moving) {
@@ -1706,6 +1893,12 @@
   function drawGhost() {
     ghostG.clear();
     gridG.clear();
+    if (zoningFor && brushMode) {
+      // Outline the footprint still waiting on its zoning, in that zone's colour.
+      const f = foot(zoningFor.key), col = BOX_COLOR[zoneOf(zoningFor.key)];
+      ghostG.lineStyle(2, hex(col), 1);
+      ghostG.strokeRect(zoningFor.tx * T + 1, zoningFor.ty * T + 1, f.w * T - 2, f.h * T - 2);
+    }
     if (rectDrag && brushMode) {
       // Faint grid so the box snaps visibly to tiles, then the box itself.
       gridG.lineStyle(1, 0xffffff, 0.14);
@@ -1732,6 +1925,7 @@
     const f = foot(placing.key);
     const issue = placementIssue(placing.key, placing.tx, placing.ty, placing.moveId);
     const ok = issue === null;
+    $('place-zone').style.display = issue === 'zone' ? '' : 'none';
     const ox = placing.tx * T, oy = placing.ty * T;
     if (!ghostImg) ghostImg = scene.add.image(0, 0, ensureBaked(placing.key)).setOrigin(0, 0).setDepth(60);
     ghostImg.setTexture(ensureBaked(placing.key)).setScale(coverScale(placing.key));
@@ -1941,7 +2135,9 @@
   const placeList = $('place-list');
 
   function startPlacing(key, moveId) {
+    zoningFor = null;
     placing = { key, moveId: moveId || null, tx: null, ty: null };
+    $('place-zone').style.display = 'none';
     $('place-bar').classList.add('open');
     $('place-confirm').disabled = true;
     $('place-bar-text').textContent = `Tap the map to aim your ${DEFS[key].label}`;
@@ -1969,7 +2165,7 @@
     `<img class="row-img${DEFS[key].icon ? '' : ' pix'}" src="${iconSrc(key)}" alt="" width="44" height="44" decoding="async">`;
   const metaLine = (key) => {
     const d = DEFS[key];
-    return `Cost ${d.cost.toLocaleString()} Strubles · builds in ${fmtDuration(d.buildMinutes)} · +${d.production}/min when done · Upkeep ${Math.floor(d.cost * (d.upkeepPct || 0))}/day`;
+    return `Cost ${E.permitCost(d.cost, village.b.length).toLocaleString()} Strubles · builds in ${fmtDuration(E.buildMinutes(d.buildMinutes, village.completedEver))} · +${d.production}/min when done · Upkeep ${Math.floor(dailyUpkeepOf(d))}/day`;
   };
   const zoneLine = (key) => {
     const f = foot(key), z = zoneOf(key);
@@ -2049,8 +2245,9 @@
     } else {
       const def = DEFS[key];
       if (availableCounts()[key] <= 0) { alert(`You can't build any more of those.`); return; }
-      if (!Strubles.spend(def.cost)) {
-        alert(`Not enough Strubles for the permit (need ${def.cost.toLocaleString()}).`);
+      const permit = E.permitCost(def.cost, village.b.length);
+      if (!Strubles.spend(permit)) {
+        alert(`Not enough Strubles for the permit (need ${permit.toLocaleString()}).`);
         return;
       }
       const now = Date.now();
@@ -2065,9 +2262,9 @@
       village.b.push({
         id: village.nextId++, key, x: tx, y: ty,
         status: 'building', startedAt: now,
-        completesAt: now + def.buildMinutes * 60000,
+        completesAt: now + E.buildMinutes(def.buildMinutes, village.completedEver) * 60000,
         lastProductionAt: now,
-        paid: def.cost,           // permit paid, refunded if the building is removed
+        paid: permit,             // permit paid, refunded if the building is removed
       });
     }
     onBuildingsChanged();
@@ -2188,6 +2385,7 @@
     if (brushMode === 'erase') el.textContent = 'Erase — drag a box over tiles to clear them. You get back what you paid.';
     else if (brushMode === 'road') el.textContent = `Road — ${cost.toLocaleString()} each, drag to lay a road`;
     else el.textContent = `${BRUSH_LABEL[brushMode]} — ${cost ? cost.toLocaleString() + ' per tile' : 'free'}, drag a box to fill an area`;
+    if (zoningFor) el.textContent += ` · Done resumes placing your ${DEFS[zoningFor.key].label}`;
   }
 
   // What a painted tile cost, so erasing or replacing it can pay it back. Tiles
@@ -2290,35 +2488,70 @@
   function setBrush(mode) {
     brushMode = mode;
     rectDrag = null;
-    document.querySelectorAll('[data-brush]').forEach((b) => {
-      b.style.opacity = (mode && b.dataset.brush === mode) ? '0.55' : '1';
+    document.querySelectorAll('.brush-chip').forEach((b) => {
+      b.classList.toggle('active', b.dataset.brush === mode);
     });
     $('brush-bar').classList.toggle('open', !!mode);
     if (mode) { stopPlacing(); selectedId = null; setBrushLabel(); }
     refresh();
+    if (!mode && zoningFor) {
+      const z = zoningFor;
+      zoningFor = null;
+      startPlacing(z.key, null);
+      if (z.tx != null) { placing.tx = z.tx; placing.ty = z.ty; refresh(); }
+    }
   }
+  // Placing a building that needs zoning: hand over to the zone brush, keeping
+  // the aimed tile so Done can return to it.
+  function paintZoningFor() {
+    if (!placing || placing.moveId != null) return;
+    zoningFor = { key: placing.key, tx: placing.tx, ty: placing.ty };
+    setBrush(zoneOf(placing.key));
+  }
+  $('place-zone').addEventListener('click', paintZoningFor);
   $('brush-done').addEventListener('click', () => setBrush(null));
+  document.querySelectorAll('.brush-chip').forEach((b) => {
+    b.addEventListener('click', () => setBrush(b.dataset.brush));
+  });
+  // Desktop keys: the letter names the brush (D for road, since R is taken),
+  // and the number keys follow the palette order.
+  const BRUSH_KEYS = { r: 'residential', c: 'commercial', i: 'industrial', d: 'road', w: 'water', e: 'erase',
+    1: 'residential', 2: 'commercial', 3: 'industrial', 4: 'road', 5: 'water', 6: 'erase' };
+  window.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (/^(input|textarea|select)$/i.test((e.target && e.target.tagName) || '')) return;
+    if (document.querySelector('.overlay.open')) return;
+    const mode = BRUSH_KEYS[e.key.toLowerCase()];
+    if (!mode) return;
+    e.preventDefault();
+    setBrush(mode);
+  });
+  // Escape drops the brush, the same way Done does (placing has its own Escape above).
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && brushMode && !placing) setBrush(null);
+  });
 
   // Grouped so the three zone colours read as a category with a shared
   // purpose, instead of three unexplained buttons sitting next to Road.
   const ZONING_GROUPS = [
     { title: 'Infrastructure', rows: [
       { brush: 'road', icon: '🛣️', name: 'Road',
-        blurb: 'Required. A building with no road touching one of its sides earns nothing at all. Roads also carry your villagers.' },
+        blurb: 'Required: a building with no road beside it earns nothing.' },
     ]},
+    // swatch: the fill colour tycoon-art.js paints each zone with (ZONE_STYLE).
     { title: 'Zones', rows: [
-      { brush: 'residential', icon: '🏘️', name: 'Residential',
-        blurb: 'Homes. Shabby Apartments, Generic Buildings and Pagodas can only be built on residential zoning.' },
-      { brush: 'commercial', icon: '🏬', name: 'Commercial',
-        blurb: 'Shops and offices. Skyscrapers, Taipei 101, Banks, Office Buildings and 7-Elevens can only be built on commercial zoning.' },
-      { brush: 'industrial', icon: '🏭', name: 'Industrial',
-        blurb: 'Sweatshops, Factories and Power Plants can only be built on industrial zoning. It adds +15% to any building it touches, but drags village mood down — and mood scales all production from 0.75x to 1.15x.' },
+      { brush: 'residential', swatch: '#2f6fd0', name: 'Residential',
+        blurb: 'Homes: Shabby Apartments, Generic Buildings, Pagodas.' },
+      { brush: 'commercial', swatch: '#e08a1f', name: 'Commercial',
+        blurb: 'Shops and offices: Skyscrapers, Banks, Taipei 101, 7-Elevens.' },
+      { brush: 'industrial', swatch: '#7b3fa0', name: 'Industrial',
+        blurb: 'Factories and plants. +15% to neighbours, but lowers mood.' },
     ]},
     { title: 'Terrain', rows: [
       { brush: 'water', icon: '💧', name: 'Water',
-        blurb: 'Scenery. Lifts mood a little, and permanently blocks building on that tile until erased.' },
+        blurb: 'Scenery: lifts mood. Blocks building until erased.' },
       { brush: 'erase', icon: '🧽', name: 'Erase',
-        blurb: 'Drag a box to clear painted tiles. You get back what you paid for them. Tiles under a building are left alone.' },
+        blurb: 'Clears painted tiles and refunds what you paid.' },
     ]},
   ];
 
@@ -2334,7 +2567,10 @@
         const cost = tileCost(r.brush);
         const row = document.createElement('div');
         row.className = 'picker-row';
-        row.innerHTML = `<div class="row-icon">${r.icon}</div><div class="row-info">${r.name}
+        const mark = r.swatch
+          ? `<div class="zone-swatch" style="background:${r.swatch}"></div>`
+          : `<div class="row-icon">${r.icon}</div>`;
+        row.innerHTML = `${mark}<div class="row-info">${r.name}
           <small style="color:var(--gold)">${r.brush === 'erase' ? 'refunds what you paid' : !cost ? 'free' : cost.toLocaleString() + ' Strubles per tile · scales with your balance'}</small>
           <small class="row-desc">${r.blurb}</small></div>`;
         row.addEventListener('click', () => {
@@ -2380,7 +2616,7 @@
     if (!s) return;
     manageId = id;
     const def = DEFS[s.key];
-    const dailyUpkeep = def.cost * (def.upkeepPct || 0);
+    const dailyUpkeep = dailyUpkeepOf(def);
     $('manage-title').textContent = def.label;
     const specialty = computeSpecialty();
     const specialtyNote = specialty && def.zone === specialty.type ? ` Specialty bonus: +${Math.round(specialty.bonus * 100)}%.` : '';
@@ -2567,17 +2803,91 @@
   });
   wireClose('guide-overlay', 'guide-close');
 
-  // ---------- Bank (unchanged behaviour: raises the wallet cap) ----------
+  // ---------- Bank (raises the wallet cap; sells land slots) ----------
+  // The teller is a 12x13 pixel grid in the villagers' palette, so the bank
+  // reads as part of the village. Drawn once per open; the art never changes.
+  const TELLER_ART = [
+    '...HHHHHH...',
+    '..HHHHHHHH..',
+    '..HSSSSSSH..',
+    '..SSESSESS..',
+    '..SSSSSSSS..',
+    '...SSRRSS...',
+    '....SSSS....',
+    '...WWTTWW...',
+    '..VVVTTVVV..',
+    '.VVVVTTVVVV.',
+    '.VVVGTTGVVV.',
+    '.VVVVVVVVVV.',
+    '.VVVVVVVVVV.',
+  ];
+  const TELLER_PAL = { H: '#3b2a1a', S: '#d9a877', E: '#1a1a1a', R: '#8a4b3a', W: '#f4f4f4', V: '#2a4f8a', T: '#b3262e', G: '#ffd700' };
+  // Right arm (sleeve, forearm, hand) and the bill it counts. The arm's sleeve
+  // meets the body's right edge, so the two read as one figure.
+  const ARM_ART = [
+    '......',
+    '......',
+    '..SSSS',
+    'VVSSSS',
+    'VV....',
+  ];
+  const BILL_ART = [
+    'KKKKKKKKKK',
+    'KBBBBBBBBK',
+    'KBGGGGGGBK',
+    'KBBBBBBBBK',
+    'KKKKKKKKKK',
+  ];
+  const PROP_PAL = { K: '#0f2a18', B: '#6fbf73', G: '#2f7a3e', S: '#d9a877', V: '#2a4f8a' };
+  // Rows 0-6 are the head, 7-12 the body. Each canvas is drawn from its own rows.
+  function drawRows(canvas, rows, pal = TELLER_PAL) {
+    const g = canvas.getContext('2d');
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    rows.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (!pal[ch]) return;
+      g.fillStyle = pal[ch];
+      g.fillRect(x, y, 1, 1);
+    }));
+  }
+  // The eyes sit on head row 3 at columns 4 and 7. `look` shifts both by -1..1
+  // so he glances left or right; the rest of the head is unchanged.
+  function drawHead(look) {
+    const rows = TELLER_ART.slice(0, 7).map((r) => r.replace(/E/g, 'S'));
+    const row = [...rows[3]];
+    row[4 + look] = 'E';
+    row[7 + look] = 'E';
+    rows[3] = row.join('');
+    drawRows($('bank-teller-head'), rows);
+  }
+  // A slow glance: left, back, right, back. Runs only while the bank is open.
+  const GLANCE = [0, -1, -1, 0, 0, 1, 1, 0];
+  const GLANCE_MS = 1100;
+  let glanceStep = 0, glanceTimer = null;
+  function startGlance() {
+    if (glanceTimer || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    glanceTimer = setInterval(() => {
+      if (!$('bank-overlay').classList.contains('open')) { clearInterval(glanceTimer); glanceTimer = null; return; }
+      drawHead(GLANCE[glanceStep++ % GLANCE.length]);
+    }, GLANCE_MS);
+  }
+  function drawTeller() {
+    drawHead(0);
+    drawRows($('bank-teller-body'), TELLER_ART.slice(7));
+    drawRows($('bank-arm'), ARM_ART, PROP_PAL);
+    drawRows($('bank-bill'), BILL_ART, PROP_PAL);
+  }
+  function bankSay(line) { $('bank-say').textContent = line; }
+
   function renderBank() {
     const TB = window.TycoonBank;
     const level = TB.currentLevel();
     const bankCap = TB.capForLevel(level);
     const taipei = TB.taipeiBonus();
     $('bank-cap-breakdown').innerHTML = `
-      <div class="bank-cap-row"><span>Bank (level ${level})</span><span>${bankCap.toLocaleString()} Strubles</span></div>
-      <div class="bank-cap-row"><span>Taipei 101 bonus</span><span>+${taipei.toLocaleString()} Strubles</span></div>
-      <div class="bank-cap-row"><span><b>Total cap</b></span><span><b>${(bankCap + taipei).toLocaleString()} Strubles</b></span></div>`;
-    $('bank-next-info').textContent = `Next: Level ${level + 1} — costs ${TB.costForLevel(level + 1).toLocaleString()}, raises the cap by ${TB.capGainForLevel(level + 1).toLocaleString()}.`;
+      <div class="bank-cap-row"><span>Bank (level ${level})</span><span>${bankCap.toLocaleString()}</span></div>
+      <div class="bank-cap-row"><span>Taipei 101 bonus</span><span>+${taipei.toLocaleString()}</span></div>
+      <div class="bank-cap-row"><span><b>Total cap</b></span><span><b>${(bankCap + taipei).toLocaleString()}</b></span></div>`;
+    $('bank-next-info').textContent = `Level ${level + 1}: ${TB.costForLevel(level + 1).toLocaleString()} for +${TB.capGainForLevel(level + 1).toLocaleString()} cap.`;
     // Raising the wallet cap needs a Bank building standing. Slots (below) stay
     // available regardless, otherwise a full village with no bank could never
     // free up the space to build one.
@@ -2585,8 +2895,16 @@
     $('bank-buy').disabled = !has;
     $('bank-buy').style.opacity = has ? '' : '0.4';
     $('bank-gate').style.display = has ? 'none' : 'block';
+    try { $('bank-bal').textContent = Strubles.get().toLocaleString(); } catch {}
   }
-  function openBank() { renderBank(); renderExpand(); $('bank-overlay').classList.add('open'); }
+  function openBank() {
+    drawTeller();
+    startGlance();
+    bankSay('Welcome to the Iantopia Bank! Need more room in your wallet, or land for another building?');
+    renderBank();
+    renderExpand();
+    $('bank-overlay').classList.add('open');
+  }
   $('bank-btn').addEventListener('click', openBank);
   $('bank-buy').addEventListener('click', () => {
     if (!hasBank()) return;
@@ -2594,12 +2912,13 @@
     const level = TB.currentLevel();
     const cost = TB.costForLevel(level + 1);
     if (!Strubles.spend(cost)) {
-      alert(`Not enough Strubles for the next level (need ${cost.toLocaleString()}).`);
+      bankSay(`Come back when you have ${cost.toLocaleString()}. The vault doesn't extend credit.`);
       return;
     }
     localStorage.setItem(TB.BANK_LEVEL_KEY, String(level + 1));
     try { window.dispatchEvent(new Event('tycoon:changed')); } catch {}
     renderBank();
+    bankSay(`Done! Your cap is now ${(TB.capForLevel(level + 1) + TB.taipeiBonus()).toLocaleString()}. Pleasure doing business.`);
     syncBalance();
   });
   wireClose('bank-overlay', 'bank-close');
@@ -2616,12 +2935,14 @@
     const owned = slotsOwned();
     const cost = expandCostForSlot(owned + 1);
     if (!Strubles.spend(cost)) {
-      alert(`Not enough Strubles for the next slot (need ${cost.toLocaleString()}).`);
+      bankSay(`A slot is ${cost.toLocaleString()}, and I can only take cash I can see in your wallet.`);
       return;
     }
     localStorage.setItem(SLOTS_KEY, String(owned + 1));
     try { window.dispatchEvent(new Event('tycoon:changed')); } catch {}
     renderExpand();
+    renderBank();
+    bankSay(`Slot ${BASE_SLOTS + owned + 1} is yours. Plenty of room for something new.`);
     refresh();
     syncBalance();
   });
@@ -2669,6 +2990,7 @@
   });
 
   // ---------- Reconcile loop ----------
+  grantFounderKit();
   if (tick()) saveVillage();
   setInterval(() => {
     if (tick()) saveVillage();

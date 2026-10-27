@@ -178,6 +178,27 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
     return true;
   }
 
+  // Tells the player when a win was only partly credited, because the wallet cap or a
+  // daily income limit clipped it. Shown as a short note, and as an event for pages.
+  function noteCapped(asked, credited) {
+    if (!(asked > credited)) return;
+    try { window.dispatchEvent(new CustomEvent('strubles:capped', { detail: { asked, credited } })); } catch {}
+    try {
+      let el = document.getElementById('strubles-capped-note');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'strubles-capped-note';
+        el.setAttribute('role', 'status');
+        el.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;background:#000;color:#ffd700;border:2px solid #ffd700;padding:10px 14px;font:12px ui-monospace,monospace;max-width:90vw;text-align:center;pointer-events:none';
+        document.body.appendChild(el);
+      }
+      el.textContent = `Only ${credited} of ${asked} Strubles were credited (a limit was reached).`;
+      el.style.display = 'block';
+      clearTimeout(noteCapped.timer);
+      noteCapped.timer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+    } catch {}
+  }
+
   // ---- the public API -------------------------------------------------------
   const api = {
     version: '3.0.0',
@@ -193,8 +214,12 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
       const cap = (window.TycoonBank && window.TycoonBank.currentCap()) || Infinity;
       const amount = Math.max(0, Math.floor(Number(n) || 0));
       if (amount === 0) return cur;
-      const next = _save(cur >= cap ? cur : Math.min(cur + amount, cap));
-      enqueue({ id: newId(), kind: kind === 'refund' ? 'refund' : 'win', amount, source: source || 'other', page: location.pathname });
+      // A guest's balance is final here. A signed-in player's is corrected when the server answers.
+      const credited = cur >= cap ? 0 : Math.min(amount, cap - cur);
+      const next = _save(cur + credited);
+      if (guest()) noteCapped(amount, credited);
+      enqueue({ id: newId(), kind: kind === 'refund' ? 'refund' : 'win', amount, source: source || 'other', page: location.pathname },
+        (r) => { if (r.ok && !r.duplicate) noteCapped(amount, r.applied); });
       return next;
     },
 
@@ -218,10 +243,13 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
       if (guest()) {
         const cur = _load();
         const cap = (window.TycoonBank && window.TycoonBank.currentCap()) || Infinity;
-        if (amount > 0) _save(cur >= cap ? cur : Math.min(cur + amount, cap));
+        const credited = cur >= cap ? 0 : Math.min(amount, cap - cur);
+        if (amount > 0) _save(cur + credited);
+        noteCapped(amount, credited);
         return;
       }
-      enqueue({ id: newId(), kind: 'settle', game, round, amount, page: location.pathname });
+      enqueue({ id: newId(), kind: 'settle', game, round, amount, page: location.pathname },
+        (r) => { if (r.ok && !r.duplicate) noteCapped(amount, r.applied); });
     },
 
     // False if the balance is too small. The server checks again and refuses a spend

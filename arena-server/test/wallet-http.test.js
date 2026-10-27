@@ -61,7 +61,7 @@ test('malformed and oversized requests are refused', async () => {
     const many = await fetch(base + '/wallet/ops', { method: 'POST', headers: auth('u1'), body: JSON.stringify({ ops: Array.from({ length: 51 }, (_, i) => ({ id: 'm' + i, kind: 'win', amount: 1 })) }) });
     assert.equal(many.status, 400);
     const huge = await fetch(base + '/wallet/ops', { method: 'POST', headers: auth('u1'), body: 'x'.repeat(40000) }).catch(() => null);
-    assert.ok(!huge || huge.status === 400 || huge.status === 500, 'a body over the limit is not accepted');
+    assert.equal(huge && huge.status, 413, 'a body over the limit gets a 413');
     const wrong = await fetch(base + '/wallet', { method: 'POST', headers: auth('u1') });
     assert.equal(wrong.status, 405);
     const other = await fetch(base + '/nope', { headers: auth('u1') });
