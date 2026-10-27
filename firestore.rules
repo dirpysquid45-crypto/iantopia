@@ -24,7 +24,7 @@ service cloud.firestore {
       }
       function noServerFields(d) {
         return !('strubles_balance_v1' in d) && !('wallet_claims' in d) && !('wallet_seen' in d)
-          && !('strubles_last_gain_v1' in d) && !('wallet_last_op' in d) && !('wallet_rounds' in d) && !('wallet_budget' in d) && !('balance_reset_at' in d) && !('ban_until' in d)
+          && !('strubles_last_gain_v1' in d) && !('wallet_last_op' in d) && !('wallet_rounds' in d) && !('wallet_budget' in d) && !('paid_ids_v1' in d) && !('balance_reset_at' in d) && !('ban_until' in d)
           && !('cheat_warning_at' in d) && !('admin_warning' in d);
       }
       allow read, delete: if request.auth != null && request.auth.uid == uid;
@@ -36,7 +36,7 @@ service cloud.firestore {
         && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time)
         && request.resource.size() < 200000
         && serverOwned('strubles_balance_v1') && serverOwned('wallet_claims') && serverOwned('wallet_seen')
-        && serverOwned('strubles_last_gain_v1') && serverOwned('wallet_last_op') && serverOwned('wallet_rounds') && serverOwned('wallet_budget') && serverOwned('balance_reset_at') && serverOwned('ban_until')
+        && serverOwned('strubles_last_gain_v1') && serverOwned('wallet_last_op') && serverOwned('wallet_rounds') && serverOwned('wallet_budget') && serverOwned('paid_ids_v1') && serverOwned('balance_reset_at') && serverOwned('ban_until')
         && serverOwned('cheat_warning_at') && serverOwned('admin_warning');
     }
 

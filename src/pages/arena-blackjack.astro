@@ -237,7 +237,7 @@
 <script is:inline src="/cloud-sync.js?v=14"></script>
 <script is:inline src="/tycoon-cap.js?v=1"></script>
 <script is:inline src="/tycoon-bank.js?v=2"></script>
-<script is:inline src="/strubles.js?v=3"></script>
+<script is:inline src="/strubles.js?v=4"></script>
 <script is:inline src="/blackjack-engine.js?v=2"></script>
 <script is:inline src="/music-library.js?v=13"></script>
 <script is:inline src="/music-position.js?v=1"></script>
@@ -564,9 +564,10 @@
       document.getElementById('stand').disabled = true;
       if (msg.hands) revealHands(msg.hands);
       document.getElementById('result-section').style.display = 'block';
+      const unpaidNote = ' Couldn’t credit this just now. It is saved and will be paid.';
       const resultText = msg.friendly
         ? (result.result === 'win' ? '🎉 You won the friendly game!' : result.result === 'push' ? 'Tie — friendly game.' : 'You lost the friendly game.')
-        : (result.result === 'win' ? `🎉 You won ${result.payout} Strubles!` : result.result === 'push' ? `Tie! Got your bet back.` : `You lost.`);
+        : (result.result === 'win' ? (result.unpaid ? '🎉 You won!' + unpaidNote : `🎉 You won ${result.payout} Strubles!`) : result.result === 'push' ? (result.unpaid ? 'Tie!' + unpaidNote : `Tie! Got your bet back.`) : `You lost.`);
       document.getElementById('result-message').textContent = resultText;
       if (result.result === 'win') {
         showCelebration();

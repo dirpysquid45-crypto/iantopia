@@ -109,6 +109,7 @@ class BlackjackGame extends ArenaGame {
 
   async resolve() {
     if (this.roundOver) return; // a hand can only settle once
+    this.roundOver = true;
     clearTimeout(this.handTimer);
     const val = this.hands.map((h) => Engine.handValue(h));
     const bust = this.hands.map((h) => Engine.isBust(h));
@@ -123,21 +124,17 @@ class BlackjackGame extends ArenaGame {
     const pot = this.bet * 2;
     const raked = this.friendly ? 0 : Math.floor(pot * this.rake);
     const payout = pot - raked; // 0 in a friendly game, since bet is 0
+    // Each credit is reported as what actually landed, so the hands never show a
+    // win the balance doesn't have.
     let results;
-    try {
-      if (winner === 'push') {
-        results = [{ result: 'push', payout: this.bet }, { result: 'push', payout: this.bet }];
-        for (let i = 0; i < 2; i++) {
-          if (this.bet > 0) this.pushBalance(i, await this.balance.creditPayout(this.players[i].userId, this.bet));
-        }
-      } else {
-        results = [{ result: 'loss', payout: 0 }, { result: 'loss', payout: 0 }];
-        results[winner] = { result: 'win', payout };
-        if (payout > 0) this.pushBalance(winner, await this.balance.creditPayout(this.players[winner].userId, payout));
-      }
-    } catch (e) {
-      console.error('[blackjack] payout failed:', e.message);
-      results = results || [{ result: 'loss', payout: 0 }, { result: 'loss', payout: 0 }];
+    if (winner === 'push') {
+      const back = [];
+      for (let i = 0; i < 2; i++) back[i] = this.bet > 0 ? await this.payPlayer(i, this.bet, 'push') : { applied: 0, paid: true };
+      results = back.map((r) => ({ result: 'push', payout: r.applied, ...(r.paid ? {} : { unpaid: true }) }));
+    } else {
+      const won = payout > 0 ? await this.payPlayer(winner, payout, 'win') : { applied: 0, paid: true };
+      results = [{ result: 'loss', payout: 0 }, { result: 'loss', payout: 0 }];
+      results[winner] = { result: 'win', payout: won.applied, ...(won.paid ? {} : { unpaid: true }) };
     }
 
     this.lastResult = { type: 'game_result', results, hands: this.hands, friendly: this.friendly };
@@ -151,11 +148,8 @@ class BlackjackGame extends ArenaGame {
     clearTimeout(this.handTimer);
     const winner = 1 - i;
     const payout = this.friendly ? 0 : this.bet * 2 - Math.floor(this.bet * 2 * this.rake);
-    if (payout > 0) {
-      try { this.pushBalance(winner, await this.balance.creditPayout(this.players[winner].userId, payout)); }
-      catch (e) { console.error('[blackjack] forfeit payout failed:', e.message); }
-    }
-    this.send(winner, { type: 'opponent_disconnected', winner, reason });
+    const won = payout > 0 ? await this.payPlayer(winner, payout, 'forfeit') : { paid: true };
+    this.send(winner, { type: 'opponent_disconnected', winner, reason, ...(won.paid ? {} : { unpaid: true }) });
     this.close();
   }
 

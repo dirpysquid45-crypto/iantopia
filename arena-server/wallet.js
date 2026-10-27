@@ -31,8 +31,10 @@
  */
 const BalanceManager = require('./balance');
 
-const START_BALANCE = 100;
-const STARTER_AMOUNT = 100;
+const { START_BALANCE, balanceOf } = BalanceManager;
+// The starting balance is already START_BALANCE (100) for every account, so the starter
+// claim is kept as a one-time marker and adds nothing. It used to add another 100.
+const STARTER_AMOUNT = 0;
 // Daily prize tiers, as the home page shows them: [amount, weight out of 100].
 const DAILY_TIERS = [[500, 50], [1000, 27], [2000, 15], [3500, 6], [5000, 2]];
 const TETRIS_PER_GAME = 150;
@@ -63,10 +65,6 @@ function rollDaily(rand) {
     r -= weight;
   }
   return DAILY_TIERS[0][0];
-}
-
-function balanceOf(data) {
-  return data.strubles_balance_v1 === undefined ? START_BALANCE : Number(data.strubles_balance_v1);
 }
 
 // A whole amount no larger than the limit. Zero is allowed only where a loss settles.

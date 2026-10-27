@@ -213,6 +213,10 @@ class Manager {
         return this.accountAction(conn, msg);
       case 'account_list':
         return this.accountList(conn);
+      case 'payouts_list':
+        return this.payoutsList(conn);
+      case 'payout_resolve':
+        return this.payoutResolve(conn, msg);
       case 'action': {
         const game = this.tableBySession(sessionId);
         // The whole message goes through: air hockey reads x and y, Tetris reads its rows.
@@ -271,6 +275,24 @@ class Manager {
 
   // The dev's inbox: newest first, admins only (checked against the verified
   // token at login, never against anything the client says).
+  // Admin: the payouts that never landed, and paying one by hand.
+  async payoutsList(conn) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    this.sendTo(conn.ws, { type: 'payouts_list', items: await this.balance.listFailedPayouts() });
+  }
+
+  async payoutResolve(conn, msg) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    const docId = typeof msg.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(msg.id) ? msg.id : null;
+    if (!docId) return this.fail(conn.ws, 'Bad request', 'bad_request');
+    try {
+      await this.balance.resolveFailedPayout(docId, conn.userId || 'admin');
+    } catch (e) {
+      return this.fail(conn.ws, e.message, 'refused');
+    }
+    this.broadcastAdmins({ type: 'payouts_list', items: await this.balance.listFailedPayouts() });
+  }
+
   async listSuggestions(conn) {
     if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
     try {

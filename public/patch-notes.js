@@ -8,6 +8,33 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: "2026-10-27",
+    title: "Tycoon Rebalance: Easy to Start, Pricier as You Grow",
+    changes: [
+      "REAL ESTATE: cheaper to get started. Military-Grade is 2,500, Restricted 6,000 and Classified 20,000 (was 15,000, 30,000 and 65,000). Covert is 90,000. Each copy you already own raises the next copy's price by 20%.",
+      "STARTER KIT: your first visit to the Tycoon gives you 2 Shabby Apartments and 1 Generic Building, once per village.",
+      "LOOTBOX: your first 2 opens are guaranteed to hold a Military-Grade or Restricted building.",
+      "FASTER FIRST BUILDS: your first 3 buildings finish in a tenth of the usual time, so income starts in your first session. New villages also earn up to double until they have made 25,000 in total; the bonus fades as you earn.",
+      "SLOTS: the first slot costs 300. The early slots are cheaper than before, and the price climbs faster from slot 15 on.",
+      "PERMITS AND UPKEEP: after your first 3 buildings, each extra building makes the next permit 7% dearer. Past 10 buildings, upkeep rises 3% per building. A small village is barely affected.",
+      "BANK: from level 4, each level costs a little more relative to your current cap (60% rising to 70% at level 9), so the top levels take longer to reach.",
+    ],
+  },
+  {
+    date: "2026-10-27",
+    title: "Tetris Arrives, Air Hockey Gets a Real Table & Wallets Move to the Server",
+    changes: [
+      "TETRIS: play solo at /tetris, or 1 versus 1 in the Arena. Each line you clear sends garbage rows to your opponent, one hole per row. Versus is friendly (free) or staked: both stakes go in at the start, and the winner takes the pot less a 5% rake.",
+      "TETRIS CONTROLS: keybind presets (Arrows rotate is the default), a panel to rebind any key, and toggles for the ghost piece, onion skin and row flashes. The touch pad shows each action's current key. The theme song and sound effects can be muted, and the mute stays on in that browser.",
+      "AIR HOCKEY: the table keeps the proportions of a 7 by 4 foot table, with rounded corners, and always shows upright with your goal at the bottom. The puck, mallets and goals are larger so they read on a phone. Each goal is a band in its owner's colour, labelled YOUR GOAL or THEIR GOAL.",
+      "AIR HOCKEY FIXES: a goal only counts once the whole puck has crossed the line. A paddle can no longer sit on top of the puck when a wall pushes the puck into it. The puck is predicted between updates, so it moves more smoothly on a slow connection.",
+      "MAHJONG: a new board every day. Beat today's board to unlock the other layouts. On a narrow or tall window the tiles stay upright instead of turning sideways.",
+      "ARENA: Tetris is listed above Blackjack in the card stack.",
+      "WALLETS: the server now keeps every signed-in balance. Winnings, refunds and spending are checked on the server, and each payout has to match a real bet. Income that isn't a bet is capped each day per source. These caps are a first setting and may change.",
+      "FIXED: after an account reset, a real win is no longer pulled back to 100. Refunds, such as a lootbox duplicate, are no longer counted as wins by the account watch.",
+    ],
+  },
+  {
     date: "2026-10-22",
     title: "Air Hockey Goes Vertical, Blackjack Splits, Raining Money Overlay & Jade Han Palace",
     changes: [
