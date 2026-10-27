@@ -18,6 +18,7 @@ window.PATCH_NOTES = [
       "SLOTS: the first slot costs 300. The early slots are cheaper than before, and the price climbs faster from slot 15 on.",
       "PERMITS AND UPKEEP: after your first 3 buildings, each extra building makes the next permit 7% dearer. Past 10 buildings, upkeep rises 3% per building. A small village is barely affected.",
       "BANK: from level 4, each level costs a little more relative to your current cap (60% rising to 70% at level 9), so the top levels take longer to reach.",
+      "POWER PLANTS: the Coal Plant now produces 10 (was 16) and the Nuclear Plant 15 (was 30).",
     ],
   },
   {
