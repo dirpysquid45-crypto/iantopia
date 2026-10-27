@@ -40,6 +40,15 @@ const SERVER_REFUND_WINDOW_MS = 30 * 1000;
 const ADMIN_SET_GRACE_MS = 2 * 60 * 1000;
 const LEADERBOARDS = ['leaderboard', 'minesweeper_leaderboard', 'horse_leaderboard'];
 
+// Limits for admin gifts. One account can get up to GIFT_MAX at a time; one gift to
+// everyone can total at most GIFT_ALL_MAX_TOTAL.
+const GIFT_MAX = 1000000;
+const GIFT_ALL_MAX_TOTAL = 5000000;
+// A gift note is plain text, up to 200 characters, with HTML characters removed.
+function cleanNote(note) {
+  return typeof note === 'string' ? note.replace(/[<>&"]/g, '').trim().slice(0, 200) : '';
+}
+
 class AccountWatch {
   constructor({ db, auth, balance, admins = { uids: [], emails: [] }, now = () => Date.now(), log = console }) {
     this.db = db;
@@ -289,17 +298,24 @@ class AccountWatch {
 
   // Adds Strubles to an account, for an admin. It goes through the same grace
   // window as setBalance, so the save it makes is not judged as a cheat.
-  async gift(uid, amount) {
-    const GIFT_MAX = 1000000;
+  // A gift is added to one account. `note` is shown in the admin feed, and is kept
+  // with the gift in the archive.
+  async gift(uid, amount, note = '') {
+    const { from, to } = await this.applyGift(uid, amount);
+    this.emit({ kind: 'punish', action: 'gift', uid, name: await this.labelFor(uid), reason: 'admin', from, to, amount, note: cleanNote(note) });
+  }
+
+  // Adds `amount` to one account in one transaction, and tells the watch the exact value
+  // written, so the save isn't judged as a cheat. Doesn't emit, so gift-all can log once.
+  async applyGift(uid, amount) {
     if (!Number.isSafeInteger(amount) || amount < 1 || amount > GIFT_MAX) {
       throw new Error(`A gift must be a whole number from 1 to ${GIFT_MAX}`);
     }
     await this.backup(uid, 'before_admin_gift');
     // The read and the write happen in one transaction, so a win that lands in between
-    // is kept rather than overwritten. The watch is told the exact value written, so it
-    // recognises the save as the admin's and doesn't judge it.
+    // is kept rather than overwritten.
     const ref = this.db.collection('users').doc(uid);
-    const { from, to } = await this.db.runTransaction(async (tx) => {
+    return this.db.runTransaction(async (tx) => {
       const snap = await tx.get(ref);
       const before = snap.exists ? balanceOf(snap.data()) : 0;
       const after = before + amount;
@@ -307,7 +323,36 @@ class AccountWatch {
       tx.set(ref, { strubles_balance_v1: String(after), balance_reset_at: new Date(this.now()) }, { merge: true });
       return { from: before, to: after };
     });
-    this.emit({ kind: 'punish', action: 'gift', uid, name: await this.labelFor(uid), reason: 'admin', from, to, amount });
+  }
+
+  // Gifts `amount` to every account that isn't banned. The total is checked before any
+  // account is changed, and it's logged once, with the note, as one feed event.
+  async giftAll(amount, note = '') {
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > GIFT_MAX) {
+      throw new Error(`A gift must be a whole number from 1 to ${GIFT_MAX}`);
+    }
+    const now = this.now();
+    const users = await this.db.collection('users').get();
+    const eligible = [];
+    for (const doc of users.docs) {
+      if (!(await BalanceManager.isBanned(this.db, doc.id, now))) eligible.push(doc.id);
+    }
+    if (eligible.length === 0) throw new Error('No accounts to gift');
+    const total = amount * eligible.length;
+    if (total > GIFT_ALL_MAX_TOTAL) {
+      throw new Error(`That gift to ${eligible.length} accounts is ${total}, over the ${GIFT_ALL_MAX_TOTAL} limit for one gift to everyone`);
+    }
+    let count = 0;
+    try {
+      for (const uid of eligible) {
+        await this.applyGift(uid, amount);
+        count++;
+      }
+    } finally {
+      // Logged even if a write fails part way, with how many went through.
+      this.emit({ kind: 'punish', action: 'gift_all', reason: 'admin', amount, count, planned: eligible.length, total: amount * count, note: cleanNote(note) });
+    }
+    return { count, total: amount * count };
   }
 
   async reset(uid) {

@@ -169,6 +169,8 @@
     <button id="setbal" class="btn" disabled>set_balance</button>
     <input id="gift-amount" class="in num" type="number" min="1" step="1" placeholder="gift" aria-label="Strubles to gift" autocomplete="off" />
     <button id="gift" class="btn" disabled>gift strubles</button>
+    <input id="gift-note" class="in wide" type="text" maxlength="200" placeholder="gift note (optional)" autocomplete="off" aria-label="Gift note" />
+    <button id="gift-all" class="btn">gift everyone</button>
     <input id="hours" class="in num" type="number" min="1" max="720" value="24" aria-label="Quarantine hours" />
     <button id="ban" class="btn danger" disabled>ban</button>
     <button id="unban" class="btn" disabled>release</button>
@@ -354,11 +356,21 @@
     const warnText = $('warn-text').value.trim();
     if (action === 'warn' && !warnText) { setStatus('write the warning first', 'err'); return; }
     if (action === 'warn' && !confirm('Send this warning to ' + uid + '?\n\n' + warnText)) return;
-    arena.send({ type: 'account_action', action, uid, hours, name, text: warnText, amount });
+    const note = $('gift-note').value.trim();
+    arena.send({ type: 'account_action', action, uid, hours, name, text: warnText, amount, note });
   }
   $('reset').addEventListener('click', () => act('reset'));
   $('setbal').addEventListener('click', () => act('set_balance'));
   $('gift').addEventListener('click', () => act('gift'));
+  // Gift to every account that isn't banned. The server checks the total before it changes anything.
+  $('gift-all').addEventListener('click', () => {
+    const amount = Number($('gift-amount').value);
+    if (!Number.isInteger(amount) || amount < 1) { setStatus('gift must be a whole number, 1 or more', 'err'); return; }
+    const note = $('gift-note').value.trim();
+    if (!confirm('GIFT ' + money(amount) + ' Strubles to EVERY account that is not banned?\n\nThe total is the amount times the number of accounts, and the server refuses it if it is over the limit.\n\nNote: ' + (note || '(none)'))) return;
+    arena.send({ type: 'account_action', action: 'gift_all', amount, note });
+    setStatus('gifting to everyone…', 'ok');
+  });
   $('ban').addEventListener('click', () => act('ban'));
   $('unban').addEventListener('click', () => act('unban'));
   $('restore').addEventListener('click', () => act('restore'));
@@ -377,7 +389,7 @@
   }
   const feedMatches = (ev) => { const q = $('ffilter').value.trim().toLowerCase(); return !q || feedText(ev).includes(q); };
   $('ffilter').addEventListener('input', () => renderFeed());
-  const TAGS = { reset: ['RST', 'warn'], ban: ['BAN', 'bad'], unban: ['UNQ', 'ok'], restore: ['RES', 'ok'], unwarn: ['UNW', 'ok'], set: ['SET', 'info'], gift: ['GFT', 'ok'], warn: ['WRN', 'warn'], rename: ['REN', 'info'], backup: ['BKP', 'info'] };
+  const TAGS = { reset: ['RST', 'warn'], ban: ['BAN', 'bad'], unban: ['UNQ', 'ok'], restore: ['RES', 'ok'], unwarn: ['UNW', 'ok'], set: ['SET', 'info'], gift: ['GFT', 'ok'], gift_all: ['GFT', 'ok'], warn: ['WRN', 'warn'], rename: ['REN', 'info'], backup: ['BKP', 'info'] };
   function feedLine(ev) {
     const el = document.createElement('div');
     el.className = 'ln';
@@ -389,7 +401,8 @@
     else if (ev.kind === 'punish') {
       tag = TAGS[ev.action] || ['PUN', 'warn'];
       if (ev.action === 'set') detail = money(ev.from) + ' → ' + money(ev.to);
-      else if (ev.action === 'gift') detail = '+' + money(ev.amount) + ' · ' + money(ev.from) + ' → ' + money(ev.to);
+      else if (ev.action === 'gift') detail = '+' + money(ev.amount) + ' · ' + money(ev.from) + ' → ' + money(ev.to) + (ev.note ? ' · "' + ev.note + '"' : '');
+      else if (ev.action === 'gift_all') detail = '+' + money(ev.amount) + ' to ' + ev.count + ' accounts · ' + money(ev.total) + ' in total' + (ev.note ? ' · "' + ev.note + '"' : '');
       else if (ev.action === 'ban') detail = 'until ' + shortDate(ev.until) + ' · ' + (ev.detected || ev.reason || '').replace(/_/g, ' ');
       else if (ev.action === 'rename') detail = ev.name || '';
       else if (ev.action === 'warn') detail = ev.text || '';
@@ -405,7 +418,7 @@
     }
     const det = span('det' + (ev.kind === 'balance' && ev.cap != null && ev.balance > ev.cap ? ' over' : ''), detail);
     const who = document.createElement('span'); who.className = 'who';
-    who.textContent = ev.name || ev.uid || 'unknown';
+    who.textContent = ev.name || ev.uid || (ev.action === 'gift_all' ? 'everyone' : 'unknown');
     const small = document.createElement('small'); text(small, ev.uid || '');
     who.append(small);
     el.append(span('t', stamp(ev.at)), span('tag ' + tag[1], tag[0]), who, det);
@@ -675,6 +688,8 @@
         state.suggestions = state.suggestions.filter((x) => x.id !== msg.id);
         renderSuggestions();
         setStatus('deleted', 'ok');
+      } else if (msg.type === 'gift_all_done') {
+        setStatus('gifted ' + money(msg.total / Math.max(1, msg.count)) + ' to ' + msg.count + ' accounts (' + money(msg.total) + ' in total)', 'ok');
       } else if (msg.type === 'error') {
         setStatus(msg.code === 'forbidden' ? 'this account is not an admin' : msg.message, 'err');
         document.querySelectorAll('.sug.gone').forEach((c) => c.classList.remove('gone'));

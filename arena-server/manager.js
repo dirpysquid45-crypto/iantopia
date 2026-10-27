@@ -64,6 +64,17 @@ class Manager {
   async accountAction(conn, msg) {
     if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
     if (!this.accounts) return this.fail(conn.ws, 'Account watch is not running', 'unavailable');
+    // Gift to everyone is the one action that isn't about a single account.
+    if (msg.action === 'gift_all') {
+      try {
+        const result = await this.accounts.giftAll(Number(msg.amount), msg.note);
+        this.broadcastPlayers().catch((e) => console.error('[accounts] refresh failed:', e.message));
+        return this.sendTo(conn.ws, { type: 'gift_all_done', count: result.count, total: result.total });
+      } catch (e) {
+        console.error('[accounts] gift to everyone failed:', e.message);
+        return this.fail(conn.ws, e.message, 'refused');
+      }
+    }
     const uid = typeof msg.uid === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(msg.uid) ? msg.uid : null;
     if (!uid) return this.fail(conn.ws, 'Bad request', 'bad_request');
     try {
@@ -76,7 +87,7 @@ class Manager {
       else if (msg.action === 'restore') await this.accounts.restore(uid);
       else if (msg.action === 'backup') await this.accounts.backup(uid, 'admin_backup');
       else if (msg.action === 'set_balance') await this.accounts.setBalance(uid, Number(msg.amount));
-      else if (msg.action === 'gift') await this.accounts.gift(uid, Number(msg.amount));
+      else if (msg.action === 'gift') await this.accounts.gift(uid, Number(msg.amount), msg.note);
       else if (msg.action === 'warn') {
         const text = typeof msg.text === 'string' ? msg.text.replace(/[<>&"]/g, '').trim().slice(0, 200) : '';
         if (!text) return this.fail(conn.ws, 'Write the warning first', 'bad_request');

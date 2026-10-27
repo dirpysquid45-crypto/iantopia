@@ -266,3 +266,29 @@ test('an admin gift sticks in the database and is not judged as a cheat, even ab
   await save('u9', 25000);   // the watch sees the admin's own save
   assert.equal(events.filter((e) => e.kind === 'punish' && e.action !== 'gift').length, 0, 'the gift is not punished');
 });
+
+test('gift to everyone skips banned accounts, is refused over the total limit, and is logged once with its note', async () => {
+  const { watch, events, db } = setup();
+  await db.collection('users').doc('g1').set({ strubles_balance_v1: '100' }, { merge: true });
+  await db.collection('users').doc('g2').set({ strubles_balance_v1: '200' }, { merge: true });
+  await db.collection('users').doc('g3').set({ strubles_balance_v1: '300' }, { merge: true });
+  await db.collection('bans').doc('g3').set({ until: new Date(Date.now() + 3600 * 1000) });
+  const result = await watch.giftAll(500, 'Thanks for testing <b>');
+  assert.equal(result.count, 2, 'the banned account is skipped');
+  assert.equal(db.docs.get('users/g1').strubles_balance_v1, '600');
+  assert.equal(db.docs.get('users/g2').strubles_balance_v1, '700');
+  assert.equal(db.docs.get('users/g3').strubles_balance_v1, '300', 'the banned account is unchanged');
+  const logged = events.filter((e) => e.action === 'gift_all');
+  assert.equal(logged.length, 1, 'one feed event for the whole gift');
+  assert.equal(logged[0].note, 'Thanks for testing b', 'the note is cleaned of HTML characters');
+  assert.equal(logged[0].total, 1000);
+});
+
+test('gift to everyone is refused before anything changes when the total is over the limit', async () => {
+  const { watch, db } = setup();
+  const uids = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+  for (const uid of uids) await db.collection('users').doc(uid).set({ strubles_balance_v1: '0' }, { merge: true });
+  // 6 accounts at 1,000,000 each is 6,000,000, over the 5,000,000 total.
+  await assert.rejects(() => watch.giftAll(1000000, 'too much'), /over the 5000000 limit/);
+  for (const uid of uids) assert.equal(db.docs.get(`users/${uid}`).strubles_balance_v1, '0', 'nothing was changed');
+});
