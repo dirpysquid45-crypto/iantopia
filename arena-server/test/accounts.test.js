@@ -256,3 +256,13 @@ test('a daily prize the server rolled is not judged as a rate cheat, even on top
   await save('u9', 6100, { amount: 5000, kind: 'grant' });   // the daily prize, on top of gains
   assert.equal(events.filter((e) => e.kind === 'punish').length, 0, 'no strike');
 });
+
+test('an admin gift sticks in the database and is not judged as a cheat, even above the cap', async () => {
+  const { watch, save, events, db } = setup();
+  await db.collection('users').doc('u9').set({ strubles_balance_v1: '24000' }, { merge: true });
+  await save('u9', 24000);
+  await watch.gift('u9', 1000);
+  assert.equal(db.docs.get('users/u9').strubles_balance_v1, '25000', 'the gift is written');
+  await save('u9', 25000);   // the watch sees the admin's own save
+  assert.equal(events.filter((e) => e.kind === 'punish' && e.action !== 'gift').length, 0, 'the gift is not punished');
+});

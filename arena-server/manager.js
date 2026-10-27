@@ -76,6 +76,7 @@ class Manager {
       else if (msg.action === 'restore') await this.accounts.restore(uid);
       else if (msg.action === 'backup') await this.accounts.backup(uid, 'admin_backup');
       else if (msg.action === 'set_balance') await this.accounts.setBalance(uid, Number(msg.amount));
+      else if (msg.action === 'gift') await this.accounts.gift(uid, Number(msg.amount));
       else if (msg.action === 'warn') {
         const text = typeof msg.text === 'string' ? msg.text.replace(/[<>&"]/g, '').trim().slice(0, 200) : '';
         if (!text) return this.fail(conn.ws, 'Write the warning first', 'bad_request');

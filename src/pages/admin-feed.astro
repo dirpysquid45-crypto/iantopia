@@ -167,6 +167,8 @@
     <button id="reset" class="btn" disabled>reset</button>
     <input id="amount" class="in num" type="number" min="0" step="1" placeholder="balance" aria-label="Set balance to" autocomplete="off" />
     <button id="setbal" class="btn" disabled>set_balance</button>
+    <input id="gift-amount" class="in num" type="number" min="1" step="1" placeholder="gift" aria-label="Strubles to gift" autocomplete="off" />
+    <button id="gift" class="btn" disabled>gift strubles</button>
     <input id="hours" class="in num" type="number" min="1" max="720" value="24" aria-label="Quarantine hours" />
     <button id="ban" class="btn danger" disabled>ban</button>
     <button id="unban" class="btn" disabled>release</button>
@@ -296,7 +298,7 @@
   }
   function updateButtons() {
     const ok = valid($('uid').value.trim());
-    ['reset', 'setbal', 'ban', 'unban', 'restore', 'unwarn', 'rename', 'backup', 'warn'].forEach((id) => { $(id).disabled = !ok; });
+    ['reset', 'setbal', 'gift', 'ban', 'unban', 'restore', 'unwarn', 'rename', 'backup', 'warn'].forEach((id) => { $(id).disabled = !ok; });
   }
   // A click that is really the end of a text selection should not change the target.
   const isSelecting = () => { const s = window.getSelection(); return !!(s && s.toString().length); };
@@ -341,6 +343,11 @@
       if (!Number.isInteger(amount) || amount < 0) { setStatus('balance must be a whole number, 0 or more', 'err'); return; }
       if (!confirm('SET ' + uid + ' balance to ' + money(amount) + ' Strubles? The wallet cap does not change.')) return;
     }
+    if (action === 'gift') {
+      amount = Number($('gift-amount').value);
+      if (!Number.isInteger(amount) || amount < 1) { setStatus('gift must be a whole number, 1 or more', 'err'); return; }
+      if (!confirm('GIFT ' + money(amount) + ' Strubles to ' + uid + '? It is added to their balance.')) return;
+    }
     const name = $('name').value.trim();
     if (action === 'rename' && !name) { setStatus('enter a display name first', 'err'); return; }
     if (action === 'rename' && !confirm('Set display name for ' + uid + ' to "' + name + '"?')) return;
@@ -351,6 +358,7 @@
   }
   $('reset').addEventListener('click', () => act('reset'));
   $('setbal').addEventListener('click', () => act('set_balance'));
+  $('gift').addEventListener('click', () => act('gift'));
   $('ban').addEventListener('click', () => act('ban'));
   $('unban').addEventListener('click', () => act('unban'));
   $('restore').addEventListener('click', () => act('restore'));
@@ -369,7 +377,7 @@
   }
   const feedMatches = (ev) => { const q = $('ffilter').value.trim().toLowerCase(); return !q || feedText(ev).includes(q); };
   $('ffilter').addEventListener('input', () => renderFeed());
-  const TAGS = { reset: ['RST', 'warn'], ban: ['BAN', 'bad'], unban: ['UNQ', 'ok'], restore: ['RES', 'ok'], unwarn: ['UNW', 'ok'], set: ['SET', 'info'], warn: ['WRN', 'warn'], rename: ['REN', 'info'], backup: ['BKP', 'info'] };
+  const TAGS = { reset: ['RST', 'warn'], ban: ['BAN', 'bad'], unban: ['UNQ', 'ok'], restore: ['RES', 'ok'], unwarn: ['UNW', 'ok'], set: ['SET', 'info'], gift: ['GFT', 'ok'], warn: ['WRN', 'warn'], rename: ['REN', 'info'], backup: ['BKP', 'info'] };
   function feedLine(ev) {
     const el = document.createElement('div');
     el.className = 'ln';
@@ -381,6 +389,7 @@
     else if (ev.kind === 'punish') {
       tag = TAGS[ev.action] || ['PUN', 'warn'];
       if (ev.action === 'set') detail = money(ev.from) + ' → ' + money(ev.to);
+      else if (ev.action === 'gift') detail = '+' + money(ev.amount) + ' · ' + money(ev.from) + ' → ' + money(ev.to);
       else if (ev.action === 'ban') detail = 'until ' + shortDate(ev.until) + ' · ' + (ev.detected || ev.reason || '').replace(/_/g, ' ');
       else if (ev.action === 'rename') detail = ev.name || '';
       else if (ev.action === 'warn') detail = ev.text || '';

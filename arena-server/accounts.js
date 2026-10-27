@@ -294,11 +294,19 @@ class AccountWatch {
     if (!Number.isSafeInteger(amount) || amount < 1 || amount > GIFT_MAX) {
       throw new Error(`A gift must be a whole number from 1 to ${GIFT_MAX}`);
     }
-    const from = await this.balanceNow(uid);
-    const to = from + amount;
     await this.backup(uid, 'before_admin_gift');
-    this.adminSets.set(uid, { at: this.now(), to });
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: String(to), balance_reset_at: new Date(this.now()) }, { merge: true });
+    // The read and the write happen in one transaction, so a win that lands in between
+    // is kept rather than overwritten. The watch is told the exact value written, so it
+    // recognises the save as the admin's and doesn't judge it.
+    const ref = this.db.collection('users').doc(uid);
+    const { from, to } = await this.db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const before = snap.exists ? balanceOf(snap.data()) : 0;
+      const after = before + amount;
+      this.adminSets.set(uid, { at: this.now(), to: after });
+      tx.set(ref, { strubles_balance_v1: String(after), balance_reset_at: new Date(this.now()) }, { merge: true });
+      return { from: before, to: after };
+    });
     this.emit({ kind: 'punish', action: 'gift', uid, name: await this.labelFor(uid), reason: 'admin', from, to, amount });
   }
 
