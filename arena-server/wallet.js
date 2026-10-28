@@ -101,6 +101,8 @@ class Wallet {
       cap: this.balance.capFromData(data),
       starterClaimed: !!claims.starter,
       dailyClaimedToday: claims.daily === dayKey(this.now()),
+      // The village name, as set by POST /village/name. Null until it has been set.
+      villageName: typeof data.village_name === 'string' ? data.village_name : null,
     };
   }
 

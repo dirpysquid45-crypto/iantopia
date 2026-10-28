@@ -23,6 +23,16 @@ test('a signed-in account reads its own balance and cap', async () => {
     assert.equal(body.balance, 500);
     assert.equal(typeof body.cap, 'number');
     assert.equal(body.starterClaimed, false);
+    assert.equal(body.villageName, null, 'no name until one is set');
+  } finally { await server.close(); }
+});
+
+test('GET /wallet returns the village name once it has been set', async () => {
+  const { server, base, db } = await start();
+  try {
+    db.docs.set('users/u1', { ...db.docs.get('users/u1'), village_name: 'Maple Glen' });
+    const body = await (await fetch(base + '/wallet', { headers: auth('u1') })).json();
+    assert.equal(body.villageName, 'Maple Glen');
   } finally { await server.close(); }
 });
 

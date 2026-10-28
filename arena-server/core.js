@@ -5,6 +5,7 @@ const RateLimit = require('./rate-limit');
 const { Wallet } = require('./wallet');
 const { PlaySessions } = require('./sessions');
 const { Gifts } = require('./gifts');
+const { VillageNames } = require('./village-name');
 
 const WALLET_BODY_MAX = 16 * 1024;
 const WALLET_OPS_MAX = 50;
@@ -68,6 +69,7 @@ function createServer(options = {}) {
   const manager = new Manager(db, auth, { timing, makeDeck, accounts, sessions });
   const wallet = new Wallet(db, manager.balance, { sessions });
   const gifts = new Gifts(db, { balance: manager.balance });
+  const villageNames = new VillageNames(db);
 
   // One HTTP server carries both the game socket (ws) and the wallet routes
   // (/wallet and /wallet/ops). nginx sends /arena-ws/ and /arena-api/ here.
@@ -152,11 +154,26 @@ function createServer(options = {}) {
         : await gifts.sendNote(who, body);
     return sendJson(res, out.status, out.body);
   }
+  // Naming a village: POST {name}. The word filter runs on the server, so the name is
+  // checked however the browser sends it.
+  async function handleVillageName(req, res) {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'method' });
+    const decoded = await verifiedToken(req);
+    if (!decoded) return sendJson(res, 401, { error: 'sign_in' });
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch (e) {
+      if (e.message === 'too large') { res.setHeader('Connection', 'close'); return sendJson(res, 413, { error: 'too_large' }); }
+      return sendJson(res, 400, { error: 'bad_json' });
+    }
+    const out = await villageNames.setName({ uid: decoded.uid }, body);
+    return sendJson(res, out.status, out.body);
+  }
   async function handleWallet(req, res) {
     allowLocalOrigin(req, res);
     if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
     const path = new URL(req.url, 'http://x').pathname;
     if (path === '/owner/check') return handleOwnerCheck(req, res);
+    if (path === '/village/name') return handleVillageName(req, res);
     if (path.startsWith('/gifts/')) {
       if (!GIFT_PATHS.has(path)) return sendJson(res, 404, { error: 'not_found' });
       return handleGifts(req, res, path);
