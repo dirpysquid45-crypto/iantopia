@@ -2429,6 +2429,25 @@
 
   $('build-btn').addEventListener('click', () => { setBrush(null); openPlacePicker(); });
   // Rename the village from the stats bar. Kept short so the bar stays on one row.
+  // The server's village name is read once after sign-in, from GET /wallet
+  // (villageName, or null until a name is set). A failed read is retried after 30s.
+  let nameSynced = false, nameSyncAfter = 0;
+  async function syncVillageName() {
+    if (nameSynced || visiting || Date.now() < nameSyncAfter || !currentUid()) return;
+    try {
+      const res = await fetch(GIFT_API + '/wallet', { headers: { Authorization: 'Bearer ' + await CloudSync.currentUser.getIdToken() } });
+      if (!res.ok) throw new Error('wallet HTTP ' + res.status);
+      const body = await res.json();
+      nameSynced = true;
+      if (typeof body.villageName === 'string' && body.villageName && body.villageName !== village.name) {
+        village.name = body.villageName;
+        $('stat-name').textContent = village.name;
+        saveVillage();
+      }
+    } catch {
+      nameSyncAfter = Date.now() + 30000;
+    }
+  }
   // Signed in, the name goes to the server, which runs the word filter and keeps
   // it as the village name. The name is never put in the visitor snapshot from
   // here, since that would skip the filter. Signed out, it stays on this device.
@@ -3633,6 +3652,7 @@
     if (tick()) saveVillage();
     maybeTriggerEvent();
     refresh();
+    syncVillageName();
   }, 1000);
 
   // ---------- Leaderboard score push ----------
