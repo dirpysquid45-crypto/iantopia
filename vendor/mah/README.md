@@ -38,3 +38,7 @@ build config). The other layouts stay locked until today's daily is won, and the
 option until then. The board no longer rotates to portrait, so tiles stay upright on narrow or tall
 windows. The rotate-board and show-daily settings are removed. The build config for this is a local
 `custom-build-config.json` with `"daily": true` (the `.dist` file is the template).
+
+Music and background (later): the music picks a random track each time (never the same one twice in a row) instead of a fixed order. The bamboo background is served as `public/mah/media/bamboo-hd.jpg`, a 2x upscale of the 940x627 panel (no higher-resolution source is on disk), so the CSS and index.html point there.
+
+House look (later): the game's panels, buttons, inputs and bars use the Iantopia skin: black fill, gold (#ffd700) outline, white pixel text, square corners, gold fill on hover. The rules are in `vendor/mah/iantopia-skin.css`, appended to the built stylesheet `public/mah/styles-*.css` (the game's component styles are in the JS bundle, so the skin uses !important). The welcome panel no longer uses the wood sign, and the board's challenge bar is black. Re-append the skin file after any rebuild.
