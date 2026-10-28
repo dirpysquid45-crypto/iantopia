@@ -25,7 +25,7 @@ service cloud.firestore {
       function noServerFields(d) {
         return !('strubles_balance_v1' in d) && !('wallet_claims' in d) && !('wallet_seen' in d)
           && !('strubles_last_gain_v1' in d) && !('wallet_last_op' in d) && !('wallet_rounds' in d) && !('wallet_budget' in d) && !('paid_ids_v1' in d) && !('balance_reset_at' in d) && !('ban_until' in d)
-          && !('cheat_warning_at' in d) && !('admin_warning' in d);
+          && !('cheat_warning_at' in d) && !('admin_warning' in d) && !('gift_day' in d);
       }
       allow read, delete: if request.auth != null && request.auth.uid == uid;
       allow create: if request.auth != null && request.auth.uid == uid
@@ -37,7 +37,7 @@ service cloud.firestore {
         && request.resource.size() < 200000
         && serverOwned('strubles_balance_v1') && serverOwned('wallet_claims') && serverOwned('wallet_seen')
         && serverOwned('strubles_last_gain_v1') && serverOwned('wallet_last_op') && serverOwned('wallet_rounds') && serverOwned('wallet_budget') && serverOwned('paid_ids_v1') && serverOwned('balance_reset_at') && serverOwned('ban_until')
-        && serverOwned('cheat_warning_at') && serverOwned('admin_warning');
+        && serverOwned('cheat_warning_at') && serverOwned('admin_warning') && serverOwned('gift_day');
     }
 
     // Public boards: anyone can read, only the owner writes their own row.
@@ -72,10 +72,12 @@ service cloud.firestore {
         && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time);
     }
 
-    // Village snapshots back the public visit page, so they're readable by
-    // anyone. Only the owner can publish or change their village.
+    // Village snapshots back the public visit page. A village is readable by visitors
+    // only while its owner has opted in (visitable == true). Only the owner can publish
+    // or change their village.
     match /village_snapshots/{uid} {
-      allow read: if true;
+      allow read: if (resource != null && resource.data.visitable == true)
+        || (request.auth != null && request.auth.uid == uid);
       allow write: if request.auth != null && request.auth.uid == uid;
 
       // Likes: anyone signed in can like a village once, as themselves.
@@ -84,6 +86,13 @@ service cloud.firestore {
         allow read: if true;
         allow create: if request.auth != null && request.auth.uid == likerUid;
         allow update, delete: if false;
+      }
+
+      // Gifts and notes into the village. The server writes them (Admin SDK bypasses
+      // these rules), so a browser can't create any. The owner can read their own inbox.
+      match /gifts/{giftId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create, update, delete: if false;
       }
     }
 

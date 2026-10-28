@@ -4,9 +4,11 @@ const Manager = require('./manager');
 const RateLimit = require('./rate-limit');
 const { Wallet } = require('./wallet');
 const { PlaySessions } = require('./sessions');
+const { Gifts } = require('./gifts');
 
 const WALLET_BODY_MAX = 16 * 1024;
 const WALLET_OPS_MAX = 50;
+const GIFT_PATHS = new Set(['/gifts/strubles', '/gifts/collect', '/gifts/note']);
 
 // Addresses that can only be our own reverse proxy / docker network.
 function isPrivateAddress(addr) {
@@ -65,6 +67,7 @@ function createServer(options = {}) {
   const sessions = new PlaySessions(db);
   const manager = new Manager(db, auth, { timing, makeDeck, accounts, sessions });
   const wallet = new Wallet(db, manager.balance, { sessions });
+  const gifts = new Gifts(db, { balance: manager.balance });
 
   // One HTTP server carries both the game socket (ws) and the wallet routes
   // (/wallet and /wallet/ops). nginx sends /arena-ws/ and /arena-api/ here.
@@ -84,6 +87,12 @@ function createServer(options = {}) {
   function bearer(req) {
     const h = String(req.headers.authorization || '');
     return h.startsWith('Bearer ') ? h.slice(7) : null;
+  }
+  // The verified sign-in token, or null. Gifts need its name, so it is kept whole.
+  async function verifiedToken(req) {
+    const token = bearer(req);
+    if (!token) return null;
+    try { return await auth.verifyIdToken(token); } catch { return null; }
   }
   // Only a signed-in account has a wallet. Guests keep their own local currency.
   async function signedInUid(req) {
@@ -127,11 +136,31 @@ function createServer(options = {}) {
     if (!isOwnerToken(decoded, ownerEmail)) return sendJson(res, 403, { error: 'not_owner' });
     return sendJson(res, 200, { owner: true });
   }
+  // Gifts: a Strubles gift, a collect, or a free note. The sender is the verified token.
+  async function handleGifts(req, res, path) {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'method' });
+    const decoded = await verifiedToken(req);
+    if (!decoded) return sendJson(res, 401, { error: 'sign_in' });
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch (e) {
+      if (e.message === 'too large') { res.setHeader('Connection', 'close'); return sendJson(res, 413, { error: 'too_large' }); }
+      return sendJson(res, 400, { error: 'bad_json' });
+    }
+    const who = { uid: decoded.uid, name: decoded.name };
+    const out = path === '/gifts/strubles' ? await gifts.sendStrubles(who, body)
+      : path === '/gifts/collect' ? await gifts.collect(who, body)
+        : await gifts.sendNote(who, body);
+    return sendJson(res, out.status, out.body);
+  }
   async function handleWallet(req, res) {
     allowLocalOrigin(req, res);
     if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
     const path = new URL(req.url, 'http://x').pathname;
     if (path === '/owner/check') return handleOwnerCheck(req, res);
+    if (path.startsWith('/gifts/')) {
+      if (!GIFT_PATHS.has(path)) return sendJson(res, 404, { error: 'not_found' });
+      return handleGifts(req, res, path);
+    }
     if (path !== '/wallet' && path !== '/wallet/ops') return sendJson(res, 404, { error: 'not_found' });
     const uid = await signedInUid(req);
     if (!uid) return sendJson(res, 401, { error: 'sign_in' });
