@@ -208,13 +208,45 @@
   .bank-window {
     margin:0; padding:12px; background:#0a0a0a; border:3px solid #ffd700;
     box-shadow:inset 0 0 0 2px #000, 3px 3px 0 #000; min-width:0;
+    /* Both windows stretch to the same height, and their button rows sit on the
+       bottom edge, so Upgrade and Buy slot line up whatever the text above says. */
+    display:flex; flex-direction:column;
   }
   .bank-window h3 { margin:0 0 8px; font-size:11px; font-weight:400; color:var(--gold); }
   .bank-note { margin:0 0 10px; font-size:9px; line-height:1.7; color:var(--muted); }
   .bank-window .bank-cap-row { font-size:9px; gap:6px; }
-  .bank-window .bank-buy-row { flex-direction:column; align-items:stretch; margin-top:12px; }
-  .bank-window .bank-buy-row p { font-size:9px; }
+  .bank-window .bank-buy-row { flex-direction:column; align-items:stretch; margin-top:auto; padding-top:12px; }
+  .bank-window .bank-buy-row p { font-size:9px; min-height:46px; }
+  /* Room for three lines of explanation and three rows of figures in every window,
+     so a short description doesn't leave a gap the other window doesn't have. */
+  .bank-window .bank-note { min-height:46px; }
+  #bank-cap-breakdown, #expand-info-breakdown { min-height:84px; }
   .bank-action { width:100%; text-align:center; }
+  .visit-modal { width:min(480px,94vw); max-height:88vh; overflow-y:auto; }
+  .visit-optin { display:flex; align-items:center; gap:10px; font-size:10px; color:var(--ink); line-height:1.7; margin:4px 0 10px; cursor:pointer; }
+  .visit-optin input { width:16px; height:16px; accent-color:var(--gold); }
+  .stats-modal { width:min(560px,94vw); max-height:88vh; overflow-y:auto; }
+  .stats-tabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .stats-pane[hidden] { display:none; }
+  .stats-heading { margin:14px 0 4px; font-size:9px; color:var(--gold); letter-spacing:1px; text-transform:uppercase; }
+  .bank-gifts { grid-column:1 / -1; }
+  .gift-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,215,0,0.2); font-size:9px; line-height:1.7; color:var(--ink); }
+  .gift-row:last-child { border-bottom:none; }
+  .gift-row .gift-body { flex:1; min-width:0; }
+  .gift-row small { display:block; color:var(--muted); }
+  .gift-stickers { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .gift-sticker { width:52px; height:52px; font-size:24px; background:#000; border:2px solid var(--gold); cursor:pointer; }
+  .gift-sticker.active { background:var(--gold); }
+  .gift-field { display:flex; flex-direction:column; gap:6px; font-size:9px; color:var(--gold); margin-bottom:12px; }
+  .gift-field textarea, .gift-field input { font-family:inherit; font-size:10px; background:#000; color:var(--ink); border:2px solid var(--gold); padding:8px; }
+  .gift-actions { display:flex; justify-content:flex-end; }
+  #visit-bar {
+    position:absolute; left:50%; top:12px; transform:translateX(-50%);
+    display:none; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center;
+    background:rgba(0,0,0,.85); border:3px solid var(--gold); padding:10px 12px; z-index:5; max-width:calc(100% - 16px);
+  }
+  #visit-bar.open { display:flex; }
+  #visit-bar-text { font-size:9px; color:var(--gold); line-height:1.6; }
   .bank-gate { margin:10px 0 0; font-size:8px; line-height:1.8; color:#ffb36b; }
   @media (max-width:520px) { .bank-windows { grid-template-columns:1fr; } .bank-teller { gap:10px; } .bank-figure { width:72px; --px:6px; } .bank-figure canvas { width:72px; } #bank-teller-head { height:42px; } #bank-teller-body { height:36px; } .bank-hall { --fig-cs:6px; } }
 
@@ -388,10 +420,10 @@
       <button id="zoning-btn" class="cta" type="button">🗺️ Zoning</button>
       <button id="undo-btn" class="cta" type="button" disabled>↩ Undo</button>
       <button id="bank-btn" class="cta" type="button">🏦 Bank</button>
+      <button id="stats-btn" class="cta" type="button">📊 Stats</button>
       <button id="guide-btn" class="cta" type="button">📖 Guide</button>
       <button id="recenter-btn" class="cta" type="button">🎯 Center</button>
       <a id="lootbox-cta" class="cta" href="/lootbox">🎁 Buildings</a>
-      <a id="leaderboard-cta" class="cta" href="/leaderboard">🏆 Ranks</a>
     </div>
 
     <div id="game-stage">
@@ -408,6 +440,11 @@
         <span id="brush-bar-text"></span>
         <button class="bar-btn" id="brush-undo" type="button" disabled>↩ Undo</button>
         <button class="bar-btn no" id="brush-done" type="button">✕ Done</button>
+      </div>
+      <div id="visit-bar">
+        <span id="visit-bar-text"></span>
+        <button class="bar-btn" id="visit-gift" type="button">🎁 Leave a gift</button>
+        <button class="bar-btn no" id="visit-home" type="button">🏠 Back home</button>
       </div>
       <div id="place-bar">
         <span id="place-bar-text"></span>
@@ -526,7 +563,76 @@
             <button class="btn bank-action" id="expand-buy" type="button">Buy slot</button>
           </div>
         </section>
+
+        <!-- Gifts from visitors, on a row of their own under the two windows above.
+             Strubles gifts wait here until you collect them; the server checks your
+             wallet cap when they land. -->
+        <section class="bank-window bank-gifts">
+          <h3>Gifts</h3>
+          <p class="bank-note">Visitors leave you notes and Strubles. Strubles gifts stay here until you collect them.</p>
+          <div id="gift-inbox"></div>
+        </section>
       </div>
+    </div>
+  </div>
+
+  <!-- Stats: your numbers, the village leaderboards, and visiting. Visiting a
+       village closes this window and walks you into it in the scene. -->
+  <div class="overlay" id="stats-overlay">
+    <div class="modal stats-modal">
+      <div class="modal-head">
+        <h2>Stats</h2>
+        <button class="btn" id="stats-close" type="button">Close</button>
+      </div>
+      <div class="stats-tabs" role="tablist">
+        <button class="board-tab active" type="button" data-stats-tab="you" role="tab">📊 You</button>
+        <button class="board-tab" type="button" data-stats-tab="board" role="tab">🏆 Leaderboard</button>
+        <button class="board-tab" type="button" data-stats-tab="visit" role="tab">🏘️ Visit</button>
+      </div>
+
+      <section class="stats-pane" data-stats-pane="you">
+        <div id="stats-you"></div>
+      </section>
+
+      <section class="stats-pane" data-stats-pane="board" hidden>
+        <div class="stats-tabs">
+          <button class="board-tab active" type="button" data-board="gdp">GDP</button>
+          <button class="board-tab" type="button" data-board="efficiency">Efficiency</button>
+        </div>
+        <div id="stats-board"></div>
+      </section>
+
+      <section class="stats-pane" data-stats-pane="visit" hidden>
+        <label class="visit-optin">
+          <input type="checkbox" id="visit-optin" />
+          Let visitors into my village
+        </label>
+        <p class="bank-note">Off by default. Visitors can look around your village but can't change it. Turning this off takes your village down.</p>
+        <p class="bank-note" id="visit-status"></p>
+        <div id="visit-list"></div>
+      </section>
+    </div>
+  </div>
+  <!-- Leave a gift in the village you are visiting. A sticker and a note are
+       free; adding Strubles takes them from your balance, and they wait in the
+       owner's bank until they collect them. -->
+  <div class="overlay" id="gift-overlay">
+    <div class="modal visit-modal">
+      <div class="modal-head">
+        <h2 id="gift-title">Leave a gift</h2>
+        <button class="btn" id="gift-close" type="button">Close</button>
+      </div>
+      <div id="gift-stickers" class="gift-stickers"></div>
+      <label class="gift-field">Note
+        <textarea id="gift-note" maxlength="140" rows="3" placeholder="Say hello (140 characters)"></textarea>
+      </label>
+      <label class="gift-field">Strubles (optional)
+        <input id="gift-amount" type="number" min="0" max="1000" step="1" value="0" />
+      </label>
+      <div class="gift-actions">
+        <button class="btn bank-action" id="gift-send" type="button">Send gift</button>
+      </div>
+      <p class="bank-note" id="gift-status"></p>
     </div>
   </div>
 
@@ -601,6 +707,46 @@
   // Economy stays frozen outside dev mode until the server-authoritative
   // village save lands (see the rework plan, phase 3). Placing/moving still
   // works so the new map can be tried; production/tax/construction do not.
+  // ---------- Daily profit ----------
+  // Strubles that move on this page, by local day: income, spending and refunds.
+  // It sees Tycoon income and spending only, not the other games, and it is kept
+  // in this browser. Income is what the cap let in, so it matches the balance.
+  const PROFIT_KEY = 'tycoon_daily_profit_v1';
+  const PROFIT_DAYS = 30;
+  const profitDay = () => new Date().toLocaleDateString('en-CA');
+  function loadProfit() {
+    try { return JSON.parse(localStorage.getItem(PROFIT_KEY)) || {}; } catch { return {}; }
+  }
+  function noteProfit(field, n) {
+    const amount = Math.max(0, Math.floor(Number(n) || 0));
+    if (!amount) return;
+    const all = loadProfit();
+    const day = profitDay();
+    const row = all[day] || { income: 0, spent: 0, refunds: 0 };
+    row[field] += amount;
+    all[day] = row;
+    const kept = {};
+    Object.keys(all).sort().slice(-PROFIT_DAYS).forEach((k) => { kept[k] = all[k]; });
+    try { localStorage.setItem(PROFIT_KEY, JSON.stringify(kept)); } catch {}
+  }
+  if (window.Strubles && !window.Strubles.profitTracked) {
+    const realAdd = Strubles.add, realSpend = Strubles.spend;
+    Strubles.add = function (n, kind) {
+      const before = Number(Strubles.get()) || 0;
+      const cap = (window.TycoonBank && TycoonBank.currentCap()) || Infinity;
+      const credited = before >= cap ? 0 : Math.min(Math.max(0, Math.floor(Number(n) || 0)), cap - before);
+      const next = realAdd.apply(this, arguments);
+      noteProfit(kind === 'refund' ? 'refunds' : 'income', credited);
+      return next;
+    };
+    Strubles.spend = function (n) {
+      const ok = realSpend.apply(this, arguments);
+      if (ok) noteProfit('spent', n);
+      return ok;
+    };
+    Strubles.profitTracked = true;
+  }
+
   const TYCOON_DISABLED = !localStorage.getItem('tycoon_dev_mode');
   $('out-of-order-banner').style.display = TYCOON_DISABLED ? 'block' : 'none';
 
@@ -685,6 +831,7 @@
   // flushed once when the pointer lifts; every other change saves immediately.
   let savePending = false;
   function saveVillage(defer) {
+    if (visiting) return;   // a neighbour's village is never written to yours
     if (defer) { savePending = true; return; }
     savePending = false;
     saveJSON(VILLAGE_KEY, village);
@@ -693,6 +840,10 @@
   function flushSave() { if (savePending) saveVillage(); }
 
   let village = loadVillage();
+  // Set while a neighbour's village is on screen: { uid, name }. Your own village
+  // is held in homeVillage until you go back. See the Visiting section below.
+  let visiting = null;
+  let homeVillage = null;
   let brushMode = null;  // "residential" | "commercial" | "industrial" | "road" | "water" | null
 
   // ---------- Grids ----------
@@ -820,6 +971,7 @@
   // builds, and after three of them no further building could be started at
   // all. Construction now always settles; only earning is gated.
   function tick() {
+    if (visiting) return false;   // no earnings from a neighbour's buildings
     const now = Date.now();
     const mood = computeMood();
     const specialty = computeSpecialty();
@@ -1187,7 +1339,7 @@
   }
 
   function maybeTriggerEvent() {
-    if (TYCOON_DISABLED) return;
+    if (TYCOON_DISABLED || visiting) return;   // a caravan pays on the size of the village on screen
     if (!village.b.some((s) => s.status === 'complete')) return;
     if (Math.random() >= EVENT_CHANCE_PER_SEC) return;
     const table = [
@@ -2135,6 +2287,7 @@
   const placeList = $('place-list');
 
   function startPlacing(key, moveId) {
+    if (visitLocked()) return;
     zoningFor = null;
     placing = { key, moveId: moveId || null, tx: null, ty: null };
     $('place-zone').style.display = 'none';
@@ -2181,6 +2334,7 @@
   };
 
   function pickBuilding(key) {
+    if (visitLocked()) return;
     if (village.b.length >= slotCap()) {
       alert(`Your village is full (${slotCap()} buildings). Buy more slots at the Bank, or remove a building first.`);
       return;
@@ -2194,6 +2348,7 @@
   }
 
   function openPlacePicker() {
+    if (visitLocked()) return;
     const avail = availableCounts(), owned = ownedCounts();
     placeList.innerHTML = '';
     const heading = (text) => {
@@ -2340,6 +2495,7 @@
     return null;
   }
   function doUndo() {
+    if (visitLocked()) return;
     const entry = undoStack[undoStack.length - 1];
     if (!entry) { toast('Nothing to undo'); return; }
     if (placing) stopPlacing();
@@ -2486,6 +2642,7 @@
   }
 
   function setBrush(mode) {
+    if (mode && visitLocked()) return;
     brushMode = mode;
     rectDrag = null;
     document.querySelectorAll('.brush-chip').forEach((b) => {
@@ -2670,6 +2827,7 @@
   // Mil-Spec is this game's Common tier. Anything rarer asks first, because
   // getting another one back means another crate or a Real Estate purchase.
   $('manage-remove').addEventListener('click', () => {
+    if (visitLocked()) return;
     const s = bById.get(manageId);
     if (!s) return;
     const def = DEFS[s.key];
@@ -2703,6 +2861,7 @@
   });
   $('manage-bank').addEventListener('click', () => { closeManage(); openBank(); });
   $('manage-firefight').addEventListener('click', () => {
+    if (visitLocked()) return;
     const s = bById.get(manageId);
     if (!s || !(s.fireUntil > Date.now())) return;
     const def = DEFS[s.key];
@@ -2907,6 +3066,7 @@
   }
   $('bank-btn').addEventListener('click', openBank);
   $('bank-buy').addEventListener('click', () => {
+    if (visitLocked()) return;
     if (!hasBank()) return;
     const TB = window.TycoonBank;
     const level = TB.currentLevel();
@@ -2923,6 +3083,460 @@
   });
   wireClose('bank-overlay', 'bank-close');
 
+  // ---------- Visit ----------
+  // Opt-in, off by default. While it is on, the village snapshot is published
+  // (see maybePushVillageSnapshot); turning it off deletes the snapshot. The
+  // visit itself is the /visit page, shown in a window so you never leave Tycoon.
+  function currentUid() {
+    return window.CloudSync && CloudSync.currentUser ? CloudSync.currentUser.uid : null;
+  }
+  function setVisitStatus(text) { $('visit-status').textContent = text; }
+  // A takedown stays pending until it succeeds, so an opt-out made while signed
+  // out (or a snapshot published before opt-in existed) is removed on the next
+  // signed-in tick.
+  let unpublishInFlight = false;
+  function unpublishVillage() {
+    const uid = currentUid();
+    if (!uid || !window.firebase) { village.unpublishPending = true; saveVillage(); setVisitStatus('Sign in and your village will be hidden.'); return; }
+    if (unpublishInFlight) return;
+    unpublishInFlight = true;
+    firebase.firestore().collection('village_snapshots').doc(uid).delete()
+      .then(() => {
+        village.unpublishPending = false; saveVillage();
+        lastSnapshotKey = null;
+        setVisitStatus('Your village is hidden from visitors.');
+      })
+      .catch((err) => { console.error('[village-snapshot] unpublish failed:', err.message || err); setVisitStatus("Couldn't hide your village. Try again in a moment."); })
+      .finally(() => { unpublishInFlight = false; });
+  }
+  $('visit-optin').addEventListener('change', (e) => {
+    village.visitable = e.target.checked;
+    saveVillage();
+    if (village.visitable) {
+      // Publish on the next tick instead of waiting out the throttle.
+      lastSnapshotPush = 0; lastSnapshotKey = null;
+      setVisitStatus(currentUid() ? 'Your village is open to visitors.' : 'Sign in to publish your village.');
+    } else {
+      unpublishVillage();
+    }
+    loadVisitList();
+  });
+  function loadVisitList() {
+    const list = $('visit-list');
+    list.innerHTML = '';
+    if (!window.firebase) { list.innerHTML = '<p class="bank-note">Visiting needs a connection.</p>'; return; }
+    const me = currentUid();
+    firebase.firestore().collection('village_snapshots').where('visitable', '==', true).limit(20).get()
+      .then((snap) => {
+        list.innerHTML = '';
+        const rows = snap.docs.filter((d) => d.id !== me);
+        if (!rows.length) { list.innerHTML = '<p class="bank-note">No villages have let visitors in yet.</p>'; return; }
+        rows.forEach((doc) => {
+          const d = doc.data();
+          const row = document.createElement('div');
+          row.className = 'picker-row';
+          const info = document.createElement('div');
+          info.className = 'row-info';
+          // Names come from other players: set as text, never as HTML.
+          info.textContent = `${d.displayName || 'Anonymous Tycoon'} · ${d.population || 0} people · ${d.gdp || 0} Strubles/min`;
+          const go = document.createElement('button');
+          go.className = 'btn';
+          go.type = 'button';
+          go.textContent = 'Visit';
+          go.addEventListener('click', () => openVisit(doc.id, d.displayName || 'Anonymous Tycoon'));
+          row.append(info, go);
+          list.appendChild(row);
+        });
+      })
+      .catch((err) => {
+        console.error('[visit] list failed:', err.message || err);
+        list.innerHTML = '<p class="bank-note">Couldn\'t load villages right now.</p>';
+      });
+  }
+  function openVisit(uid, name) {
+    closeStats();
+    enterVisit(uid, name);
+  }
+  // ---------- Stats window: you, the village leaderboards, and visiting ----------
+  // Your numbers are the stats bar, so this window reads it rather than doing
+  // the maths twice. While you are visiting, the bar shows the village on screen,
+  // so "You" says so instead of showing the wrong numbers.
+  const BOARD_CFG = {
+    gdp: { field: 'gdp', format: (v) => `${Number(v || 0).toLocaleString()} Strubles/min`, empty: 'No villages ranked yet.' },
+    efficiency: { field: 'efficiency', requireQualified: true, format: (v) => `${Number(v || 0).toLocaleString()} per building`, empty: 'No villages ranked yet. A village needs a few standing buildings to qualify.' },
+  };
+  let statsTab = 'you';
+  let boardKey = 'gdp';
+  function openStats(tab) {
+    $('stats-overlay').classList.add('open');
+    showStatsTab(tab || 'you');
+  }
+  function closeStats() { $('stats-overlay').classList.remove('open'); }
+  function showStatsTab(name) {
+    statsTab = name;
+    document.querySelectorAll('[data-stats-tab]').forEach((b) => b.classList.toggle('active', b.dataset.statsTab === name));
+    document.querySelectorAll('[data-stats-pane]').forEach((p) => { p.hidden = p.dataset.statsPane !== name; });
+    if (name === 'you') renderYourStats();
+    if (name === 'board') loadBoard(boardKey);
+    if (name === 'visit') {
+      // The opt-in belongs to your own village, so it can't change while you are visiting.
+      $('visit-optin').checked = !!village.visitable && !visiting;
+      $('visit-optin').disabled = !!visiting;
+      setVisitStatus(visiting ? 'Head home to change this.' : '');
+      loadVisitList();
+    }
+  }
+  function renderYourStats() {
+    const box = $('stats-you');
+    box.innerHTML = '';
+    const add = (label, value) => {
+      const row = document.createElement('div');
+      row.className = 'gift-row';
+      const l = document.createElement('div');
+      l.className = 'gift-body';
+      l.textContent = label;
+      const v = document.createElement('b');
+      v.textContent = value;
+      row.append(l, v);
+      box.appendChild(row);
+    };
+    if (visiting) {
+      const note = document.createElement('p');
+      note.className = 'bank-note';
+      note.textContent = `You're visiting ${visiting.name}. Head home to see your own numbers.`;
+      box.appendChild(note);
+    } else {
+      document.querySelectorAll('#stats-bar > span').forEach((s) => {
+        if (s.style.display === 'none') return;
+        // "GDP: 2/min" is a label, a colon, then the value (which can include a unit).
+        const label = (s.firstChild ? s.firstChild.textContent : '').replace(/:\s*$/, '').trim();
+        const value = s.textContent.slice(label.length).replace(/^\s*:\s*/, '').trim();
+        add(label, value);
+      });
+      add('Lifetime earned', `${Number(village.lifetimeEarned || 0).toLocaleString()} Strubles`);
+      try { add('Strubles', Number(Strubles.get() || 0).toLocaleString()); } catch {}
+    }
+    renderProfit(add);
+  }
+  // Daily profit: income - spent + refunds, for today and the last few days.
+  function profitOf(row) { return (row.income || 0) - (row.spent || 0) + (row.refunds || 0); }
+  function renderProfit(add) {
+    const all = loadProfit();
+    const today = profitDay();
+    const row = all[today] || { income: 0, spent: 0, refunds: 0 };
+    const sign = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString();
+    const heading = document.createElement('div');
+    heading.className = 'stats-heading';
+    heading.textContent = 'Today (this browser, Tycoon only)';
+    $('stats-you').appendChild(heading);
+    add('Income', `+${(row.income || 0).toLocaleString()}`);
+    add('Spent', `−${(row.spent || 0).toLocaleString()}`);
+    add('Refunds', `+${(row.refunds || 0).toLocaleString()}`);
+    add('Profit today', sign(profitOf(row)) + ' Strubles');
+    const past = Object.keys(all).sort().reverse().filter((k) => k !== today).slice(0, 6);
+    if (past.length) {
+      const h2 = document.createElement('div');
+      h2.className = 'stats-heading';
+      h2.textContent = 'Recent days';
+      $('stats-you').appendChild(h2);
+      past.forEach((k) => add(k, sign(profitOf(all[k])) + ' Strubles'));
+    }
+  }
+  function loadBoard(key) {
+    boardKey = key;
+    document.querySelectorAll('[data-board]').forEach((b) => b.classList.toggle('active', b.dataset.board === key));
+    const box = $('stats-board');
+    box.textContent = 'Loading…';
+    if (!window.firebase) { box.textContent = 'Leaderboards need a connection.'; return; }
+    const cfg = BOARD_CFG[key];
+    const LIMIT = 20;
+    // Efficiency filters on `qualified`, a second field, so it is filtered here
+    // rather than with a composite index (the same trick as /leaderboard).
+    firebase.firestore().collection('leaderboard')
+      .orderBy(cfg.field, 'desc').limit(cfg.requireQualified ? LIMIT * 4 : LIMIT).get()
+      .then((snap) => {
+        if (boardKey !== key || statsTab !== 'board') return;
+        let docs = snap.docs;
+        if (cfg.requireQualified) docs = docs.filter((d) => d.data().qualified !== false);
+        docs = docs.slice(0, LIMIT);
+        box.innerHTML = '';
+        if (!docs.length) { box.innerHTML = `<p class="bank-note">${cfg.empty}</p>`; return; }
+        const me = currentUid();
+        docs.forEach((doc, i) => {
+          const d = doc.data();
+          const isMe = doc.id === me;
+          const row = document.createElement('div');
+          row.className = 'gift-row';
+          const rank = document.createElement('div');
+          rank.textContent = `#${i + 1}`;
+          const who = document.createElement('div');
+          who.className = 'gift-body';
+          // Names come from other players: set as text, never as HTML.
+          who.textContent = (d.displayName || 'Anonymous Tycoon') + (isMe ? ' (you)' : '');
+          const val = document.createElement('b');
+          val.textContent = cfg.format(d[cfg.field]);
+          row.append(rank, who, val);
+          if (!isMe) {
+            const go = document.createElement('button');
+            go.className = 'btn';
+            go.type = 'button';
+            go.textContent = 'Visit';
+            go.addEventListener('click', () => openVisit(doc.id, d.displayName || 'Anonymous Tycoon'));
+            row.appendChild(go);
+          }
+          box.appendChild(row);
+        });
+      })
+      .catch((err) => {
+        console.error('[leaderboard] query failed:', err.message || err);
+        box.innerHTML = '<p class="bank-note">Couldn\'t load the leaderboard right now.</p>';
+      });
+  }
+  $('stats-btn').addEventListener('click', () => openStats('you'));
+  wireClose('stats-overlay', 'stats-close');
+  document.querySelectorAll('[data-stats-tab]').forEach((b) => {
+    b.addEventListener('click', () => showStatsTab(b.dataset.statsTab));
+  });
+  document.querySelectorAll('[data-board]').forEach((b) => {
+    b.addEventListener('click', () => loadBoard(b.dataset.board));
+  });
+
+  // ---------- Visiting a neighbour's village, in the same scene ----------
+  // Their village is swapped in for yours, read-only. While it is out, every
+  // path that would spend, refund, earn or publish is blocked (visitLocked, tick,
+  // saveVillage and the snapshot pushes), so nothing of theirs is saved or paid.
+  function visitLocked() {
+    if (!visiting) return false;
+    toast("You're visiting. Head home to build or spend.", true);
+    return true;
+  }
+  function clearBuildingSprites() {
+    for (const sp of bSprites.values()) { if (sp && sp.destroy) sp.destroy(); }
+    for (const lb of bLabels.values()) { if (lb && lb.destroy) lb.destroy(); }
+    bSprites.clear(); bLabels.clear();
+  }
+  // Draw everything from a village object. Sprites are keyed by building id, so
+  // they are cleared on every swap: a neighbour's id must not reuse ours.
+  function showVillage(v) {
+    village = v;
+    clearBuildingSprites();
+    rebuildTileGrid();
+    onBuildingsChanged();
+    refresh();
+  }
+  async function enterVisit(uid, name) {
+    if (!window.firebase) { toast("Visiting needs a connection.", true); return; }
+    let snap;
+    try { snap = await firebase.firestore().collection('village_snapshots').doc(uid).get(); }
+    catch (err) { console.error('[visit] load failed:', err.message || err); toast("Couldn't reach that village right now.", true); return; }
+    if (!snap.exists || snap.data().visitable !== true) { toast('That village is closed to visitors now.', true); return; }
+    loadVisit(uid, snap.data(), name);
+  }
+  // Shows a village from its snapshot. Split from enterVisit so it can be tested
+  // without Firestore (see TycoonTest.loadVisit).
+  function loadVisit(uid, d, name) {
+    stopPlacing();
+    setBrush(null);
+    selectedId = null;
+    if (!visiting) homeVillage = village;
+    visiting = { uid, name: name || d.displayName || 'Anonymous Tycoon' };
+    const b = (Array.isArray(d.buildings) ? d.buildings : [])
+      .filter((s) => s && DEFS[s.key] && Number.isFinite(s.x) && Number.isFinite(s.y))
+      .map((s, i) => ({
+        id: Number.isFinite(s.id) ? s.id : i + 1, key: s.key, x: s.x, y: s.y,
+        status: 'complete', startedAt: 0, completesAt: 0, lastProductionAt: 0, paid: 0,
+      }));
+    const tiles = {};
+    Object.entries(d.tiles || {}).forEach(([k, t]) => { if (TILE_ID_KNOWN.has(t)) tiles[k] = t; });
+    showVillage({ v: 2, nextId: 1, name: visiting.name, b, tiles, paid: {}, founderKit: true });
+    $('visit-bar-text').textContent = `🏘️ Visiting ${visiting.name}`;
+    $('visit-bar').classList.add('open');
+    if (cam) recenter();
+  }
+  function exitVisit() {
+    if (!visiting) return;
+    visiting = null;
+    $('visit-bar').classList.remove('open');
+    closeGiftWindow();
+    const home = homeVillage;
+    homeVillage = null;
+    showVillage(home);
+    if (cam) recenter();
+  }
+  $('visit-home').addEventListener('click', exitVisit);
+  $('visit-gift').addEventListener('click', () => openGiftWindow());
+
+  // ---------- Gifts ----------
+  // A sticker and a note are free. Strubles go through the server: it debits the
+  // sender and holds the amount in a pending gift until the owner collects it.
+  // Until the server and rules for gifts are live, these calls fail and the
+  // window says so.
+  const GIFT_API = location.protocol === 'https:'
+    ? '/arena-api'
+    : 'http://' + (location.hostname || 'localhost') + ':4001';
+  const GIFT_MAX_AMOUNT = 1000;
+  const GIFT_STICKERS = [
+    { id: 'sunflower', emoji: '🌻', label: 'Sunflower' },
+    { id: 'balloon', emoji: '🎈', label: 'Balloon' },
+    { id: 'cake', emoji: '🍰', label: 'Cake' },
+    { id: 'star', emoji: '⭐', label: 'Star' },
+    { id: 'cat', emoji: '🐈', label: 'Cat' },
+    { id: 'letter', emoji: '📮', label: 'Letter' },
+  ];
+  const GIFT_ERRORS = {
+    sign_in: 'Sign in to send gifts.',
+    insufficient: "You don't have that many Strubles.",
+    cap: "They're at their wallet cap, so the gift can't land yet.",
+    limit: "You've already sent a gift today. Try again tomorrow.",
+    not_visitable: 'That village is closed to visitors now.',
+    self: "You can't send a gift to yourself.",
+    blocked_text: "That note has a word we can't send. Try different words.",
+    bad_request: "That gift wasn't valid. Check the amount and note.",
+    not_found: 'That gift is gone.',
+    already_collected: 'That gift was already collected.',
+  };
+  let giftSticker = GIFT_STICKERS[0].id;
+  function setGiftStatus(text) { $('gift-status').textContent = text; }
+  async function giftPost(path, body) {
+    const user = window.CloudSync && CloudSync.currentUser;
+    if (!user) return { ok: false, error: 'sign_in' };
+    try {
+      const res = await fetch(GIFT_API + path, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + await user.getIdToken(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) return Object.assign({ ok: true }, data);
+      if (res.status === 404) return { ok: false, error: 'not_switched_on' };
+      return { ok: false, error: data.error || 'http_' + res.status };
+    } catch {
+      return { ok: false, error: 'network' };
+    }
+  }
+  function giftErrorText(code) {
+    if (code === 'not_switched_on') return "Gifts aren't switched on yet.";
+    return GIFT_ERRORS[code] || "Something went wrong. Try again.";
+  }
+  function openGiftWindow() {
+    if (!visiting) return;
+    $('gift-title').textContent = `Leave a gift for ${visiting.name}`;
+    $('gift-note').value = '';
+    $('gift-amount').value = '0';
+    setGiftStatus('');
+    renderGiftStickers();
+    $('gift-overlay').classList.add('open');
+  }
+  // Only the sticker row is redrawn on a pick, so a note already typed survives.
+  function renderGiftStickers() {
+    const box = $('gift-stickers');
+    box.innerHTML = '';
+    GIFT_STICKERS.forEach((s) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'gift-sticker' + (s.id === giftSticker ? ' active' : '');
+      b.title = s.label;
+      b.setAttribute('aria-label', s.label);
+      b.textContent = s.emoji;
+      b.addEventListener('click', () => { giftSticker = s.id; renderGiftStickers(); });
+      box.appendChild(b);
+    });
+  }
+  function closeGiftWindow() { $('gift-overlay').classList.remove('open'); }
+  wireClose('gift-overlay', 'gift-close');
+  $('gift-send').addEventListener('click', async () => {
+    if (!visiting) return;
+    const user = window.CloudSync && CloudSync.currentUser;
+    if (!user) { setGiftStatus('Sign in to send gifts.'); return; }
+    const toUid = visiting.uid;
+    if (user.uid === toUid) { setGiftStatus(giftErrorText('self')); return; }
+    const note = $('gift-note').value.trim().slice(0, 140);
+    const amount = Math.floor(Number($('gift-amount').value) || 0);
+    if (amount < 0 || amount > GIFT_MAX_AMOUNT) { setGiftStatus(`Strubles must be between 0 and ${GIFT_MAX_AMOUNT}.`); return; }
+    $('gift-send').disabled = true;
+    setGiftStatus('Sending…');
+    let result;
+    if (amount > 0) {
+      result = await giftPost('/gifts/strubles', { toUid, amount, stickerId: giftSticker, note });
+      if (result.ok) { try { Strubles.refresh(); } catch {} }
+    } else {
+      // A note alone moves no money. The server checks it for blocked words and
+      // writes it to the owner's gift list; clients can't write there directly.
+      result = await giftPost('/gifts/note', { toUid, stickerId: giftSticker, note });
+    }
+    $('gift-send').disabled = false;
+    if (!result.ok) { setGiftStatus(giftErrorText(result.error)); return; }
+    setGiftStatus('Sent! 🎁');
+    $('gift-note').value = '';
+    $('gift-amount').value = '0';
+  });
+
+  // The owner's inbox, inside the bank. Notes are read-only; Strubles gifts
+  // collect into the balance on the server, which checks the wallet cap.
+  function loadGiftInbox() {
+    const box = $('gift-inbox');
+    box.innerHTML = '';
+    const uid = currentUid();
+    if (!uid || !window.firebase) { box.innerHTML = '<p class="bank-note">Sign in to see the gifts your visitors leave.</p>'; return; }
+    firebase.firestore().collection('village_snapshots').doc(uid).collection('gifts')
+      .orderBy('createdAt', 'desc').limit(20).get()
+      .then((snap) => {
+        box.innerHTML = '';
+        if (snap.empty) { box.innerHTML = '<p class="bank-note">No gifts yet.</p>'; return; }
+        snap.docs.forEach((doc) => {
+          const g = doc.data();
+          const row = document.createElement('div');
+          row.className = 'gift-row';
+          const sticker = GIFT_STICKERS.find((s) => s.id === g.stickerId);
+          const mark = document.createElement('div');
+          mark.textContent = sticker ? sticker.emoji : '🎁';
+          const body = document.createElement('div');
+          body.className = 'gift-body';
+          const from = document.createElement('strong');
+          from.textContent = g.fromName || 'Anonymous Tycoon';
+          const note = document.createElement('small');
+          note.textContent = g.note || '';
+          body.append(from, note);
+          row.append(mark, body);
+          if (g.kind === 'strubles') {
+            const amt = document.createElement('div');
+            amt.textContent = `${(g.amount || 0).toLocaleString()} Strubles`;
+            row.appendChild(amt);
+            if (g.status === 'pending') {
+              const btn = document.createElement('button');
+              btn.className = 'btn';
+              btn.type = 'button';
+              btn.textContent = 'Collect';
+              btn.addEventListener('click', () => collectGift(doc.id, btn));
+              row.appendChild(btn);
+            } else {
+              const done = document.createElement('small');
+              done.textContent = 'collected';
+              row.appendChild(done);
+            }
+          }
+          box.appendChild(row);
+        });
+      })
+      .catch((err) => {
+        console.error('[gift] inbox failed:', err.message || err);
+        box.innerHTML = '<p class="bank-note">Couldn\'t load your gifts right now.</p>';
+      });
+  }
+  async function collectGift(giftId, btn) {
+    btn.disabled = true;
+    const result = await giftPost('/gifts/collect', { giftId });
+    if (result.ok) {
+      try { Strubles.refresh(); } catch {}
+      toast(`🎁 Collected ${(result.applied || 0).toLocaleString()} Strubles`);
+      loadGiftInbox();
+      return;
+    }
+    btn.disabled = false;
+    toast(result.error === 'cap' ? 'Make room under your wallet cap first.' : giftErrorText(result.error), true);
+  }
+  $('bank-btn').addEventListener('click', () => { setTimeout(loadGiftInbox, 0); });
+
   // ---------- Building slots ----------
   function renderExpand() {
     const owned = slotsOwned();
@@ -2932,6 +3546,7 @@
     $('expand-next-info').textContent = `Next: slot ${BASE_SLOTS + owned + 1} — costs ${expandCostForSlot(owned + 1).toLocaleString()} Strubles.`;
   }
   $('expand-buy').addEventListener('click', () => {
+    if (visitLocked()) return;
     const owned = slotsOwned();
     const cost = expandCostForSlot(owned + 1);
     if (!Strubles.spend(cost)) {
@@ -2953,7 +3568,11 @@
   // between strokes (mid-stroke it is deliberately held steady).
   window.addEventListener('strubles:change', () => { if (brushMode && strokeBasis == null) setBrushLabel(); });
   window.addEventListener('storage', (e) => {
-    if (e.key === VILLAGE_KEY) { village = loadVillage(); rebuildTileGrid(); onBuildingsChanged(); refresh(); }
+    if (e.key === VILLAGE_KEY) {
+      // Another tab changed your village. While visiting, keep it aside until you go home.
+      if (visiting) homeVillage = loadVillage();
+      else showVillage(loadVillage());
+    }
     if (e.key === INV_KEY) refresh();
   });
   // Cloud pull reloads the page itself, so no extra reconcile hook is needed.
@@ -3007,6 +3626,7 @@
   let leaderboardPushInFlight = false;
   let leaderboardCooldownUntil = 0;
   function maybePushLeaderboardScore(stats) {
+    if (visiting) return;   // a visited village's numbers are not yours to report
     if (!window.CloudSync || !CloudSync.isSignedIn()) return;
     if (Date.now() < leaderboardCooldownUntil) return;
     const key = JSON.stringify(stats);
@@ -3045,10 +3665,18 @@
   const SNAPSHOT_MIN_INTERVAL_MS = 30000;
   let lastSnapshotPush = 0, lastSnapshotKey = null, snapshotPushInFlight = false, snapshotCooldownUntil = 0;
   function maybePushVillageSnapshot(stats) {
+    if (visiting) return;   // never publish a neighbour's village as yours
     if (!window.CloudSync || !CloudSync.isSignedIn()) return;
     if (Date.now() < snapshotCooldownUntil) return;
     const user = CloudSync.currentUser;
     if (!user) return;
+    // Opted out: nothing is published, and any snapshot left from before opt-in
+    // existed (or from an opt-out made while signed out) is taken down.
+    if (!village.visitable) {
+      if (village.visitable === undefined) { village.visitable = false; village.unpublishPending = true; saveVillage(); }
+      if (village.unpublishPending) unpublishVillage();
+      return;
+    }
     const buildings = village.b.map((s) => ({ id: s.id, key: s.key, x: s.x, y: s.y, status: s.status, fireUntil: s.fireUntil || 0 }));
     const payload = { tiles: village.tiles, buildings, ...stats };
     const key = JSON.stringify(payload);
@@ -3058,6 +3686,7 @@
     snapshotPushInFlight = true;
     firebase.firestore().collection('village_snapshots').doc(user.uid).set({
       displayName: user.displayName || 'Anonymous Tycoon',
+      visitable: true,
       tiles: payload.tiles,
       buildings: payload.buildings,
       gdp: Math.round(stats.gdp * 1000) / 1000,
@@ -3066,7 +3695,7 @@
       mood: Math.round(stats.mood),
       specialty: stats.specialty,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    })
+    }, { merge: true })   // merge, so a push never wipes fields set elsewhere (such as the opt-in)
       .then(() => { lastSnapshotKey = key; lastSnapshotPush = Date.now(); })
       .catch((err) => {
         // Same reasoning as the leaderboard push: a missing-rules error
@@ -3091,7 +3720,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // Test hook for the browser suites; only exists in dev mode.
-  if (!TYCOON_DISABLED && window.IANTOPIA_IS_DEV) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood, triggerFire, triggerCaravan, triggerAudit, estimateGDP };
+  if (!TYCOON_DISABLED && window.IANTOPIA_IS_DEV) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood, triggerFire, triggerCaravan, triggerAudit, estimateGDP, loadVisit, exitVisit, get visiting() { return visiting; }, get homeVillage() { return homeVillage; } };
 })();
 </script>
 </body>
