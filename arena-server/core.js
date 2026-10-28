@@ -3,6 +3,7 @@ const WebSocket = require('ws');
 const Manager = require('./manager');
 const RateLimit = require('./rate-limit');
 const { Wallet } = require('./wallet');
+const { PlaySessions } = require('./sessions');
 
 const WALLET_BODY_MAX = 16 * 1024;
 const WALLET_OPS_MAX = 50;
@@ -61,8 +62,9 @@ function createServer(options = {}) {
   const ownerEmail = String(options.ownerEmail !== undefined ? options.ownerEmail : (process.env.OWNER_EMAIL || '')).trim().toLowerCase();
   const log = quiet ? () => {} : (...a) => console.log(...a);
 
-  const manager = new Manager(db, auth, { timing, makeDeck, accounts });
-  const wallet = new Wallet(db, manager.balance);
+  const sessions = new PlaySessions(db);
+  const manager = new Manager(db, auth, { timing, makeDeck, accounts, sessions });
+  const wallet = new Wallet(db, manager.balance, { sessions });
 
   // One HTTP server carries both the game socket (ws) and the wallet routes
   // (/wallet and /wallet/ops). nginx sends /arena-ws/ and /arena-api/ here.

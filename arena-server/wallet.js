@@ -76,6 +76,7 @@ class Wallet {
   constructor(db, balance, opts = {}) {
     this.db = db;
     this.balance = balance || new BalanceManager(db);
+    this.sessions = opts.sessions || null;   // PlaySessions, for the admin's play report
     this.now = opts.now || (() => Date.now());
     this.rand = opts.rand || Math.random;
     this.rate = new Map();
@@ -108,6 +109,12 @@ class Wallet {
   async applyBatch(uid, ops) {
     const results = [];
     for (const op of ops) results.push(await this.applyOne(uid, op));
+    if (this.sessions) {
+      // Recording a session must never fail the player's ops, so its errors are only logged.
+      const items = ops.map((op, i) => ({ page: op && typeof op.page === 'string' ? op.page.slice(0, 120) : null, kind: op && op.kind, applied: results[i].applied, ok: results[i].ok && !results[i].duplicate }))
+        .filter((it) => it.ok);
+      this.sessions.record(uid, items).catch((e) => console.error('[sessions] record failed:', e.message));
+    }
     return results;
   }
 

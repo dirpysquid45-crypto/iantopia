@@ -88,6 +88,9 @@
     .ln .tag.bad { color:var(--red); }
     .ln .tag.info { color:var(--cyan); }
     .ln .who { overflow:hidden; text-overflow:ellipsis; }
+    .ln.play { grid-template-columns:minmax(160px,1fr) repeat(6,minmax(64px,auto)); cursor:default; }
+    .ln.play > span { text-align:right; }
+    .ln.play > span:first-child { text-align:left; }
     .ln .who small { color:var(--dim); margin-left:6px; }
     .ln .det { overflow:hidden; text-overflow:ellipsis; }
     .over { color:var(--red); }
@@ -175,12 +178,12 @@
     <button id="ban" class="btn danger" disabled>ban</button>
     <button id="unban" class="btn" disabled>release</button>
     <button id="restore" class="btn" disabled>release &amp; restore</button>
-    <button id="unwarn" class="btn" disabled>unwarn</button>
     <input id="name" class="in wide" type="text" maxlength="40" placeholder="display name" autocomplete="off" aria-label="New display name" />
     <button id="rename" class="btn" disabled>rename</button>
     <button id="backup" class="btn" disabled>snapshot</button>
     <input id="warn-text" class="in wide" type="text" maxlength="200" placeholder="warning text" autocomplete="off" aria-label="Warning message" />
     <button id="warn" class="btn amber" disabled>warn</button>
+    <button id="unwarn" class="btn" disabled>unwarn</button>
   </section>
   <div id="status" class="status" role="status" aria-live="polite">booting console…</div>
 
@@ -190,6 +193,7 @@
     <button class="btn" role="tab" data-tab="suggest" aria-selected="false"><span class="k">3</span>suggestions<span class="n" id="n-suggest"></span></button>
     <button class="btn" role="tab" data-tab="scores" aria-selected="false"><span class="k">4</span>scores</button>
     <button class="btn" role="tab" data-tab="payouts" aria-selected="false"><span class="k">5</span>payouts<span class="n" id="n-payouts"></span></button>
+    <button class="btn" role="tab" data-tab="sessions" aria-selected="false"><span class="k">6</span>play report</button>
   </nav>
 
   <!-- FEED -->
@@ -255,6 +259,17 @@
     <div id="pfeed" class="body"></div>
   </section>
 
+  <!-- PLAY REPORT -->
+  <section class="win hidden" data-view="sessions" aria-label="Play report">
+    <header>
+      <span><b>PLAY_REPORT</b> · <span class="dim">solo games and their Strubles, last 7 days. Arena multiplayer is not counted.</span></span>
+      <span class="cmd" style="border:0;padding:0;background:none">
+        <button id="sesref" class="btn">refresh</button>
+      </span>
+    </header>
+    <div id="sesbody" class="body"></div>
+  </section>
+
   <!-- SCORES -->
   <section class="win hidden" data-view="scores" aria-label="Leaderboard scores">
     <header>
@@ -280,7 +295,7 @@
 <script is:inline>
 (() => {
   const $ = (id) => document.getElementById(id);
-  const VIEWS = ['feed', 'players', 'suggest', 'scores', 'payouts'];
+  const VIEWS = ['feed', 'players', 'suggest', 'scores', 'payouts', 'sessions'];
   const MAX_EVENTS = 300;
   const PUBLIC_BOARD_LIMIT = 50;
   const state = { view: 'feed', events: [], players: [], suggestions: [], sTab: 'new', board: 'horse', sel: null };
@@ -606,6 +621,28 @@
     }
   }
   $('pref').addEventListener('click', () => arena.send({ type: 'payouts_list' }));
+
+  // ---- play report -----------------------------------------------------------
+  function renderSessions() {
+    const body = $('sesbody');
+    const r = state.sessions;
+    body.replaceChildren();
+    if (!r) { body.append(span('empty dim', 'loading the play report…')); return; }
+    const t = r.totals;
+    body.append(span('dim', 'last ' + r.days + ' days · ' + money(t.sessions) + ' sessions · ' + money(t.players) + ' players · ' + money(t.minutes) + ' active minutes · ' + money(t.staked) + ' staked · ' + money(t.won) + ' won' + (r.truncated ? ' · newest 5,000 sessions only' : '')));
+    if (!r.games.length) { body.append(span('empty dim', 'no game sessions in this period')); return; }
+    const head = document.createElement('div');
+    head.className = 'ln play dim';
+    head.append(span('', 'game'), span('', 'sessions'), span('', 'players'), span('', 'minutes'), span('', 'rounds'), span('', 'staked'), span('', 'won'));
+    body.append(head);
+    for (const g of r.games) {
+      const row = document.createElement('div');
+      row.className = 'ln play';
+      row.append(span('', g.page), span('', money(g.sessions)), span('', money(g.players)), span('', money(g.minutes)), span('', money(g.rounds)), span('', money(g.staked)), span('', money(g.won)));
+      body.append(row);
+    }
+  }
+  $('sesref').addEventListener('click', () => arena.send({ type: 'sessions_list' }));
   $('sxlsx').addEventListener('click', () => {
     if (!window.XLSX) { setStatus('spreadsheet library did not load, check the connection', 'err'); return; }
     const wb = XLSX.utils.book_new();
@@ -723,6 +760,9 @@
         state.suggestions = state.suggestions.filter((x) => x.id !== msg.id);
         renderSuggestions();
         setStatus('deleted', 'ok');
+      } else if (msg.type === 'sessions') {
+        state.sessions = msg;
+        renderSessions();
       } else if (msg.type === 'payouts_list') {
         state.payouts = msg.items || [];
         renderPayouts();
@@ -739,6 +779,7 @@
     if (view === 'players') arena.send({ type: 'account_list' });
     if (view === 'suggest') arena.send({ type: 'suggestions_list' });
     if (view === 'payouts') arena.send({ type: 'payouts_list' });
+    if (view === 'sessions') arena.send({ type: 'sessions_list' });
   };
 })();
 </script>

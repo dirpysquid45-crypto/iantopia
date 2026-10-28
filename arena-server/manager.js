@@ -16,6 +16,7 @@ class Manager {
     this.auth = auth;
     this.opts = opts;                                // { timing } overrides, used by tests
     this.balance = opts.balance || new BalanceManager(db);
+    this.sessions = opts.sessions || null;           // PlaySessions, for the admin's play report
     this.connections = new Map(); // sessionId -> { userId, ws, guest, name }
     this.queue = [];              // open lobbies
     this.tables = new Map();      // tableId -> game
@@ -215,6 +216,8 @@ class Manager {
         return this.accountList(conn);
       case 'payouts_list':
         return this.payoutsList(conn);
+      case 'sessions_list':
+        return this.sessionsList(conn, msg);
       case 'payout_resolve':
         return this.payoutResolve(conn, msg);
       case 'action': {
@@ -279,6 +282,19 @@ class Manager {
   async payoutsList(conn) {
     if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
     this.sendTo(conn.ws, { type: 'payouts_list', items: await this.balance.listFailedPayouts() });
+  }
+
+  // Admin-only play report: which game pages were played, and for how long, over the last week.
+  async sessionsList(conn, msg) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    if (!this.sessions) return this.fail(conn.ws, 'Play sessions are not recorded', 'unavailable');
+    const days = Math.min(90, Math.max(1, Math.floor(Number(msg && msg.days)) || 7));
+    try {
+      this.sendTo(conn.ws, { type: 'sessions', ...(await this.sessions.summary(days)) });
+    } catch (e) {
+      console.error('[sessions] report failed:', e.message);
+      this.fail(conn.ws, 'Could not load the play report', 'unavailable');
+    }
   }
 
   async payoutResolve(conn, msg) {
