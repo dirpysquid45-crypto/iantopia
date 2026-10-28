@@ -338,5 +338,13 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
     api.reset = (v = START) => _save(v);
   }
 
+  if (window.Strubles && Object.isFrozen(window.Strubles)) return;   // loaded twice: keep the first
   window.Strubles = Object.assign(window.Strubles || {}, api);
+  // In production the object is frozen, and window.Strubles can not be replaced, so a
+  // console can not add, change or override its functions. Calls to add() still go
+  // through the server's caps and rate limit. Dev keeps it open for testing.
+  if (!window.IANTOPIA_IS_DEV) {
+    Object.freeze(window.Strubles);
+    Object.defineProperty(window, 'Strubles', { value: window.Strubles, writable: false, configurable: false });
+  }
 })();

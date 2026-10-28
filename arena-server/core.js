@@ -45,6 +45,12 @@ function isAdminToken(decoded, admins) {
   // An email only counts if Google has verified it.
   return !!decoded.email && decoded.email_verified !== false && admins.emails.includes(String(decoded.email).toLowerCase());
 }
+// The owner's dev endpoint: only a verified sign-in with the owner's email. OWNER_EMAIL
+// is compared lowercased. If it is not set, nobody is the owner.
+function isOwnerToken(decoded, ownerEmail) {
+  if (!decoded || !ownerEmail || decoded.email_verified !== true) return false;
+  return String(decoded.email || '').toLowerCase() === ownerEmail;
+}
 
 function createServer(options = {}) {
   const {
@@ -52,6 +58,7 @@ function createServer(options = {}) {
     authTimeoutMs = 10000, heartbeatMs = 25000, admins, accounts,
   } = options;
   const adminList = admins || adminsFromEnv(process.env);
+  const ownerEmail = String(options.ownerEmail !== undefined ? options.ownerEmail : (process.env.OWNER_EMAIL || '')).trim().toLowerCase();
   const log = quiet ? () => {} : (...a) => console.log(...a);
 
   const manager = new Manager(db, auth, { timing, makeDeck, accounts });
@@ -108,10 +115,21 @@ function createServer(options = {}) {
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   }
+  // Owner-only: a verified sign-in with the owner's email. Everyone else gets a 403, so
+  // the endpoint tells nobody but the owner anything.
+  async function handleOwnerCheck(req, res) {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'method' });
+    let decoded = null;
+    const token = bearer(req);
+    if (token) { try { decoded = await auth.verifyIdToken(token); } catch {} }
+    if (!isOwnerToken(decoded, ownerEmail)) return sendJson(res, 403, { error: 'not_owner' });
+    return sendJson(res, 200, { owner: true });
+  }
   async function handleWallet(req, res) {
     allowLocalOrigin(req, res);
     if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
     const path = new URL(req.url, 'http://x').pathname;
+    if (path === '/owner/check') return handleOwnerCheck(req, res);
     if (path !== '/wallet' && path !== '/wallet/ops') return sendJson(res, 404, { error: 'not_found' });
     const uid = await signedInUid(req);
     if (!uid) return sendJson(res, 401, { error: 'sign_in' });
@@ -245,4 +263,4 @@ function createServer(options = {}) {
   };
 }
 
-module.exports = { createServer, clientIp, isPrivateAddress, cleanName };
+module.exports = { createServer, clientIp, isPrivateAddress, cleanName, isOwnerToken };

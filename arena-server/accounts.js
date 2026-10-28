@@ -11,12 +11,13 @@ const { balanceOf } = BalanceManager;
 // in strubles.js says those can exist from before the cap existed.
 //
 // Punishment: first offence in 7 days resets the balance to 100 and records
-// a warning. A second offence in that window bans for 24 hours, resets
-// again, and removes the cheater's leaderboard rows.
+// a warning. A second offence in that window bans (BAN_HOURS, 24 by default),
+// resets to BAN_RESET_BALANCE (100 by default), and removes the cheater's
+// leaderboard rows.
 
 const STARTING_BALANCE = '100';
 const STRIKE_WINDOW_MS = 7 * 24 * 3600 * 1000;
-const BAN_MS = 24 * 3600 * 1000;
+const BAN_HOURS = 24;                 // the default; BAN_HOURS in server.js overrides it
 const FEED_MAX = 300;
 // Resetting the cap: the wallet cap comes from the bank level and the village's
 // buildings (see balance.js capFromData), so a reset clears both.
@@ -53,7 +54,13 @@ function cleanNote(note) {
 }
 
 class AccountWatch {
-  constructor({ db, auth, balance, admins = { uids: [], emails: [] }, now = () => Date.now(), log = console }) {
+  constructor({ db, auth, balance, admins = { uids: [], emails: [] }, now = () => Date.now(), log = console, banHours = BAN_HOURS, banReset = STARTING_BALANCE }) {
+    // The ban terms are set by BAN_HOURS and BAN_RESET_BALANCE (see server.js). A bad value
+    // stops the server at startup, rather than banning with the wrong terms.
+    if (!(Number.isFinite(banHours) && banHours > 0)) throw new Error('BAN_HOURS must be a positive number');
+    if (!/^\d+$/.test(String(banReset))) throw new Error('BAN_RESET_BALANCE must be a whole number of Strubles');
+    this.banHours = banHours;
+    this.banReset = String(banReset);
     this.db = db;
     this.admins = admins;         // the admin list (ADMIN_UIDS / ADMIN_EMAILS), never banned
     this.auth = auth;
@@ -261,7 +268,7 @@ class AccountWatch {
     });
     const detail = { page: info.page || null, detected: info.reason || 'over_cap', streak: info.streak, perMinute: info.perMinute };
     if (count >= 2) {
-      await this.ban(uid, BAN_MS / 3600000, { reason: 'cheat_second_offence', ...info, strikes: count, ...detail });
+      await this.ban(uid, this.banHours, { reason: 'cheat_second_offence', ...info, strikes: count, ...detail });
       return;
     }
     await this.backup(uid, 'before_cheat_reset');
@@ -276,7 +283,7 @@ class AccountWatch {
     await this.backup(uid, 'before_ban');
     const until = new Date(this.now() + hours * 3600 * 1000);
     await this.db.collection('bans').doc(uid).set({ until, reason: info.reason || 'admin', at: new Date(this.now()) });
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, ban_until: until, balance_reset_at: new Date(this.now()), ...CAP_RESET }, { merge: true });
+    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: this.banReset, ban_until: until, balance_reset_at: new Date(this.now()), ...CAP_RESET }, { merge: true });
     for (const col of LEADERBOARDS) await this.db.collection(col).doc(uid).delete();
     const name = info.name || await this.labelFor(uid);
     this.emit({ kind: 'punish', action: 'ban', uid, name, until: until.toISOString(), reason: info.reason || 'admin', from: info.balance, strikes: info.strikes, page: info.page || null, detected: info.detected || null });
@@ -477,4 +484,4 @@ function lastOpOf(data, now) {
 }
 
 
-module.exports = { AccountWatch, STARTING_BALANCE, STRIKE_WINDOW_MS, BAN_MS };
+module.exports = { AccountWatch, STARTING_BALANCE, STRIKE_WINDOW_MS, BAN_HOURS };

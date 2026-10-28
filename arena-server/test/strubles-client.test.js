@@ -175,3 +175,19 @@ test('a Tetris payout the server credits as 0 says so, and a zero request does n
   assert.equal(notes.length, 1);
   assert.match(notes[0], /No Tetris pay was credited/);
 });
+
+test('in production the Strubles object is frozen, so the console can not override it or swap it out', () => {
+  const { S, win } = loadStrubles({ signedIn: true, hostname: 'iantopia.com', respond: () => ({}) });
+  const add = S.add;
+  S.add = () => { throw new Error('overridden'); };
+  assert.equal(S.add, add, 'add can not be replaced');
+  win.Strubles = {};
+  assert.equal(win.Strubles, S, 'window.Strubles can not be replaced');
+  assert.equal(Object.isFrozen(S), true);
+});
+
+test('on localhost the object stays open for testing', () => {
+  const { S } = loadStrubles({ signedIn: true, respond: () => ({}) });
+  assert.equal(Object.isFrozen(S), false);
+  assert.equal(typeof S.set, 'function');
+});

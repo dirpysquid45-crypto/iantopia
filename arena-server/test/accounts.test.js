@@ -47,7 +47,7 @@ function fakeDb() {
   return db;
 }
 
-function setup(now = Date.now()) {
+function setup(now = Date.now(), options = {}) {
   let t = now;
   const db = fakeDb();
   const watch = new AccountWatch({
@@ -56,6 +56,7 @@ function setup(now = Date.now()) {
     balance: { capFromData: () => 20000 },
     now: () => t,
     log: { error() {} },
+    ...options,
   });
   const events = [];
   watch.subscribe((e) => events.push(e));
@@ -131,6 +132,25 @@ test('a second offence within the window bans the account and records the page',
   assert.equal(ban.page, '/lootbox');
   assert.ok(db.docs.get('bans/u6'), 'a ban record exists, which the rules check');
   assert.ok(db.docs.get('users/u6').ban_until, 'the account shows its ban time');
+});
+
+test('the ban terms are the configured hours and reset balance, not the defaults', async () => {
+  const t = Date.now();
+  const { save, db } = setup(t, { banHours: 2, banReset: '250' });
+  await save('u9', 100);
+  await save('u9', 1000000, { amount: 999900, page: '/lootbox' });
+  await save('u9', 100);
+  await save('u9', 1000000, { amount: 999900, page: '/lootbox' });
+  assert.equal(db.docs.get('users/u9').strubles_balance_v1, '250', 'reset to the configured balance');
+  assert.equal(db.docs.get('bans/u9').until.getTime(), t + 2 * 3600 * 1000, 'banned for the configured hours');
+});
+
+test('a bad ban term stops the watch from starting', () => {
+  const base = { db: fakeDb(), auth: {}, balance: { capFromData: () => 0 }, log: { error() {} } };
+  assert.throws(() => new AccountWatch({ ...base, banHours: 0 }), /BAN_HOURS/);
+  assert.throws(() => new AccountWatch({ ...base, banHours: NaN }), /BAN_HOURS/);
+  assert.throws(() => new AccountWatch({ ...base, banReset: '-5' }), /BAN_RESET_BALANCE/);
+  assert.throws(() => new AccountWatch({ ...base, banReset: '12.5' }), /BAN_RESET_BALANCE/);
 });
 
 test('the per-minute rate is the net change, so wins that losses cancel out are not flagged', async () => {
