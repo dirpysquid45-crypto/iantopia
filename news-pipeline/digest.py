@@ -87,7 +87,13 @@ def call_ollama(context: str) -> str:
         timeout=TIMEOUT,
     )
     response.raise_for_status()
-    return response.json()["response"].strip()
+    text = response.json()["response"].strip()
+    # Small models often open with an echo of the request ("Here is a summary ... :").
+    # Drop that first line when it is one, so the digest starts with the news itself.
+    first, sep, rest = text.partition("\n")
+    if sep and first.lower().startswith(("here is", "here's", "sure", "below is")):
+        text = rest.strip()
+    return text
 
 
 def main() -> None:
