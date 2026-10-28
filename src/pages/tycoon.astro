@@ -2429,15 +2429,33 @@
 
   $('build-btn').addEventListener('click', () => { setBrush(null); openPlacePicker(); });
   // Rename the village from the stats bar. Kept short so the bar stays on one row.
-  $('stat-name').parentElement.addEventListener('click', () => {
+  // Signed in, the name goes to the server, which runs the word filter and keeps
+  // it as the village name. The name is never put in the visitor snapshot from
+  // here, since that would skip the filter. Signed out, it stays on this device.
+  const VILLAGE_NAME_ERRORS = {
+    blocked_text: "That name has a word we can't use. Try a different name.",
+    not_switched_on: "Village names aren't switched on yet.",
+  };
+  $('stat-name').parentElement.addEventListener('click', async () => {
+    if (visitLocked()) return;
     const next = prompt('Name your village (up to 24 characters):', village.name || 'My Village');
     if (next == null) return;
     const clean = next.replace(/[<>]/g, '').trim().slice(0, 24);
     if (!clean) return;
-    village.name = clean;
-    $('stat-name').textContent = clean;
+    let shown = clean;
+    if (currentUid()) {
+      const result = await giftPost('/village/name', { name: clean });
+      if (!result.ok) {
+        toast(VILLAGE_NAME_ERRORS[result.error] || giftErrorText(result.error), true);
+        return;
+      }
+      // The server's filtered copy is the one that shows.
+      shown = result.village_name || result.name || clean;
+    }
+    village.name = shown;
+    $('stat-name').textContent = shown;
     saveVillage();
-    toast('🏘️ Your village is now ' + clean + '.');
+    toast('🏘️ Your village is now ' + shown + '.');
   });
   $('place-confirm').addEventListener('click', confirmPlacing);
   $('place-cancel').addEventListener('click', stopPlacing);
