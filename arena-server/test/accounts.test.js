@@ -98,15 +98,16 @@ test('a normal run of small wins, spread out, is not flagged', async () => {
   assert.equal(events.filter((e) => e.kind === 'punish').length, 0);
 });
 
-test('twenty gains in a row with no loss between them is flagged as a win streak, with its page', async () => {
+test('twenty gains in a row with no loss between them are logged to the feed with their page, and not punished', async () => {
   const { save, events, tick } = setup();
   await save('u4', 100);
   let bal = 100;
   for (let i = 0; i < 20; i++) { bal += 100; tick(10000); await save('u4', bal, { amount: 100, page: '/horse-web-game' }); }
-  const punish = events.find((e) => e.kind === 'punish');
-  assert.ok(punish, 'the streak was flagged');
-  assert.equal(punish.detected, 'win_streak');
-  assert.equal(punish.page, '/horse-web-game');
+  const streak = events.find((e) => e.kind === 'punish' && e.action === 'streak');
+  assert.ok(streak, 'the streak is logged');
+  assert.equal(streak.reason, 'win_streak');
+  assert.equal(streak.page, '/horse-web-game');
+  assert.equal(events.filter((e) => e.kind === 'punish' && e.action !== 'streak').length, 0, 'no reset, no ban');
 });
 
 test('a loss between wins restarts the streak', async () => {

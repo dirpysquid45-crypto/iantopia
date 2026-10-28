@@ -27,7 +27,9 @@ const ARCHIVE_BACKUP = 'account_backups'; // record copies taken before a change
 // RATE_LIMIT Strubles in any RATE_WINDOW_MS (the most the site's games can pay
 // in a minute at the largest bets). Losses count against it, so a run of wins
 // and losses is judged by where the balance actually went. STREAK_LIMIT gains
-// in a row with no loss between them is flagged as a run of wins nobody has.
+// in a row with no loss between them is logged to the feed for an admin to look
+// at. It is not punished: normal play (Tetris, tycoon income) can run that long,
+// and the per-source daily caps and the rate limit still bound what a run can pay.
 const RATE_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT = 5000;
 const STREAK_LIMIT = 20;
@@ -190,7 +192,7 @@ class AccountWatch {
     this.streaks.set(uid, streak);
     if (streak >= STREAK_LIMIT) {
       this.streaks.set(uid, 0);
-      return this.punish(uid, { ...info, reason: 'win_streak', streak });
+      this.emit({ kind: 'punish', action: 'streak', uid, name, reason: 'win_streak', streak, page, balance });
     }
   }
 
