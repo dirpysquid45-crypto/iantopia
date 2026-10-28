@@ -1,4 +1,4 @@
-# iantopia VM setup (Oracle Cloud, Ubuntu 22.04 ARM)
+# iantopia VM setup (Google Cloud, Ubuntu 22.04)
 
 Runs everything that used to live on qasim: the static site, the arena server,
 the transcript app, and the news job. Firestore and Auth are already in the
@@ -55,8 +55,9 @@ docker ps                            # arena-server and transcript containers up
 
 ## 4. Things to watch
 
-- **Oracle reclaims idle free VMs.** Check the instance's status in the Oracle
-  console if the site goes down unexpectedly.
+- **Check the VM's status in the Google Cloud console** (project `iantopia`,
+  instance `instance-20261021-231846`, zone `us-central1-a`) if the site goes
+  down unexpectedly.
 - **Secrets stay on the VM.** Never commit them, and keep the Firebase key out
   of chat.
 - **Deploying updates:** re-run `bootstrap.sh` (it pulls, rebuilds, and
