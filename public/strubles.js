@@ -101,6 +101,7 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
         // The server refused the batch as malformed. Drop it so the queue can't stall.
         queue.splice(0, batch.length);
         batch.forEach((op) => { const cb = callbacks[op.id]; delete callbacks[op.id]; if (cb) cb({ id: op.id, ok: false, error: 'bad_request' }); });
+        noteRefused('bad_request');
       } else if (!res.ok) {
         throw new Error('wallet HTTP ' + res.status);
       } else {
@@ -109,6 +110,7 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
           const cb = callbacks[r.id];
           delete callbacks[r.id];
           if (cb) cb(r);
+          if (r.ok === false) noteRefused(r.error);
           if (r.ok === false && r.error === 'insufficient') {
             window.dispatchEvent(new CustomEvent('strubles:refused', { detail: { id: r.id } }));
           }
@@ -178,11 +180,9 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
     return true;
   }
 
-  // Tells the player when a win was only partly credited, because the wallet cap or a
-  // daily income limit clipped it. Shown as a short note, and as an event for pages.
-  function noteCapped(asked, credited) {
-    if (!(asked > credited)) return;
-    try { window.dispatchEvent(new CustomEvent('strubles:capped', { detail: { asked, credited } })); } catch {}
+  // A short note at the bottom of the page, and a 'strubles:notice' event for pages.
+  function showNote(text) {
+    try { window.dispatchEvent(new CustomEvent('strubles:notice', { detail: { text } })); } catch {}
     try {
       let el = document.getElementById('strubles-capped-note');
       if (!el) {
@@ -192,11 +192,35 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
         el.style.cssText = 'position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;background:#000;color:#ffd700;border:2px solid #ffd700;padding:10px 14px;font:12px ui-monospace,monospace;max-width:90vw;text-align:center;pointer-events:none';
         document.body.appendChild(el);
       }
-      el.textContent = `Only ${credited} of ${asked} Strubles were credited (a limit was reached).`;
+      el.textContent = text;
       el.style.display = 'block';
-      clearTimeout(noteCapped.timer);
-      noteCapped.timer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+      clearTimeout(showNote.timer);
+      showNote.timer = setTimeout(() => { el.style.display = 'none'; }, 4000);
     } catch {}
+  }
+
+  // Tells the player when a win was only partly credited, because the wallet cap or a
+  // daily income limit clipped it. Shown as a short note, and as an event for pages.
+  function noteCapped(asked, credited) {
+    if (!(asked > credited)) return;
+    try { window.dispatchEvent(new CustomEvent('strubles:capped', { detail: { asked, credited } })); } catch {}
+    showNote(`Only ${credited} of ${asked} Strubles were credited (a limit was reached).`);
+  }
+
+  // The server refused an op outright (ok: false). Each reason gets a short note, so a
+  // refused credit is never dropped without a word. The balance is corrected to the
+  // server's number when the queue empties.
+  const REFUSAL_TEXT = {
+    rate_limited: 'Too many Strubles changes at once. The last one was not counted.',
+    banned: 'Strubles changes are paused on this account.',
+    insufficient: 'Not enough Strubles for that.',
+    no_round: 'That round had already closed, so its Strubles were not credited.',
+    over_limit: 'That payout is more than the game allows, so it was not credited.',
+    over_refund_budget: 'That refund is more than was paid, so it was not credited.',
+  };
+  function noteRefused(error) {
+    if (error === 'already_claimed') return;   // a second daily or starter claim: the page already shows it
+    showNote(REFUSAL_TEXT[error] || 'A Strubles change was refused, so it was not saved.');
   }
 
   // ---- the public API -------------------------------------------------------
@@ -271,8 +295,10 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
     // when the server answers (0 for guests).
     tetris(points, cb) {
       if (guest()) { guestTetris(points, cb); return; }
-      enqueue({ id: newId(), kind: 'tetris', points: Math.max(0, Number(points) || 0), page: location.pathname }, (r) => {
+      const asked = Math.max(0, Number(points) || 0);
+      enqueue({ id: newId(), kind: 'tetris', points: asked, page: location.pathname }, (r) => {
         if (r.ok && r.applied) _save(r.balance);
+        if (r.ok && !r.duplicate && asked > 0 && r.applied === 0) showNote('No Tetris pay was credited: a daily limit or the wallet cap was reached.');
         if (cb) cb(r.ok ? r.applied : 0);
       });
     },
@@ -283,7 +309,7 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
       if (claims.dailyToday) { if (cb) cb(null); return false; }
       claims.dailyToday = true;
       enqueue({ id: newId(), kind: 'daily' }, (r) => {
-        if (r.ok) { if (r.balance !== undefined) _save(r.balance); if (cb) cb(r.rolled); }
+        if (r.ok) { if (r.balance !== undefined) _save(r.balance); noteCapped(r.rolled, r.applied); if (cb) cb(r.rolled); }
         else { claims.dailyToday = r.error === 'already_claimed'; if (cb) cb(null); }
       });
       return true;
@@ -296,6 +322,7 @@ window.IANTOPIA_IS_DEV = ['localhost', '127.0.0.1', '[::1]'].includes(location.h
       claims.starter = true;
       enqueue({ id: newId(), kind: 'starter' }, (r) => {
         if (r.ok && r.balance !== undefined) _save(r.balance);
+        if (r.ok && r.applied === 0) showNote('The starter Strubles were not credited: the wallet is full.');
         if (cb) cb(r.ok ? r.applied : 0);
       });
       return true;

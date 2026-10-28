@@ -129,3 +129,49 @@ test('the browser has no way to set the balance in production', () => {
   assert.equal(S.set, undefined, 'set is dev-only');
   assert.equal(S.reset, undefined, 'reset is dev-only');
 });
+
+test('a credit the server refuses for rate limiting says so, and the balance drops back', async () => {
+  const { S, win } = loadStrubles({ signedIn: true, respond: (url, opts) => {
+    const ops = JSON.parse(opts.body).ops;
+    return { results: ops.map((o) => ({ id: o.id, ok: false, error: 'rate_limited', applied: 0, balance: 100 })), balance: 100 };
+  } });
+  const notes = [];
+  win.addEventListener('strubles:notice', (e) => notes.push(e.detail.text));
+  await wait(20);
+  S.add(50, undefined, 'tycoon');
+  assert.equal(S.get(), 150, 'shown at once');
+  await wait();
+  assert.equal(S.get(), 100, 'the server answer replaces it');
+  assert.equal(notes.length, 1, 'one note for the refusal');
+  assert.match(notes[0], /Too many Strubles changes/);
+});
+
+test('a win the server credits as 0 says how much was credited', async () => {
+  const { S, win } = loadStrubles({ signedIn: true, respond: (url, opts) => {
+    const ops = JSON.parse(opts.body).ops;
+    return { results: ops.map((o) => ({ id: o.id, ok: true, applied: 0, balance: 100 })), balance: 100 };
+  } });
+  const notes = [];
+  win.addEventListener('strubles:notice', (e) => notes.push(e.detail.text));
+  await wait(20);
+  S.add(50, undefined, 'tycoon');
+  await wait();
+  assert.deepEqual(notes, ['Only 0 of 50 Strubles were credited (a limit was reached).']);
+});
+
+test('a Tetris payout the server credits as 0 says so, and a zero request does not', async () => {
+  const { S, win } = loadStrubles({ signedIn: true, respond: (url, opts) => {
+    const ops = JSON.parse(opts.body).ops;
+    return { results: ops.map((o) => ({ id: o.id, ok: true, applied: 0, balance: 100 })), balance: 100 };
+  } });
+  const notes = [];
+  win.addEventListener('strubles:notice', (e) => notes.push(e.detail.text));
+  await wait(20);
+  S.tetris(0, () => {});
+  await wait();
+  assert.equal(notes.length, 0, 'nothing was asked for, so nothing is refused');
+  S.tetris(40, () => {});
+  await wait();
+  assert.equal(notes.length, 1);
+  assert.match(notes[0], /No Tetris pay was credited/);
+});
