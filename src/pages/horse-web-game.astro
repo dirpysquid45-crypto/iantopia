@@ -1015,21 +1015,33 @@
         const level = terrainLevel();
         const t = level / TERRAIN_MAX_LEVEL;
         const jitter = (v) => v * (0.92 + Math.random() * 0.16);
-        const len = Math.max(260, W * jitter(1.1 - 0.35 * t));
-        const base = Math.random() < 0.5 ? jitter(36 + 84 * t) : -jitter(6 + 12 * t);
-        terrain.push({ x: originX, w: len, h: base, cleared: false });
-        // Hurdles keep clear of both ends so the horse has room to land and to leave.
-        const margin = 120;
-        const usable = len - margin * 2;
+        // Whole pixels: the picture and the collision then agree exactly. A fractional
+        // height left the drawn surface off the one the horse stands on by a pixel.
+        const base = Math.random() < 0.5 ? Math.round(jitter(36 + 84 * t)) : -Math.round(jitter(6 + 12 * t));
+        const raised = base > 0;
+        // Room for the jump at the edge: the previous obstacle's landing, then time to react.
+        const pad = Math.round(maxJumpDistance(atSpeed) * 0.35);
+        const x0 = originX + pad;
+        // A jump up onto a raised stretch comes down anywhere from just past the edge to as
+        // far as the jump can carry: the time the horse spends above the stretch's height,
+        // at this speed. Hurdles start beyond that, plus the horse's length and a moment to
+        // react, so none sits on the landing spot. A dip is gentler (a few px), but the
+        // horse must jump out of its far end, so the room is kept at that end instead.
+        const carryTime = raised ? (2 * Math.sqrt(Math.max(0, JUMP_VELOCITY * JUMP_VELOCITY + 2 * GRAVITY * base))) / Math.abs(GRAVITY) : 0;
+        const lead = Math.round(raised ? atSpeed * carryTime + horseW + atSpeed * 0.25 : 150);
+        const tail = Math.round(raised ? 100 : maxJumpDistance(atSpeed) * 0.55 + 60);
+        const len = Math.round(Math.max(260, W * jitter(1.1 - 0.35 * t), lead + tail + 80));
+        terrain.push({ x: x0, w: len, h: base, cleared: false });
+        const usable = len - lead - tail;
         const spacing = Math.max(230, maxJumpDistance(atSpeed) * 0.8);
         const count = Math.min(1 + Math.floor(level / 3), Math.floor(usable / spacing) + 1);
         const step = count > 1 ? usable / (count - 1) : 0;
         for (let i = 0; i < count; i++) {
           const hurdleType = pickHurdleType();
-          const x = count > 1 ? originX + margin + i * step : originX + len / 2 - hurdleType.w / 2;
-          hurdles.push({ id: nextHurdleId++, x, w: hurdleType.w, h: hurdleType.h, base, cleared: false });
+          const x = count > 1 ? x0 + lead + i * step : x0 + lead + usable / 2 - hurdleType.w / 2;
+          hurdles.push({ id: nextHurdleId++, x: Math.round(x), w: hurdleType.w, h: hurdleType.h, base, cleared: false });
         }
-        return len;
+        return pad + len;
       }},
       // The deadly low plane only enters rotation after 50 hurdle clears
       // -- an explicit skill-gate rather than a speed-tier one, so it
@@ -1182,7 +1194,8 @@
       horse.y = floor; horse.vy = 0; horse.holding = false;
     }
     if (!horse.invincible && !horse.falling && surfaceAt(horseRight) > horse.y + TERRAIN_WALL_TOLERANCE) {
-      endGame('Wiped Out!');
+      // Ran into the face of a platform, higher than the horse's feet.
+      endGame('You Stubbed Your Toe!');
       return;
     }
 
