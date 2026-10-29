@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="/lowfx.css?v=2">
 <script is:inline src="/lowfx.js?v=2"></script>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <title>Tetris at Iantopia</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/tetris/tetris.css?v=5">
+<link rel="stylesheet" href="/tetris/tetris.css?v=7">
 </head>
 <body>
   <div class="tetris-app">
@@ -34,7 +34,7 @@
 
     <div class="main">
       <div class="side">
-        <div class="box"><span>HOLD</span><canvas id="hold-canvas" aria-label="Held piece"></canvas></div>
+        <div class="box holdbox" id="hold-box"><span>HOLD</span><canvas id="hold-canvas" aria-label="Held piece"></canvas></div>
       </div>
 
       <div class="stage" id="stage">
@@ -42,7 +42,8 @@
 
         <div class="overlay show" id="start-overlay" role="dialog" aria-labelledby="start-title">
           <h2 id="start-title">TETRIS</h2>
-          <p>Touch: use the keys below.<br>Keys are shown on each key, and you can change them in Settings.</p>
+          <p class="touch-only">Touch: tap the board to rotate, drag sideways to move, swipe down fast to slam (slower to soft drop), tap HOLD to hold.</p>
+          <p>Keyboard keys can be changed in Settings.</p>
           <button class="btn" id="btn-start" type="button">Start</button>
           <button class="btn" id="btn-settings-start" type="button">Settings</button>
           <p class="credit">Rules from Tetrigo (GPL-3.0). Piece colours from Flatris (MIT). Sounds: PC / Computer, Tetris Zone.</p>
@@ -103,7 +104,7 @@
   <script is:inline src="/tetris/engine.js?v=5"></script>
   <script is:inline src="/tetris/view.js?v=2"></script>
   <script is:inline src="/tetris/keys.js?v=2"></script>
-  <script is:inline src="/tetris/controls.js?v=3"></script>
+  <script is:inline src="/tetris/controls.js?v=5"></script>
   <script is:inline src="/tetris/sfx.js?v=1"></script>
   <script is:inline>
     (() => {
@@ -210,7 +211,7 @@
         $('btn-again').focus();
       }
 
-      function onAction(name) {
+      function onAction(name, via) {
         if (state === 'paused') { if (name === 'pause') resume(); return; }
         if (state !== 'playing' || !board) return;
         switch (name) {
@@ -219,7 +220,10 @@
           case 'rotcw': SFX.play(board.rotate(true) ? 'rotate' : 'rotatefail'); break;
           case 'rotccw': SFX.play(board.rotate(false) ? 'rotate' : 'rotatefail'); break;
           case 'hard': board.hardDrop(); break;
-          case 'hold': if (board.holdPiece()) SFX.play('hold'); break;
+          case 'hold':
+            if (board.holdPiece()) SFX.play('hold');
+            else if (via === 'tap') { SFX.play('rotatefail'); controls.denied($('hold-box')); }   // already held this piece
+            break;
           case 'pause': pause(); return;
           default: break;
         }
@@ -228,6 +232,9 @@
 
       const controls = TetrisControls.attach({
         pad: document.querySelector('.pad'),
+        zone: document.querySelector('.main'),
+        board: $('board'),
+        holdBox: $('hold-box'),
         onAction,
         onSoft: (on) => {
           if (!board || state !== 'playing') return;
