@@ -1665,7 +1665,7 @@
        translucent glass. The buttons inside keep their own per-theme styling. */
     #menu-btn {
       position: fixed;
-      top: calc(10px + env(safe-area-inset-top));
+      top: calc(66px + env(safe-area-inset-top)); /* under the Strubles counter */
       left: calc(20px + env(safe-area-inset-left));
       width: 42px; height: 42px; padding: 0;
       display: flex; align-items: center; justify-content: center;
@@ -1701,7 +1701,7 @@
     #menu-panel {
       position: fixed; top: 0; left: 0; bottom: 0; z-index: 58;
       width: min(300px, 86vw); box-sizing: border-box;
-      padding: calc(64px + env(safe-area-inset-top)) 16px 20px calc(16px + env(safe-area-inset-left));
+      padding: calc(122px + env(safe-area-inset-top)) 16px 20px calc(16px + env(safe-area-inset-left));
       display: flex; flex-direction: column; gap: 10px; overflow-y: auto;
       background: rgba(10, 12, 20, 0.34);
       background: color-mix(in srgb, var(--menu-accent, #8899aa) 9%, rgba(8, 10, 18, 0.34));
@@ -1733,10 +1733,65 @@
     a#strubles-badge { color: inherit; text-decoration: none; cursor: none; transition: transform .15s ease; }
     a#strubles-badge:hover { transform: translateY(-1px); }
     a#strubles-badge:focus-visible { outline: 2px solid #ffd700; outline-offset: 3px; }
+    @media (min-width: 769px) {
+      /* The counter moves up to the corner, and the hamburger sits right under it. */
+      #strubles-badge { top: calc(14px + env(safe-area-inset-top)); }
+    }
     @media (max-width: 768px) {
       /* The Strubles counter sits at the top-left on phones, so the hamburger goes just under it. */
       #menu-btn { top: calc(58px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); }
+      #menu-panel { padding-top: calc(112px + env(safe-area-inset-top)); }
     }
+
+    /* ---- Chat (in the menu panel, under Sign In) ---- */
+    #chat-box, #chat-hint { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    #menu-panel > #chat-box[hidden], #menu-panel > #chat-hint[hidden] { display: none !important; }
+    #menu-panel > #chat-box {
+      min-height: 0 !important; padding: 0; overflow: hidden; color: #fff;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--menu-accent, rgba(255, 255, 255, 0.4));
+      border-radius: var(--menu-radius, 10px);
+      box-shadow: var(--menu-glow, none);
+    }
+    #chat-toggle {
+      all: unset; box-sizing: border-box; display: block; width: 100%; padding: 10px 12px;
+      font-size: 13px; font-weight: 700; color: #fff; cursor: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }
+    #chat-toggle:focus-visible, #chat-send:focus-visible, #chat-reply-cancel:focus-visible, .chat-reply:focus-visible { outline: 2px solid var(--menu-accent, #fff); outline-offset: -2px; }
+    #chat-body { padding: 0 8px 8px; }
+    #chat-log {
+      height: clamp(84px, calc(100vh - 560px), 170px); /* shrinks on short screens so the menu still fits */
+      overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 6px;
+      background: rgba(0, 0, 0, 0.28); border-radius: 8px; font-size: 12px; line-height: 1.4; overscroll-behavior: contain;
+      user-select: text; -webkit-user-select: text;
+    }
+    .chat-msg { padding: 4px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.07); overflow-wrap: anywhere; }
+    .chat-msg.own { background: rgba(255, 255, 255, 0.14); }
+    .chat-msg b { color: var(--menu-accent, #ffd700); font-weight: 700; margin-right: 4px; }
+    .chat-quote { margin: 0 0 3px; padding-left: 6px; border-left: 2px solid var(--menu-accent, #888); color: rgba(255, 255, 255, 0.7); font-size: 11px; }
+    .chat-reply { all: unset; cursor: none; float: right; margin-left: 6px; padding: 0 4px; font-size: 11px; color: rgba(255, 255, 255, 0.65); }
+    .chat-reply:hover { color: #fff; }
+    .chat-empty { margin: auto; color: rgba(255, 255, 255, 0.55); font-size: 12px; text-align: center; }
+    #chat-replying { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; padding: 3px 6px; font-size: 11px; background: rgba(255, 255, 255, 0.1); border-radius: 6px; }
+    #chat-replying[hidden] { display: none; }
+    #chat-replying-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #chat-reply-cancel { all: unset; cursor: none; padding: 0 4px; color: #fff; }
+    #chat-form { display: flex; gap: 6px; margin-top: 6px; }
+    #chat-input {
+      flex: 1; min-width: 0; box-sizing: border-box; padding: 8px; font: inherit; font-size: 13px; cursor: none;
+      color: #fff; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 8px;
+      user-select: text; -webkit-user-select: text;
+    }
+    #chat-input::placeholder { color: rgba(255, 255, 255, 0.5); }
+    #chat-input:focus { outline: 2px solid var(--menu-accent, #fff); outline-offset: 0; }
+    #chat-send {
+      all: unset; box-sizing: border-box; cursor: none; padding: 0 10px; font-size: 14px; font-weight: 700; color: #fff;
+      background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 8px;
+    }
+    #chat-send:disabled { opacity: 0.45; }
+    #chat-status { margin: 4px 0 0; min-height: 15px; font-size: 11px; color: #ffb4b4; }
+    #menu-panel > #chat-hint { min-height: 0 !important; }
+    #chat-hint { margin: 2px 4px 0; font-size: 12px; color: rgba(255, 255, 255, 0.7); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
     @media (prefers-reduced-motion: reduce) {
       #menu-panel, #menu-panel.open, .menu-bars i, #menu-btn { transition: none; }
     }
@@ -1998,6 +2053,20 @@
       <img id="account-btn-icon" src="/assets/icons/google-logo.png" alt="" referrerpolicy="no-referrer" />
       <span id="account-btn-label">Sign In</span>
     </button>
+    <!-- Chat: signed-in players only. It listens for new messages only while it is open. -->
+    <section id="chat-box" aria-label="Chat" hidden>
+      <button id="chat-toggle" type="button" aria-expanded="false" aria-controls="chat-body">💬 Chat</button>
+      <div id="chat-body" hidden>
+        <div id="chat-log" role="log" aria-live="polite"></div>
+        <div id="chat-replying" hidden><span id="chat-replying-text"></span><button id="chat-reply-cancel" type="button" aria-label="Cancel reply">✕</button></div>
+        <form id="chat-form" autocomplete="off">
+          <input id="chat-input" type="text" maxlength="200" placeholder="Say something…" aria-label="Chat message" enterkeyhint="send" autocomplete="off" />
+          <button id="chat-send" type="submit" aria-label="Send message">↵</button>
+        </form>
+        <p id="chat-status" role="status"></p>
+      </div>
+    </section>
+    <p id="chat-hint">Sign in to chat.</p>
   </nav>
   <video id="bg-video" autoplay muted loop playsinline></video>
 
@@ -2045,11 +2114,150 @@
     });
     // Choosing an item (which may open a picker or a page) closes the panel behind it.
     panel.addEventListener('click', (e) => {
+      if (e.target.closest('#chat-box')) return;   // chatting keeps the panel open
       if (e.target.closest('button, a')) setTimeout(() => setOpen(false), 0);
     });
     // A theme change is a class change on the body: re-read the look.
     new MutationObserver(skin).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     skin();
+  })();
+  </script>
+
+  <script is:inline>
+  // Chat, in the menu panel under Sign In. Signed-in players only.
+  //  - Reading: a live Firestore listener on the latest messages, attached only while the panel AND
+  //    the chat are open. Closed, nothing runs and nothing is read.
+  //  - Sending: only when the player presses Enter (or the send button). The message goes to the
+  //    arena server, which applies the word filter, the rate limit and the ban check, and stores it.
+  //  - Replying: each message has a Reply button; the server fills in the quote from the stored message.
+  (() => {
+    const $ = (id) => document.getElementById(id);
+    const box = $('chat-box'), hint = $('chat-hint'), panel = $('menu-panel');
+    if (!box || !hint || !panel) return;
+    const toggle = $('chat-toggle'), body = $('chat-body'), log = $('chat-log'), form = $('chat-form');
+    const input = $('chat-input'), send = $('chat-send'), status = $('chat-status');
+    const replyBar = $('chat-replying'), replyText = $('chat-replying-text');
+    const API = location.protocol === 'https:' ? '/arena-api' : 'http://' + (location.hostname || 'localhost') + ':4001';
+    const ERRORS = {
+      blocked_text: "That message has a word we can't allow.",
+      slow_down: 'Slow down a little.',
+      limit: "You're sending too fast. Wait a minute.",
+      banned: "You can't chat right now.",
+      bad_reply: 'That message is gone, so the reply was cleared.',
+      sign_in: 'Sign in again to chat.',
+      default: "Couldn't send. Try again.",
+    };
+    let unsubscribe = null, replyTo = null, expanded = false, firstRender = true;
+    const user = () => (window.CloudSync && window.CloudSync.currentUser) || null;
+    const setStatus = (t) => { status.textContent = t || ''; };
+
+    function stopListening() { if (unsubscribe) { unsubscribe(); unsubscribe = null; } }
+    function startListening() {
+      if (unsubscribe || !window.firebase) return;
+      try {
+        unsubscribe = firebase.firestore().collection('chat_messages').orderBy('createdAt', 'desc').limit(40).onSnapshot(
+          (snap) => render(snap.docs.map((d) => Object.assign({ id: d.id }, d.data())).reverse()),
+          () => { setStatus('Chat is not available right now.'); stopListening(); }
+        );
+      } catch { setStatus('Chat is not available right now.'); }
+    }
+    // Listen only while the panel and the chat are both open and a player is signed in.
+    function sync() {
+      const live = !box.hidden && expanded && panel.classList.contains('open') && !!user();
+      if (live) startListening(); else stopListening();
+    }
+    function refreshAuth() {
+      const on = !!user();
+      box.hidden = !on;
+      hint.hidden = on;
+      if (!on) { expanded = false; body.hidden = true; toggle.setAttribute('aria-expanded', 'false'); firstRender = true; }
+      sync();
+    }
+
+    function render(msgs) {
+      const me = user() && user().uid;
+      const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+      log.replaceChildren();
+      if (!msgs.length) {
+        const empty = document.createElement('div');
+        empty.className = 'chat-empty';
+        empty.textContent = 'No messages yet. Say hi!';
+        log.append(empty);
+        return;
+      }
+      for (const m of msgs) {
+        const row = document.createElement('div');
+        row.className = 'chat-msg' + (m.uid === me ? ' own' : '');
+        if (m.replyTo) {
+          const q = document.createElement('div');
+          q.className = 'chat-quote';
+          q.textContent = '↩ ' + (m.replyTo.name || 'Player') + ': ' + (m.replyTo.text || '');
+          row.append(q);
+        }
+        const reply = document.createElement('button');
+        reply.type = 'button';
+        reply.className = 'chat-reply';
+        reply.textContent = '↩ Reply';
+        reply.setAttribute('aria-label', 'Reply to ' + (m.name || 'Player'));
+        reply.addEventListener('click', () => setReply(m));
+        const name = document.createElement('b');
+        name.textContent = m.name || 'Player';
+        const text = document.createElement('span');
+        text.textContent = m.text || '';
+        row.append(reply, name, text);
+        log.append(row);
+      }
+      if (nearBottom || firstRender) log.scrollTop = log.scrollHeight;
+      firstRender = false;
+    }
+
+    function setReply(m) {
+      replyTo = { id: m.id, name: m.name || 'Player', text: m.text || '' };
+      replyText.textContent = 'Replying to ' + replyTo.name + ': ' + replyTo.text.slice(0, 40);
+      replyBar.hidden = false;
+      input.focus();
+    }
+    function clearReply() { replyTo = null; replyBar.hidden = true; replyText.textContent = ''; }
+    $('chat-reply-cancel').addEventListener('click', () => { clearReply(); input.focus(); });
+
+    toggle.addEventListener('click', () => {
+      expanded = !expanded;
+      body.hidden = !expanded;
+      toggle.setAttribute('aria-expanded', String(expanded));
+      if (expanded) { firstRender = true; input.focus(); }
+      sync();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text || send.disabled) return;
+      const u = user();
+      if (!u) { setStatus(ERRORS.sign_in); return; }
+      send.disabled = true;
+      setStatus('');
+      try {
+        const token = await u.getIdToken();
+        const res = await fetch(API + '/chat/send', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, replyTo: replyTo ? replyTo.id : undefined }),
+        });
+        const out = await res.json().catch(() => ({}));
+        if (res.ok) { input.value = ''; clearReply(); }
+        else {
+          if (out.error === 'bad_reply') clearReply();
+          setStatus(ERRORS[out.error] || ERRORS.default);   // the text stays, so nothing typed is lost
+        }
+      } catch { setStatus(ERRORS.default); }
+      send.disabled = false;
+      input.focus();
+    });
+
+    // Closing the panel stops the listener; opening it with the chat expanded starts it again.
+    new MutationObserver(sync).observe(panel, { attributes: true, attributeFilter: ['class'] });
+    window.addEventListener('cloudsync:authchanged', refreshAuth);
+    refreshAuth();
   })();
   </script>
 
