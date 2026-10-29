@@ -159,7 +159,7 @@
   }
   @media (prefers-reduced-motion: reduce) { #bank-teller-head { animation:none; } }
   .bank-bubble {
-    position:relative; flex:1; margin:0 0 50px; padding:10px 12px; /* clears the arm and bill on the counter */
+    position:relative; flex:1; margin:0 0 110px; padding:10px 12px; /* clears the money above the counter */
     background:#fff8e1; color:#1a0f08; border:3px solid #000; box-shadow:3px 3px 0 #000;
     font-size:9px; line-height:1.8;
   }
@@ -172,7 +172,7 @@
     border-top:5px solid transparent; border-bottom:5px solid transparent; border-right:7px solid #fff8e1;
   }
   .bank-counter {
-    position:relative; height:44px; margin:0 -16px;
+    position:relative; z-index:3; height:44px; margin:0 -16px; /* over the money, so the hand is under the table */
     border-top:6px solid #d9a243; border-bottom:4px solid #000;
     background:
       linear-gradient(90deg, rgba(0,0,0,.18) 1px, transparent 1px) 0 0 / 46px 100%,
@@ -180,28 +180,25 @@
       repeating-linear-gradient(90deg, #8b5530 0 46px, #74442a 46px 48px);
     box-shadow:inset 0 -6px 0 rgba(0,0,0,.35);
   }
-  /* The arm is drawn flush against his right shoulder, on the same pixel grid
-     as the figure, so it stays attached. Only the bill moves: it slides in
-     under the hand once in a while, as if being counted. */
-  .bank-arm, .bank-bill {
-    position:absolute; bottom:44px; /* the counter's height: sits on the counter top */
-    width:calc(var(--fig-cs) * 6); height:calc(var(--fig-cs) * 5);
-    image-rendering:pixelated; image-rendering:crisp-edges; pointer-events:none;
+  /* The money: a hand under the counter, waving a fan of bills. The image is taller than
+     what shows. Its lower part (the hand and wrist) sits behind the counter, which is drawn
+     over it, so the hand looks like it is under the table and only the money shows. It swings
+     back and forth around the wrist, which makes the arc. */
+  .bank-money {
+    --money-w:164px; --money-hidden:40px; /* the part of the image behind the counter (at most the counter's 44px, less its border) */
+    position:absolute; z-index:2; pointer-events:none; user-select:none; -webkit-user-drag:none;
+    width:var(--money-w); height:auto;
+    left:calc(16px + var(--fig-cs) * 12);
+    bottom:calc(44px - var(--money-hidden)); /* 44px is the counter's height */
+    transform-origin:78% 92%; /* the wrist, under the counter */
+    filter:drop-shadow(2px 3px 0 rgba(0,0,0,.55));
+    animation:bank-wave 2.6s ease-in-out infinite;
   }
-  .bank-arm { left:calc(16px + var(--fig-cs) * 11); z-index:2; }
-  .bank-bill {
-    left:calc(16px + var(--fig-cs) * 15); width:calc(var(--fig-cs) * 10); opacity:0;
-    animation:bank-count 14s steps(1,end) infinite;
+  @keyframes bank-wave {
+    0%, 100% { transform:rotate(-14deg) translateX(-3px); }
+    50%      { transform:rotate(14deg) translateX(3px); }
   }
-  @keyframes bank-count {
-    0%, 79% { opacity:0; transform:translateX(0); }
-    80% { opacity:1; transform:translateX(calc(var(--fig-cs) * 3)); }
-    81% { transform:translateX(calc(var(--fig-cs) * 2)); }
-    82% { transform:translateX(var(--fig-cs)); }
-    83%, 84% { transform:translateX(0); }
-    85%, 100% { opacity:0; transform:translateX(0); }
-  }
-  @media (prefers-reduced-motion: reduce) { .bank-bill { animation:none; opacity:0; } }
+  @media (prefers-reduced-motion: reduce) { .bank-money { animation:none; transform:rotate(-4deg); } }
   .bank-counter::before {
     content:''; position:absolute; left:0; right:0; top:0; height:4px;
     background:linear-gradient(#ffe9a8,#c58a2b); border-bottom:2px solid #000;
@@ -259,7 +256,7 @@
   #visit-bar.open { display:flex; }
   #visit-bar-text { font-size:9px; color:var(--gold); line-height:1.6; }
   .bank-gate { margin:10px 0 0; font-size:8px; line-height:1.8; color:#ffb36b; }
-  @media (max-width:520px) { .bank-windows { grid-template-columns:1fr; } .bank-teller { gap:10px; } .bank-figure { width:72px; --px:6px; } .bank-figure canvas { width:72px; } #bank-teller-head { height:42px; } #bank-teller-body { height:36px; } .bank-hall { --fig-cs:6px; } }
+  @media (max-width:520px) { .bank-windows { grid-template-columns:1fr; } .bank-teller { gap:10px; } .bank-figure { width:72px; --px:6px; } .bank-figure canvas { width:72px; } #bank-teller-head { height:42px; } #bank-teller-body { height:36px; } .bank-hall { --fig-cs:6px; } .bank-money { --money-w:118px; --money-hidden:32px; } .bank-bubble { margin-bottom:80px; } }
 
   /* ---------- The village stage (Phaser canvas lives in here) ---------- */
   #game-stage {
@@ -539,8 +536,8 @@
           </div>
           <p class="bank-bubble" id="bank-say"></p>
         </div>
-        <canvas class="bank-arm" id="bank-arm" width="6" height="5" aria-hidden="true"></canvas>
-        <canvas class="bank-bill" id="bank-bill" width="10" height="5" aria-hidden="true"></canvas>
+        <!-- A hand under the counter waves a fan of bills. The counter is drawn over the hand. -->
+        <img class="bank-money" src="/tycoon/money-spread.png" alt="" aria-hidden="true" draggable="false" />
         <div class="bank-counter"></div>
       </div>
 
@@ -3029,23 +3026,6 @@
     '.VVVVVVVVVV.',
   ];
   const TELLER_PAL = { H: '#3b2a1a', S: '#d9a877', E: '#1a1a1a', R: '#8a4b3a', W: '#f4f4f4', V: '#2a4f8a', T: '#b3262e', G: '#ffd700' };
-  // Right arm (sleeve, forearm, hand) and the bill it counts. The arm's sleeve
-  // meets the body's right edge, so the two read as one figure.
-  const ARM_ART = [
-    '......',
-    '......',
-    '..SSSS',
-    'VVSSSS',
-    'VV....',
-  ];
-  const BILL_ART = [
-    'KKKKKKKKKK',
-    'KBBBBBBBBK',
-    'KBGGGGGGBK',
-    'KBBBBBBBBK',
-    'KKKKKKKKKK',
-  ];
-  const PROP_PAL = { K: '#0f2a18', B: '#6fbf73', G: '#2f7a3e', S: '#d9a877', V: '#2a4f8a' };
   // Rows 0-6 are the head, 7-12 the body. Each canvas is drawn from its own rows.
   function drawRows(canvas, rows, pal = TELLER_PAL) {
     const g = canvas.getContext('2d');
@@ -3080,8 +3060,6 @@
   function drawTeller() {
     drawHead(0);
     drawRows($('bank-teller-body'), TELLER_ART.slice(7));
-    drawRows($('bank-arm'), ARM_ART, PROP_PAL);
-    drawRows($('bank-bill'), BILL_ART, PROP_PAL);
   }
   function bankSay(line) { $('bank-say').textContent = line; }
 
