@@ -2,6 +2,7 @@
 // hits and pausing. The loops are stopped and the simulation is stepped by hand,
 // so the tests don't depend on real time.
 const test = require('node:test');
+const { after } = require('node:test');
 const assert = require('node:assert/strict');
 const { AirHockeyGame, W, H, PUCK_R, PADDLE_R, GOAL_TOP, GOAL_BOTTOM, CORNER_R } = require('../airhockey');
 
@@ -9,10 +10,21 @@ function fakePlayer(name, sessionId) {
   const sent = [];
   return { name, sessionId, userId: 'u_' + sessionId, sent, ws: { readyState: 1, send: (d) => sent.push(JSON.parse(d)) }, bet: 0, guest: false };
 }
+// Every game made here is torn down at the end of the file. A finished game starts a
+// rematch timer (60 s in these tests), which would otherwise keep the process alive.
+const made = [];
+after(() => {
+  for (const g of made) {
+    clearInterval(g.loop); clearInterval(g.snapshotLoop); clearTimeout(g.pauseTimer);
+    g.close();
+  }
+});
+
 function newGame(mode = 'score7') {
   const a = fakePlayer('Ann', 's1'), b = fakePlayer('Ben', 's2');
   const g = new AirHockeyGame('t1', a, b, null, { mode, timing: { graceMs: 60000, rematchMs: 60000 } });
   g.closeTable = () => {};
+  made.push(g);
   g.begin();
   clearInterval(g.loop); clearInterval(g.snapshotLoop); clearTimeout(g.pauseTimer);
   g.paused = false;
