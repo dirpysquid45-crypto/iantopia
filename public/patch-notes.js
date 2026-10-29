@@ -8,6 +8,24 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: "2026-10-29",
+    title: "A New Menu, Chat, Better Games, and Iantopia Is Almost Here",
+    changes: [
+      "COMING SOON: Iantopia is almost published. It is still a work in progress, so expect more changes and the odd bug while we finish it.",
+      "MENU: Inventory, Background, Cursor, Patch Notes, Suggest and Sign In now live behind a hamburger button, right under your Strubles counter. It opens a see-through glass panel that slides in, and it matches whichever theme you are on.",
+      "STRUBLES COUNTER: click it to open the Strubles leaderboard.",
+      "CHAT: sign in, open the menu and open Chat, under Sign In. Press Enter to send, and use Reply on any message to answer it. It only updates while it is open, and messages go through the same word filter as village names.",
+      "LEADERBOARDS: Minesweeper now has one board with a difficulty picker (All, Beginner, Intermediate, Expert, Hormuz) instead of separate ones, and there is a new Strubles board.",
+      "TYCOON STATS: the numbers bar at the top is gone. Everything is in the Stats window, which now updates live and has a Rename village button. The Leaderboard, Visit and You buttons are black with gold outlines.",
+      "BANK: the teller now waves a fan of bills from under the counter.",
+      "GIFTS AND NOTES: send a gift of Strubles (one a day, up to 1,000) or a free note to villages that are open to visitors. Words we can't allow are blocked, and village names are filtered too.",
+      "HORSE GAME: platforms now rise out of the ground as solid dirt walls with grass on top. Hurdles are spaced fairly, so none lands on top of your landing spot, and running into a platform's wall ends the run with You Stubbed Your Toe! You hear an oops when you wipe out, and the Tetris tink when you grab a Struble.",
+      "HORSE GAME ON PHONES: the whole game now scales to your screen, so the horse, hurdles and Strubles keep their proportions, the box is bigger, and double-tapping no longer zooms the page.",
+      "TETRIS ON PHONES: tap the board to rotate, drag a finger sideways to move, swipe down to slam, and tap the Hold box to hold. Double-tap zoom and text highlighting are off while you play. Solo Tetris has a Restart button, and arena Tetris has a New match button once a match is over.",
+      "SCARY MAZE: your mouse pointer comes back after you win or get caught, so you can find the way out.",
+    ],
+  },
+  {
     date: "2026-10-28",
     title: "Daily Profit",
     changes: [
