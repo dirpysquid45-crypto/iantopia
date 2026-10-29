@@ -81,13 +81,17 @@
     text-shadow: 2px 2px 0 #000; text-align:center; width:100%;
   }
 
+  /* Hidden: the Stats window shows these numbers. The bar stays in the page because the game
+     keeps it up to date, and the Stats window reads its numbers from it. */
   #stats-bar {
     flex:0 0 auto;
-    display:flex; justify-content:center; gap:18px; flex-wrap:wrap;
+    display:none; justify-content:center; gap:18px; flex-wrap:wrap;
     background:rgba(0,0,0,.55); border:2px solid var(--gold); padding:8px 14px;
     margin-bottom:12px; font-size:9px; color:#fff;
   }
   #stats-bar b { color:var(--gold); }
+  .stats-actions { margin:0 0 10px; }
+  #stats-rename[hidden] { display:none; }
 
   #cta-row {
     flex:0 0 auto;
@@ -188,7 +192,7 @@
     --money-w:164px; --money-hidden:40px; /* the part of the image behind the counter (at most the counter's 44px, less its border) */
     position:absolute; z-index:2; pointer-events:none; user-select:none; -webkit-user-drag:none;
     width:var(--money-w); height:auto;
-    left:calc(16px + var(--fig-cs) * 12);
+    left:calc(16px + var(--fig-cs) * 8.5); /* just in front of the teller's right side, so the hand reads as his */
     bottom:calc(44px - var(--money-hidden)); /* 44px is the counter's height */
     transform-origin:78% 92%; /* the wrist, under the counter */
     filter:drop-shadow(2px 3px 0 rgba(0,0,0,.55));
@@ -599,6 +603,7 @@
       </div>
 
       <section class="stats-pane" data-stats-pane="you">
+        <div class="stats-actions"><button class="btn" id="stats-rename" type="button">✏️ Rename village</button></div>
         <div id="stats-you"></div>
       </section>
 
@@ -2463,7 +2468,7 @@
     blocked_text: "That name has a word we can't use. Try a different name.",
     not_switched_on: "Village names aren't switched on yet.",
   };
-  $('stat-name').parentElement.addEventListener('click', async () => {
+  async function renameVillage() {
     if (visitLocked()) return;
     const next = prompt('Name your village (up to 24 characters):', village.name || 'My Village');
     if (next == null) return;
@@ -2483,7 +2488,9 @@
     $('stat-name').textContent = shown;
     saveVillage();
     toast('🏘️ Your village is now ' + shown + '.');
-  });
+  }
+  $('stat-name').parentElement.addEventListener('click', renameVillage);
+  $('stats-rename').addEventListener('click', async () => { await renameVillage(); if (statsTab === 'you') renderYourStats(); });
   $('place-confirm').addEventListener('click', confirmPlacing);
   $('place-cancel').addEventListener('click', stopPlacing);
   $('recenter-btn').addEventListener('click', () => { if (cam) recenter(); });
@@ -3197,12 +3204,23 @@
     $('stats-overlay').classList.add('open');
     showStatsTab(tab || 'you');
   }
-  function closeStats() { $('stats-overlay').classList.remove('open'); }
+  function closeStats() { $('stats-overlay').classList.remove('open'); stopStatsLive(); }
+  // While the You tab is open its numbers refresh every second; nothing runs when it is closed.
+  let statsLive = null;
+  function stopStatsLive() { if (statsLive) { clearInterval(statsLive); statsLive = null; } }
+  function startStatsLive() {
+    stopStatsLive();
+    statsLive = setInterval(() => {
+      if (!$('stats-overlay').classList.contains('open') || statsTab !== 'you') { stopStatsLive(); return; }
+      renderYourStats();
+    }, 1000);
+  }
   function showStatsTab(name) {
+    stopStatsLive();
     statsTab = name;
     document.querySelectorAll('[data-stats-tab]').forEach((b) => b.classList.toggle('active', b.dataset.statsTab === name));
     document.querySelectorAll('[data-stats-pane]').forEach((p) => { p.hidden = p.dataset.statsPane !== name; });
-    if (name === 'you') renderYourStats();
+    if (name === 'you') { renderYourStats(); startStatsLive(); }
     if (name === 'board') loadBoard(boardKey);
     if (name === 'visit') {
       // The opt-in belongs to your own village, so it can't change while you are visiting.
@@ -3214,6 +3232,7 @@
   }
   function renderYourStats() {
     const box = $('stats-you');
+    $('stats-rename').hidden = !!visiting;   // the name belongs to your own village
     box.innerHTML = '';
     const add = (label, value) => {
       const row = document.createElement('div');
