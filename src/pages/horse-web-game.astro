@@ -226,6 +226,7 @@
           <h2>🐴 Horse Game</h2>
           <p>Space / ↑ / tap to jump — hold for a higher jump.<br>
           Walk off a gap's edge and you'll fall in — jump clear of it instead. Big gaps have a glowing orb: jump toward it, then tap jump again while touching it to boost across. The widest gaps need two orbs chained back-to-back.<br>
+          After 10 hurdles cleared, the ground starts changing — long stretches of dirt rise up (jump onto the top, but hitting the front face is game over) or sink down (drop in, then jump back out). Hurdles can stand on them, and every 10 hurdles they get bigger.<br>
           After 50 hurdles cleared, low planes start flying in — ↓ / S / the ⬇ button to duck under one, or it's game over.<br>
           Only coins pay <b>Strubles</b> — clearing hurdles just builds your streak. Some orb boosts lead to a rare glowing rice bag: grab it for a few seconds of invincibility.<br>
           Past 100 hurdles, the whole run flips — new stone ground, everything mirrored.</p>
@@ -310,9 +311,9 @@
   powerupAudio.volume = Math.min(0.55, vol + 0.15);
   explosionAudio.volume = Math.min(0.4, vol + 0.1);
 
-  // Default mode auto-alternates through these, advancing on each track's
-  // natural end (not a fixed loop) so it reads as one long rotation
-  // rather than any single song repeating on its own.
+  // Default mode plays these in a random order, picking the next one on each
+  // track's natural end (not a fixed loop). The next pick is never the track
+  // that just finished, so the same song never plays back to back.
   const DUET_TRACKS = [
     { src: '/audio/music/arvan-khoyor-jil.mp3', label: 'Arvan Khoyor Jil' },
     { src: '/audio/music/chinggis-khaan.mp3', label: 'Chinggis Khaan' },
@@ -322,7 +323,12 @@
   // it's mostly silence and bird chirps, a deliberate change of pace from
   // the duet rather than a third rotation slot.
   const QUIET_TRACK = { src: '/audio/music/wild-horse.mp3', label: 'Amazing Wild Horse' };
-  let duetIdx = 0;
+  // Random pick that is never the index passed in, so two tracks can't repeat back to back.
+  function pickOtherDuet(exclude) {
+    const n = Math.floor(Math.random() * (DUET_TRACKS.length - 1));
+    return n >= exclude ? n + 1 : n;
+  }
+  let duetIdx = Math.floor(Math.random() * DUET_TRACKS.length);
   let musicMode = 'duet'; // 'duet' | 'quiet'
 
   function applyTrack(restart) {
@@ -336,7 +342,7 @@
   }
   themeMusic.addEventListener('ended', () => {
     if (musicMode !== 'duet') return;
-    duetIdx = (duetIdx + 1) % DUET_TRACKS.length;
+    duetIdx = pickOtherDuet(duetIdx);
     applyTrack(true);
   });
   $('track-btn').addEventListener('click', () => {
@@ -419,8 +425,18 @@
   rockImg.onload = () => console.log('[Rock] Image loaded successfully');
   rockImg.onerror = () => console.error('[Rock] Failed to load rock.png');
   rockImg.src = '/images/rock.png';
+  // Flat dirt texture for raised and lowered ground (see drawTerrain()).
+  const dirtImg = new Image();
+  dirtImg.src = '/horse-game/dirt-texture.jpg';
+  let dirtPattern = null;
   const HURDLE_FLIP_THRESHOLD = 100;
   const FLIP_COOLDOWN = 2.5; // seconds of no spawning after hitting 100
+  // Terrain: plateaus that raise or lower the ground in chunks. They start
+  // after TERRAIN_FIRST hurdles, get more extreme every 10 hurdles, and stop
+  // at the flip.
+  const TERRAIN_FIRST = 10;
+  const TERRAIN_MAX_LEVEL = 8; // reached at 90 hurdles and held until the flip
+  const TERRAIN_WALL_TOLERANCE = 2; // px a foot can sit below a surface ahead of it before it counts as a wall
   // Bat obstacle: replaces plane from here forward. Bat dimensions are wider and more menacing.
   const batImg = new Image();
   batImg.onload = () => console.log('[Bat] Image loaded');
@@ -531,6 +547,7 @@
   let explosion = null; // { cx, cy, w, age, life, deathReason } -- see triggerPlaneExplosion()
   let horse = { y: 0, vy: 0, holding: false, ducking: false, falling: false, invincible: false };
   let hurdles = [];
+  let terrain = []; // { x, w, h, cleared } -- h is the surface's offset from the ground: + raised, - lowered
   let gaps = [];
   let coins = [];
   let planes = [];
@@ -553,11 +570,25 @@
 
   function hurdleHitbox(w) { return { inset: w * 0.12 }; }
 
+  // Surface offset under a point: the plateau it's over, or the ground (0).
+  // Edges count as on the plateau, so one step flows straight into the next.
+  function surfaceAt(x) {
+    let best = null;
+    for (const t of terrain) {
+      if (x >= t.x && x <= t.x + t.w && (!best || t.h > best.h)) best = t;
+    }
+    return best ? best.h : 0;
+  }
+  // Offset of the surface the horse is standing on (0 for the ground).
+  function standHeight() {
+    return surfaceAt(HORSE_X + horseW * 0.5);
+  }
+
   // Single source of truth for the horse's current collision box --
   // ducking only shrinks its height (and only while grounded), so every
   // obstacle type checks against this instead of re-deriving it.
   function horseBox() {
-    const h = (horse.ducking && horse.y <= 0.5 && !horse.falling) ? horseH * DUCK_HEIGHT_FACTOR : horseH;
+    const h = (horse.ducking && horse.y <= standHeight() + 0.5 && !horse.falling) ? horseH * DUCK_HEIGHT_FACTOR : horseH;
     const left = HORSE_X + horseW * 0.24;
     const right = HORSE_X + horseW * 0.86;
     const top = groundY - horse.y - h;
@@ -579,7 +610,7 @@
     flipCooldown = 0;
     cleared = 0; earned = 0;
     deathReason = 'Wiped Out!';
-    hurdles = []; gaps = []; coins = []; planes = []; orbs = []; riceBags = [];
+    hurdles = []; terrain = []; gaps = []; coins = []; planes = []; orbs = []; riceBags = [];
     dust = []; bursts = []; particles = []; shake = 0; explosion = null;
     powerupAudio.pause();
     powerupAudio.currentTime = 0;
@@ -634,7 +665,7 @@
     if (state === 'idle' || state === 'over') { beginRun(); return; }
     if (state !== 'playing') return;
     if (horse.falling) return; // already committed to the hole -- no jumping out of it
-    if (horse.y > 0.5 || horse.vy > 0) {
+    if (horse.y > standHeight() + 0.5 || horse.vy > 0) {
       // Airborne -- a second, distinct jump press only ever does one
       // thing: parry a live orb it's currently touching. Deliberately a
       // real double-click, not an auto-pickup on overlap -- tap to jump,
@@ -827,6 +858,12 @@
     return p;
   }
 
+  // Terrain difficulty: level 0 for hurdles 10-19, up one level every 10
+  // hurdles, held at TERRAIN_MAX_LEVEL from 90 until the flip at 100.
+  function terrainLevel() {
+    return Math.min(TERRAIN_MAX_LEVEL, Math.floor(cleared / 10) - 1);
+  }
+
   function spawnGap(x, w, withOrb) {
     gaps.push({ x, w, cleared: false });
     if (withOrb) {
@@ -961,6 +998,32 @@
         spawnGap(originX, w, true);
         return w;
       }},
+      // Raised or lowered ground, from 10 hurdles until the flip. Each stretch
+      // is long, and it can carry hurdles along its top (or floor): they
+      // stand on the ground's new level, spaced so each one can be jumped.
+      // A level sets how high or deep the ground moves. Walls at each end
+      // are what the horse has to jump: up onto a raised stretch, or back
+      // out of a dip.
+      { tier: 0, weight: 2, enabled: () => cleared >= TERRAIN_FIRST && cleared < HURDLE_FLIP_THRESHOLD, build: () => {
+        const level = terrainLevel();
+        const t = level / TERRAIN_MAX_LEVEL;
+        const jitter = (v) => v * (0.92 + Math.random() * 0.16);
+        const len = Math.max(260, W * jitter(1.1 - 0.35 * t));
+        const base = Math.random() < 0.5 ? jitter(36 + 84 * t) : -jitter(6 + 12 * t);
+        terrain.push({ x: originX, w: len, h: base, cleared: false });
+        // Hurdles keep clear of both ends so the horse has room to land and to leave.
+        const margin = 120;
+        const usable = len - margin * 2;
+        const spacing = Math.max(230, maxJumpDistance(atSpeed) * 0.8);
+        const count = Math.min(1 + Math.floor(level / 3), Math.floor(usable / spacing) + 1);
+        const step = count > 1 ? usable / (count - 1) : 0;
+        for (let i = 0; i < count; i++) {
+          const hurdleType = pickHurdleType();
+          const x = count > 1 ? originX + margin + i * step : originX + len / 2 - hurdleType.w / 2;
+          hurdles.push({ id: nextHurdleId++, x, w: hurdleType.w, h: hurdleType.h, base, cleared: false });
+        }
+        return len;
+      }},
       // The deadly low plane only enters rotation after 50 hurdle clears
       // -- an explicit skill-gate rather than a speed-tier one, so it
       // reliably shows up once a player has proven they can handle the
@@ -1010,6 +1073,7 @@
     // ground clamp itself is decided further down, once this frame's gap
     // positions are known (see "Ground contact" below) -- stepping onto
     // open air falls through instead of snapping back to y=0.
+    const prevY = horse.y;
     const grounded = horse.y <= 0.5 && !horse.falling;
     const gravityMult = (horse.ducking && !grounded && !horse.falling) ? FASTFALL_GRAVITY_MULT : 1;
     horse.vy += GRAVITY * gravityMult * dt;
@@ -1052,7 +1116,7 @@
       const hurdleLeft = h.x + hb.inset;
       const hurdleRight = h.x + h.w - hb.inset;
       const xOverlap = horseRight > hurdleLeft && horseLeft < hurdleRight;
-      if (xOverlap && horse.y < h.h - 8 && !horse.invincible) {
+      if (xOverlap && horse.y < (h.base || 0) + h.h - 8 && !horse.invincible) {
         endGame('Wiped Out!');
         return;
       }
@@ -1086,13 +1150,41 @@
       if (g.x + g.w < -30) gaps.splice(i, 1);
     }
 
+    // Terrain -- scroll it, and count a plateau as cleared once the horse is
+    // past it. The horse's centre decides what it stands on, and it only
+    // lands on a surface it was already at or above (so it can't teleport
+    // up a stair). The front foot is what meets walls: if the surface under
+    // it is higher than the horse's feet, that's a wipe-out. A drop just lets
+    // it fall, since the back foot isn't checked.
+    for (let i = terrain.length - 1; i >= 0; i--) {
+      const t = terrain[i];
+      t.x -= speed * dt;
+      if (!t.cleared && t.x + t.w < HORSE_X) {
+        t.cleared = true;
+        cleared++;
+        $('stat-cleared').textContent = cleared.toLocaleString();
+        if (cleared === HURDLE_FLIP_THRESHOLD) flipCooldown = FLIP_COOLDOWN;
+      }
+      if (t.x + t.w < -30) terrain.splice(i, 1);
+    }
+    const floor = standHeight();
+    if (!horse.falling && horse.y <= floor + 0.5 && prevY >= floor - 0.5) {
+      horse.y = floor; horse.vy = 0; horse.holding = false;
+    }
+    if (!horse.invincible && !horse.falling && surfaceAt(horseRight) > horse.y + TERRAIN_WALL_TOLERANCE) {
+      endGame('Wiped Out!');
+      return;
+    }
+
     // Ground contact -- the horse only actually falls into a gap once it
     // physically crosses onto the open space over it, rather than dying
     // the instant a hitbox merely touches the gap's edge. Once falling
     // starts it's committed (no jumping out, see jump()) and gravity just
     // keeps pulling it down past the ground line into the hole, ending
-    // the run once it's fallen far enough to be off-screen.
-    if (!horse.falling && horse.y <= 0.5) {
+    // the run once it's fallen far enough to be off-screen. Only the
+    // ground itself is handled here: a horse on a plateau or in a dip is
+    // held by the terrain check above.
+    if (!horse.falling && floor === 0 && horse.y <= 0.5) {
       const centerX = HORSE_X + horseW * 0.5;
       // A few px of grace inset from each edge -- grazing the very lip of
       // a gap shouldn't be an instant fall, only being solidly over it.
@@ -1229,14 +1321,17 @@
       for (const h of hurdles) if (!h.knocked) furthest = Math.max(furthest, h.x + h.w);
       for (const g of gaps) furthest = Math.max(furthest, g.x + g.w);
       for (const p of planes) furthest = Math.max(furthest, p.x + p.w);
+      for (const t of terrain) furthest = Math.max(furthest, t.x + t.w);
       if (furthest > spawnX - clearance) {
         spawnTimer = 0.15; // still occupied -- recheck shortly instead of forcing an overlap
       } else {
         const gapsBefore = gaps.length;
         const planesBefore = planes.length;
+        const terrainBefore = terrain.length;
         const extent = buildEncounter(spawnX, speed);
         const addedGap = gaps.length > gapsBefore;
         const addedPlane = planes.length > planesBefore;
+        const addedTerrain = terrain.length > terrainBefore;
         const base = Math.max(0.6, 1.45 - speed / 750);
         // A wide orb-gap can extend hundreds of px past its own origin --
         // the next encounter must not spawn until THIS one's tail has
@@ -1251,7 +1346,7 @@
         // specifically needs a jump-capable recovery (duck -> stand ->
         // ready to jump is a bigger transition than duck -> duck again),
         // so it gets the same bonus a gap does.
-        const recoveryBonus = (addedGap || addedPlane) ? 0.7 : 0;
+        const recoveryBonus = (addedGap || addedPlane || addedTerrain) ? 0.7 : 0;
         spawnTimer = Math.max(base + Math.random() * 0.5, safeTimer) + recoveryBonus;
       }
     }
@@ -1301,18 +1396,40 @@
     }
   }
 
+  // A plateau or dip: the ground there sits at a different height. The
+  // earth under the surface is filled in, with the grass strip on top.
+  function drawTerrain(t) {
+    const surfaceY = groundY - t.h;
+    ctx.save();
+    if (t.h < 0) {
+      // Cut the ground out of a dip first, so the lowered dirt sits where it should.
+      ctx.clearRect(t.x, groundY - 2, t.w, H - groundY + 2);
+    }
+    ctx.beginPath();
+    ctx.rect(t.x, surfaceY, t.w, H - surfaceY);
+    ctx.clip();
+    if (!dirtPattern && dirtImg.complete && dirtImg.naturalWidth) {
+      // The texture is 1200px; scale it down so the dirt grain reads at game size.
+      dirtPattern = ctx.createPattern(dirtImg, 'repeat');
+      dirtPattern.setTransform(new DOMMatrix().scale(0.4));
+    }
+    ctx.fillStyle = dirtPattern || '#5a3b1e';
+    ctx.fillRect(t.x, surfaceY, t.w, H - surfaceY);
+    ctx.restore();
+  }
+
   function drawHurdle(h) {
     ctx.save();
     if (h.knocked) {
       // Invincibility just punted this one off screen -- shift it up by
       // how far it's flown, then spin it around its own center.
       ctx.translate(0, -h.knockY);
-      const cx = h.x + h.w / 2, cy = groundY - h.h / 2;
+      const cx = h.x + h.w / 2, cy = groundY - (h.base || 0) - h.h / 2;
       ctx.translate(cx, cy);
       ctx.rotate(h.knockRot);
       ctx.translate(-cx, -cy);
     }
-    const baseY = groundY;
+    const baseY = groundY - (h.base || 0);
     const topY = baseY - h.h;
 
     // After 100 hurdles, use rock skin for second act. Before that, use fence.
@@ -1325,7 +1442,7 @@
         const rockDisplayH = Math.max(h.h * 1.8, 120);
         const rockDisplayW = rockDisplayH * ROCK_ASPECT;
         const rockX = h.x + h.w / 2 - rockDisplayW / 2;
-        const rockY = groundY - rockDisplayH;
+        const rockY = baseY - rockDisplayH;
         ctx.drawImage(rockImg, rockX, rockY, rockDisplayW, rockDisplayH);
       } else {
         // Fallback: brown stone color if image not loaded
@@ -1358,15 +1475,16 @@
   }
 
   function drawHorse() {
-    const ducking = horse.ducking && horse.y <= 0.5 && !horse.falling;
-    const jumping = !ducking && !horse.falling && horse.y > 0.5;
+    const ground = standHeight();
+    const ducking = horse.ducking && horse.y <= ground + 0.5 && !horse.falling;
+    const jumping = !ducking && !horse.falling && horse.y > ground + 0.5;
     const w = ducking ? horseW * 1.3 : horseW;
     const h = ducking ? w * DUCK_ASPECT : (jumping ? w * JUMP_ASPECT : horseH);
     const x = ducking ? HORSE_X - (w - horseW) * 0.35 : HORSE_X;
     const y = groundY - h - horse.y;
     // Gallop bob only while grounded and actually running -- airborne
     // motion already reads from the jump arc itself.
-    const bob = (state === 'playing' && horse.y <= 0.5 && !horse.falling)
+    const bob = (state === 'playing' && horse.y <= ground + 0.5 && !horse.falling)
       ? Math.sin(performance.now() / 90) * 3
       : 0;
     ctx.save();
@@ -1597,13 +1715,16 @@
 
     drawSpeedLines();
     drawDust();
+    // The ground is painted before anything that stands on it, so a dip's
+    // cut-out never erases the horse's legs.
+    drawGround();
+    for (const t of terrain) drawTerrain(t);
     for (const c of coins) drawCoin(c);
     for (const h of hurdles) drawHurdle(h);
     for (const b of planes) drawBat(b);
     for (const o of orbs) drawOrb(o);
     for (const rb of riceBags) drawRiceBag(rb);
     drawHorse();
-    drawGround();
     drawParticles();
     drawExplosion();
     ctx.restore();
@@ -1674,7 +1795,8 @@
     getState: () => ({
       state, speed, cleared, earned, best, deathReason, powerupTimer,
       horse: { y: horse.y, vy: horse.vy, ducking: horse.ducking, falling: horse.falling, invincible: horse.invincible },
-      hurdles: hurdles.map((h) => ({ id: h.id, x: h.x, w: h.w, h: h.h, cleared: h.cleared, knocked: !!h.knocked })),
+      hurdles: hurdles.map((h) => ({ id: h.id, x: h.x, w: h.w, h: h.h, base: h.base || 0, cleared: h.cleared, knocked: !!h.knocked })),
+      terrain: terrain.map((t) => ({ x: t.x, w: t.w, h: t.h, cleared: t.cleared })),
       gaps: gaps.map((g) => ({ x: g.x, w: g.w })),
       coins: coins.map((c) => ({ x: c.x, y: c.y, value: c.value, collected: c.collected })),
       planes: planes.map((p) => ({ x: p.x, y: p.y })),
