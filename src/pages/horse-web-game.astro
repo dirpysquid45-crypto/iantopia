@@ -311,6 +311,26 @@
   powerupAudio.volume = Math.min(0.55, vol + 0.15);
   explosionAudio.volume = Math.min(0.4, vol + 0.1);
 
+  // Struble pickup: the Tetris "piece lands gently" tink (the lock sound,
+  // not the hard-drop slam). Pickups can land a few frames apart, so a small
+  // round-robin pool of Audio objects lets each one ring out in full instead
+  // of cutting the previous one off. oops.mp3 is the death sound.
+  const COIN_SFX_SRC = '/audio/tetris/sfx/SFX_PieceLockdown.mp3';
+  const coinSfxPool = Array.from({ length: 6 }, () => {
+    const a = new Audio(COIN_SFX_SRC);
+    a.preload = 'auto';
+    return a;
+  });
+  let coinSfxNext = 0;
+  const oopsAudio = new Audio('/maze-game/oops.mp3');
+  oopsAudio.preload = 'auto';
+  function sfxVolumes(v) {
+    const coinVol = Math.min(1, v + 0.35);
+    for (const a of coinSfxPool) a.volume = coinVol;
+    oopsAudio.volume = Math.min(1, v + 0.4);
+  }
+  sfxVolumes(vol);
+
   // Default mode plays these in a random order, picking the next one on each
   // track's natural end (not a fixed loop). The next pick is never the track
   // that just finished, so the same song never plays back to back.
@@ -374,11 +394,23 @@
     sfxClear.volume = Math.min(1, v + 0.3);
     powerupAudio.volume = Math.min(0.55, v + 0.15);
     explosionAudio.volume = Math.min(0.4, v + 0.1);
+    sfxVolumes(v);
     localStorage.setItem(VOLUME_KEY, v);
   });
   function playClearSfx() {
     if (!audioEnabled) return;
     try { sfxClear.currentTime = 0; sfxClear.play().catch(() => {}); } catch {}
+  }
+
+  function playCoinSfx() {
+    if (!audioEnabled) return;
+    const a = coinSfxPool[coinSfxNext];
+    coinSfxNext = (coinSfxNext + 1) % coinSfxPool.length;
+    try { a.currentTime = 0; a.play().catch(() => {}); } catch {}
+  }
+  function playOopsSfx() {
+    if (!audioEnabled) return;
+    try { oopsAudio.currentTime = 0; oopsAudio.play().catch(() => {}); } catch {}
   }
 
   // ================= Game =================
@@ -773,6 +805,7 @@
     shake = 0.25;
     if (horse.invincible) { horse.invincible = false; powerupTimer = 0; powerupAudio.pause(); }
     deathReason = reason || 'Wiped Out!';
+    playOopsSfx();
     try { GameStats.record('horse', 'run', { score: cleared, net: earned }); } catch {}
     if (cleared > best) {
       best = cleared;
@@ -1270,6 +1303,7 @@
         const dy = c.y - (box.top + box.bottom) / 2;
         if (Math.hypot(dx, dy) < c.r + horseW * 0.28) {
           c.collected = true;
+          playCoinSfx();
           earned += c.value;
           const beforeBal = Strubles.get();
           const cap = (window.TycoonBank && window.TycoonBank.currentCap()) || Infinity;
