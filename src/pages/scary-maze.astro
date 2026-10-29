@@ -77,6 +77,9 @@
     gap:18px; text-align:center; padding:20px;
   }
   #result-screen.show { display:flex; }
+  /* The pointer is hidden while the dot is picked up. It must be back on the result screen. */
+  #result-screen, #result-screen * { cursor:default; }
+  #result-screen a { cursor:pointer; }
   #result-screen h1 { font-size:clamp(16px,4vw,24px); color:var(--green); text-shadow:0 0 16px rgba(57,255,20,.7); margin:0; }
   #result-screen .reward {
     display:flex; flex-direction:column; align-items:center; gap:10px;
@@ -257,6 +260,7 @@
   function caught() {
     over = true; playing = false;
     if (document.pointerLockElement) document.exitPointerLock();
+    document.body.style.cursor = 'default';
     jumpscare.classList.add('show');
     try { sfxScream.currentTime = 0; sfxScream.volume = 0.85; sfxScream.play().catch(() => {}); } catch {}
     setTimeout(() => { location.href = '/'; }, 1900);
@@ -265,6 +269,7 @@
   function win() {
     over = true; playing = false;
     if (document.pointerLockElement) document.exitPointerLock();
+    document.body.style.cursor = 'default';
     grantJobApplication();
     showConfetti();
     try { sfxCheer.currentTime = 0; sfxCheer.volume = 0.8; sfxCheer.play().catch(() => {}); } catch {}
@@ -311,11 +316,11 @@
   });
 
   document.addEventListener('pointerlockchange', () => {
-    if (over) return;
     const locked = document.pointerLockElement === canvas;
+    document.body.style.cursor = locked && !over ? 'none' : 'default';
+    if (over) return;
     playing = locked;
     if (locked) hasStarted = true;
-    document.body.style.cursor = locked ? 'none' : 'default';
     hud.textContent = locked
       ? "Esc pauses. Don't touch the black walls."
       : (hasStarted ? 'Click the red square to resume.' : 'Click the red square to pick it up.');
