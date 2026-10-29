@@ -583,12 +583,19 @@
   function standHeight() {
     return surfaceAt(HORSE_X + horseW * 0.5);
   }
+  // The height that holds the horse up: the higher of what is under its centre and
+  // under its front foot. Landing on the centre alone meant a jump that came down with
+  // the front foot already over a platform (or back over the ground after a dip) fell
+  // past the surface, and the wall check then ended the run on a jump that cleared.
+  function supportHeight() {
+    return Math.max(standHeight(), surfaceAt(HORSE_X + horseW * 0.86));
+  }
 
   // Single source of truth for the horse's current collision box --
   // ducking only shrinks its height (and only while grounded), so every
   // obstacle type checks against this instead of re-deriving it.
   function horseBox() {
-    const h = (horse.ducking && horse.y <= standHeight() + 0.5 && !horse.falling) ? horseH * DUCK_HEIGHT_FACTOR : horseH;
+    const h = (horse.ducking && horse.y <= supportHeight() + 0.5 && !horse.falling) ? horseH * DUCK_HEIGHT_FACTOR : horseH;
     const left = HORSE_X + horseW * 0.24;
     const right = HORSE_X + horseW * 0.86;
     const top = groundY - horse.y - h;
@@ -665,7 +672,7 @@
     if (state === 'idle' || state === 'over') { beginRun(); return; }
     if (state !== 'playing') return;
     if (horse.falling) return; // already committed to the hole -- no jumping out of it
-    if (horse.y > standHeight() + 0.5 || horse.vy > 0) {
+    if (horse.y > supportHeight() + 0.5 || horse.vy > 0) {
       // Airborne -- a second, distinct jump press only ever does one
       // thing: parry a live orb it's currently touching. Deliberately a
       // real double-click, not an auto-pickup on overlap -- tap to jump,
@@ -1167,7 +1174,10 @@
       }
       if (t.x + t.w < -30) terrain.splice(i, 1);
     }
-    const floor = standHeight();
+    // The centre decides ground and gap contact below. The front foot also holds the
+    // horse up, so a landing with only the front over a surface still lands.
+    const centerFloor = standHeight();
+    const floor = supportHeight();
     if (!horse.falling && horse.y <= floor + 0.5 && prevY >= floor - 0.5) {
       horse.y = floor; horse.vy = 0; horse.holding = false;
     }
@@ -1184,7 +1194,7 @@
     // the run once it's fallen far enough to be off-screen. Only the
     // ground itself is handled here: a horse on a plateau or in a dip is
     // held by the terrain check above.
-    if (!horse.falling && floor === 0 && horse.y <= 0.5) {
+    if (!horse.falling && centerFloor === 0 && horse.y <= 0.5) {
       const centerX = HORSE_X + horseW * 0.5;
       // A few px of grace inset from each edge -- grazing the very lip of
       // a gap shouldn't be an instant fall, only being solidly over it.
@@ -1396,25 +1406,83 @@
     }
   }
 
-  // A plateau or dip: the ground there sits at a different height. The
-  // earth under the surface is filled in, with the grass strip on top.
+  // A plateau or dip: the ground there sits at a different height. The earth under the
+  // surface is dirt, with the grass strip laid OVER the top of it (the strip's top edge is
+  // see-through blade tips, so the dirt starts a little way down and the blades cover it).
+  // Soft shading falls on the dirt just under the grass, and the sides are darkened so a
+  // raised stretch reads as a block of earth. Edges are snapped to whole pixels: with
+  // fractional edges the platform and the ground beside it left a hairline seam, which
+  // made the platform look like a hazard.
+  const TERRAIN_GRASS_TOP_GAP = 21;   // px of the grass strip above the dirt: the thin blade tips, so the dirt edge never shows through them
   function drawTerrain(t) {
-    const surfaceY = groundY - t.h;
+    const x0 = Math.floor(t.x);
+    const x1 = Math.ceil(t.x + t.w);
+    if (x1 <= 0 || x0 >= W) return;
+    const w = x1 - x0;
+    const surfaceY = Math.round(groundY - t.h);   // the surface line, where the horse's feet are
+    const dirtTop = surfaceY + TERRAIN_GRASS_TOP_GAP;
+    const grassH = GROUND_H;
     ctx.save();
     if (t.h < 0) {
       // Cut the ground out of a dip first, so the lowered dirt sits where it should.
-      ctx.clearRect(t.x, groundY - 2, t.w, H - groundY + 2);
+      ctx.clearRect(x0, groundY - 2, w, H - groundY + 2);
     }
+
+    // 1. The dirt. The pattern is drawn in the platform's own coordinates, so the grain
+    // moves with it instead of sliding underneath.
+    ctx.save();
     ctx.beginPath();
-    ctx.rect(t.x, surfaceY, t.w, H - surfaceY);
+    ctx.rect(x0, dirtTop, w, H - dirtTop);
     ctx.clip();
+    ctx.translate(x0, dirtTop);
     if (!dirtPattern && dirtImg.complete && dirtImg.naturalWidth) {
       // The texture is 1200px; scale it down so the dirt grain reads at game size.
       dirtPattern = ctx.createPattern(dirtImg, 'repeat');
       dirtPattern.setTransform(new DOMMatrix().scale(0.4));
     }
     ctx.fillStyle = dirtPattern || '#5a3b1e';
-    ctx.fillRect(t.x, surfaceY, t.w, H - surfaceY);
+    ctx.fillRect(0, 0, w, H - dirtTop);
+    // 2. Shade the dirt right under the grass, deepest where the blades end, fading out.
+    const shadeEnd = grassH - TERRAIN_GRASS_TOP_GAP + 16;
+    const shade = ctx.createLinearGradient(0, 0, 0, shadeEnd);
+    shade.addColorStop(0, 'rgba(10,18,4,.62)');
+    shade.addColorStop(0.7, 'rgba(10,18,4,.34)');
+    shade.addColorStop(1, 'rgba(10,18,4,0)');
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 0, w, shadeEnd);
+    // Darker sides, so the stretch looks like a block with edges, not a flat sticker.
+    const edge = Math.min(14, Math.floor(w / 2));
+    const left = ctx.createLinearGradient(0, 0, edge, 0);
+    left.addColorStop(0, 'rgba(0,0,0,.45)'); left.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = left;
+    ctx.fillRect(0, 0, edge, H - dirtTop);
+    const right = ctx.createLinearGradient(w - edge, 0, w, 0);
+    right.addColorStop(0, 'rgba(0,0,0,0)'); right.addColorStop(1, 'rgba(0,0,0,.45)');
+    ctx.fillStyle = right;
+    ctx.fillRect(w - edge, 0, edge, H - dirtTop);
+    ctx.restore();
+
+    // 3. The grass strip, over the dirt. It uses the same tile phase as the ground, so the
+    // blades line up with the grass on either side of the platform.
+    const useStone = cleared >= HURDLE_FLIP_THRESHOLD;
+    const groundImg = useStone ? stoneImg : grassImg;
+    const groundAspect = useStone ? STONE_ASPECT : GRASS_ASPECT;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, surfaceY, w, grassH);
+    ctx.clip();
+    if (groundImg.complete && groundImg.naturalWidth) {
+      const tileW = grassH / groundAspect;
+      let x = -groundScroll;
+      while (x < x1) {
+        if (x + tileW > x0) ctx.drawImage(groundImg, x, surfaceY, tileW, grassH);
+        x += tileW;
+      }
+    } else {
+      ctx.fillStyle = useStone ? '#6b6b66' : '#2f6d2f';
+      ctx.fillRect(x0, surfaceY + TERRAIN_GRASS_TOP_GAP, w, grassH - TERRAIN_GRASS_TOP_GAP);
+    }
+    ctx.restore();
     ctx.restore();
   }
 
@@ -1475,7 +1543,7 @@
   }
 
   function drawHorse() {
-    const ground = standHeight();
+    const ground = supportHeight();
     const ducking = horse.ducking && horse.y <= ground + 0.5 && !horse.falling;
     const jumping = !ducking && !horse.falling && horse.y > ground + 0.5;
     const w = ducking ? horseW * 1.3 : horseW;
