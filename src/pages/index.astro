@@ -1658,6 +1658,88 @@
       a.big, button.big { padding: 10px 16px; font-size: clamp(14px, 2.5vw, 20px); }
     }
 
+
+    /* ---- Menu: a hamburger that opens a see-through glass side panel ----
+       The hamburger has no background of its own (just the theme's outline and glow, from
+       --menu-accent / --menu-glow, set by the script from a themed button). The panel is
+       translucent glass. The buttons inside keep their own per-theme styling. */
+    #menu-btn {
+      position: fixed;
+      top: calc(10px + env(safe-area-inset-top));
+      left: calc(20px + env(safe-area-inset-left));
+      width: 42px; height: 42px; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent;
+      color: var(--menu-ink, #fff);
+      border: 2px solid var(--menu-accent, #2a3245);
+      border-radius: var(--menu-radius, 10px);
+      box-shadow: var(--menu-glow, none);
+      cursor: none; z-index: 60;
+      transition: transform .15s ease, box-shadow .2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #menu-btn:hover { transform: translateY(-1px); }
+    #menu-btn:focus-visible { outline: 2px solid var(--menu-accent, #fff); outline-offset: 3px; }
+    .menu-bars { position: relative; display: block; width: 20px; height: 14px; }
+    .menu-bars i {
+      position: absolute; left: 0; width: 100%; height: 2px; border-radius: 2px;
+      /* White bars with a dark edge and a themed glow, so they show on any theme's background
+         (a button's own text colour is chosen for its own coloured face, not for the page). */
+      background: #fff; box-shadow: 0 0 5px var(--menu-accent, rgba(0, 0, 0, 0.6)), 0 0 2px rgba(0, 0, 0, 0.75);
+      transition: transform .25s ease, opacity .2s ease, top .25s ease;
+    }
+    .menu-bars i:nth-child(1) { top: 0; }
+    .menu-bars i:nth-child(2) { top: 6px; }
+    .menu-bars i:nth-child(3) { top: 12px; }
+    #menu-btn.open .menu-bars i:nth-child(1) { top: 6px; transform: rotate(45deg); }
+    #menu-btn.open .menu-bars i:nth-child(2) { opacity: 0; }
+    #menu-btn.open .menu-bars i:nth-child(3) { top: 6px; transform: rotate(-45deg); }
+
+    #menu-scrim { position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, 0.14); }
+    #menu-scrim[hidden] { display: none; }
+
+    #menu-panel {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 58;
+      width: min(300px, 86vw); box-sizing: border-box;
+      padding: calc(64px + env(safe-area-inset-top)) 16px 20px calc(16px + env(safe-area-inset-left));
+      display: flex; flex-direction: column; gap: 10px; overflow-y: auto;
+      background: rgba(10, 12, 20, 0.34);
+      background: color-mix(in srgb, var(--menu-accent, #8899aa) 9%, rgba(8, 10, 18, 0.34));
+      -webkit-backdrop-filter: blur(16px) saturate(1.35);
+      backdrop-filter: blur(16px) saturate(1.35);
+      border-right: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 10px 0 40px rgba(0, 0, 0, 0.35), inset -1px 0 0 rgba(255, 255, 255, 0.1);
+      transform: translateX(-104%); opacity: 0; visibility: hidden;
+      transition: transform .34s cubic-bezier(.22, 1, .36, 1), opacity .22s ease, visibility 0s linear .34s;
+    }
+    #menu-panel.open {
+      transform: none; opacity: 1; visibility: visible;
+      transition: transform .34s cubic-bezier(.22, 1, .36, 1), opacity .22s ease, visibility 0s;
+    }
+    /* A soft sheen across the glass, under the buttons. */
+    #menu-panel::before {
+      content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.05));
+    }
+    /* Every button fills the panel in one column, whatever position the page gave it before. */
+    #menu-panel > * {
+      position: static !important; top: auto !important; left: auto !important; right: auto !important; bottom: auto !important;
+      width: 100% !important; margin: 0 !important; box-sizing: border-box !important;
+      min-height: 42px !important; justify-content: flex-start !important; text-align: left !important; flex-shrink: 0;
+    }
+    /* The Alternate Ending link shows only once the page un-hides it. */
+    #menu-panel > #ending-link[hidden] { display: none !important; }
+    /* The Strubles counter is a link to the leaderboard. */
+    a#strubles-badge { color: inherit; text-decoration: none; cursor: none; transition: transform .15s ease; }
+    a#strubles-badge:hover { transform: translateY(-1px); }
+    a#strubles-badge:focus-visible { outline: 2px solid #ffd700; outline-offset: 3px; }
+    @media (max-width: 768px) {
+      /* The Strubles counter sits at the top-left on phones, so the hamburger goes just under it. */
+      #menu-btn { top: calc(58px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #menu-panel, #menu-panel.open, .menu-bars i, #menu-btn { transition: none; }
+    }
   </style>
 
   <link rel="preload" as="image" href="/strubles.png" />
@@ -1892,23 +1974,84 @@
   <div id="topia-timer">Loading…</div>
 
   <!-- Strubles badge -->
-  <div id="strubles-badge">
+  <!-- Click the Strubles counter to open the Strubles leaderboard. -->
+  <a id="strubles-badge" href="/leaderboard?board=strubles" title="Strubles leaderboard">
     <img src="/strubles.png" alt="Struble" />
     <span id="strubles-amt">0</span>
-  </div>
+  </a>
 
-  <button id="inv-btn" title="Inventory">🎒 Inventory</button>
-  <button id="bg-btn" title="Change background">🖼️ Background</button>
-  <button id="cursor-btn" title="Change cursor">🖱️ Cursor</button>
-  <!-- Revealed only once /never has been pulled from a case. -->
-  <a id="ending-link" href="/alternate-ending" title="Alternate Ending" hidden>🎬 Alternate Ending</a>
-  <button id="account-btn" title="Save progress with Google">
-    <img id="account-btn-icon" src="/assets/icons/google-logo.png" alt="" referrerpolicy="no-referrer" />
-    <span id="account-btn-label">Sign In</span>
+  <!-- Menu: a hamburger button opens a see-through glass side panel that holds the buttons.
+       The buttons keep their ids, so every theme's own styling and every script still applies. -->
+  <button id="menu-btn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu-panel">
+    <span class="menu-bars" aria-hidden="true"><i></i><i></i><i></i></span>
   </button>
-  <button id="patch-btn" title="Patch Notes">📋 Patch Notes</button>
-  <button id="suggest-btn" title="Send a suggestion">💡 Suggest</button>
+  <div id="menu-scrim" hidden></div>
+  <nav id="menu-panel" aria-label="Menu">
+    <button id="inv-btn" title="Inventory">🎒 Inventory</button>
+    <button id="bg-btn" title="Change background">🖼️ Background</button>
+    <button id="cursor-btn" title="Change cursor">🖱️ Cursor</button>
+    <!-- Revealed only once /never has been pulled from a case. -->
+    <a id="ending-link" href="/alternate-ending" title="Alternate Ending" hidden>🎬 Alternate Ending</a>
+    <button id="patch-btn" title="Patch Notes">📋 Patch Notes</button>
+    <button id="suggest-btn" title="Send a suggestion">💡 Suggest</button>
+    <button id="account-btn" title="Save progress with Google">
+      <img id="account-btn-icon" src="/assets/icons/google-logo.png" alt="" referrerpolicy="no-referrer" />
+      <span id="account-btn-label">Sign In</span>
+    </button>
+  </nav>
   <video id="bg-video" autoplay muted loop playsinline></video>
+
+  <script is:inline>
+  // The menu: opens and closes the side panel, and gives the hamburger the look of the current
+  // theme by reading the colour, outline and glow of a themed button, so each theme keeps its own.
+  (() => {
+    const btn = document.getElementById('menu-btn');
+    const panel = document.getElementById('menu-panel');
+    const scrim = document.getElementById('menu-scrim');
+    if (!btn || !panel || !scrim) return;
+    const sample = document.getElementById('inv-btn') || panel.firstElementChild;
+
+    function skin() {
+      try {
+        const cs = getComputedStyle(sample);
+        const hasBorder = parseFloat(cs.borderTopWidth) > 0 && cs.borderTopColor !== 'rgba(0, 0, 0, 0)' && cs.borderTopStyle !== 'none';
+        const accent = hasBorder ? cs.borderTopColor : cs.color;
+        for (const el of [btn, panel]) {
+          el.style.setProperty('--menu-accent', accent);
+          el.style.setProperty('--menu-ink', cs.color);
+          el.style.setProperty('--menu-glow', cs.boxShadow && cs.boxShadow !== 'none' ? cs.boxShadow : 'none');
+          el.style.setProperty('--menu-radius', cs.borderTopLeftRadius || '10px');
+          el.style.setProperty('--menu-font', cs.fontFamily);
+        }
+      } catch {}
+    }
+
+    function setOpen(open) {
+      btn.setAttribute('aria-expanded', String(open));
+      btn.classList.toggle('open', open);
+      panel.classList.toggle('open', open);
+      scrim.hidden = !open;
+      if (open) {
+        skin();
+        const first = panel.querySelector('button:not([hidden]), a:not([hidden])');
+        if (first) first.focus({ preventScroll: true });
+      }
+    }
+
+    btn.addEventListener('click', () => setOpen(!panel.classList.contains('open')));
+    scrim.addEventListener('click', () => setOpen(false));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && panel.classList.contains('open')) { setOpen(false); btn.focus(); }
+    });
+    // Choosing an item (which may open a picker or a page) closes the panel behind it.
+    panel.addEventListener('click', (e) => {
+      if (e.target.closest('button, a')) setTimeout(() => setOpen(false), 0);
+    });
+    // A theme change is a class change on the body: re-read the look.
+    new MutationObserver(skin).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    skin();
+  })();
+  </script>
 
   <!-- Account modal -->
   <div class="modal-overlay" id="account-overlay" role="dialog" aria-modal="true" aria-labelledby="account-title">
