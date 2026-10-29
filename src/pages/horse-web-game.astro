@@ -487,7 +487,7 @@
   rockImg.onload = () => console.log('[Rock] Image loaded successfully');
   rockImg.onerror = () => console.error('[Rock] Failed to load rock.png');
   rockImg.src = '/images/rock.png';
-  // Flat dirt texture for raised and lowered ground (see drawTerrain()).
+  // Flat dirt texture for the walls of raised platforms (see drawTerrain()).
   const dirtImg = new Image();
   dirtImg.src = '/horse-game/dirt-texture.jpg';
   let dirtPattern = null;
@@ -623,7 +623,7 @@
   let explosion = null; // { cx, cy, w, age, life, deathReason } -- see triggerPlaneExplosion()
   let horse = { y: 0, vy: 0, holding: false, ducking: false, falling: false, invincible: false };
   let hurdles = [];
-  let terrain = []; // { x, w, h, cleared } -- h is the surface's offset from the ground: + raised, - lowered
+  let terrain = []; // { x, w, h, cleared } -- h is how far the platform's top is raised above the ground
   let gaps = [];
   let coins = [];
   let planes = [];
@@ -661,8 +661,8 @@
   }
   // The height that holds the horse up: the higher of what is under its centre and
   // under its front foot. Landing on the centre alone meant a jump that came down with
-  // the front foot already over a platform (or back over the ground after a dip) fell
-  // past the surface, and the wall check then ended the run on a jump that cleared.
+  // the front foot already over a platform fell past its surface, and the wall check
+  // then ended the run on a jump that cleared.
   function supportHeight() {
     return Math.max(standHeight(), surfaceAt(HORSE_X + horseW * 0.86));
   }
@@ -1091,32 +1091,30 @@
         spawnGap(originX, w, true);
         return w;
       }},
-      // Raised or lowered ground, from 10 hurdles until the flip. Each stretch
-      // is long, and it can carry hurdles along its top (or floor): they
-      // stand on the ground's new level, spaced so each one can be jumped.
-      // A level sets how high or deep the ground moves. Walls at each end
-      // are what the horse has to jump: up onto a raised stretch, or back
-      // out of a dip.
+      // Raised ground, from 10 hurdles until the flip: a long plateau the horse jumps up onto,
+      // runs along and drops off, which adds some up and down to the run. It only ever rises
+      // above the grass, never below it. It can carry hurdles along its top: they stand on the
+      // platform's level, spaced so each one can be jumped. A level sets how high it rises.
+      // The wall at its front is what the horse has to jump.
       { tier: 0, weight: 2, enabled: () => cleared >= TERRAIN_FIRST && cleared < HURDLE_FLIP_THRESHOLD, build: () => {
         const level = terrainLevel();
         const t = level / TERRAIN_MAX_LEVEL;
         const jitter = (v) => v * (0.92 + Math.random() * 0.16);
-        // Whole pixels: the picture and the collision then agree exactly. A fractional
-        // height left the drawn surface off the one the horse stands on by a pixel.
-        const base = Math.random() < 0.5 ? Math.round(jitter(36 + 84 * t)) : -Math.round(jitter(6 + 12 * t));
-        const raised = base > 0;
+        // Whole pixels: the picture and the collision then agree exactly. The lowest is tall
+        // enough that its dirt wall shows below the grass cap.
+        const base = Math.round(jitter(56 + 70 * t));
         // Room for the jump at the edge: the previous obstacle's landing, then time to react.
         const pad = Math.round(maxJumpDistance(atSpeed) * 0.35);
         const x0 = originX + pad;
-        // A jump up onto a raised stretch comes down anywhere from just past the edge to as
-        // far as the jump can carry: the time the horse spends above the stretch's height,
-        // at this speed. Hurdles start beyond that, plus the horse's length and a moment to
-        // react, so none sits on the landing spot. A dip is gentler (a few px), but the
-        // horse must jump out of its far end, so the room is kept at that end instead.
-        const carryTime = raised ? (2 * Math.sqrt(Math.max(0, JUMP_VELOCITY * JUMP_VELOCITY + 2 * GRAVITY * base))) / Math.abs(GRAVITY) : 0;
-        const lead = Math.round(raised ? atSpeed * carryTime + horseW + atSpeed * 0.25 : 150);
-        const tail = Math.round(raised ? 100 : maxJumpDistance(atSpeed) * 0.55 + 60);
-        const len = Math.round(Math.max(260, W * jitter(1.1 - 0.35 * t), lead + tail + 80));
+        // A jump up onto the platform comes down anywhere from just past its edge to as far as
+        // the jump can carry: the time the horse spends above the platform's height, at this
+        // speed. Hurdles start beyond that, plus the horse's length and a moment to react, so
+        // none sits on the landing spot.
+        const carryTime = (2 * Math.sqrt(Math.max(0, JUMP_VELOCITY * JUMP_VELOCITY + 2 * GRAVITY * base))) / Math.abs(GRAVITY);
+        const lead = Math.round(atSpeed * carryTime + horseW + atSpeed * 0.25);
+        const tail = 100;
+        // Long: at least a screen and a bit, so there is real distance to run along the top.
+        const len = Math.round(Math.max(420, W * jitter(1.4 - 0.3 * t), lead + tail + 80));
         terrain.push({ x: x0, w: len, h: base, cleared: false });
         const usable = len - lead - tail;
         const spacing = Math.max(230, maxJumpDistance(atSpeed) * 0.8);
@@ -1291,8 +1289,8 @@
     // starts it's committed (no jumping out, see jump()) and gravity just
     // keeps pulling it down past the ground line into the hole, ending
     // the run once it's fallen far enough to be off-screen. Only the
-    // ground itself is handled here: a horse on a plateau or in a dip is
-    // held by the terrain check above.
+    // ground itself is handled here: a horse on a plateau is held by the
+    // terrain check above.
     if (!horse.falling && centerFloor === 0 && horse.y <= 0.5) {
       const centerX = HORSE_X + horseW * 0.5;
       // A few px of grace inset from each edge -- grazing the very lip of
@@ -1506,29 +1504,27 @@
     }
   }
 
-  // A plateau or dip: the ground there sits at a different height. The earth under the
-  // surface is dirt, with the grass strip laid OVER the top of it (the strip's top edge is
-  // see-through blade tips, so the dirt starts a little way down and the blades cover it).
-  // Soft shading falls on the dirt just under the grass, and the sides are darkened so a
-  // raised stretch reads as a block of earth. Edges are snapped to whole pixels: with
-  // fractional edges the platform and the ground beside it left a hairline seam, which
-  // made the platform look like a hazard.
-  const TERRAIN_GRASS_TOP_GAP = 21;   // px of the grass strip above the dirt: the thin blade tips, so the dirt edge never shows through them
+  // A raised platform: the ground rises into a plateau the horse jumps up onto, runs along
+  // and drops off. The earth is the platform's wall: dirt from the surface right down to the
+  // bottom of the stage, so it shows as a solid face. Only a thin cap of grass sits on top (the
+  // grass strip is tall, and laid full height it covered all of a low platform's dirt). The
+  // strip's top edge is see-through blade tips, so the dirt starts a little way down and the
+  // cap's blades cover that join. Soft shading falls on the dirt under the cap, and the sides
+  // are darkened so it reads as a block of earth. Edges are snapped to whole pixels: with
+  // fractional edges the platform and the ground beside it left a hairline seam.
+  const TERRAIN_CAP = 32;        // height of the grass cap, in world units
+  const TERRAIN_CAP_TIPS = 18;   // the see-through blade tips at the top of the strip; the dirt starts below them so its edge never shows through
   function drawTerrain(t) {
     const x0 = Math.floor(t.x);
     const x1 = Math.ceil(t.x + t.w);
     if (x1 <= 0 || x0 >= W) return;
     const w = x1 - x0;
     const surfaceY = Math.round(groundY - t.h);   // the surface line, where the horse's feet are
-    const dirtTop = surfaceY + TERRAIN_GRASS_TOP_GAP;
-    const grassH = GROUND_H;
+    const dirtTop = surfaceY + TERRAIN_CAP_TIPS;
+    const stripH = GROUND_H;
     ctx.save();
-    if (t.h < 0) {
-      // Cut the ground out of a dip first, so the lowered dirt sits where it should.
-      ctx.clearRect(x0, groundY - 2, w, H - groundY + 2);
-    }
 
-    // 1. The dirt. The pattern is drawn in the platform's own coordinates, so the grain
+    // 1. The dirt wall. The pattern is drawn in the platform's own coordinates, so the grain
     // moves with it instead of sliding underneath.
     ctx.save();
     ctx.beginPath();
@@ -1542,45 +1538,46 @@
     }
     ctx.fillStyle = dirtPattern || '#5a3b1e';
     ctx.fillRect(0, 0, w, H - dirtTop);
-    // 2. Shade the dirt right under the grass, deepest where the blades end, fading out.
-    const shadeEnd = grassH - TERRAIN_GRASS_TOP_GAP + 16;
+    // 2. Shade the dirt right under the grass cap, deepest at the join, fading out.
+    const capBottom = TERRAIN_CAP - TERRAIN_CAP_TIPS;
+    const shadeEnd = capBottom + 22;
     const shade = ctx.createLinearGradient(0, 0, 0, shadeEnd);
-    shade.addColorStop(0, 'rgba(10,18,4,.62)');
-    shade.addColorStop(0.7, 'rgba(10,18,4,.34)');
+    shade.addColorStop(0, 'rgba(10,18,4,.6)');
+    shade.addColorStop(capBottom / shadeEnd, 'rgba(10,18,4,.5)');
     shade.addColorStop(1, 'rgba(10,18,4,0)');
     ctx.fillStyle = shade;
     ctx.fillRect(0, 0, w, shadeEnd);
     // Darker sides, so the stretch looks like a block with edges, not a flat sticker.
     const edge = Math.min(14, Math.floor(w / 2));
     const left = ctx.createLinearGradient(0, 0, edge, 0);
-    left.addColorStop(0, 'rgba(0,0,0,.45)'); left.addColorStop(1, 'rgba(0,0,0,0)');
+    left.addColorStop(0, 'rgba(0,0,0,.5)'); left.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = left;
     ctx.fillRect(0, 0, edge, H - dirtTop);
     const right = ctx.createLinearGradient(w - edge, 0, w, 0);
-    right.addColorStop(0, 'rgba(0,0,0,0)'); right.addColorStop(1, 'rgba(0,0,0,.45)');
+    right.addColorStop(0, 'rgba(0,0,0,0)'); right.addColorStop(1, 'rgba(0,0,0,.5)');
     ctx.fillStyle = right;
     ctx.fillRect(w - edge, 0, edge, H - dirtTop);
     ctx.restore();
 
-    // 3. The grass strip, over the dirt. It uses the same tile phase as the ground, so the
-    // blades line up with the grass on either side of the platform.
+    // 3. The grass cap on top, over the dirt. It uses the same tile phase as the ground, so
+    // the blades line up with the grass either side of the platform.
     const useStone = cleared >= HURDLE_FLIP_THRESHOLD;
     const groundImg = useStone ? stoneImg : grassImg;
     const groundAspect = useStone ? STONE_ASPECT : GRASS_ASPECT;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(x0, surfaceY, w, grassH);
+    ctx.rect(x0, surfaceY, w, TERRAIN_CAP);
     ctx.clip();
     if (groundImg.complete && groundImg.naturalWidth) {
-      const tileW = grassH / groundAspect;
+      const tileW = stripH / groundAspect;
       let x = -groundScroll;
       while (x < x1) {
-        if (x + tileW > x0) ctx.drawImage(groundImg, x, surfaceY, tileW, grassH);
+        if (x + tileW > x0) ctx.drawImage(groundImg, x, surfaceY, tileW, stripH);
         x += tileW;
       }
     } else {
       ctx.fillStyle = useStone ? '#6b6b66' : '#2f6d2f';
-      ctx.fillRect(x0, surfaceY + TERRAIN_GRASS_TOP_GAP, w, grassH - TERRAIN_GRASS_TOP_GAP);
+      ctx.fillRect(x0, dirtTop, w, TERRAIN_CAP - TERRAIN_CAP_TIPS);
     }
     ctx.restore();
     ctx.restore();
@@ -1883,8 +1880,8 @@
 
     drawSpeedLines();
     drawDust();
-    // The ground is painted before anything that stands on it, so a dip's
-    // cut-out never erases the horse's legs.
+    // The ground is painted before anything that stands on it, then the platforms, so
+    // nothing here can paint over the horse's legs.
     drawGround();
     for (const t of terrain) drawTerrain(t);
     for (const c of coins) drawCoin(c);
