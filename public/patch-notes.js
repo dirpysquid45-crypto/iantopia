@@ -8,6 +8,35 @@
 // cache-busting ?v=N on every page's <script src="/patch-notes.js?v=N">.
 window.PATCH_NOTES = [
   {
+    date: "2026-10-28",
+    title: "Daily Profit",
+    changes: [
+      "PROFIT: the You tab in Stats shows today's income, spending, refunds and profit for your Tycoon, plus the last few days. It's kept in this browser and counts Tycoon Strubles only.",
+    ],
+  },
+  {
+    date: "2026-10-28",
+    title: "Stats Window",
+    changes: [
+      "STATS: a Stats button in the Tycoon opens one window with three tabs: You (your numbers), Leaderboard (GDP and Efficiency, with a Visit button next to each village), and Visit (let visitors in, and visit a village).",
+    ],
+  },
+  {
+    date: "2026-10-28",
+    title: "Visit Other Villages",
+    changes: [
+      "VISIT: the Tycoon has a Visit button. Villages whose owners have let visitors in show up there, and you walk into one in the Tycoon scene to look around. You can't build, spend or earn while you're visiting. Back home takes you to your own village.",
+      "PRIVATE BY DEFAULT: your village is hidden from visitors until you turn on 'Let visitors into my village'. Turning it off takes it down again.",
+    ],
+  },
+  {
+    date: "2026-10-28",
+    title: "Scary Maze Fixed on Phones",
+    changes: [
+      "SCARY MAZE: on phones the walls between the corridors were too thin, so you could cut from the start straight to the red square. The corridors are now sized to the board, so the walls hold on every screen size.",
+    ],
+  },
+  {
     date: "2026-10-27",
     title: "Tycoon Rebalance: Easy to Start, Pricier as You Grow",
     changes: [
