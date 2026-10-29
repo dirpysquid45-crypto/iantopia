@@ -19,3 +19,10 @@ public/news-data/*.json
 # Large source art for My Iantopia; the build script writes the small web
 # versions into public/tycoon (see scripts/build-tycoon-assets.py).
 art-source/tycoon/
+
+# Source media: too big for git (the Han Palace video alone is 184 MB).
+art-source/music-sources/
+art-source/video-sources/
+
+# Firestore backups (player data): never commit
+scripts/admin/backups/

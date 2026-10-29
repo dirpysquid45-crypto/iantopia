@@ -4,6 +4,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Haunted Iantopia</title>
@@ -269,36 +271,61 @@
       line-height: 1.25;
       font-size: clamp(18px, 2.6vw, 26px);
       box-shadow: 0 12px 26px rgba(0, 0, 0, 0.4);
-      transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+      transition: transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
       will-change: transform;
-      animation: stackDrop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.15) backwards;
     }
-    .button-grid > .big:nth-child(1) { animation-delay: 0ms; }
-    .button-grid > .big:nth-child(2) { animation-delay: 80ms; }
-    .button-grid > .big:nth-child(3) { animation-delay: 160ms; }
-    .button-grid > .big:nth-child(4) { animation-delay: 240ms; }
-    .button-grid > .big:nth-child(5) { animation-delay: 320ms; }
-    .button-grid > .big:nth-child(6) { animation-delay: 400ms; }
-    .button-grid > .big:nth-child(7) { animation-delay: 480ms; }
-    .button-grid > .big:nth-child(8) { animation-delay: 560ms; }
-    .button-grid > .big:nth-child(9) { animation-delay: 640ms; }
-    .button-grid > .big:nth-child(10) { animation-delay: 720ms; }
+    /* Hover: the button grows a little and wobbles once. It never fades or drops
+       in, so it is always fully visible. */
     .button-grid > .big:hover {
-      transform: translateY(-4px) scale(1.02);
-      box-shadow: 0 18px 32px rgba(0, 0, 0, 0.5);
-      animation: none;
+      transform: scale(1.05);
+      animation: buttonWobble 0.6s ease-in-out;
     }
     .button-grid > .big:active {
-      transform: translateY(-1px) scale(0.99);
+      transform: scale(0.98);
     }
-    @keyframes stackDrop {
-      0% { opacity: 0; transform: translateY(-48px) rotate(-8deg); }
-      60% { opacity: 1; transform: translateY(6px) rotate(1deg); }
-      100% { opacity: 1; transform: translateY(0) rotate(0deg); }
+    /* Spring Morning in the Han Palace: the menu buttons are carved jade, with a green glow. */
+    body.theme-han a.big, body.theme-han button.big {
+      background: #1d5c35 url('/textures/jade.jpg') center / cover no-repeat !important;
+      border-color: #4cff7a !important; color: #e6ffe9 !important;
+      text-shadow: 0 0 6px rgba(76, 255, 122, 0.8), 1px 1px 0 #0a2a16 !important;
+      box-shadow: 0 0 18px rgba(76, 255, 122, 0.55), inset 0 0 12px rgba(120, 255, 170, 0.3) !important;
+    }
+    body.theme-han a.big:hover, body.theme-han button.big:hover {
+      box-shadow: 0 0 28px rgba(76, 255, 122, 0.95), inset 0 0 14px rgba(150, 255, 190, 0.45) !important;
+    }
+    body.theme-han #inv-btn, body.theme-han #bg-btn, body.theme-han #cursor-btn, body.theme-han #account-btn,
+    body.theme-han #patch-btn, body.theme-han #suggest-btn, body.theme-han #ending-link {
+      border-color: #4cff7a !important; box-shadow: 0 0 12px rgba(76, 255, 122, 0.6) !important;
+    }
+    /* The picture and the counter glow green in the Han theme too. !important beats the
+       gold glow animation on the flip card. */
+    body.theme-han .flip-card {
+      filter: drop-shadow(0 0 30px rgba(76, 255, 122, 0.6)) drop-shadow(0 0 60px rgba(150, 255, 190, 0.4)) !important;
+    }
+    body.theme-han #topia-timer {
+      background: #1d5c35 url('/textures/jade.jpg') center / cover no-repeat !important;
+      color: #8bffb0 !important; border-color: #4cff7a !important; box-shadow: 0 0 14px rgba(76, 255, 122, 0.6) !important;
+      text-shadow: 0 0 8px rgba(76, 255, 122, 0.8) !important;
+    }
+    /* A gap between the Patch Notes and Suggest buttons in the top-left corner. */
+    /* The top-left button stack: every button the same height, and each one 50px
+       below the last, so the gaps between them are all equal. */
+    #inv-btn, #bg-btn, #cursor-btn, #ending-link, #patch-btn, #suggest-btn {
+      height: 40px !important; box-sizing: border-box !important; margin: 0 !important;
+      display: flex !important; align-items: center !important;
+    }
+    /* The graphics mode row in the Background picker. */
+    .graphics-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:14px 0 6px; padding-top:12px; border-top:1px solid rgba(255,255,255,0.15); font-size:12px; }
+    .graphics-toggle { font:inherit; font-size:12px; padding:8px 12px; cursor:pointer; }
+    @keyframes buttonWobble {
+      0%   { transform: scale(1.05) rotate(0deg); }
+      25%  { transform: scale(1.07) rotate(-1.2deg); }
+      50%  { transform: scale(1.07) rotate(1deg); }
+      75%  { transform: scale(1.05) rotate(-0.5deg); }
+      100% { transform: scale(1.05) rotate(0deg); }
     }
     @media (prefers-reduced-motion: reduce) {
-      .button-grid > .big,
-      .button-grid > .big:hover { animation: none; transform: none; }
+      .button-grid > .big:hover { animation: none; }
     }
     /* Looping glows and pulses repaint their element every frame. While the page
        is moving, pause them so scrolling stays smooth; they resume when it stops. */
@@ -1081,6 +1108,14 @@
        isHalloweenSeason()/getActiveBgKey()/getActiveTrackKey()). Same
        body.theme-X pattern as every theme above; nothing here is reachable
        outside October since nothing ever adds this class then. */
+    /* The Halloween title sits still: the ghost copy behind it doesn't flicker,
+       and the Haunted word only lights up (white) when hovered. */
+    body.theme-halloween .ghost-title h1::before { animation: none; opacity: 0; }
+    body.theme-halloween .haunted-word:hover,
+    body.theme-halloween .haunted-word:focus-visible {
+      text-shadow: 0 0 6px #fff, 0 0 14px #fff, 0 0 24px #fff !important;
+      color: #fff !important;
+    }
     @keyframes halloweenTitleGlow {
       0%, 100% { text-shadow: 0 0 6px #000, 2px 2px 0 #000, -2px 2px 0 #000, 0 0 18px rgba(255,111,0,.7), 0 0 36px rgba(94,23,168,.5); }
       50%      { text-shadow: 0 0 10px #000, 2px 2px 0 #000, -2px 2px 0 #000, 0 0 26px rgba(255,111,0,1), 0 0 52px rgba(94,23,168,.8); }
@@ -1089,7 +1124,7 @@
       color: #ff6f00;
       -webkit-text-stroke: 1.5px #ffffff;
       paint-order: stroke fill;
-      animation: titleScale 0.8s ease-out, halloweenTitleGlow 2.6s ease-in-out infinite 0.8s;
+      animation: titleScale 0.8s ease-out;
     }
     body.theme-halloween .flip-card {
       filter: drop-shadow(0 0 26px rgba(94,23,168,.8)) drop-shadow(0 0 52px rgba(57,255,20,.35));
@@ -1400,7 +1435,7 @@
       background: rgba(255, 255, 255, 0.03);
       font-size: 13px;
     }
-    .modal-track.active { border-color: #ffeb3b; background: rgba(255, 235, 59, 0.1); }
+    .modal-track.active { border-color: #4cff7a; background: rgba(76, 255, 122, 0.14); box-shadow: inset 0 0 0 2px #4cff7a; color: #4cff7a; }
     .modal-track:hover { background: rgba(255, 255, 255, 0.08); }
     .modal-empty { color: #888; font-size: 12px; padding: 8px 0 4px; }
     .modal-close {
@@ -1480,7 +1515,7 @@
       cursor: none;
       z-index: 20;
       box-shadow: 0 0 10px rgba(255, 215, 0, 0.35);
-      animation: endingGlow 2.4s ease-in-out infinite;
+      animation: none;
     }
     #ending-link:hover { background: #ffd700; color: #000; }
     #ending-link[hidden] { display: none; }
@@ -1524,7 +1559,7 @@
 
     #suggest-btn {
       position: fixed;
-      top: calc(358px + env(safe-area-inset-top));
+      top: calc(370px + env(safe-area-inset-top));
       left: calc(20px + env(safe-area-inset-left));
       background: rgba(0, 0, 0, 0.6);
       color: #fff;
@@ -1623,6 +1658,143 @@
       a.big, button.big { padding: 10px 16px; font-size: clamp(14px, 2.5vw, 20px); }
     }
 
+
+    /* ---- Menu: a hamburger that opens a see-through glass side panel ----
+       The hamburger has no background of its own (just the theme's outline and glow, from
+       --menu-accent / --menu-glow, set by the script from a themed button). The panel is
+       translucent glass. The buttons inside keep their own per-theme styling. */
+    #menu-btn {
+      position: fixed;
+      top: calc(66px + env(safe-area-inset-top)); /* under the Strubles counter */
+      left: calc(20px + env(safe-area-inset-left));
+      width: 42px; height: 42px; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: transparent;
+      color: var(--menu-ink, #fff);
+      border: 2px solid var(--menu-accent, #2a3245);
+      border-radius: var(--menu-radius, 10px);
+      box-shadow: var(--menu-glow, none);
+      cursor: none; z-index: 60;
+      transition: transform .15s ease, box-shadow .2s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #menu-btn:hover { transform: translateY(-1px); }
+    #menu-btn:focus-visible { outline: 2px solid var(--menu-accent, #fff); outline-offset: 3px; }
+    .menu-bars { position: relative; display: block; width: 20px; height: 14px; }
+    .menu-bars i {
+      position: absolute; left: 0; width: 100%; height: 2px; border-radius: 2px;
+      /* White bars with a dark edge and a themed glow, so they show on any theme's background
+         (a button's own text colour is chosen for its own coloured face, not for the page). */
+      background: #fff; box-shadow: 0 0 5px var(--menu-accent, rgba(0, 0, 0, 0.6)), 0 0 2px rgba(0, 0, 0, 0.75);
+      transition: transform .25s ease, opacity .2s ease, top .25s ease;
+    }
+    .menu-bars i:nth-child(1) { top: 0; }
+    .menu-bars i:nth-child(2) { top: 6px; }
+    .menu-bars i:nth-child(3) { top: 12px; }
+    #menu-btn.open .menu-bars i:nth-child(1) { top: 6px; transform: rotate(45deg); }
+    #menu-btn.open .menu-bars i:nth-child(2) { opacity: 0; }
+    #menu-btn.open .menu-bars i:nth-child(3) { top: 6px; transform: rotate(-45deg); }
+
+    #menu-scrim { position: fixed; inset: 0; z-index: 55; background: rgba(0, 0, 0, 0.14); }
+    #menu-scrim[hidden] { display: none; }
+
+    #menu-panel {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 58;
+      width: min(300px, 86vw); box-sizing: border-box;
+      padding: calc(122px + env(safe-area-inset-top)) 16px 20px calc(16px + env(safe-area-inset-left));
+      display: flex; flex-direction: column; gap: 10px; overflow-y: auto;
+      background: rgba(10, 12, 20, 0.34);
+      background: color-mix(in srgb, var(--menu-accent, #8899aa) 9%, rgba(8, 10, 18, 0.34));
+      -webkit-backdrop-filter: blur(16px) saturate(1.35);
+      backdrop-filter: blur(16px) saturate(1.35);
+      border-right: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 10px 0 40px rgba(0, 0, 0, 0.35), inset -1px 0 0 rgba(255, 255, 255, 0.1);
+      transform: translateX(-104%); opacity: 0; visibility: hidden;
+      transition: transform .34s cubic-bezier(.22, 1, .36, 1), opacity .22s ease, visibility 0s linear .34s;
+    }
+    #menu-panel.open {
+      transform: none; opacity: 1; visibility: visible;
+      transition: transform .34s cubic-bezier(.22, 1, .36, 1), opacity .22s ease, visibility 0s;
+    }
+    /* A soft sheen across the glass, under the buttons. */
+    #menu-panel::before {
+      content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.05));
+    }
+    /* Every button fills the panel in one column, whatever position the page gave it before. */
+    #menu-panel > * {
+      position: static !important; top: auto !important; left: auto !important; right: auto !important; bottom: auto !important;
+      width: 100% !important; margin: 0 !important; box-sizing: border-box !important;
+      min-height: 42px !important; justify-content: flex-start !important; text-align: left !important; flex-shrink: 0;
+    }
+    /* The Alternate Ending link shows only once the page un-hides it. */
+    #menu-panel > #ending-link[hidden] { display: none !important; }
+    /* The Strubles counter is a link to the leaderboard. */
+    a#strubles-badge { color: inherit; text-decoration: none; cursor: none; transition: transform .15s ease; }
+    a#strubles-badge:hover { transform: translateY(-1px); }
+    a#strubles-badge:focus-visible { outline: 2px solid #ffd700; outline-offset: 3px; }
+    @media (min-width: 769px) {
+      /* The counter moves up to the corner, and the hamburger sits right under it. */
+      #strubles-badge { top: calc(14px + env(safe-area-inset-top)); }
+    }
+    @media (max-width: 768px) {
+      /* The Strubles counter sits at the top-left on phones, so the hamburger goes just under it. */
+      #menu-btn { top: calc(58px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); }
+      #menu-panel { padding-top: calc(112px + env(safe-area-inset-top)); }
+    }
+
+    /* ---- Chat (in the menu panel, under Sign In) ---- */
+    #chat-box, #chat-hint { font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    #menu-panel > #chat-box[hidden], #menu-panel > #chat-hint[hidden] { display: none !important; }
+    #menu-panel > #chat-box {
+      min-height: 0 !important; padding: 0; overflow: hidden; color: #fff;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--menu-accent, rgba(255, 255, 255, 0.4));
+      border-radius: var(--menu-radius, 10px);
+      box-shadow: var(--menu-glow, none);
+    }
+    #chat-toggle {
+      all: unset; box-sizing: border-box; display: block; width: 100%; padding: 10px 12px;
+      font-size: 13px; font-weight: 700; color: #fff; cursor: none; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    }
+    #chat-toggle:focus-visible, #chat-send:focus-visible, #chat-reply-cancel:focus-visible, .chat-reply:focus-visible { outline: 2px solid var(--menu-accent, #fff); outline-offset: -2px; }
+    #chat-body { padding: 0 8px 8px; }
+    #chat-log {
+      height: clamp(84px, calc(100vh - 560px), 170px); /* shrinks on short screens so the menu still fits */
+      overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 6px;
+      background: rgba(0, 0, 0, 0.28); border-radius: 8px; font-size: 12px; line-height: 1.4; overscroll-behavior: contain;
+      user-select: text; -webkit-user-select: text;
+    }
+    .chat-msg { padding: 4px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.07); overflow-wrap: anywhere; }
+    .chat-msg.own { background: rgba(255, 255, 255, 0.14); }
+    .chat-msg b { color: var(--menu-accent, #ffd700); font-weight: 700; margin-right: 4px; }
+    .chat-quote { margin: 0 0 3px; padding-left: 6px; border-left: 2px solid var(--menu-accent, #888); color: rgba(255, 255, 255, 0.7); font-size: 11px; }
+    .chat-reply { all: unset; cursor: none; float: right; margin-left: 6px; padding: 0 4px; font-size: 11px; color: rgba(255, 255, 255, 0.65); }
+    .chat-reply:hover { color: #fff; }
+    .chat-empty { margin: auto; color: rgba(255, 255, 255, 0.55); font-size: 12px; text-align: center; }
+    #chat-replying { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; padding: 3px 6px; font-size: 11px; background: rgba(255, 255, 255, 0.1); border-radius: 6px; }
+    #chat-replying[hidden] { display: none; }
+    #chat-replying-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #chat-reply-cancel { all: unset; cursor: none; padding: 0 4px; color: #fff; }
+    #chat-form { display: flex; gap: 6px; margin-top: 6px; }
+    #chat-input {
+      flex: 1; min-width: 0; box-sizing: border-box; padding: 8px; font: inherit; font-size: 13px; cursor: none;
+      color: #fff; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 8px;
+      user-select: text; -webkit-user-select: text;
+    }
+    #chat-input::placeholder { color: rgba(255, 255, 255, 0.5); }
+    #chat-input:focus { outline: 2px solid var(--menu-accent, #fff); outline-offset: 0; }
+    #chat-send {
+      all: unset; box-sizing: border-box; cursor: none; padding: 0 10px; font-size: 14px; font-weight: 700; color: #fff;
+      background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.35); border-radius: 8px;
+    }
+    #chat-send:disabled { opacity: 0.45; }
+    #chat-status { margin: 4px 0 0; min-height: 15px; font-size: 11px; color: #ffb4b4; }
+    #menu-panel > #chat-hint { min-height: 0 !important; }
+    #chat-hint { margin: 2px 4px 0; font-size: 12px; color: rgba(255, 255, 255, 0.7); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); }
+    @media (prefers-reduced-motion: reduce) {
+      #menu-panel, #menu-panel.open, .menu-bars i, #menu-btn { transition: none; }
+    }
   </style>
 
   <link rel="preload" as="image" href="/strubles.png" />
@@ -1748,14 +1920,20 @@
       // flips it over then takes you to the maze -- the ONE direct route
       // in, the Easter egg this whole image exists for in October. Outside
       // the season it's just the ordinary spin-boost on click, unchanged.
-      const halloween = window.isHalloweenSeason();
-      if (halloween) {
-        document.body.classList.add('theme-halloween');
+      // applyBackground() switches this on and off (window.setHalloweenLook),
+      // so the look follows the background actually in use: the October
+      // default, a saved pick, or the Haunted click. Checking the date once at
+      // load missed everyone whose saved background wasn't the Halloween one.
+      let halloween = false;
+      window.setHalloweenLook = (on) => {
+        halloween = on;
+        document.body.classList.toggle('theme-halloween', on);
         document.querySelectorAll('#flip-card img').forEach((img) => {
-          img.src = '/assets/decorations/job-application-form.png';
-          img.alt = 'Job Application Form';
+          const back = img.closest('.flip-card-back') !== null;
+          img.src = on ? '/assets/decorations/job-application-form.png' : '/Iantopia.webp';
+          img.alt = on ? 'Job Application Form' : (back ? 'Iantopia Image Back' : 'Iantopia Image');
         });
-      }
+      };
 
       const NORMAL_SPEED = 360 / 4000; // deg/ms -- matches the old 4s-per-rotation
       const FAST_SPEED = 360 / 400;    // deg/ms -- matches the old 0.4s-per-rotation
@@ -1851,23 +2029,237 @@
   <div id="topia-timer">Loading…</div>
 
   <!-- Strubles badge -->
-  <div id="strubles-badge">
+  <!-- Click the Strubles counter to open the Strubles leaderboard. -->
+  <a id="strubles-badge" href="/leaderboard?board=strubles" title="Strubles leaderboard">
     <img src="/strubles.png" alt="Struble" />
     <span id="strubles-amt">0</span>
-  </div>
+  </a>
 
-  <button id="inv-btn" title="Inventory">🎒 Inventory</button>
-  <button id="bg-btn" title="Change background">🖼️ Background</button>
-  <button id="cursor-btn" title="Change cursor">🖱️ Cursor</button>
-  <!-- Revealed only once /never has been pulled from a case. -->
-  <a id="ending-link" href="/alternate-ending" title="Alternate Ending" hidden>🎬 Alternate Ending</a>
-  <button id="account-btn" title="Save progress with Google">
-    <img id="account-btn-icon" src="/assets/icons/google-logo.png" alt="" referrerpolicy="no-referrer" />
-    <span id="account-btn-label">Sign In</span>
+  <!-- Menu: a hamburger button opens a see-through glass side panel that holds the buttons.
+       The buttons keep their ids, so every theme's own styling and every script still applies. -->
+  <button id="menu-btn" type="button" aria-label="Menu" aria-expanded="false" aria-controls="menu-panel">
+    <span class="menu-bars" aria-hidden="true"><i></i><i></i><i></i></span>
   </button>
-  <button id="patch-btn" title="Patch Notes">📋 Patch Notes</button>
-  <button id="suggest-btn" title="Send a suggestion">💡 Suggest</button>
+  <div id="menu-scrim" hidden></div>
+  <nav id="menu-panel" aria-label="Menu">
+    <button id="inv-btn" title="Inventory">🎒 Inventory</button>
+    <button id="bg-btn" title="Change background">🖼️ Background</button>
+    <button id="cursor-btn" title="Change cursor">🖱️ Cursor</button>
+    <!-- Revealed only once /never has been pulled from a case. -->
+    <a id="ending-link" href="/alternate-ending" title="Alternate Ending" hidden>🎬 Alternate Ending</a>
+    <button id="patch-btn" title="Patch Notes">📋 Patch Notes</button>
+    <button id="suggest-btn" title="Send a suggestion">💡 Suggest</button>
+    <button id="account-btn" title="Save progress with Google">
+      <img id="account-btn-icon" src="/assets/icons/google-logo.png" alt="" referrerpolicy="no-referrer" />
+      <span id="account-btn-label">Sign In</span>
+    </button>
+    <!-- Chat: signed-in players only. It listens for new messages only while it is open. -->
+    <section id="chat-box" aria-label="Chat" hidden>
+      <button id="chat-toggle" type="button" aria-expanded="false" aria-controls="chat-body">💬 Chat</button>
+      <div id="chat-body" hidden>
+        <div id="chat-log" role="log" aria-live="polite"></div>
+        <div id="chat-replying" hidden><span id="chat-replying-text"></span><button id="chat-reply-cancel" type="button" aria-label="Cancel reply">✕</button></div>
+        <form id="chat-form" autocomplete="off">
+          <input id="chat-input" type="text" maxlength="200" placeholder="Say something…" aria-label="Chat message" enterkeyhint="send" autocomplete="off" />
+          <button id="chat-send" type="submit" aria-label="Send message">↵</button>
+        </form>
+        <p id="chat-status" role="status"></p>
+      </div>
+    </section>
+    <p id="chat-hint">Sign in to chat.</p>
+  </nav>
   <video id="bg-video" autoplay muted loop playsinline></video>
+
+  <script is:inline>
+  // The menu: opens and closes the side panel, and gives the hamburger the look of the current
+  // theme by reading the colour, outline and glow of a themed button, so each theme keeps its own.
+  (() => {
+    const btn = document.getElementById('menu-btn');
+    const panel = document.getElementById('menu-panel');
+    const scrim = document.getElementById('menu-scrim');
+    if (!btn || !panel || !scrim) return;
+    const sample = document.getElementById('inv-btn') || panel.firstElementChild;
+
+    function skin() {
+      try {
+        const cs = getComputedStyle(sample);
+        const hasBorder = parseFloat(cs.borderTopWidth) > 0 && cs.borderTopColor !== 'rgba(0, 0, 0, 0)' && cs.borderTopStyle !== 'none';
+        const accent = hasBorder ? cs.borderTopColor : cs.color;
+        for (const el of [btn, panel]) {
+          el.style.setProperty('--menu-accent', accent);
+          el.style.setProperty('--menu-ink', cs.color);
+          el.style.setProperty('--menu-glow', cs.boxShadow && cs.boxShadow !== 'none' ? cs.boxShadow : 'none');
+          el.style.setProperty('--menu-radius', cs.borderTopLeftRadius || '10px');
+          el.style.setProperty('--menu-font', cs.fontFamily);
+        }
+      } catch {}
+    }
+
+    function setOpen(open) {
+      btn.setAttribute('aria-expanded', String(open));
+      btn.classList.toggle('open', open);
+      panel.classList.toggle('open', open);
+      scrim.hidden = !open;
+      if (open) {
+        skin();
+        const first = panel.querySelector('button:not([hidden]), a:not([hidden])');
+        if (first) first.focus({ preventScroll: true });
+      }
+    }
+
+    btn.addEventListener('click', () => setOpen(!panel.classList.contains('open')));
+    scrim.addEventListener('click', () => setOpen(false));
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && panel.classList.contains('open')) { setOpen(false); btn.focus(); }
+    });
+    // Choosing an item (which may open a picker or a page) closes the panel behind it.
+    panel.addEventListener('click', (e) => {
+      if (e.target.closest('#chat-box')) return;   // chatting keeps the panel open
+      if (e.target.closest('button, a')) setTimeout(() => setOpen(false), 0);
+    });
+    // A theme change is a class change on the body: re-read the look.
+    new MutationObserver(skin).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    skin();
+  })();
+  </script>
+
+  <script is:inline>
+  // Chat, in the menu panel under Sign In. Signed-in players only.
+  //  - Reading: a live Firestore listener on the latest messages, attached only while the panel AND
+  //    the chat are open. Closed, nothing runs and nothing is read.
+  //  - Sending: only when the player presses Enter (or the send button). The message goes to the
+  //    arena server, which applies the word filter, the rate limit and the ban check, and stores it.
+  //  - Replying: each message has a Reply button; the server fills in the quote from the stored message.
+  (() => {
+    const $ = (id) => document.getElementById(id);
+    const box = $('chat-box'), hint = $('chat-hint'), panel = $('menu-panel');
+    if (!box || !hint || !panel) return;
+    const toggle = $('chat-toggle'), body = $('chat-body'), log = $('chat-log'), form = $('chat-form');
+    const input = $('chat-input'), send = $('chat-send'), status = $('chat-status');
+    const replyBar = $('chat-replying'), replyText = $('chat-replying-text');
+    const API = location.protocol === 'https:' ? '/arena-api' : 'http://' + (location.hostname || 'localhost') + ':4001';
+    const ERRORS = {
+      blocked_text: "That message has a word we can't allow.",
+      slow_down: 'Slow down a little.',
+      limit: "You're sending too fast. Wait a minute.",
+      banned: "You can't chat right now.",
+      bad_reply: 'That message is gone, so the reply was cleared.',
+      sign_in: 'Sign in again to chat.',
+      default: "Couldn't send. Try again.",
+    };
+    let unsubscribe = null, replyTo = null, expanded = false, firstRender = true;
+    const user = () => (window.CloudSync && window.CloudSync.currentUser) || null;
+    const setStatus = (t) => { status.textContent = t || ''; };
+
+    function stopListening() { if (unsubscribe) { unsubscribe(); unsubscribe = null; } }
+    function startListening() {
+      if (unsubscribe || !window.firebase) return;
+      try {
+        unsubscribe = firebase.firestore().collection('chat_messages').orderBy('createdAt', 'desc').limit(40).onSnapshot(
+          (snap) => render(snap.docs.map((d) => Object.assign({ id: d.id }, d.data())).reverse()),
+          () => { setStatus('Chat is not available right now.'); stopListening(); }
+        );
+      } catch { setStatus('Chat is not available right now.'); }
+    }
+    // Listen only while the panel and the chat are both open and a player is signed in.
+    function sync() {
+      const live = !box.hidden && expanded && panel.classList.contains('open') && !!user();
+      if (live) startListening(); else stopListening();
+    }
+    function refreshAuth() {
+      const on = !!user();
+      box.hidden = !on;
+      hint.hidden = on;
+      if (!on) { expanded = false; body.hidden = true; toggle.setAttribute('aria-expanded', 'false'); firstRender = true; }
+      sync();
+    }
+
+    function render(msgs) {
+      const me = user() && user().uid;
+      const nearBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+      log.replaceChildren();
+      if (!msgs.length) {
+        const empty = document.createElement('div');
+        empty.className = 'chat-empty';
+        empty.textContent = 'No messages yet. Say hi!';
+        log.append(empty);
+        return;
+      }
+      for (const m of msgs) {
+        const row = document.createElement('div');
+        row.className = 'chat-msg' + (m.uid === me ? ' own' : '');
+        if (m.replyTo) {
+          const q = document.createElement('div');
+          q.className = 'chat-quote';
+          q.textContent = '↩ ' + (m.replyTo.name || 'Player') + ': ' + (m.replyTo.text || '');
+          row.append(q);
+        }
+        const reply = document.createElement('button');
+        reply.type = 'button';
+        reply.className = 'chat-reply';
+        reply.textContent = '↩ Reply';
+        reply.setAttribute('aria-label', 'Reply to ' + (m.name || 'Player'));
+        reply.addEventListener('click', () => setReply(m));
+        const name = document.createElement('b');
+        name.textContent = m.name || 'Player';
+        const text = document.createElement('span');
+        text.textContent = m.text || '';
+        row.append(reply, name, text);
+        log.append(row);
+      }
+      if (nearBottom || firstRender) log.scrollTop = log.scrollHeight;
+      firstRender = false;
+    }
+
+    function setReply(m) {
+      replyTo = { id: m.id, name: m.name || 'Player', text: m.text || '' };
+      replyText.textContent = 'Replying to ' + replyTo.name + ': ' + replyTo.text.slice(0, 40);
+      replyBar.hidden = false;
+      input.focus();
+    }
+    function clearReply() { replyTo = null; replyBar.hidden = true; replyText.textContent = ''; }
+    $('chat-reply-cancel').addEventListener('click', () => { clearReply(); input.focus(); });
+
+    toggle.addEventListener('click', () => {
+      expanded = !expanded;
+      body.hidden = !expanded;
+      toggle.setAttribute('aria-expanded', String(expanded));
+      if (expanded) { firstRender = true; input.focus(); }
+      sync();
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text || send.disabled) return;
+      const u = user();
+      if (!u) { setStatus(ERRORS.sign_in); return; }
+      send.disabled = true;
+      setStatus('');
+      try {
+        const token = await u.getIdToken();
+        const res = await fetch(API + '/chat/send', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, replyTo: replyTo ? replyTo.id : undefined }),
+        });
+        const out = await res.json().catch(() => ({}));
+        if (res.ok) { input.value = ''; clearReply(); }
+        else {
+          if (out.error === 'bad_reply') clearReply();
+          setStatus(ERRORS[out.error] || ERRORS.default);   // the text stays, so nothing typed is lost
+        }
+      } catch { setStatus(ERRORS.default); }
+      send.disabled = false;
+      input.focus();
+    });
+
+    // Closing the panel stops the listener; opening it with the chat expanded starts it again.
+    new MutationObserver(sync).observe(panel, { attributes: true, attributeFilter: ['class'] });
+    window.addEventListener('cloudsync:authchanged', refreshAuth);
+    refreshAuth();
+  })();
+  </script>
 
   <!-- Account modal -->
   <div class="modal-overlay" id="account-overlay" role="dialog" aria-modal="true" aria-labelledby="account-title">
@@ -1923,6 +2315,11 @@
     <div class="modal-box">
       <h2 id="background-title">Background</h2>
       <div id="background-list"></div>
+      <!-- Graphics lives with the backgrounds, since it's about how they're drawn. -->
+      <div class="graphics-row">
+        <span>Graphics</span>
+        <button id="graphics-btn" class="graphics-toggle" type="button" title="Low or Full">🎛️ Graphics: Full</button>
+      </div>
       <button class="modal-close" id="background-close">Close</button>
     </div>
   </div>
@@ -1979,13 +2376,14 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script is:inline src="/game-stats.js?v=1"></script>
-<script is:inline src="/cloud-sync.js?v=10"></script>
+<script is:inline src="/cloud-sync.js?v=14"></script>
   <script is:inline src="/music-library.js?v=13"></script>
   <script is:inline src="/music-position.js?v=1"></script>
   <script is:inline src="/background-library.js?v=13"></script>
   <script is:inline src="/pickers.js?v=11"></script>
   <script is:inline src="/cursor-library.js?v=4"></script>
-  <script is:inline src="/patch-notes.js?v=18"></script>
+  <script is:inline src="/patch-notes.js?v=28"></script>
+  <script is:inline src="/money-rain.js?v=1"></script>
 
   <!-- Timer Script -->
   <script is:inline>
@@ -2023,7 +2421,7 @@
   <!-- Strubles -->
   <script is:inline src="/tycoon-cap.js?v=1"></script>
   <script is:inline src="/tycoon-bank.js?v=2"></script>
-  <script is:inline src="/strubles.js?v=3"></script>
+  <script is:inline src="/strubles.js?v=6"></script>
 
   <!-- Earn UI wiring -->
   <script is:inline>
@@ -2036,14 +2434,6 @@
       const todayUTC = () => {
         const d = new Date();
         return `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
-      };
-      Strubles.canDailyClaim ??= () =>
-        localStorage.getItem("daily") !== todayUTC();
-      Strubles.dailyClaim ??= (amt) => {
-        if (!Strubles.canDailyClaim()) return false;
-        Strubles.add(amt);
-        localStorage.setItem("daily", todayUTC());
-        return true;
       };
 
       function updateUI() {
@@ -2135,7 +2525,6 @@
         dailyWinTier.classList.add('show');
         dailyReelClose.classList.add('show');
 
-        Strubles.dailyClaim(winner.amt);
         updateUI();
       }
 
@@ -2153,8 +2542,18 @@
           dailyWinTier.classList.remove('show');
           dailyReelClose.classList.remove('show');
           dailyReelOverlay.classList.add('open');
-          const winner = pickDailyTier();
-          requestAnimationFrame(() => playDailyReel(winner));
+          // The server rolls the prize and records the day's claim. The reel
+          // plays the tier it returns, so the browser can't choose a bigger one.
+          Strubles.dailyClaim((amount) => {
+            const winner = DAILY_TIERS.find((t) => t.amt === amount);
+            if (!winner) {
+              dailyReelOverlay.classList.remove('open');
+              dailyBtn.disabled = !Strubles.canDailyClaim();
+              updateUI();
+              return;
+            }
+            requestAnimationFrame(() => playDailyReel(winner));
+          });
         });
       }
 
@@ -2615,6 +3014,8 @@
       })();
 
       function applyBackground(key) {
+        // A saved Raining Money choice becomes the overlay on the default background.
+        if (key === 'raining_money') { if (window.MoneyRain) window.MoneyRain.set(true); key = 'default'; }
         const bg = BG_LIBRARY[key] || BG_LIBRARY.default;
         activeBgKey = key;
         if (bg.type === 'video') {
@@ -2659,6 +3060,9 @@
         // background active picks up the same class automatically.
         if (window.BACKGROUND_THEME_CLASSES) document.body.classList.remove(...window.BACKGROUND_THEME_CLASSES);
         if (bg.theme) document.body.classList.add(bg.theme);
+        // The Halloween look is part of the same theme: set it here, after the
+        // class list is cleared, so it survives a background change either way.
+        if (window.setHalloweenLook) window.setHalloweenLook(bg.theme === 'theme-halloween');
       }
       applyBackground(getActiveBgKey());
 
@@ -2676,14 +3080,24 @@
         } else {
           unlocked.forEach((key) => {
             if (!BG_LIBRARY[key]) return;
+            // Raining Money is an overlay, not a background: it has its own row below.
+            if (key === 'raining_money') return;
             // Inventory-only shelf backgrounds never show up here — they're
             // restricted to the dedicated Inventory Room picker.
             if (BG_LIBRARY[key].restricted) return;
             html += bgRow(key, BG_LIBRARY[key].label);
           });
         }
+        // Raining Money layers over whichever background is chosen, so it has its own on/off row.
+        if (unlocked.includes('raining_money') && window.MoneyRain) {
+          const on = window.MoneyRain.isOn();
+          html += '<div class="modal-track' + (on ? ' active' : '') + '" data-money="1"><span>🌧️ Raining Money (over any background)</span><span>' + (on ? 'ON' : 'OFF') + '</span></div>';
+        }
         backgroundList.innerHTML = html;
-        backgroundList.querySelectorAll('.modal-track').forEach((row) => {
+        backgroundList.querySelectorAll('.modal-track[data-money]').forEach((row) => {
+          row.addEventListener('click', () => { window.MoneyRain.set(!window.MoneyRain.isOn()); renderBackgroundList(); });
+        });
+        backgroundList.querySelectorAll('.modal-track[data-key]').forEach((row) => {
           row.addEventListener('click', () => {
             const key = row.dataset.key;
             localStorage.setItem(ACTIVE_BG_KEY, key);

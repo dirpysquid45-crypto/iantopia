@@ -177,7 +177,7 @@ window.TYCOON_BUILDINGS = {
     icon: '/tycoon/icons/coal_plant.png?v=2',
     w: 3, h: 3, zone: 'industrial',
     description: 'Burns the old way. Big, dependable output, and a haze over everything within sight of it.',
-    production: 16, buildMinutes: 300, cost: 8000, upkeepPct: 0.06,
+    production: 10, buildMinutes: 300, cost: 8000, upkeepPct: 0.06,
     moodEffect: -8,
   },
   nuclear_plant: {
@@ -188,7 +188,7 @@ window.TYCOON_BUILDINGS = {
     icon: '/tycoon/icons/nuclear_plant.png?v=2',
     w: 3, h: 3, zone: 'industrial',
     description: 'The most output of anything you can build. The neighbours are supportive in public.',
-    production: 30, buildMinutes: 720, cost: 40000, upkeepPct: 0.07,
+    production: 15, buildMinutes: 720, cost: 40000, upkeepPct: 0.07,
     moodEffect: -6,
   },
 };

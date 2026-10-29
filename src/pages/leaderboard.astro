@@ -4,6 +4,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Iantopia Leaderboards</title>
@@ -74,7 +76,7 @@
   }
 
   .leaderboard-row {
-    display:grid; grid-template-columns:40px 1fr 150px; gap:10px; align-items:center;
+    display:grid; grid-template-columns:40px minmax(0,1fr) minmax(150px,50%); gap:10px; align-items:center;
     padding:12px 16px; border-bottom:1px solid rgba(255,215,0,0.2); font-size:11px;
     transition:background 0.2s;
   }
@@ -90,6 +92,7 @@
   .leaderboard-row.visitable:hover .visit-hint { opacity:0.85; }
   .leaderboard-score { color:var(--muted); text-align:right; display:flex; flex-direction:column; gap:2px; line-height:1.3; }
   .leaderboard-score small { color:#6a7690; font-size:0.8em; }
+  .score-main { white-space:nowrap; }
 
   #board-tabs { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
   .board-tab {
@@ -100,9 +103,19 @@
   .board-tab:hover { background:rgba(255,215,0,.15); }
   .board-tab.active { background:var(--gold); color:#000; }
 
+  #mine-diffs { display:flex; gap:8px; margin:-6px 0 16px; flex-wrap:wrap; }
+  #mine-diffs[hidden] { display:none; }
+  .mine-chip {
+    background:#000; color:var(--gold); border:2px solid var(--gold); padding:8px 12px;
+    font-family:inherit; font-size:9px; font-weight:700; cursor:pointer; touch-action:manipulation;
+    transition:background .15s, color .15s;
+  }
+  .mine-chip:hover { background:rgba(255,215,0,.15); }
+  .mine-chip.active { background:var(--gold); color:#000; }
+
   @media (max-width:768px) {
     main { padding-left:12px; padding-right:12px; }
-    .leaderboard-row { grid-template-columns:30px 1fr 110px; font-size:9px; padding:10px 12px; }
+    .leaderboard-row { grid-template-columns:30px minmax(0,1fr) minmax(110px,46%); font-size:9px; padding:10px 12px; }
     header a { font-size:9px; padding:6px 10px; }
     .board-tab { font-size:9px; padding:11px 8px; }
   }
@@ -118,10 +131,16 @@
 
     <div id="board-tabs">
       <button class="board-tab active" type="button" data-board="horse">🐎 Horse Run</button>
-      <button class="board-tab" type="button" data-board="mines_beginner">💣 Beginner</button>
-      <button class="board-tab" type="button" data-board="mines_intermediate">💣 Intermediate</button>
-      <button class="board-tab" type="button" data-board="mines_expert">💣 Expert</button>
-      <button class="board-tab" type="button" data-board="mines_hormuz">🌊 Hormuz</button>
+      <button class="board-tab" type="button" data-board="minesweeper">💣 Minesweeper</button>
+      <button class="board-tab" type="button" data-board="strubles">💰 Strubles</button>
+    </div>
+    <!-- Minesweeper has one board. This picks which difficulty it ranks; All adds them up. -->
+    <div id="mine-diffs" hidden>
+      <button class="mine-chip active" type="button" data-diff="all">All</button>
+      <button class="mine-chip" type="button" data-diff="beginner">Beginner</button>
+      <button class="mine-chip" type="button" data-diff="intermediate">Intermediate</button>
+      <button class="mine-chip" type="button" data-diff="expert">Expert</button>
+      <button class="mine-chip" type="button" data-diff="hormuz">Hormuz</button>
     </div>
 
     <div id="leaderboard-list">
@@ -133,117 +152,122 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script is:inline src="/game-stats.js?v=1"></script>
-<script is:inline src="/cloud-sync.js?v=10"></script>
+<script is:inline src="/cloud-sync.js?v=14"></script>
 
 <script is:inline>
 (() => {
   const listEl = document.getElementById('leaderboard-list');
   const currentUserId = window.CloudSync?.currentUser?.uid;
 
+  // The Strubles board comes from the arena server (same address rule as strubles.js).
+  const API = location.protocol === 'https:' ? '/arena-api' : 'http://' + (location.hostname || 'localhost') + ':4001';
+  const esc = (v) => String(v).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+  const num = (v) => Number(v || 0).toLocaleString();
+
+  // Minesweeper has ONE board. Each player's doc keeps { beginner: {w, l}, intermediate: {w, l},
+  // expert: {w, l}, hormuz: {w, l} }. "All" ranks by boards won across every difficulty; a single
+  // difficulty ranks by that one.
+  const MINE_DIFFS = { beginner: 'Beginner', intermediate: 'Intermediate', expert: 'Expert', hormuz: 'Hormuz' };
+  const MINE_ALL_FETCH = 500;   // "All" is summed here, so it reads up to this many players
+  const BOARDS = {
+    horse: { empty: 'No riders ranked yet — go clear some hurdles!' },
+    minesweeper: { empty: 'No Minesweeper boards cleared or lost yet — play one to get on here!' },
+    strubles: { empty: 'Nobody is on the Strubles board yet.' },
+  };
+  let activeBoard = 'horse';
+  let mineDiff = 'all';
+  const wl = (d, diff) => { const r = (d && d[diff]) || {}; return { w: Number(r.w || 0), l: Number(r.l || 0) }; };
+  const pctText = (w, l) => (w + l ? Math.round((w / (w + l)) * 100) + '% win rate' : '—');
+
   function renderLoading() {
     listEl.innerHTML = '<div class="leaderboard-loading">Loading leaderboard...</div>';
   }
-
-  // Village boards (GDP, Efficiency) are off until tycoon is live.
-  const BOARDS = {
-    horse: {
-      collection: 'horse_leaderboard', field: 'best',
-      empty: 'No riders ranked yet — go clear some hurdles!',
-      fallbackName: 'Anonymous Rider',
-      format: (v) => `${Number(v || 0).toLocaleString()} hurdles`,
-    },
-  };
-  // Minesweeper: one board per difficulty, ranked by boards won. Each player's
-  // doc keeps { beginner: {w, l}, intermediate: {w, l}, expert: {w, l}, hormuz: {w, l} }.
-  const MINE_DIFFS = { beginner: 'Beginner', intermediate: 'Intermediate', expert: 'Expert', hormuz: 'Strait of Hormuz' };
-  function mineBoard(diff) {
-    return {
-      collection: 'minesweeper_leaderboard', field: diff + '.w', visitable: false,
-      empty: `No ${MINE_DIFFS[diff]} boards cleared or lost yet — play one to get on here!`,
-      fallbackName: 'Anonymous Sweeper',
-      format: (v) => `${Number(v || 0).toLocaleString()} won`,
-      sub: (d) => {
-        const r = d[diff] || {};
-        const w = Number(r.w || 0), l = Number(r.l || 0);
-        const pct = w + l ? Math.round((w / (w + l)) * 100) + '%' : '—';
-        return `${l.toLocaleString()} lost · ${pct} win rate`;
-      },
-    };
-  }
-  for (const diff of Object.keys(MINE_DIFFS)) BOARDS['mines_' + diff] = mineBoard(diff);
-  let activeBoard = 'horse';
-  // Firestore field paths like "beginner.w" point into nested maps.
-  const fieldValue = (data, path) => path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), data);
-  const SPECIALTY_ICON = { residential: '🏘️', commercial: '🏬', industrial: '🏭' };
-
-  function renderEmpty() {
-    listEl.innerHTML = `<div class="leaderboard-empty">${BOARDS[activeBoard].empty}</div>`;
-  }
-
   function renderError(message) {
     listEl.innerHTML = `<div class="leaderboard-error">${message}</div>`;
   }
-
-  function renderList(docs) {
-    if (docs.length === 0) {
-      renderEmpty();
+  // rows: [{ id, name, score, sub }], already ranked. The same markup serves every board.
+  function renderRows(rows, empty) {
+    if (!rows.length) {
+      listEl.innerHTML = `<div class="leaderboard-empty">${empty}</div>`;
       return;
     }
-    const board = BOARDS[activeBoard];
-    listEl.innerHTML = docs.map((doc, idx) => {
-      const data = doc.data();
-      const rank = idx + 1;
-      const isCurrentUser = doc.id === currentUserId;
-      const name = String(data.displayName || board.fallbackName)
-        .replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
-      const sub = board.sub ? `<small>${board.sub(data)}</small>` : '';
-      // A village with a committed majority zone shows its specialty as a
-      // little badge next to its name — see computeSpecialty() in tycoon.astro.
-      const badge = data.specialty && SPECIALTY_ICON[data.specialty]
-        ? `<span class="specialty-badge" title="${data.specialty[0].toUpperCase()}${data.specialty.slice(1)} specialty">${SPECIALTY_ICON[data.specialty]}</span>` : '';
-      // Rows link to a read-only visit only for boards that have a village
-      // behind them; the horse and minesweeper boards stay unclickable.
-      const visitable = board.visitable && !isCurrentUser;
-      return `
-        <div class="leaderboard-row ${isCurrentUser ? 'current-user' : ''}${visitable ? ' visitable' : ''}" ${visitable ? `data-uid="${doc.id}"` : ''}>
-          <div class="leaderboard-rank">#${rank}</div>
-          <div class="leaderboard-name">${badge}${name}${visitable ? ' <small class=\"visit-hint\">👁️ visit</small>' : ''}</div>
-          <div class="leaderboard-score">${board.format(fieldValue(data, board.field))}${sub}</div>
-        </div>
-      `;
-    }).join('');
+    listEl.innerHTML = rows.map((r, idx) => `
+      <div class="leaderboard-row ${r.id && r.id === currentUserId ? 'current-user' : ''}">
+        <div class="leaderboard-rank">#${idx + 1}</div>
+        <div class="leaderboard-name">${esc(r.name)}</div>
+        <div class="leaderboard-score"><span class="score-main">${esc(r.score)}</span>${r.sub ? `<small>${esc(r.sub)}</small>` : ''}</div>
+      </div>`).join('');
   }
-  listEl.addEventListener('click', (e) => {
-    const row = e.target.closest('.leaderboard-row[data-uid]');
-    if (row) location.href = '/visit?uid=' + encodeURIComponent(row.dataset.uid);
-  });
+
+  const LIMIT = 50;
+  // Each loader resolves to { rows } for its board.
+  function loadHorse() {
+    return firebase.firestore().collection('horse_leaderboard').orderBy('best', 'desc').limit(LIMIT).get()
+      .then((snap) => ({ rows: snap.docs.map((doc) => {
+        const d = doc.data();
+        return { id: doc.id, name: d.displayName || 'Anonymous Rider', score: `${num(d.best)} hurdles` };
+      }) }));
+  }
+  function loadMines() {
+    const col = firebase.firestore().collection('minesweeper_leaderboard');
+    const name = (d) => d.displayName || 'Anonymous Sweeper';
+    if (mineDiff !== 'all') {
+      return col.orderBy(mineDiff + '.w', 'desc').limit(LIMIT).get().then((snap) => ({ rows: snap.docs.map((doc) => {
+        const d = doc.data();
+        const { w, l } = wl(d, mineDiff);
+        return { id: doc.id, name: name(d), score: `${num(w)} won`, sub: `${num(l)} lost · ${pctText(w, l)}` };
+      }) }));
+    }
+    return col.limit(MINE_ALL_FETCH).get().then((snap) => {
+      const players = snap.docs.map((doc) => {
+        const d = doc.data();
+        let w = 0, l = 0;
+        const parts = [];
+        for (const k of Object.keys(MINE_DIFFS)) {
+          const r = wl(d, k);
+          w += r.w; l += r.l;
+          parts.push(`${MINE_DIFFS[k]} ${num(r.w)}`);
+        }
+        return { id: doc.id, name: name(d), w, l, parts };
+      }).filter((p) => p.w + p.l > 0)
+        .sort((a, b) => b.w - a.w || a.l - b.l)
+        .slice(0, LIMIT);
+      return { rows: players.map((p) => ({ id: p.id, name: p.name, score: `${num(p.w)} won`, sub: `${p.parts.join(' · ')} · ${num(p.l)} lost · ${pctText(p.w, p.l)}` })) };
+    });
+  }
+  function loadStrubles() {
+    return fetch(API + '/leaderboard/strubles').then((res) => {
+      if (!res.ok) throw new Error('strubles board HTTP ' + res.status);
+      return res.json();
+    }).then((body) => ({
+      rows: (body.rows || []).map((r) => ({ id: null, name: r.name || 'Player', score: `${num(r.balance)} Strubles` })),
+      note: body.updated ? `Updated ${new Date(body.updated).toLocaleTimeString()}. The board refreshes every few minutes.` : '',
+    }));
+  }
+  const LOADERS = { horse: loadHorse, minesweeper: loadMines, strubles: loadStrubles };
 
   function loadBoard(key) {
     activeBoard = key;
     document.querySelectorAll('.board-tab').forEach((t) => {
       t.classList.toggle('active', t.dataset.board === key);
     });
-    const board = BOARDS[key];
+    document.getElementById('mine-diffs').hidden = key !== 'minesweeper';
+    document.querySelectorAll('.mine-chip').forEach((c) => {
+      c.classList.toggle('active', c.dataset.diff === mineDiff);
+    });
     renderLoading();
-    // requireQualified (Efficiency) needs docs where `qualified` is true, but
-    // that's a second field — a Firestore orderBy+where on different fields
-    // needs a composite index we'd have to hand-configure in the Firebase
-    // console. Simpler: over-fetch past the display limit and filter here.
-    const LIMIT = 50;
-    firebase.firestore().collection(board.collection)
-      .orderBy(board.field, 'desc').limit(board.requireQualified ? LIMIT * 4 : LIMIT).get()
-      .then((snap) => {
-        if (activeBoard !== key) return; // a later tab click already won
-        const docs = board.requireQualified
-          ? snap.docs.filter((d) => d.data().qualified !== false).slice(0, LIMIT)
-          : snap.docs;
-        if (docs.length === 0) renderEmpty();
-        else renderList(docs);
+    LOADERS[key]()
+      .then((out) => {
+        if (activeBoard !== key) return; // a later click already won
+        renderRows(out.rows, BOARDS[key].empty);
+        if (out.note && out.rows.length) listEl.insertAdjacentHTML('beforeend', `<div class="leaderboard-empty" style="padding:12px">${esc(out.note)}</div>`);
       })
       .catch((err) => {
-        console.error('[leaderboard] query failed:', err);
+        console.error('[leaderboard] load failed:', err);
         if (activeBoard !== key) return;
-        if (err.code === 'permission-denied') {
+        if (key === 'strubles') {
+          renderError('The Strubles board is not available right now. Please try again later.');
+        } else if (err && err.code === 'permission-denied') {
           renderError('This leaderboard is not available yet — check back soon!');
         } else {
           renderError('Failed to load leaderboard. Please try again later.');
@@ -254,10 +278,18 @@
   document.querySelectorAll('.board-tab').forEach((tab) => {
     tab.addEventListener('click', () => loadBoard(tab.dataset.board));
   });
-  // /leaderboard?board=horse deep-links straight to a tab (the horse game
-  // links here); anything unrecognised falls back to the village board.
-  const wanted = new URLSearchParams(location.search).get('board');
-  loadBoard(BOARDS[wanted] ? wanted : 'horse');
+  document.querySelectorAll('.mine-chip').forEach((chip) => {
+    chip.addEventListener('click', () => { mineDiff = chip.dataset.diff; loadBoard('minesweeper'); });
+  });
+  // /leaderboard?board=horse (or minesweeper, strubles) opens straight on that tab. The old
+  // per-difficulty links (?board=mines_expert) open Minesweeper on that difficulty.
+  const wanted = new URLSearchParams(location.search).get('board') || '';
+  if (wanted.startsWith('mines_') && MINE_DIFFS[wanted.slice(6)]) {
+    mineDiff = wanted.slice(6);
+    loadBoard('minesweeper');
+  } else {
+    loadBoard(BOARDS[wanted] ? wanted : 'horse');
+  }
 })();
 </script>
 </body>

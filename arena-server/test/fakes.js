@@ -44,6 +44,10 @@ class FakeDb {
           },
         }),
       }),
+      get: async () => ({
+        docs: [...db.docs.entries()].filter(([k]) => k.startsWith(name + '/'))
+          .map(([k, v]) => ({ id: k.slice(name.length + 1), data: () => clone(v) })),
+      }),
       add: async (data) => { const id = 'auto' + Math.random().toString(36).slice(2, 8); await this.ref(`${name}/${id}`).set(data); return { id }; },
     };
   }

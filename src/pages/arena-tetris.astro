@@ -1,0 +1,441 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Tetris at Iantopia</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<meta name="theme-color" content="#050608">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tetris/tetris.css?v=7">
+<style is:global>
+  #banner { position:fixed; top:0; left:0; right:0; z-index:25; background:rgba(180,30,30,.92); color:#fff; font-size:8px; padding:8px; text-align:center; display:none; }
+</style>
+</head>
+<body>
+  <div id="banner" role="status"></div>
+
+  <div class="tetris-app">
+    <header class="top">
+      <a class="back" href="/arena">← Arena</a>
+      <h1>Tetris at Iantopia</h1>
+      <button class="restart" id="restart-btn" type="button" disabled title="Available once a match is over">↻ New match</button>
+      <button class="sound" id="sound-btn" type="button" aria-pressed="false" aria-label="Sound on">🔊</button>
+
+      <div class="hud" aria-live="off">
+        <div class="stat"><small>YOU</small><b id="score">0</b></div>
+        <div class="stat"><small>LINES</small><b id="lines">0</b></div>
+        <div class="stat"><small>LEVEL</small><b id="level">1</b></div>
+        <div class="stat"><small>OPPONENT</small><span class="name" id="opp-name">…</span></div>
+      </div>
+    </header>
+
+    <div class="main">
+      <div class="side">
+        <div class="box holdbox" id="hold-box"><span>HOLD</span><canvas id="hold-canvas" aria-label="Held piece"></canvas></div>
+      </div>
+
+      <div class="stage" id="stage">
+        <canvas id="board" role="img" aria-label="Your board"></canvas>
+
+        <div class="overlay settings show" id="lobby" role="dialog" aria-labelledby="lobby-title">
+          <div class="settings-panel">
+            <h2 id="lobby-title">TETRIS 1v1</h2>
+            <p class="lobby-blurb">Clear rows to send them to your opponent's well. Play friendly, or stake Strubles: the winner takes the pot less a 5% rake.</p>
+            <p class="lobby-blurb touch-only">Touch: tap the board to rotate, drag sideways to move, swipe down fast to slam (slower to soft drop), tap HOLD to hold.</p>
+            <div class="stake-row">
+              <button type="button" id="seg-friendly" class="seg-btn on">Friendly · free</button>
+              <button type="button" id="seg-stake" class="seg-btn">For Strubles</button>
+            </div>
+            <input type="number" id="bet-input" class="bet-input" min="100" step="100" inputmode="numeric" placeholder="Stake (min 100)" hidden />
+            <p class="lobby-blurb" id="balance-line"></p>
+            <div id="find-row">
+              <button class="btn" id="btn-find" type="button">Find a match</button>
+            </div>
+            <div id="waiting" hidden>
+              <p id="wait-text">Waiting for an opponent…</p>
+              <button class="btn" id="cancel-wait" type="button">Cancel</button>
+            </div>
+            <p id="status"></p>
+            <h3 class="settings-h">Open lobbies</h3>
+            <div id="lobby-rows"></div>
+            <p class="lobby-blurb" id="lobby-empty">No open lobbies yet.</p>
+            <button class="btn" id="btn-settings" type="button">Settings</button>
+            <p class="credit">Rules from Tetrigo (GPL-3.0). Piece colours from Flatris (MIT). Sounds: PC / Computer, Tetris Zone.</p>
+            <a href="/arena" class="frame-back">← Back to Arena</a>
+          </div>
+        </div>
+
+        <div class="overlay" id="result" role="dialog" aria-labelledby="result-title">
+          <h2 id="result-title">Game over</h2>
+          <p id="result-score"></p>
+          <p id="rematch-note"></p>
+          <button class="btn" id="btn-rematch" type="button" disabled>Rematch</button>
+          <button class="btn" id="btn-lobby" type="button">Back to lobby</button>
+        </div>
+
+      </div>
+
+      <div class="side">
+        <div class="box next"><span>NEXT</span><canvas id="next-canvas" aria-label="Upcoming pieces"></canvas></div>
+        <div class="opp" aria-label="Opponent's board"><canvas id="opp-canvas"></canvas></div>
+      </div>
+    </div>
+
+    <div class="pad" role="group" aria-label="Touch controls">
+      <div class="pad-row">
+        <button type="button" class="key left" data-action="left" aria-label="Move left"><span class="icon">◀</span><span class="cap">LEFT</span><span class="hint" data-hint="left"></span></button>
+        <button type="button" class="key right" data-action="right" aria-label="Move right"><span class="icon">▶</span><span class="cap">RIGHT</span><span class="hint" data-hint="right"></span></button>
+        <button type="button" class="key rotccw" data-action="rotccw" aria-label="Rotate counter-clockwise"><span class="icon">⟲</span><span class="cap">ROTATE</span><span class="hint" data-hint="rotccw"></span></button>
+        <button type="button" class="key rotcw" data-action="rotcw" aria-label="Rotate clockwise"><span class="icon">⟳</span><span class="cap">ROTATE</span><span class="hint" data-hint="rotcw"></span></button>
+      </div>
+      <div class="pad-row three">
+        <button type="button" class="key soft" data-action="soft" aria-label="Soft drop, hold to fall faster"><span class="icon">▼</span><span class="cap">SOFT</span><span class="hint" data-hint="soft"></span></button>
+        <button type="button" class="key hard" data-action="hard" aria-label="Slam, hard drop"><span class="icon">⤓</span><span class="cap">SLAM</span><span class="hint" data-hint="hard"></span></button>
+        <button type="button" class="key hold" data-action="hold" aria-label="Hold piece"><span class="icon">⬒</span><span class="cap">HOLD</span><span class="hint" data-hint="hold"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay settings" id="settings-overlay" role="dialog" aria-labelledby="settings-title">
+      <div class="settings-panel">
+        <h2 id="settings-title">SETTINGS</h2>
+        <div id="settings-body"></div>
+        <button class="btn" id="btn-settings-done" type="button">Done</button>
+      </div>
+    </div>
+
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script is:inline src="/game-stats.js?v=1"></script>
+  <script is:inline src="/cloud-sync.js?v=14"></script>
+  <script is:inline src="/tycoon-cap.js?v=1"></script>
+  <script is:inline src="/tycoon-bank.js?v=2"></script>
+  <script is:inline src="/strubles.js?v=6"></script>
+  <script is:inline src="/arena-client.js?v=1"></script>
+  <script is:inline src="/tetris/engine.js?v=5"></script>
+  <script is:inline src="/tetris/view.js?v=2"></script>
+  <script is:inline src="/tetris/keys.js?v=2"></script>
+  <script is:inline src="/tetris/controls.js?v=5"></script>
+  <script is:inline src="/tetris/sfx.js?v=1"></script>
+  <script is:inline>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const E = window.TetrisEngine;
+      const boardView = TetrisView.createBoard($('board'));
+      const holdView = TetrisView.createPreview($('hold-canvas'));
+      const nextView = TetrisView.createPreview($('next-canvas'));
+      const oppView = TetrisView.createRows($('opp-canvas'));
+      const SFX = window.TetrisSound;
+
+      function syncSoundButton() {
+        const muted = SFX.isMuted();
+        $('sound-btn').textContent = muted ? '🔇' : '🔊';
+        $('sound-btn').setAttribute('aria-pressed', String(muted));
+        $('sound-btn').setAttribute('aria-label', muted ? 'Sound off' : 'Sound on');
+      }
+      $('sound-btn').addEventListener('click', () => {
+        const muted = SFX.toggleMute();
+        syncSoundButton();
+        if (!muted && S.phase === 'playing') SFX.startMusic();
+      });
+      syncSoundButton();
+
+      TetrisKeys.mountSettings($('settings-body'));
+      $('btn-settings').addEventListener('click', () => { show('lobby', false); show('settings-overlay', true); $('btn-settings-done').focus(); });
+      let stakeMode = false;
+      $('btn-settings-done').addEventListener('click', () => { show('settings-overlay', false); show('lobby', S.phase === 'lobby'); });
+
+      // phase: lobby | playing | dead (we topped out, waiting for the result) | over
+      const S = { phase: 'lobby', board: null, yourIndex: 0, opponentName: 'Opponent', seed: 0, rematchSent: false, netPaused: false, reported: false, lastSnapshot: 0 };
+      let last = performance.now();
+
+      function show(id, on) { $(id).classList.toggle('show', on); }
+      function banner(text) { const b = $('banner'); if (!text) { b.style.display = 'none'; return; } b.textContent = text; b.style.display = 'block'; }
+      function setWaiting(on, text) {
+        $('waiting').hidden = !on;
+        $('find-row').hidden = on;
+        $('wait-text').textContent = text || '';
+      }
+      function showLobby(msg) {
+        S.phase = 'lobby'; S.board = null; S.netPaused = false;
+        setWaiting(false);
+        show('result', false); show('lobby', true);
+        $('status').textContent = msg || '';
+        $('btn-find').disabled = false;
+        $('restart-btn').disabled = true;
+        oppView.draw(null);
+      }
+
+      function newBoard(seed) {
+        return new E.Board({
+          seed,
+          onLock: (rows) => arena.send({ type: 'action', action: 'cleared', lines: rows.length }),
+          onEvent: (name, data) => { if (name === 'clear') boardView.flash(data); SFX.onEngineEvent(name, data); },
+        });
+      }
+
+      function startGame(m) {
+        S.phase = 'playing'; S.yourIndex = m.yourIndex; S.opponentName = m.opponentName || 'Opponent';
+        S.seed = m.seed; S.bet = m.bet || 0; S.rematchSent = false; S.netPaused = false; S.reported = false;
+        S.board = newBoard(m.seed);
+        $('opp-name').textContent = S.opponentName;
+        SFX.play('start');
+        SFX.startMusic();
+        show('lobby', false); show('result', false);
+        setWaiting(false);
+        $('status').textContent = '';
+        $('restart-btn').disabled = true;
+        last = performance.now();
+      }
+
+      // Top-out is sent once, with the final score; the server then names the winner.
+      function checkTopOut() {
+        const b = S.board;
+        if (!b || !b.over || S.reported) return;
+        S.reported = true;
+        S.phase = 'dead';
+        $('rematch-note').textContent = 'Waiting for the result…';
+        arena.send({ type: 'action', action: 'topout', score: b.score, lines: b.lines });
+      }
+
+      function onAction(name, via) {
+        const b = S.board;
+        if (S.phase !== 'playing' || !b || S.netPaused) return;
+        switch (name) {
+          case 'left': if (b.move(-1)) SFX.play('move'); break;
+          case 'right': if (b.move(1)) SFX.play('move'); break;
+          case 'rotcw': SFX.play(b.rotate(true) ? 'rotate' : 'rotatefail'); break;
+          case 'rotccw': SFX.play(b.rotate(false) ? 'rotate' : 'rotatefail'); break;
+          case 'hard': b.hardDrop(); break;
+          case 'hold':
+            if (b.holdPiece()) SFX.play('hold');
+            else if (via === 'tap') { SFX.play('rotatefail'); controls.denied($('hold-box')); }   // already held this piece
+            break;
+          default: return;   // pause does nothing here: the other side is still playing
+        }
+        checkTopOut();
+      }
+
+      const controls = TetrisControls.attach({
+        pad: document.querySelector('.pad'),
+        zone: document.querySelector('.main'),
+        board: $('board'),
+        holdBox: $('hold-box'),
+        onAction,
+        onSoft: (on) => {
+          if (!S.board || S.phase !== 'playing' || S.netPaused) return;
+          S.board.setSoftDrop(on);
+          if (on) SFX.play('softdrop', 0.35);
+        },
+      });
+
+      function render(now) {
+        const b = S.board;
+        if (b) {
+          boardView.draw(b, TetrisKeys.look());
+          holdView.draw(b.held ? [b.held] : []);
+          nextView.draw(b.preview());
+          $('score').textContent = b.score;
+          $('lines').textContent = b.lines;
+          $('level').textContent = b.level;
+          if (S.phase === 'playing' && now - S.lastSnapshot > 250) {
+            S.lastSnapshot = now;
+            arena.send({ type: 'action', action: 'board', rows: b.snapshot() });
+          }
+        } else {
+          boardView.draw(null);
+        }
+      }
+
+      function frame(now) {
+        const dt = (now - last) / 1000;
+        last = now;
+        if (S.phase === 'playing' && S.board && !S.netPaused) {
+          S.board.tick(dt);
+          checkTopOut();
+        }
+        render(now);
+        requestAnimationFrame(frame);
+      }
+
+      function showResult(m) {
+        controls.releaseAll();
+        S.phase = 'over';
+        SFX.stopMusic();
+        const won = m.winner === S.yourIndex;
+        SFX.play(won ? 'level' : 'over');
+        const title = $('result-title');
+        title.textContent = won ? '🏆 YOU WIN' : 'You lost';
+        title.style.color = won ? '#7dff7d' : '';
+        const reason = m.reason === 'topout' ? (won ? 'They topped out.' : 'You topped out.')
+          : m.reason === 'left' ? 'Your opponent left.'
+          : m.reason === 'disconnect' ? 'Your opponent disconnected.' : '';
+        const mine = (m.scores && m.scores[S.yourIndex]) || { score: 0, lines: 0 };
+        const theirs = (m.scores && m.scores[1 - S.yourIndex]) || { score: 0, lines: 0 };
+        let stakeLine = '';
+        if (S.bet > 0) {
+          stakeLine = won
+            ? (m.unpaid ? ' Couldn’t credit the pot just now. It is saved and will be paid.' : ` +${(m.payout || 0).toLocaleString()} Strubles.`)
+            : ` −${S.bet.toLocaleString()} Strubles.`;
+        }
+        $('result-score').textContent = `You ${mine.score} points, ${mine.lines} lines. ${S.opponentName}: ${theirs.score} points, ${theirs.lines} lines. ${reason}${stakeLine}`;
+        $('rematch-note').textContent = '';
+        $('btn-rematch').disabled = true;
+        // A new match is only offered once this one is over. Leaving mid-match would forfeit.
+        $('restart-btn').disabled = false;
+        show('result', true);
+      }
+
+      // Connection
+      const arena = ArenaClient.create({
+        game: 'tetris',
+        canSwitchIdentity: () => S.phase === 'lobby',
+        onState: (state) => {
+          if (state === 'open') banner('');
+          else if (state === 'replaced') banner('This game was opened in another tab. Close that tab, then reload this page.');
+          else banner('Connection lost. Reconnecting…');
+        },
+        onMessage: (m) => {
+          switch (m.type) {
+            case 'status':
+              if (m.status === 'queued') setWaiting(true, 'Waiting for a friendly opponent…');
+              if (m.status === 'matched') setWaiting(true, 'Matched! Starting…');
+              break;
+            case 'game_start': startGame(m); break;
+            case 'lobby_update': renderLobbies(m.lobbies); break;
+            case 'tetris_garbage':
+              if (S.phase === 'playing' && S.board) {
+                S.board.receiveRows(m.rows);
+                checkTopOut();
+              }
+              break;
+            case 'tetris_board': oppView.draw(m.rows); break;
+            case 'opponent_away':
+              S.netPaused = true; controls.releaseAll(); SFX.stopMusic();
+              banner(`${S.opponentName} disconnected. Holding the game for ${Math.round((m.graceMs || 30000) / 1000)}s…`);
+              break;
+            case 'opponent_back': S.netPaused = false; banner(''); last = performance.now(); SFX.startMusic(); break;
+            case 'tetris_over': showResult(m); break;
+            case 'show_rematch_prompt': if (S.phase === 'over') $('btn-rematch').disabled = false; break;
+            case 'rematch_opponent_accepted': $('rematch-note').textContent = `${S.opponentName} wants a rematch!`; break;
+            case 'rematch_declined': $('rematch-note').textContent = `${S.opponentName} left.`; $('btn-rematch').disabled = true; break;
+            case 'rematch_failed': $('rematch-note').textContent = m.message || 'Rematch failed.'; $('btn-rematch').disabled = true; break;
+            case 'ready_for_queue':
+              if (S.phase === 'over') { $('btn-rematch').disabled = true; $('rematch-note').textContent ||= 'The table has closed.'; }
+              break;
+            case 'resync':
+              // Still holding our board from before the drop: carry on. A reloaded page has
+              // no board, so leave the table and say why.
+              if (m.phase === 'over') { showResult({ winner: m.winner, reason: m.reason, scores: m.scores }); break; }
+              if (S.board && S.phase === 'playing') { S.netPaused = false; banner(''); break; }
+              arena.send({ type: 'leave_game' });
+              showLobby('Your game ended when the page reloaded.');
+              break;
+            case 'error':
+              setWaiting(false);
+              $('status').textContent = m.message || 'Something went wrong.';
+              $('btn-find').disabled = false;
+              break;
+            default: break;
+          }
+        },
+      });
+      arena.connect();
+
+      // Stake or friendly. A stake is checked here too, so the server's refusals are
+      // rarely the first news a player gets.
+      function stakeValue() { return stakeMode ? Number($('bet-input').value) : 0; }
+      function setStakeMode(on) {
+        stakeMode = !!on;
+        $('seg-friendly').classList.toggle('on', !stakeMode);
+        $('seg-stake').classList.toggle('on', stakeMode);
+        $('bet-input').hidden = !stakeMode;
+        $('balance-line').textContent = stakeMode ? `Balance: ${Strubles.get().toLocaleString()} Strubles` : '';
+        $('btn-find').textContent = stakeMode ? 'Find a stake match' : 'Find a match';
+      }
+      function stakeProblem(bet) {
+        if (!stakeMode) return null;
+        if (arena.me.guest) return 'Sign in to play for Strubles. Guests play friendly.';
+        if (!Number.isInteger(bet) || bet < 100) return 'A stake must be at least 100 Strubles.';
+        if (bet > Strubles.get()) return "You don't have that many Strubles.";
+        return null;
+      }
+      $('seg-friendly').addEventListener('click', () => setStakeMode(false));
+      $('seg-stake').addEventListener('click', () => setStakeMode(true));
+      $('btn-find').addEventListener('click', () => {
+        const bet = stakeValue();
+        const problem = stakeProblem(bet);
+        if (problem) { $('status').textContent = problem; return; }
+        $('status').textContent = '';
+        $('btn-find').disabled = true;
+        SFX.startMusic();
+        setWaiting(true, bet ? `Looking for a ${bet.toLocaleString()} Strubles opponent…` : 'Looking for an opponent…');
+        arena.send({ type: 'join_queue', bet, gameType: 'tetris' });
+      });
+
+      // Open lobbies: the server lists every waiting table; Tetris ones are shown here.
+      function renderLobbies(lobbies) {
+        const box = $('lobby-rows');
+        const tetris = (lobbies || []).filter((l) => l.gameType === 'tetris');
+        box.textContent = '';
+        tetris.forEach((l) => {
+          const row = document.createElement('div');
+          row.className = 'lobby-row';
+          const label = document.createElement('span');
+          label.textContent = `${l.name || 'Player'} · ${l.bet ? l.bet.toLocaleString() + ' Strubles' : 'friendly'}`;
+          row.appendChild(label);
+          const take = document.createElement('button');
+          take.type = 'button';
+          take.textContent = l.bet ? 'Take' : 'Join';
+          take.addEventListener('click', () => {
+            if (l.bet && arena.me.guest) { $('status').textContent = 'Sign in to play for Strubles.'; return; }
+            if (l.bet && l.bet > Strubles.get()) { $('status').textContent = "You don't have enough Strubles for that lobby."; return; }
+            $('status').textContent = '';
+            arena.send({ type: 'match_bet', queueId: l.queueId });
+          });
+          row.appendChild(take);
+          box.appendChild(row);
+        });
+        $('lobby-empty').hidden = tetris.length > 0;
+      }
+      $('cancel-wait').addEventListener('click', () => {
+        arena.send({ type: 'leave_queue' });
+        setWaiting(false);
+        $('btn-find').disabled = false;
+        $('status').textContent = '';
+      });
+      $('btn-rematch').addEventListener('click', () => {
+        if (S.rematchSent) return;
+        S.rematchSent = true;
+        $('rematch-note').textContent = 'Waiting for your opponent…';
+        arena.send({ type: 'rematch_accept' });
+      });
+      $('btn-lobby').addEventListener('click', () => {
+        arena.send({ type: 'rematch_decline' });
+        arena.send({ type: 'leave_game' });
+        $('btn-find').disabled = false;
+        showLobby('');
+      });
+
+      // Quick restart after a finished match: same as Back to lobby, then Find a match.
+      $('restart-btn').addEventListener('click', () => {
+        $('btn-lobby').click();
+        $('btn-find').click();
+      });
+
+      document.addEventListener('visibilitychange', () => { if (document.hidden) controls.releaseAll(); });
+
+      requestAnimationFrame((t) => { last = t; render(t); requestAnimationFrame(frame); });
+    })();
+  </script>
+</body>
+</html>

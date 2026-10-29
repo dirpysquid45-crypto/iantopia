@@ -38,7 +38,7 @@ window.GameStats = (function () {
     save(s);
   }
 
-  const SKIP = /^\/(admin-suggestions)/;
+  const SKIP = /^\/(admin-feed|admin-suggestions)/;
   function pagePath() {
     let p = (location.pathname || '/').toLowerCase().replace(/\/index\.html$/, '/');
     if (p.length > 1) p = p.replace(/\/+$/, '');

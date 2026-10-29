@@ -4,6 +4,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Arena: Battleship</title>
@@ -320,13 +322,13 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script is:inline src="/game-stats.js?v=1"></script>
-<script is:inline src="/cloud-sync.js?v=10"></script>
-<script is:inline src="/strubles.js?v=3"></script>
+<script is:inline src="/cloud-sync.js?v=14"></script>
+<script is:inline src="/strubles.js?v=6"></script>
 <script is:inline src="/music-library.js?v=13"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline>window.PAGE_FREE_TRACK_KEY = 'koronba';</script>
 <script is:inline src="/pickers.js?v=11"></script>
-<script is:inline src="/arena-client.js?v=1"></script>
+<script is:inline src="/money-rain.js?v=1"></script><script is:inline src="/arena-client.js?v=1"></script>
 <script is:inline>
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -809,7 +811,7 @@
     $('result-sub').textContent = reason === 'left' || reason === 'disconnect' ? (won ? `${S.oppName} left the game.` : 'You left the game.')
       : reason === 'timeout' ? (won ? `${S.oppName} ran out of time.` : 'You ran out of time.')
       : won ? `You sank ${S.oppName}'s whole fleet.` : `${S.oppName} sank your whole fleet.`;
-    $('result-pay').textContent = msg.friendly ? 'Friendly game — no Strubles at stake.' : (won && mine.payout > 0 ? `+${mine.payout.toLocaleString()} Strubles` : (won ? '' : `−${S.bet.toLocaleString()} Strubles`));
+    $('result-pay').textContent = msg.friendly ? 'Friendly game — no Strubles at stake.' : (won && mine.unpaid ? 'Couldn’t credit this just now. It is saved and will be paid.' : won && mine.payout > 0 ? `+${mine.payout.toLocaleString()} Strubles` : (won ? '' : `−${S.bet.toLocaleString()} Strubles`));
     $('rematch-note').textContent = ''; $('btn-rematch').disabled = true; $('btn-rematch').textContent = '↻ Rematch';
     $('result-card').hidden = false; $('firebar').hidden = true;
     showPhaseKeep(); renderTurn(); paintBoards();
@@ -903,7 +905,7 @@
       case 'game_voided': toLobby(m.reason || 'The game was cancelled. Any stake was returned.'); break;
       case 'opponent_away': $('away-banner').hidden = false; $('away-banner').textContent = `${S.oppName} disconnected — holding the game for ${Math.round((m.graceMs || 30000) / 1000)}s…`; break;
       case 'opponent_back': $('away-banner').hidden = true; toast(`${S.oppName} is back.`, 1800); break;
-      case 'balance_update': try { Strubles.set(m.balance); } catch {} updateBalance(); break;
+      case 'balance_update': try { Strubles.setFromServer(m.balance); } catch {} updateBalance(); break;
       case 'error':
         if (m.code === 'guest_stake') { toast(m.message); setStakeMode(false); }
         else if (m.code === 'busy') toast('You already have a lobby or game open.');
@@ -932,7 +934,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // handle for automated tests
-  window.BattleshipTest = { state: S, arena };
+  if (window.IANTOPIA_IS_DEV) window.BattleshipTest = { state: S, arena };
 })();
 </script>
 </body>

@@ -4,6 +4,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
 <title>My Iantopia</title>
@@ -79,13 +81,17 @@
     text-shadow: 2px 2px 0 #000; text-align:center; width:100%;
   }
 
+  /* Hidden: the Stats window shows these numbers. The bar stays in the page because the game
+     keeps it up to date, and the Stats window reads its numbers from it. */
   #stats-bar {
     flex:0 0 auto;
-    display:flex; justify-content:center; gap:18px; flex-wrap:wrap;
+    display:none; justify-content:center; gap:18px; flex-wrap:wrap;
     background:rgba(0,0,0,.55); border:2px solid var(--gold); padding:8px 14px;
     margin-bottom:12px; font-size:9px; color:#fff;
   }
   #stats-bar b { color:var(--gold); }
+  .stats-actions { margin:0 0 10px; }
+  #stats-rename[hidden] { display:none; }
 
   #cta-row {
     flex:0 0 auto;
@@ -105,11 +111,156 @@
   .cta.primary { background:var(--gold); color:#000; border-color:#000; }
   .cta.primary:hover { background:#ffe766; }
 
+  /* Stats window tabs had no styling here, so they fell back to the browser's
+     white buttons. Black with a gold outline and white text, like the CTAs. */
+  .board-tab { color:#fff; background:#000; border:3px solid var(--gold); padding:8px 12px; font-family:inherit; font-size:10px; font-weight:700; cursor:none; touch-action:manipulation; transition:background .2s, color .2s; }
+  .board-tab:hover { background:var(--gold); color:#000; }
+  .board-tab:focus-visible { outline:2px solid #fff; outline-offset:2px; }
+  .board-tab.active { background:var(--gold); color:#000; }
+  .board-tab:disabled { opacity:.4; pointer-events:none; }
+  @media (max-width:768px) {
+    .board-tab { font-size:9px; padding:8px 10px; }
+  }
+
   .bank-cap-row { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,215,0,0.2); color:var(--gold); font-size:10px; }
   .bank-cap-row:last-child { border-bottom:none; }
   .bank-cap-row span:last-child { color:var(--muted); }
   .bank-buy-row { margin-top:16px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
   .bank-buy-row p { margin:0; font-size:10px; color:var(--ink); line-height:1.7; }
+
+  /* Bank teller window. Checkered marble floor, a wood counter with a brass
+     rail, a pixel teller behind it and two service windows on the counter. */
+  .modal.bank-modal { width:min(680px,94vw); max-height:88vh; padding:0; background:#120a05; box-shadow:0 0 0 2px #000, 0 0 26px rgba(255,215,0,.35); }
+  .bank-sign {
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:12px 14px; border-bottom:4px solid #000;
+    background:repeating-linear-gradient(90deg,#1f6b3a 0 14px,#185630 14px 28px);
+  }
+  .bank-sign h2 { margin:0; font-size:13px; font-weight:400; color:var(--gold); text-shadow:2px 2px 0 #000; letter-spacing:1px; }
+  .bank-hall {
+    --fig-cs:8px; /* one pixel of the teller art on screen */
+    position:relative; padding:18px 16px 0;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,.35)),
+      conic-gradient(#2c1d12 25%, #3a2615 0 50%, #2c1d12 0 75%, #3a2615 0) 0 0 / 28px 28px;
+    border-bottom:2px solid #000;
+  }
+  .bank-teller { display:flex; align-items:flex-end; gap:14px; }
+  /* The teller is two canvases: the head breathes (one art pixel down and
+     back, in steps so it stays crisp), the body stays put. The figure's
+     bottom edge is the counter's top edge, so he stands on the counter. */
+  .bank-figure {
+    --px:8px; /* one art pixel on screen */
+    position:relative; flex:none; width:96px;
+    filter:drop-shadow(3px 3px 0 #000);
+  }
+  .bank-figure canvas { display:block; width:96px; image-rendering:pixelated; image-rendering:crisp-edges; }
+  #bank-teller-head { height:56px; position:relative; z-index:1; animation:bank-breathe 3.2s steps(1,end) infinite; }
+  #bank-teller-body { height:48px; }
+  @keyframes bank-breathe {
+    0%, 49% { transform:translateY(0); }
+    50%, 100% { transform:translateY(var(--px)); }
+  }
+  @media (prefers-reduced-motion: reduce) { #bank-teller-head { animation:none; } }
+  .bank-bubble {
+    position:relative; flex:1; margin:0 0 110px; padding:10px 12px; /* clears the money above the counter */
+    background:#fff8e1; color:#1a0f08; border:3px solid #000; box-shadow:3px 3px 0 #000;
+    font-size:9px; line-height:1.8;
+  }
+  .bank-bubble::before {
+    content:''; position:absolute; left:-12px; bottom:14px; width:0; height:0;
+    border-top:7px solid transparent; border-bottom:7px solid transparent; border-right:9px solid #000;
+  }
+  .bank-bubble::after {
+    content:''; position:absolute; left:-6px; bottom:15px; width:0; height:0;
+    border-top:5px solid transparent; border-bottom:5px solid transparent; border-right:7px solid #fff8e1;
+  }
+  .bank-counter {
+    position:relative; z-index:3; height:44px; margin:0 -16px; /* over the money, so the hand is under the table */
+    border-top:6px solid #d9a243; border-bottom:4px solid #000;
+    background:
+      linear-gradient(90deg, rgba(0,0,0,.18) 1px, transparent 1px) 0 0 / 46px 100%,
+      repeating-linear-gradient(176deg, rgba(255,220,160,.07) 0 2px, transparent 2px 7px),
+      repeating-linear-gradient(90deg, #8b5530 0 46px, #74442a 46px 48px);
+    box-shadow:inset 0 -6px 0 rgba(0,0,0,.35);
+  }
+  /* The money: a hand under the counter, waving a fan of bills. The image is taller than
+     what shows. Its lower part (the hand and wrist) sits behind the counter, which is drawn
+     over it, so the hand looks like it is under the table and only the money shows. It swings
+     back and forth around the wrist, which makes the arc. */
+  .bank-money {
+    --money-w:164px; --money-hidden:40px; /* the part of the image behind the counter (at most the counter's 44px, less its border) */
+    position:absolute; z-index:2; pointer-events:none; user-select:none; -webkit-user-drag:none;
+    width:var(--money-w); height:auto;
+    left:calc(16px + var(--fig-cs) * 8.5); /* just in front of the teller's right side, so the hand reads as his */
+    bottom:calc(44px - var(--money-hidden)); /* 44px is the counter's height */
+    transform-origin:78% 92%; /* the wrist, under the counter */
+    filter:drop-shadow(2px 3px 0 rgba(0,0,0,.55));
+    animation:bank-wave 2.6s ease-in-out infinite;
+  }
+  @keyframes bank-wave {
+    0%, 100% { transform:rotate(-14deg) translateX(-3px); }
+    50%      { transform:rotate(14deg) translateX(3px); }
+  }
+  @media (prefers-reduced-motion: reduce) { .bank-money { animation:none; transform:rotate(-4deg); } }
+  .bank-counter::before {
+    content:''; position:absolute; left:0; right:0; top:0; height:4px;
+    background:linear-gradient(#ffe9a8,#c58a2b); border-bottom:2px solid #000;
+  }
+  .bank-balance {
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    margin:0; padding:10px 14px; background:#000; border-bottom:2px solid #ffd700;
+    font-size:10px; color:var(--muted);
+  }
+  .bank-balance b { color:var(--gold); font-weight:400; font-size:12px; }
+  .bank-windows {
+    display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:14px;
+    background:#1b110a; max-height:none;
+  }
+  .bank-window {
+    margin:0; padding:12px; background:#0a0a0a; border:3px solid #ffd700;
+    box-shadow:inset 0 0 0 2px #000, 3px 3px 0 #000; min-width:0;
+    /* Both windows stretch to the same height, and their button rows sit on the
+       bottom edge, so Upgrade and Buy slot line up whatever the text above says. */
+    display:flex; flex-direction:column;
+  }
+  .bank-window h3 { margin:0 0 8px; font-size:11px; font-weight:400; color:var(--gold); }
+  .bank-note { margin:0 0 10px; font-size:9px; line-height:1.7; color:var(--muted); }
+  .bank-window .bank-cap-row { font-size:9px; gap:6px; }
+  .bank-window .bank-buy-row { flex-direction:column; align-items:stretch; margin-top:auto; padding-top:12px; }
+  .bank-window .bank-buy-row p { font-size:9px; min-height:46px; }
+  /* Room for three lines of explanation and three rows of figures in every window,
+     so a short description doesn't leave a gap the other window doesn't have. */
+  .bank-window .bank-note { min-height:46px; }
+  #bank-cap-breakdown, #expand-info-breakdown { min-height:84px; }
+  .bank-action { width:100%; text-align:center; }
+  .visit-modal { width:min(480px,94vw); max-height:88vh; overflow-y:auto; }
+  .visit-optin { display:flex; align-items:center; gap:10px; font-size:10px; color:var(--ink); line-height:1.7; margin:4px 0 10px; cursor:pointer; }
+  .visit-optin input { width:16px; height:16px; accent-color:var(--gold); }
+  .stats-modal { width:min(560px,94vw); max-height:88vh; overflow-y:auto; }
+  .stats-tabs { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .stats-pane[hidden] { display:none; }
+  .stats-heading { margin:14px 0 4px; font-size:9px; color:var(--gold); letter-spacing:1px; text-transform:uppercase; }
+  .bank-gifts { grid-column:1 / -1; }
+  .gift-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid rgba(255,215,0,0.2); font-size:9px; line-height:1.7; color:var(--ink); }
+  .gift-row:last-child { border-bottom:none; }
+  .gift-row .gift-body { flex:1; min-width:0; }
+  .gift-row small { display:block; color:var(--muted); }
+  .gift-stickers { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+  .gift-sticker { width:52px; height:52px; font-size:24px; background:#000; border:2px solid var(--gold); cursor:pointer; }
+  .gift-sticker.active { background:var(--gold); }
+  .gift-field { display:flex; flex-direction:column; gap:6px; font-size:9px; color:var(--gold); margin-bottom:12px; }
+  .gift-field textarea, .gift-field input { font-family:inherit; font-size:10px; background:#000; color:var(--ink); border:2px solid var(--gold); padding:8px; }
+  .gift-actions { display:flex; justify-content:flex-end; }
+  #visit-bar {
+    position:absolute; left:50%; top:12px; transform:translateX(-50%);
+    display:none; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center;
+    background:rgba(0,0,0,.85); border:3px solid var(--gold); padding:10px 12px; z-index:5; max-width:calc(100% - 16px);
+  }
+  #visit-bar.open { display:flex; }
+  #visit-bar-text { font-size:9px; color:var(--gold); line-height:1.6; }
+  .bank-gate { margin:10px 0 0; font-size:8px; line-height:1.8; color:#ffb36b; }
+  @media (max-width:520px) { .bank-windows { grid-template-columns:1fr; } .bank-teller { gap:10px; } .bank-figure { width:72px; --px:6px; } .bank-figure canvas { width:72px; } #bank-teller-head { height:42px; } #bank-teller-body { height:36px; } .bank-hall { --fig-cs:6px; } .bank-money { --money-w:118px; --money-hidden:32px; } .bank-bubble { margin-bottom:80px; } }
 
   /* ---------- The village stage (Phaser canvas lives in here) ---------- */
   #game-stage {
@@ -142,6 +293,17 @@
   #brush-bar.open { display:flex; }
   #brush-bar-text { font-size:9px; color:var(--gold); line-height:1.6; }
   #brush-bar-text.bad { color:#ff6b6b; }
+  /* One-tap brush palette. The active brush is filled gold, so it reads at a glance. */
+  #brush-palette { display:flex; gap:6px; flex-wrap:wrap; justify-content:center; width:100%; }
+  .brush-chip {
+    display:inline-flex; align-items:center; gap:6px; background:#000; color:var(--gold);
+    border:2px solid var(--gold); padding:6px 8px; font-size:9px; font-family:inherit; font-weight:700;
+    cursor:none; touch-action:manipulation; line-height:1;
+  }
+  .brush-chip i { display:inline-block; width:12px; height:12px; border:1px solid #ffe9a8; }
+  .brush-chip:hover { background:rgba(255,215,0,.2); }
+  .brush-chip.active { background:var(--gold); color:#000; }
+  .brush-chip.active i { border-color:#000; }
   .bar-btn {
     background:#000; color:var(--gold); border:3px solid var(--gold); padding:12px 14px;
     font-size:11px; font-weight:700; cursor:none; font-family:inherit; touch-action:manipulation;
@@ -176,8 +338,10 @@
   .picker-row:last-child { border-bottom:none; }
   .picker-row:hover { background:rgba(255,215,0,.08); }
   .row-icon { font-size:26px; width:40px; text-align:center; flex-shrink:0; }
+  /* Same colour the zone is painted on the map, so the panel explains it. */
+  .zone-swatch { width:40px; height:24px; flex-shrink:0; border:2px solid #ffe9a8; box-shadow:inset 0 0 0 2px rgba(0,0,0,.35); }
   .picker-row .row-info, .guide-row .row-info { flex:1; line-height:1.6; }
-  .row-info small { color:var(--muted); display:block; font-size:8px; }
+  .row-info small { color:var(--muted); display:block; font-size:8px; line-height:1.8; }
   .row-info small.row-desc { font-style:italic; margin-top:3px; }
   .picker-empty { color:var(--muted); font-size:10px; padding:10px 0; line-height:1.8; text-align:center; }
   .picker-group { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin:14px 0 4px; }
@@ -188,7 +352,8 @@
      art (hence image-rendering) where there is no PNG. */
   .row-img { width:44px; height:44px; object-fit:contain; flex-shrink:0; }
   .row-img.pix { image-rendering:pixelated; }
-  .zone-chip { display:inline-block; padding:0 5px; border:1px solid currentColor; border-radius:2px; text-transform:uppercase; font-size:7px; letter-spacing:.5px; }
+  /* Press Start 2P is drawn on an 8px grid, so 8px is the smallest size that stays crisp. */
+  .zone-chip { display:inline-block; padding:0 5px; border:1px solid currentColor; border-radius:2px; text-transform:uppercase; font-size:8px; letter-spacing:.5px; }
   .zone-residential { color:#7db6ff; } .zone-commercial { color:#ffb457; } .zone-industrial { color:#c99bf0; }
 
   .guide-row {
@@ -212,7 +377,7 @@
     /* On a phone the map sat below the fold: a three-line stats bar and three
        rows of wrapped buttons used the whole first screen. One swipeable row
        of buttons and a compact stats bar give the map the space back. */
-    #stats-bar { font-size:7px; gap:4px 10px; padding:6px 8px; margin-bottom:8px; line-height:1.5; }
+    #stats-bar { font-size:8px; gap:6px 12px; padding:6px 8px; margin-bottom:8px; line-height:1.6; }
     #cta-row { flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; gap:8px; margin-bottom:8px; padding-bottom:4px; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
     #cta-row::-webkit-scrollbar { display:none; }
     .cta { font-size:9px; padding:9px 10px; white-space:nowrap; flex:0 0 auto; border-width:2px; }
@@ -267,21 +432,35 @@
       <button id="zoning-btn" class="cta" type="button">🗺️ Zoning</button>
       <button id="undo-btn" class="cta" type="button" disabled>↩ Undo</button>
       <button id="bank-btn" class="cta" type="button">🏦 Bank</button>
+      <button id="stats-btn" class="cta" type="button">📊 Stats</button>
       <button id="guide-btn" class="cta" type="button">📖 Guide</button>
       <button id="recenter-btn" class="cta" type="button">🎯 Center</button>
       <a id="lootbox-cta" class="cta" href="/lootbox">🎁 Buildings</a>
-      <a id="leaderboard-cta" class="cta" href="/leaderboard">🏆 Ranks</a>
     </div>
 
     <div id="game-stage">
       <div id="toast" role="status"></div>
       <div id="brush-bar">
+        <div id="brush-palette" role="group" aria-label="Brushes">
+          <button class="brush-chip" data-brush="residential" type="button" title="Residential (1 or R)" aria-label="Residential"><i style="background:#2f6fd0"></i>Res</button>
+          <button class="brush-chip" data-brush="commercial" type="button" title="Commercial (2 or C)" aria-label="Commercial"><i style="background:#e08a1f"></i>Com</button>
+          <button class="brush-chip" data-brush="industrial" type="button" title="Industrial (3 or I)" aria-label="Industrial"><i style="background:#7b3fa0"></i>Ind</button>
+          <button class="brush-chip" data-brush="road" type="button" title="Road (4 or D)" aria-label="Road">🛣️</button>
+          <button class="brush-chip" data-brush="water" type="button" title="Water (5 or W)" aria-label="Water">💧</button>
+          <button class="brush-chip" data-brush="erase" type="button" title="Erase (6 or E)" aria-label="Erase">🧽</button>
+        </div>
         <span id="brush-bar-text"></span>
         <button class="bar-btn" id="brush-undo" type="button" disabled>↩ Undo</button>
         <button class="bar-btn no" id="brush-done" type="button">✕ Done</button>
       </div>
+      <div id="visit-bar">
+        <span id="visit-bar-text"></span>
+        <button class="bar-btn" id="visit-gift" type="button">🎁 Leave a gift</button>
+        <button class="bar-btn no" id="visit-home" type="button">🏠 Back home</button>
+      </div>
       <div id="place-bar">
         <span id="place-bar-text"></span>
+        <button class="bar-btn" id="place-zone" type="button" style="display:none;">🗺️ Paint zoning</button>
         <button class="bar-btn ok" id="place-confirm" type="button">✓ Place</button>
         <button class="bar-btn no" id="place-cancel" type="button">✕ Cancel</button>
       </div>
@@ -345,30 +524,128 @@
 
   <!-- Bank: current wallet cap (Bank level + Taipei bonus, itemized) and the next level's cost -->
   <div class="overlay" id="bank-overlay">
-    <div class="modal">
-      <div class="modal-head">
-        <h2>Bank</h2>
+    <div class="modal bank-modal">
+      <div class="bank-sign">
+        <h2>Iantopia Bank</h2>
         <button class="btn" id="bank-close" type="button">Close</button>
       </div>
-      <p style="font-size:10px; color:var(--muted); line-height:1.7; margin:0 0 14px;">Strubles earned past your wallet cap don't accrue — spend down below the cap, or raise it here.</p>
-      <div id="bank-cap-breakdown"></div>
-      <p id="bank-gate" style="display:none; font-size:9px; line-height:1.8; color:#ffb36b; margin:12px 0 0;">
-        🏦 Raising the wallet cap needs a completed Bank building. Win one from the Lootbox or buy one in the Shop's Real Estate section, then zone 2×2 commercial land and build it.
-      </p>
-      <div class="bank-buy-row">
-        <p id="bank-next-info"></p>
-        <button class="btn" id="bank-buy" type="button">Upgrade</button>
+
+      <!-- The teller stands behind the counter. Two services, both paid in
+           Strubles: the wallet cap (a Bank building is needed) and land slots. -->
+      <div class="bank-hall">
+        <div class="bank-teller">
+          <div class="bank-figure" role="img" aria-label="Bank teller">
+            <canvas id="bank-teller-head" width="12" height="7" aria-hidden="true"></canvas>
+            <canvas id="bank-teller-body" width="12" height="6" aria-hidden="true"></canvas>
+          </div>
+          <p class="bank-bubble" id="bank-say"></p>
+        </div>
+        <!-- A hand under the counter waves a fan of bills. The counter is drawn over the hand. -->
+        <img class="bank-money" src="/tycoon/money-spread.png" alt="" aria-hidden="true" draggable="false" />
+        <div class="bank-counter"></div>
       </div>
 
-      <!-- Building slots used to be their own button and modal. Both are
-           "spend Strubles to raise a ceiling", so they live together now. -->
-      <h2 style="font-size:12px; color:var(--gold); font-weight:400; margin:22px 0 10px; padding-top:16px; border-top:1px solid rgba(255,215,0,.25);">Building Slots</h2>
-      <p style="font-size:10px; color:var(--muted); line-height:1.7; margin:0 0 14px;">How many buildings your village can hold. Each new slot costs about half again as much as the last.</p>
-      <div id="expand-info-breakdown"></div>
-      <div class="bank-buy-row">
-        <p id="expand-next-info"></p>
-        <button class="btn" id="expand-buy" type="button">Purchase</button>
+      <div class="bank-balance">
+        <span>Your Strubles</span>
+        <b id="bank-bal">0</b>
       </div>
+
+      <div class="bank-windows">
+        <section class="bank-window">
+          <h3>Wallet Cap</h3>
+          <p class="bank-note">Strubles earned past your cap don't accrue. Raise the cap here.</p>
+          <div id="bank-cap-breakdown"></div>
+          <p id="bank-gate" class="bank-gate" style="display:none;">
+            🏦 Raising the cap needs a completed Bank building. Win one from the Lootbox or buy one in the Shop's Real Estate section, then zone 2×2 commercial land and build it.
+          </p>
+          <div class="bank-buy-row">
+            <p id="bank-next-info"></p>
+            <button class="btn bank-action" id="bank-buy" type="button">Upgrade</button>
+          </div>
+        </section>
+
+        <!-- Building slots used to be their own button and modal. Both are
+             "spend Strubles to raise a ceiling", so they live together now. -->
+        <section class="bank-window">
+          <h3>Land Slots</h3>
+          <p class="bank-note">How many buildings your village can hold. Each new slot costs about a third more than the last.</p>
+          <div id="expand-info-breakdown"></div>
+          <div class="bank-buy-row">
+            <p id="expand-next-info"></p>
+            <button class="btn bank-action" id="expand-buy" type="button">Buy slot</button>
+          </div>
+        </section>
+
+        <!-- Gifts from visitors, on a row of their own under the two windows above.
+             Strubles gifts wait here until you collect them; the server checks your
+             wallet cap when they land. -->
+        <section class="bank-window bank-gifts">
+          <h3>Gifts</h3>
+          <p class="bank-note">Visitors leave you notes and Strubles. Strubles gifts stay here until you collect them.</p>
+          <div id="gift-inbox"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats: your numbers, the village leaderboards, and visiting. Visiting a
+       village closes this window and walks you into it in the scene. -->
+  <div class="overlay" id="stats-overlay">
+    <div class="modal stats-modal">
+      <div class="modal-head">
+        <h2>Stats</h2>
+        <button class="btn" id="stats-close" type="button">Close</button>
+      </div>
+      <div class="stats-tabs" role="tablist">
+        <button class="board-tab active" type="button" data-stats-tab="you" role="tab">📊 You</button>
+        <button class="board-tab" type="button" data-stats-tab="board" role="tab">🏆 Leaderboard</button>
+        <button class="board-tab" type="button" data-stats-tab="visit" role="tab">🏘️ Visit</button>
+      </div>
+
+      <section class="stats-pane" data-stats-pane="you">
+        <div class="stats-actions"><button class="btn" id="stats-rename" type="button">✏️ Rename village</button></div>
+        <div id="stats-you"></div>
+      </section>
+
+      <section class="stats-pane" data-stats-pane="board" hidden>
+        <div class="stats-tabs">
+          <button class="board-tab active" type="button" data-board="gdp">GDP</button>
+          <button class="board-tab" type="button" data-board="efficiency">Efficiency</button>
+        </div>
+        <div id="stats-board"></div>
+      </section>
+
+      <section class="stats-pane" data-stats-pane="visit" hidden>
+        <label class="visit-optin">
+          <input type="checkbox" id="visit-optin" />
+          Let visitors into my village
+        </label>
+        <p class="bank-note">Off by default. Visitors can look around your village but can't change it. Turning this off takes your village down.</p>
+        <p class="bank-note" id="visit-status"></p>
+        <div id="visit-list"></div>
+      </section>
+    </div>
+  </div>
+  <!-- Leave a gift in the village you are visiting. A sticker and a note are
+       free; adding Strubles takes them from your balance, and they wait in the
+       owner's bank until they collect them. -->
+  <div class="overlay" id="gift-overlay">
+    <div class="modal visit-modal">
+      <div class="modal-head">
+        <h2 id="gift-title">Leave a gift</h2>
+        <button class="btn" id="gift-close" type="button">Close</button>
+      </div>
+      <div id="gift-stickers" class="gift-stickers"></div>
+      <label class="gift-field">Note
+        <textarea id="gift-note" maxlength="140" rows="3" placeholder="Say hello (140 characters)"></textarea>
+      </label>
+      <label class="gift-field">Strubles (optional)
+        <input id="gift-amount" type="number" min="0" max="1000" step="1" value="0" />
+      </label>
+      <div class="gift-actions">
+        <button class="btn bank-action" id="gift-send" type="button">Send gift</button>
+      </div>
+      <p class="bank-note" id="gift-status"></p>
     </div>
   </div>
 
@@ -415,7 +692,7 @@
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script is:inline src="/game-stats.js?v=1"></script>
-<script is:inline src="/cloud-sync.js?v=10"></script>
+<script is:inline src="/cloud-sync.js?v=14"></script>
 <script is:inline src="/music-library.js?v=13"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/background-library.js?v=13"></script>
@@ -424,16 +701,17 @@
 <script is:inline src="/tycoon-buildings.js?v=14"></script>
 <script is:inline src="/tycoon-art.js?v=5"></script>
 <script is:inline src="/cursor.js?v=3"></script>
-<script is:inline src="/tycoon-cap.js?v=1"></script>
+<script is:inline src="/tycoon-cap.js?v=2"></script>
+<script is:inline src="/tycoon-economy.js?v=1"></script>
 <script is:inline src="/tycoon-bank.js?v=2"></script>
-<script is:inline src="/strubles.js?v=3"></script>
+<script is:inline src="/strubles.js?v=6"></script>
 <script is:inline>
   // What the page shows until a background is picked, and what "default" in
   // the picker resets to.
   window.PAGE_DEFAULT_BG = { type: 'gif', src: '/tycoon/sky-background.gif', label: 'Skyline', position: 'center' };
 </script>
 <script is:inline src="/pickers.js?v=11"></script>
-<!-- Pinned exact version: Phaser 4 is new (Apr 2026), don't float it. -->
+<script is:inline src="/money-rain.js?v=1"></script><!-- Pinned exact version: Phaser 4 is new (Apr 2026), don't float it. -->
 <script is:inline src="https://cdn.jsdelivr.net/npm/phaser@4.0.0/dist/phaser.min.js"></script>
 <script is:inline>
 (() => {
@@ -442,6 +720,46 @@
   // Economy stays frozen outside dev mode until the server-authoritative
   // village save lands (see the rework plan, phase 3). Placing/moving still
   // works so the new map can be tried; production/tax/construction do not.
+  // ---------- Daily profit ----------
+  // Strubles that move on this page, by local day: income, spending and refunds.
+  // It sees Tycoon income and spending only, not the other games, and it is kept
+  // in this browser. Income is what the cap let in, so it matches the balance.
+  const PROFIT_KEY = 'tycoon_daily_profit_v1';
+  const PROFIT_DAYS = 30;
+  const profitDay = () => new Date().toLocaleDateString('en-CA');
+  function loadProfit() {
+    try { return JSON.parse(localStorage.getItem(PROFIT_KEY)) || {}; } catch { return {}; }
+  }
+  function noteProfit(field, n) {
+    const amount = Math.max(0, Math.floor(Number(n) || 0));
+    if (!amount) return;
+    const all = loadProfit();
+    const day = profitDay();
+    const row = all[day] || { income: 0, spent: 0, refunds: 0 };
+    row[field] += amount;
+    all[day] = row;
+    const kept = {};
+    Object.keys(all).sort().slice(-PROFIT_DAYS).forEach((k) => { kept[k] = all[k]; });
+    try { localStorage.setItem(PROFIT_KEY, JSON.stringify(kept)); } catch {}
+  }
+  if (window.Strubles && !window.Strubles.profitTracked) {
+    const realAdd = Strubles.add, realSpend = Strubles.spend;
+    Strubles.add = function (n, kind) {
+      const before = Number(Strubles.get()) || 0;
+      const cap = (window.TycoonBank && TycoonBank.currentCap()) || Infinity;
+      const credited = before >= cap ? 0 : Math.min(Math.max(0, Math.floor(Number(n) || 0)), cap - before);
+      const next = realAdd.apply(this, arguments);
+      noteProfit(kind === 'refund' ? 'refunds' : 'income', credited);
+      return next;
+    };
+    Strubles.spend = function (n) {
+      const ok = realSpend.apply(this, arguments);
+      if (ok) noteProfit('spent', n);
+      return ok;
+    };
+    Strubles.profitTracked = true;
+  }
+
   const TYCOON_DISABLED = !localStorage.getItem('tycoon_dev_mode');
   $('out-of-order-banner').style.display = TYCOON_DISABLED ? 'block' : 'none';
 
@@ -460,12 +778,9 @@
   const MAX_PER_TYPE = window.TYCOON_MAX_PER_TYPE || 5;
   const MAX_CONCURRENT = window.TYCOON_MAX_CONCURRENT_BUILDS || 3;
   const RARITY = window.CASE_RARITIES || {};
-  // Building slots. The first one used to cost 200,000 and each tripled the
-  // last -- ten times the base wallet cap, so it could never be bought at all.
-  // Now 1,500 and 1.5x per slot, which lands the first six well inside the
-  // base 20,000 cap and makes the later ones a genuine late-game spend.
-  const EXPAND_BASE_COST = 1500;
-  const EXPAND_GROWTH = 1.5;
+  // Every cost and pacing rule below (slots, permits, build time, upkeep,
+  // rookie catch-up) lives in tycoon-economy.js, so the numbers are testable.
+  const E = window.TycoonEconomy;
 
   // Footprint lives on the definition (tycoon-buildings.js), the one source of
   // truth for every building stat.
@@ -478,7 +793,7 @@
 
   function slotsOwned() { return Math.max(0, Number(localStorage.getItem(SLOTS_KEY)) || 0); }
   function slotCap() { return BASE_SLOTS + slotsOwned(); }
-  function expandCostForSlot(n) { return n <= 0 ? 0 : Math.round((EXPAND_BASE_COST * Math.pow(EXPAND_GROWTH, n - 1)) / 10) * 10; }
+  function expandCostForSlot(n) { return E.slotCost(n); }
 
   // Village state: { v:2, nextId, b:[...buildings], tiles:{tx_ty: type} }
   // tiles map: "x_y" -> "residential"/"commercial"/"industrial"/"road"/"water"
@@ -529,6 +844,7 @@
   // flushed once when the pointer lifts; every other change saves immediately.
   let savePending = false;
   function saveVillage(defer) {
+    if (visiting) return;   // a neighbour's village is never written to yours
     if (defer) { savePending = true; return; }
     savePending = false;
     saveJSON(VILLAGE_KEY, village);
@@ -537,6 +853,10 @@
   function flushSave() { if (savePending) saveVillage(); }
 
   let village = loadVillage();
+  // Set while a neighbour's village is on screen: { uid, name }. Your own village
+  // is held in homeVillage until you go back. See the Visiting section below.
+  let visiting = null;
+  let homeVillage = null;
   let brushMode = null;  // "residential" | "commercial" | "industrial" | "road" | "water" | null
 
   // ---------- Grids ----------
@@ -634,6 +954,27 @@
     return avail;
   }
   const hasBank = () => village.b.some((s) => s.key === 'bank' && s.status === 'complete');
+  // Upkeep per day for a building, scaled up for a big village (tycoon-economy.js).
+  const dailyUpkeepOf = (def) => def.cost * (def.upkeepPct || 0) * E.upkeepMultiplier(village.b.length);
+
+  // A new village gets a starter kit once: two Shabby Apartments and a Generic
+  // Building, so the first income lands in the first session without waiting on
+  // a lootbox. The flag lives on the village, so it syncs with the account.
+  const FOUNDER_KIT = { shabby_apartment: 2, generic_building: 1 };
+  function grantFounderKit() {
+    if (village.founderKit || village.b.length) return;
+    village.founderKit = true;
+    const inv = loadJSON(INV_KEY, {});
+    inv.buildings = Array.isArray(inv.buildings) ? inv.buildings : [];
+    const have = ownedCounts();
+    Object.keys(FOUNDER_KIT).forEach((key) => {
+      const n = Math.min(FOUNDER_KIT[key], Math.max(0, MAX_PER_TYPE - (have[key] || 0)));
+      for (let i = 0; i < n; i++) inv.buildings.push(key);
+    });
+    saveJSON(INV_KEY, inv);
+    saveVillage();
+    try { window.dispatchEvent(new Event('inventory:changed')); } catch {}
+  }
   const buildingCount = () => village.b.filter((s) => s.status === 'building').length;
 
   // ---------- Economy tick ----------
@@ -643,6 +984,7 @@
   // builds, and after three of them no further building could be started at
   // all. Construction now always settles; only earning is gated.
   function tick() {
+    if (visiting) return false;   // no earnings from a neighbour's buildings
     const now = Date.now();
     const mood = computeMood();
     const specialty = computeSpecialty();
@@ -652,6 +994,7 @@
       if (!def) return;
       if (slot.status === 'building' && now >= slot.completesAt) {
         slot.status = 'complete';
+        village.completedEver = (village.completedEver || 0) + 1;
         slot.lastProductionAt = slot.completesAt;
         slot.lastTaxAt = slot.completesAt;
         slot.taxDebt = slot.taxDebt || 0;
@@ -682,7 +1025,7 @@
             changed = true;
           }
         }
-        const dailyUpkeep = def.cost * (def.upkeepPct || 0);
+        const dailyUpkeep = dailyUpkeepOf(def);
         const elapsedTax = Math.max(0, now - slot.lastTaxAt) / 60000;
         const perMin = dailyUpkeep / 1440;
         const taxOwed = perMin > 0 ? Math.floor(elapsedTax * perMin) : 0;
@@ -695,7 +1038,11 @@
     });
     localStorage.setItem(LAST_SEEN_KEY, String(now));
     if (TYCOON_DISABLED) return changed;
-    if (earned > 0) { try { Strubles.add(earned); } catch {} }
+    if (earned > 0) {
+      try { Strubles.add(earned, undefined, 'tycoon'); } catch {}
+      village.lifetimeEarned = (village.lifetimeEarned || 0) + earned;
+      changed = true;
+    }
     village.b.forEach((slot) => {
       if (slot.status === 'complete' && slot.taxDebt > 0 && Strubles.spend(slot.taxDebt)) {
         slot.taxDebt = 0;
@@ -949,6 +1296,7 @@
     if (touchesTile(s, 'industrial')) p *= 1 + INDUSTRIAL_BONUS;
     if (specialty && def.zone === specialty.type) p *= 1 + specialty.bonus;
     if (s.taxDebt > 0) p *= 0.5;
+    p *= E.rookieMultiplier(village.lifetimeEarned);
     return p * moodMultiplier(mood);
   }
 
@@ -986,7 +1334,7 @@
 
   function triggerCaravan() {
     const bonus = Math.round(Math.max(150, estimateGDP() * (2 + Math.random() * 3)));
-    try { Strubles.add(bonus); } catch {}
+    try { Strubles.add(bonus, undefined, 'tycoon'); } catch {}
     toast(`🚚 A trade caravan passed through! +${bonus.toLocaleString()} Strubles`);
     return true;
   }
@@ -1004,7 +1352,7 @@
   }
 
   function maybeTriggerEvent() {
-    if (TYCOON_DISABLED) return;
+    if (TYCOON_DISABLED || visiting) return;   // a caravan pays on the size of the village on screen
     if (!village.b.some((s) => s.status === 'complete')) return;
     if (Math.random() >= EVENT_CHANCE_PER_SEC) return;
     const table = [
@@ -1024,7 +1372,10 @@
     return id ? (bById.get(id) || null) : null;
   }
 
-  function syncBalance() { try { $('bal').textContent = Strubles.get().toLocaleString(); } catch {} }
+  function syncBalance() {
+    try { $('bal').textContent = Strubles.get().toLocaleString(); } catch {}
+    try { $('bank-bal').textContent = Strubles.get().toLocaleString(); } catch {}
+  }
   function fmtDuration(min) {
     if (min >= 1440) return (min / 1440).toFixed(min % 1440 === 0 ? 0 : 1) + 'd';
     if (min >= 60) return (min / 60).toFixed(min % 60 === 0 ? 0 : 1) + 'h';
@@ -1055,6 +1406,9 @@
   let selectedId = null;
   // Placement mode: { key, moveId|null, tx, ty, restore|null }
   let placing = null;
+  // Set while the player paints the zoning a building needs. Done (or Escape)
+  // brings them back to placing that same building on the same tile.
+  let zoningFor = null;   // { key, tx, ty } or null
   let layer, ghostG, gridG;
 
   // Ground layers and building sprites. Everything static is composed once and
@@ -1608,7 +1962,7 @@
       } else {
         sp.setVisible(!moving);
         totalProduction += productionFor(s, mood, specialty);
-        totalUpkeep += def.cost * (def.upkeepPct || 0);
+        totalUpkeep += dailyUpkeepOf(def);
         const connected = roadOk(s);
         if (connected) onRoadCount++;
         if (!moving) {
@@ -1704,6 +2058,12 @@
   function drawGhost() {
     ghostG.clear();
     gridG.clear();
+    if (zoningFor && brushMode) {
+      // Outline the footprint still waiting on its zoning, in that zone's colour.
+      const f = foot(zoningFor.key), col = BOX_COLOR[zoneOf(zoningFor.key)];
+      ghostG.lineStyle(2, hex(col), 1);
+      ghostG.strokeRect(zoningFor.tx * T + 1, zoningFor.ty * T + 1, f.w * T - 2, f.h * T - 2);
+    }
     if (rectDrag && brushMode) {
       // Faint grid so the box snaps visibly to tiles, then the box itself.
       gridG.lineStyle(1, 0xffffff, 0.14);
@@ -1730,6 +2090,7 @@
     const f = foot(placing.key);
     const issue = placementIssue(placing.key, placing.tx, placing.ty, placing.moveId);
     const ok = issue === null;
+    $('place-zone').style.display = issue === 'zone' ? '' : 'none';
     const ox = placing.tx * T, oy = placing.ty * T;
     if (!ghostImg) ghostImg = scene.add.image(0, 0, ensureBaked(placing.key)).setOrigin(0, 0).setDepth(60);
     ghostImg.setTexture(ensureBaked(placing.key)).setScale(coverScale(placing.key));
@@ -1939,7 +2300,10 @@
   const placeList = $('place-list');
 
   function startPlacing(key, moveId) {
+    if (visitLocked()) return;
+    zoningFor = null;
     placing = { key, moveId: moveId || null, tx: null, ty: null };
+    $('place-zone').style.display = 'none';
     $('place-bar').classList.add('open');
     $('place-confirm').disabled = true;
     $('place-bar-text').textContent = `Tap the map to aim your ${DEFS[key].label}`;
@@ -1967,7 +2331,7 @@
     `<img class="row-img${DEFS[key].icon ? '' : ' pix'}" src="${iconSrc(key)}" alt="" width="44" height="44" decoding="async">`;
   const metaLine = (key) => {
     const d = DEFS[key];
-    return `Cost ${d.cost.toLocaleString()} Strubles · builds in ${fmtDuration(d.buildMinutes)} · +${d.production}/min when done · Upkeep ${Math.floor(d.cost * (d.upkeepPct || 0))}/day`;
+    return `Cost ${E.permitCost(d.cost, village.b.length).toLocaleString()} Strubles · builds in ${fmtDuration(E.buildMinutes(d.buildMinutes, village.completedEver))} · +${d.production}/min when done · Upkeep ${Math.floor(dailyUpkeepOf(d))}/day`;
   };
   const zoneLine = (key) => {
     const f = foot(key), z = zoneOf(key);
@@ -1983,6 +2347,7 @@
   };
 
   function pickBuilding(key) {
+    if (visitLocked()) return;
     if (village.b.length >= slotCap()) {
       alert(`Your village is full (${slotCap()} buildings). Buy more slots at the Bank, or remove a building first.`);
       return;
@@ -1996,6 +2361,7 @@
   }
 
   function openPlacePicker() {
+    if (visitLocked()) return;
     const avail = availableCounts(), owned = ownedCounts();
     placeList.innerHTML = '';
     const heading = (text) => {
@@ -2047,8 +2413,9 @@
     } else {
       const def = DEFS[key];
       if (availableCounts()[key] <= 0) { alert(`You can't build any more of those.`); return; }
-      if (!Strubles.spend(def.cost)) {
-        alert(`Not enough Strubles for the permit (need ${def.cost.toLocaleString()}).`);
+      const permit = E.permitCost(def.cost, village.b.length);
+      if (!Strubles.spend(permit)) {
+        alert(`Not enough Strubles for the permit (need ${permit.toLocaleString()}).`);
         return;
       }
       const now = Date.now();
@@ -2063,9 +2430,9 @@
       village.b.push({
         id: village.nextId++, key, x: tx, y: ty,
         status: 'building', startedAt: now,
-        completesAt: now + def.buildMinutes * 60000,
+        completesAt: now + E.buildMinutes(def.buildMinutes, village.completedEver) * 60000,
         lastProductionAt: now,
-        paid: def.cost,           // permit paid, refunded if the building is removed
+        paid: permit,             // permit paid, refunded if the building is removed
       });
     }
     onBuildingsChanged();
@@ -2075,16 +2442,55 @@
 
   $('build-btn').addEventListener('click', () => { setBrush(null); openPlacePicker(); });
   // Rename the village from the stats bar. Kept short so the bar stays on one row.
-  $('stat-name').parentElement.addEventListener('click', () => {
+  // The server's village name is read once after sign-in, from GET /wallet
+  // (villageName, or null until a name is set). A failed read is retried after 30s.
+  let nameSynced = false, nameSyncAfter = 0;
+  async function syncVillageName() {
+    if (nameSynced || visiting || Date.now() < nameSyncAfter || !currentUid()) return;
+    try {
+      const res = await fetch(GIFT_API + '/wallet', { headers: { Authorization: 'Bearer ' + await CloudSync.currentUser.getIdToken() } });
+      if (!res.ok) throw new Error('wallet HTTP ' + res.status);
+      const body = await res.json();
+      nameSynced = true;
+      if (typeof body.villageName === 'string' && body.villageName && body.villageName !== village.name) {
+        village.name = body.villageName;
+        $('stat-name').textContent = village.name;
+        saveVillage();
+      }
+    } catch {
+      nameSyncAfter = Date.now() + 30000;
+    }
+  }
+  // Signed in, the name goes to the server, which runs the word filter and keeps
+  // it as the village name. The name is never put in the visitor snapshot from
+  // here, since that would skip the filter. Signed out, it stays on this device.
+  const VILLAGE_NAME_ERRORS = {
+    blocked_text: "That name has a word we can't use. Try a different name.",
+    not_switched_on: "Village names aren't switched on yet.",
+  };
+  async function renameVillage() {
+    if (visitLocked()) return;
     const next = prompt('Name your village (up to 24 characters):', village.name || 'My Village');
     if (next == null) return;
     const clean = next.replace(/[<>]/g, '').trim().slice(0, 24);
     if (!clean) return;
-    village.name = clean;
-    $('stat-name').textContent = clean;
+    let shown = clean;
+    if (currentUid()) {
+      const result = await giftPost('/village/name', { name: clean });
+      if (!result.ok) {
+        toast(VILLAGE_NAME_ERRORS[result.error] || giftErrorText(result.error), true);
+        return;
+      }
+      // The server's filtered copy is the one that shows.
+      shown = result.village_name || result.name || clean;
+    }
+    village.name = shown;
+    $('stat-name').textContent = shown;
     saveVillage();
-    toast('🏘️ Your village is now ' + clean + '.');
-  });
+    toast('🏘️ Your village is now ' + shown + '.');
+  }
+  $('stat-name').parentElement.addEventListener('click', renameVillage);
+  $('stats-rename').addEventListener('click', async () => { await renameVillage(); if (statsTab === 'you') renderYourStats(); });
   $('place-confirm').addEventListener('click', confirmPlacing);
   $('place-cancel').addEventListener('click', stopPlacing);
   $('recenter-btn').addEventListener('click', () => { if (cam) recenter(); });
@@ -2136,11 +2542,12 @@
   // Puts back money spent (spent > 0), or pays back a refund that was received
   // (spent < 0). Returns an error string if a refund can't be repaid.
   function reverseMoney(spent) {
-    if (spent > 0) { try { Strubles.add(spent); } catch {} return null; }
+    if (spent > 0) { try { Strubles.add(spent, 'refund'); } catch {} return null; }
     if (spent < 0 && !Strubles.spend(-spent)) return `Need ${(-spent).toLocaleString()} Strubles to undo that`;
     return null;
   }
   function doUndo() {
+    if (visitLocked()) return;
     const entry = undoStack[undoStack.length - 1];
     if (!entry) { toast('Nothing to undo'); return; }
     if (placing) stopPlacing();
@@ -2186,6 +2593,7 @@
     if (brushMode === 'erase') el.textContent = 'Erase — drag a box over tiles to clear them. You get back what you paid.';
     else if (brushMode === 'road') el.textContent = `Road — ${cost.toLocaleString()} each, drag to lay a road`;
     else el.textContent = `${BRUSH_LABEL[brushMode]} — ${cost ? cost.toLocaleString() + ' per tile' : 'free'}, drag a box to fill an area`;
+    if (zoningFor) el.textContent += ` · Done resumes placing your ${DEFS[zoningFor.key].label}`;
   }
 
   // What a painted tile cost, so erasing or replacing it can pay it back. Tiles
@@ -2211,7 +2619,7 @@
     const refund = existing ? refundForTile(tx, ty, existing) : 0;
     const net = cost - refund;
     if (net > 0 && !Strubles.spend(net)) { brushMsg(`Need ${net.toLocaleString()} Strubles`, true); return; }
-    if (net < 0) Strubles.add(-net);
+    if (net < 0) Strubles.add(-net, 'refund');
     if (!strokeLog) strokeLog = { tiles: [], spent: 0 };
     strokeLog.tiles.push(tileSnapshot(tx, ty)); strokeLog.spent += net;
     setTileType(tx, ty, 'road');
@@ -2270,7 +2678,7 @@
       return;
     }
     if (plan.net > 0 && !Strubles.spend(plan.net)) { brushMsg(`Need ${plan.net.toLocaleString()} Strubles`, true); return; }
-    if (plan.net < 0) Strubles.add(-plan.net);
+    if (plan.net < 0) Strubles.add(-plan.net, 'refund');
     const before = plan.changes.map(([x, y]) => tileSnapshot(x, y));
     plan.changes.forEach(([x, y, type, paid]) => { setTileType(x, y, type); setPaid(x, y, paid); });
     const n = plan.changes.length;
@@ -2286,37 +2694,73 @@
   }
 
   function setBrush(mode) {
+    if (mode && visitLocked()) return;
     brushMode = mode;
     rectDrag = null;
-    document.querySelectorAll('[data-brush]').forEach((b) => {
-      b.style.opacity = (mode && b.dataset.brush === mode) ? '0.55' : '1';
+    document.querySelectorAll('.brush-chip').forEach((b) => {
+      b.classList.toggle('active', b.dataset.brush === mode);
     });
     $('brush-bar').classList.toggle('open', !!mode);
     if (mode) { stopPlacing(); selectedId = null; setBrushLabel(); }
     refresh();
+    if (!mode && zoningFor) {
+      const z = zoningFor;
+      zoningFor = null;
+      startPlacing(z.key, null);
+      if (z.tx != null) { placing.tx = z.tx; placing.ty = z.ty; refresh(); }
+    }
   }
+  // Placing a building that needs zoning: hand over to the zone brush, keeping
+  // the aimed tile so Done can return to it.
+  function paintZoningFor() {
+    if (!placing || placing.moveId != null) return;
+    zoningFor = { key: placing.key, tx: placing.tx, ty: placing.ty };
+    setBrush(zoneOf(placing.key));
+  }
+  $('place-zone').addEventListener('click', paintZoningFor);
   $('brush-done').addEventListener('click', () => setBrush(null));
+  document.querySelectorAll('.brush-chip').forEach((b) => {
+    b.addEventListener('click', () => setBrush(b.dataset.brush));
+  });
+  // Desktop keys: the letter names the brush (D for road, since R is taken),
+  // and the number keys follow the palette order.
+  const BRUSH_KEYS = { r: 'residential', c: 'commercial', i: 'industrial', d: 'road', w: 'water', e: 'erase',
+    1: 'residential', 2: 'commercial', 3: 'industrial', 4: 'road', 5: 'water', 6: 'erase' };
+  window.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (/^(input|textarea|select)$/i.test((e.target && e.target.tagName) || '')) return;
+    if (document.querySelector('.overlay.open')) return;
+    const mode = BRUSH_KEYS[e.key.toLowerCase()];
+    if (!mode) return;
+    e.preventDefault();
+    setBrush(mode);
+  });
+  // Escape drops the brush, the same way Done does (placing has its own Escape above).
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && brushMode && !placing) setBrush(null);
+  });
 
   // Grouped so the three zone colours read as a category with a shared
   // purpose, instead of three unexplained buttons sitting next to Road.
   const ZONING_GROUPS = [
     { title: 'Infrastructure', rows: [
       { brush: 'road', icon: '🛣️', name: 'Road',
-        blurb: 'Required. A building with no road touching one of its sides earns nothing at all. Roads also carry your villagers.' },
+        blurb: 'Required: a building with no road beside it earns nothing.' },
     ]},
+    // swatch: the fill colour tycoon-art.js paints each zone with (ZONE_STYLE).
     { title: 'Zones', rows: [
-      { brush: 'residential', icon: '🏘️', name: 'Residential',
-        blurb: 'Homes. Shabby Apartments, Generic Buildings and Pagodas can only be built on residential zoning.' },
-      { brush: 'commercial', icon: '🏬', name: 'Commercial',
-        blurb: 'Shops and offices. Skyscrapers, Taipei 101, Banks, Office Buildings and 7-Elevens can only be built on commercial zoning.' },
-      { brush: 'industrial', icon: '🏭', name: 'Industrial',
-        blurb: 'Sweatshops, Factories and Power Plants can only be built on industrial zoning. It adds +15% to any building it touches, but drags village mood down — and mood scales all production from 0.75x to 1.15x.' },
+      { brush: 'residential', swatch: '#2f6fd0', name: 'Residential',
+        blurb: 'Homes: Shabby Apartments, Generic Buildings, Pagodas.' },
+      { brush: 'commercial', swatch: '#e08a1f', name: 'Commercial',
+        blurb: 'Shops and offices: Skyscrapers, Banks, Taipei 101, 7-Elevens.' },
+      { brush: 'industrial', swatch: '#7b3fa0', name: 'Industrial',
+        blurb: 'Factories and plants. +15% to neighbours, but lowers mood.' },
     ]},
     { title: 'Terrain', rows: [
       { brush: 'water', icon: '💧', name: 'Water',
-        blurb: 'Scenery. Lifts mood a little, and permanently blocks building on that tile until erased.' },
+        blurb: 'Scenery: lifts mood. Blocks building until erased.' },
       { brush: 'erase', icon: '🧽', name: 'Erase',
-        blurb: 'Drag a box to clear painted tiles. You get back what you paid for them. Tiles under a building are left alone.' },
+        blurb: 'Clears painted tiles and refunds what you paid.' },
     ]},
   ];
 
@@ -2332,7 +2776,10 @@
         const cost = tileCost(r.brush);
         const row = document.createElement('div');
         row.className = 'picker-row';
-        row.innerHTML = `<div class="row-icon">${r.icon}</div><div class="row-info">${r.name}
+        const mark = r.swatch
+          ? `<div class="zone-swatch" style="background:${r.swatch}"></div>`
+          : `<div class="row-icon">${r.icon}</div>`;
+        row.innerHTML = `${mark}<div class="row-info">${r.name}
           <small style="color:var(--gold)">${r.brush === 'erase' ? 'refunds what you paid' : !cost ? 'free' : cost.toLocaleString() + ' Strubles per tile · scales with your balance'}</small>
           <small class="row-desc">${r.blurb}</small></div>`;
         row.addEventListener('click', () => {
@@ -2378,7 +2825,7 @@
     if (!s) return;
     manageId = id;
     const def = DEFS[s.key];
-    const dailyUpkeep = def.cost * (def.upkeepPct || 0);
+    const dailyUpkeep = dailyUpkeepOf(def);
     $('manage-title').textContent = def.label;
     const specialty = computeSpecialty();
     const specialtyNote = specialty && def.zone === specialty.type ? ` Specialty bonus: +${Math.round(specialty.bonus * 100)}%.` : '';
@@ -2432,6 +2879,7 @@
   // Mil-Spec is this game's Common tier. Anything rarer asks first, because
   // getting another one back means another crate or a Real Estate purchase.
   $('manage-remove').addEventListener('click', () => {
+    if (visitLocked()) return;
     const s = bById.get(manageId);
     if (!s) return;
     const def = DEFS[s.key];
@@ -2444,7 +2892,7 @@
     const copy = JSON.parse(JSON.stringify(s));
     const removedAt = Date.now();
     village.b = village.b.filter((x) => x.id !== manageId);
-    if (refund > 0) { try { Strubles.add(refund); } catch {} }
+    if (refund > 0) { try { Strubles.add(refund, 'refund'); } catch {} }
     pushUndo(`remove ${def.label}`, () => {
       if (village.b.length >= slotCap()) return 'No free building slot to put it back';
       if (placementIssue(copy.key, copy.x, copy.y)) return 'Its old spot is no longer free';
@@ -2465,6 +2913,7 @@
   });
   $('manage-bank').addEventListener('click', () => { closeManage(); openBank(); });
   $('manage-firefight').addEventListener('click', () => {
+    if (visitLocked()) return;
     const s = bById.get(manageId);
     if (!s || !(s.fireUntil > Date.now())) return;
     const def = DEFS[s.key];
@@ -2565,17 +3014,72 @@
   });
   wireClose('guide-overlay', 'guide-close');
 
-  // ---------- Bank (unchanged behaviour: raises the wallet cap) ----------
+  // ---------- Bank (raises the wallet cap; sells land slots) ----------
+  // The teller is a 12x13 pixel grid in the villagers' palette, so the bank
+  // reads as part of the village. Drawn once per open; the art never changes.
+  const TELLER_ART = [
+    '...HHHHHH...',
+    '..HHHHHHHH..',
+    '..HSSSSSSH..',
+    '..SSESSESS..',
+    '..SSSSSSSS..',
+    '...SSRRSS...',
+    '....SSSS....',
+    '...WWTTWW...',
+    '..VVVTTVVV..',
+    '.VVVVTTVVVV.',
+    '.VVVGTTGVVV.',
+    '.VVVVVVVVVV.',
+    '.VVVVVVVVVV.',
+  ];
+  const TELLER_PAL = { H: '#3b2a1a', S: '#d9a877', E: '#1a1a1a', R: '#8a4b3a', W: '#f4f4f4', V: '#2a4f8a', T: '#b3262e', G: '#ffd700' };
+  // Rows 0-6 are the head, 7-12 the body. Each canvas is drawn from its own rows.
+  function drawRows(canvas, rows, pal = TELLER_PAL) {
+    const g = canvas.getContext('2d');
+    g.clearRect(0, 0, canvas.width, canvas.height);
+    rows.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (!pal[ch]) return;
+      g.fillStyle = pal[ch];
+      g.fillRect(x, y, 1, 1);
+    }));
+  }
+  // The eyes sit on head row 3 at columns 4 and 7. `look` shifts both by -1..1
+  // so he glances left or right; the rest of the head is unchanged.
+  function drawHead(look) {
+    const rows = TELLER_ART.slice(0, 7).map((r) => r.replace(/E/g, 'S'));
+    const row = [...rows[3]];
+    row[4 + look] = 'E';
+    row[7 + look] = 'E';
+    rows[3] = row.join('');
+    drawRows($('bank-teller-head'), rows);
+  }
+  // A slow glance: left, back, right, back. Runs only while the bank is open.
+  const GLANCE = [0, -1, -1, 0, 0, 1, 1, 0];
+  const GLANCE_MS = 1100;
+  let glanceStep = 0, glanceTimer = null;
+  function startGlance() {
+    if (glanceTimer || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    glanceTimer = setInterval(() => {
+      if (!$('bank-overlay').classList.contains('open')) { clearInterval(glanceTimer); glanceTimer = null; return; }
+      drawHead(GLANCE[glanceStep++ % GLANCE.length]);
+    }, GLANCE_MS);
+  }
+  function drawTeller() {
+    drawHead(0);
+    drawRows($('bank-teller-body'), TELLER_ART.slice(7));
+  }
+  function bankSay(line) { $('bank-say').textContent = line; }
+
   function renderBank() {
     const TB = window.TycoonBank;
     const level = TB.currentLevel();
     const bankCap = TB.capForLevel(level);
     const taipei = TB.taipeiBonus();
     $('bank-cap-breakdown').innerHTML = `
-      <div class="bank-cap-row"><span>Bank (level ${level})</span><span>${bankCap.toLocaleString()} Strubles</span></div>
-      <div class="bank-cap-row"><span>Taipei 101 bonus</span><span>+${taipei.toLocaleString()} Strubles</span></div>
-      <div class="bank-cap-row"><span><b>Total cap</b></span><span><b>${(bankCap + taipei).toLocaleString()} Strubles</b></span></div>`;
-    $('bank-next-info').textContent = `Next: Level ${level + 1} — costs ${TB.costForLevel(level + 1).toLocaleString()}, raises the cap by ${TB.capGainForLevel(level + 1).toLocaleString()}.`;
+      <div class="bank-cap-row"><span>Bank (level ${level})</span><span>${bankCap.toLocaleString()}</span></div>
+      <div class="bank-cap-row"><span>Taipei 101 bonus</span><span>+${taipei.toLocaleString()}</span></div>
+      <div class="bank-cap-row"><span><b>Total cap</b></span><span><b>${(bankCap + taipei).toLocaleString()}</b></span></div>`;
+    $('bank-next-info').textContent = `Level ${level + 1}: ${TB.costForLevel(level + 1).toLocaleString()} for +${TB.capGainForLevel(level + 1).toLocaleString()} cap.`;
     // Raising the wallet cap needs a Bank building standing. Slots (below) stay
     // available regardless, otherwise a full village with no bank could never
     // free up the space to build one.
@@ -2583,24 +3087,500 @@
     $('bank-buy').disabled = !has;
     $('bank-buy').style.opacity = has ? '' : '0.4';
     $('bank-gate').style.display = has ? 'none' : 'block';
+    try { $('bank-bal').textContent = Strubles.get().toLocaleString(); } catch {}
   }
-  function openBank() { renderBank(); renderExpand(); $('bank-overlay').classList.add('open'); }
+  function openBank() {
+    drawTeller();
+    startGlance();
+    bankSay('Welcome to the Iantopia Bank! Need more room in your wallet, or land for another building?');
+    renderBank();
+    renderExpand();
+    $('bank-overlay').classList.add('open');
+  }
   $('bank-btn').addEventListener('click', openBank);
   $('bank-buy').addEventListener('click', () => {
+    if (visitLocked()) return;
     if (!hasBank()) return;
     const TB = window.TycoonBank;
     const level = TB.currentLevel();
     const cost = TB.costForLevel(level + 1);
     if (!Strubles.spend(cost)) {
-      alert(`Not enough Strubles for the next level (need ${cost.toLocaleString()}).`);
+      bankSay(`Come back when you have ${cost.toLocaleString()}. The vault doesn't extend credit.`);
       return;
     }
     localStorage.setItem(TB.BANK_LEVEL_KEY, String(level + 1));
     try { window.dispatchEvent(new Event('tycoon:changed')); } catch {}
     renderBank();
+    bankSay(`Done! Your cap is now ${(TB.capForLevel(level + 1) + TB.taipeiBonus()).toLocaleString()}. Pleasure doing business.`);
     syncBalance();
   });
   wireClose('bank-overlay', 'bank-close');
+
+  // ---------- Visit ----------
+  // Opt-in, off by default. While it is on, the village snapshot is published
+  // (see maybePushVillageSnapshot); turning it off deletes the snapshot. The
+  // visit itself is the /visit page, shown in a window so you never leave Tycoon.
+  function currentUid() {
+    return window.CloudSync && CloudSync.currentUser ? CloudSync.currentUser.uid : null;
+  }
+  function setVisitStatus(text) { $('visit-status').textContent = text; }
+  // A takedown stays pending until it succeeds, so an opt-out made while signed
+  // out (or a snapshot published before opt-in existed) is removed on the next
+  // signed-in tick.
+  let unpublishInFlight = false;
+  function unpublishVillage() {
+    const uid = currentUid();
+    if (!uid || !window.firebase) { village.unpublishPending = true; saveVillage(); setVisitStatus('Sign in and your village will be hidden.'); return; }
+    if (unpublishInFlight) return;
+    unpublishInFlight = true;
+    firebase.firestore().collection('village_snapshots').doc(uid).delete()
+      .then(() => {
+        village.unpublishPending = false; saveVillage();
+        lastSnapshotKey = null;
+        setVisitStatus('Your village is hidden from visitors.');
+      })
+      .catch((err) => { console.error('[village-snapshot] unpublish failed:', err.message || err); setVisitStatus("Couldn't hide your village. Try again in a moment."); })
+      .finally(() => { unpublishInFlight = false; });
+  }
+  $('visit-optin').addEventListener('change', (e) => {
+    village.visitable = e.target.checked;
+    saveVillage();
+    if (village.visitable) {
+      // Publish on the next tick instead of waiting out the throttle.
+      lastSnapshotPush = 0; lastSnapshotKey = null;
+      setVisitStatus(currentUid() ? 'Your village is open to visitors.' : 'Sign in to publish your village.');
+    } else {
+      unpublishVillage();
+    }
+    loadVisitList();
+  });
+  function loadVisitList() {
+    const list = $('visit-list');
+    list.innerHTML = '';
+    if (!window.firebase) { list.innerHTML = '<p class="bank-note">Visiting needs a connection.</p>'; return; }
+    const me = currentUid();
+    firebase.firestore().collection('village_snapshots').where('visitable', '==', true).limit(20).get()
+      .then((snap) => {
+        list.innerHTML = '';
+        const rows = snap.docs.filter((d) => d.id !== me);
+        if (!rows.length) { list.innerHTML = '<p class="bank-note">No villages have let visitors in yet.</p>'; return; }
+        rows.forEach((doc) => {
+          const d = doc.data();
+          const row = document.createElement('div');
+          row.className = 'picker-row';
+          const info = document.createElement('div');
+          info.className = 'row-info';
+          // Names come from other players: set as text, never as HTML.
+          info.textContent = `${d.displayName || 'Anonymous Tycoon'} · ${d.population || 0} people · ${d.gdp || 0} Strubles/min`;
+          const go = document.createElement('button');
+          go.className = 'btn';
+          go.type = 'button';
+          go.textContent = 'Visit';
+          go.addEventListener('click', () => openVisit(doc.id, d.displayName || 'Anonymous Tycoon'));
+          row.append(info, go);
+          list.appendChild(row);
+        });
+      })
+      .catch((err) => {
+        console.error('[visit] list failed:', err.message || err);
+        list.innerHTML = '<p class="bank-note">Couldn\'t load villages right now.</p>';
+      });
+  }
+  function openVisit(uid, name) {
+    closeStats();
+    enterVisit(uid, name);
+  }
+  // ---------- Stats window: you, the village leaderboards, and visiting ----------
+  // Your numbers are the stats bar, so this window reads it rather than doing
+  // the maths twice. While you are visiting, the bar shows the village on screen,
+  // so "You" says so instead of showing the wrong numbers.
+  const BOARD_CFG = {
+    gdp: { field: 'gdp', format: (v) => `${Number(v || 0).toLocaleString()} Strubles/min`, empty: 'No villages ranked yet.' },
+    efficiency: { field: 'efficiency', requireQualified: true, format: (v) => `${Number(v || 0).toLocaleString()} per building`, empty: 'No villages ranked yet. A village needs a few standing buildings to qualify.' },
+  };
+  let statsTab = 'you';
+  let boardKey = 'gdp';
+  function openStats(tab) {
+    $('stats-overlay').classList.add('open');
+    showStatsTab(tab || 'you');
+  }
+  function closeStats() { $('stats-overlay').classList.remove('open'); stopStatsLive(); }
+  // While the You tab is open its numbers refresh every second; nothing runs when it is closed.
+  let statsLive = null;
+  function stopStatsLive() { if (statsLive) { clearInterval(statsLive); statsLive = null; } }
+  function startStatsLive() {
+    stopStatsLive();
+    statsLive = setInterval(() => {
+      if (!$('stats-overlay').classList.contains('open') || statsTab !== 'you') { stopStatsLive(); return; }
+      renderYourStats();
+    }, 1000);
+  }
+  function showStatsTab(name) {
+    stopStatsLive();
+    statsTab = name;
+    document.querySelectorAll('[data-stats-tab]').forEach((b) => b.classList.toggle('active', b.dataset.statsTab === name));
+    document.querySelectorAll('[data-stats-pane]').forEach((p) => { p.hidden = p.dataset.statsPane !== name; });
+    if (name === 'you') { renderYourStats(); startStatsLive(); }
+    if (name === 'board') loadBoard(boardKey);
+    if (name === 'visit') {
+      // The opt-in belongs to your own village, so it can't change while you are visiting.
+      $('visit-optin').checked = !!village.visitable && !visiting;
+      $('visit-optin').disabled = !!visiting;
+      setVisitStatus(visiting ? 'Head home to change this.' : '');
+      loadVisitList();
+    }
+  }
+  function renderYourStats() {
+    const box = $('stats-you');
+    $('stats-rename').hidden = !!visiting;   // the name belongs to your own village
+    box.innerHTML = '';
+    const add = (label, value) => {
+      const row = document.createElement('div');
+      row.className = 'gift-row';
+      const l = document.createElement('div');
+      l.className = 'gift-body';
+      l.textContent = label;
+      const v = document.createElement('b');
+      v.textContent = value;
+      row.append(l, v);
+      box.appendChild(row);
+    };
+    if (visiting) {
+      const note = document.createElement('p');
+      note.className = 'bank-note';
+      note.textContent = `You're visiting ${visiting.name}. Head home to see your own numbers.`;
+      box.appendChild(note);
+    } else {
+      document.querySelectorAll('#stats-bar > span').forEach((s) => {
+        if (s.style.display === 'none') return;
+        // "GDP: 2/min" is a label, a colon, then the value (which can include a unit).
+        const label = (s.firstChild ? s.firstChild.textContent : '').replace(/:\s*$/, '').trim();
+        const value = s.textContent.slice(label.length).replace(/^\s*:\s*/, '').trim();
+        add(label, value);
+      });
+      add('Lifetime earned', `${Number(village.lifetimeEarned || 0).toLocaleString()} Strubles`);
+      try { add('Strubles', Number(Strubles.get() || 0).toLocaleString()); } catch {}
+    }
+    renderProfit(add);
+  }
+  // Daily profit: income - spent + refunds, for today and the last few days.
+  function profitOf(row) { return (row.income || 0) - (row.spent || 0) + (row.refunds || 0); }
+  function renderProfit(add) {
+    const all = loadProfit();
+    const today = profitDay();
+    const row = all[today] || { income: 0, spent: 0, refunds: 0 };
+    const sign = (n) => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n).toLocaleString();
+    const heading = document.createElement('div');
+    heading.className = 'stats-heading';
+    heading.textContent = 'Today (this browser, Tycoon only)';
+    $('stats-you').appendChild(heading);
+    add('Income', `+${(row.income || 0).toLocaleString()}`);
+    add('Spent', `−${(row.spent || 0).toLocaleString()}`);
+    add('Refunds', `+${(row.refunds || 0).toLocaleString()}`);
+    add('Profit today', sign(profitOf(row)) + ' Strubles');
+    const past = Object.keys(all).sort().reverse().filter((k) => k !== today).slice(0, 6);
+    if (past.length) {
+      const h2 = document.createElement('div');
+      h2.className = 'stats-heading';
+      h2.textContent = 'Recent days';
+      $('stats-you').appendChild(h2);
+      past.forEach((k) => add(k, sign(profitOf(all[k])) + ' Strubles'));
+    }
+  }
+  function loadBoard(key) {
+    boardKey = key;
+    document.querySelectorAll('[data-board]').forEach((b) => b.classList.toggle('active', b.dataset.board === key));
+    const box = $('stats-board');
+    box.textContent = 'Loading…';
+    if (!window.firebase) { box.textContent = 'Leaderboards need a connection.'; return; }
+    const cfg = BOARD_CFG[key];
+    const LIMIT = 20;
+    // Efficiency filters on `qualified`, a second field, so it is filtered here
+    // rather than with a composite index (the same trick as /leaderboard).
+    firebase.firestore().collection('leaderboard')
+      .orderBy(cfg.field, 'desc').limit(cfg.requireQualified ? LIMIT * 4 : LIMIT).get()
+      .then((snap) => {
+        if (boardKey !== key || statsTab !== 'board') return;
+        let docs = snap.docs;
+        if (cfg.requireQualified) docs = docs.filter((d) => d.data().qualified !== false);
+        docs = docs.slice(0, LIMIT);
+        box.innerHTML = '';
+        if (!docs.length) { box.innerHTML = `<p class="bank-note">${cfg.empty}</p>`; return; }
+        const me = currentUid();
+        docs.forEach((doc, i) => {
+          const d = doc.data();
+          const isMe = doc.id === me;
+          const row = document.createElement('div');
+          row.className = 'gift-row';
+          const rank = document.createElement('div');
+          rank.textContent = `#${i + 1}`;
+          const who = document.createElement('div');
+          who.className = 'gift-body';
+          // Names come from other players: set as text, never as HTML.
+          who.textContent = (d.displayName || 'Anonymous Tycoon') + (isMe ? ' (you)' : '');
+          const val = document.createElement('b');
+          val.textContent = cfg.format(d[cfg.field]);
+          row.append(rank, who, val);
+          if (!isMe) {
+            const go = document.createElement('button');
+            go.className = 'btn';
+            go.type = 'button';
+            go.textContent = 'Visit';
+            go.addEventListener('click', () => openVisit(doc.id, d.displayName || 'Anonymous Tycoon'));
+            row.appendChild(go);
+          }
+          box.appendChild(row);
+        });
+      })
+      .catch((err) => {
+        console.error('[leaderboard] query failed:', err.message || err);
+        box.innerHTML = '<p class="bank-note">Couldn\'t load the leaderboard right now.</p>';
+      });
+  }
+  $('stats-btn').addEventListener('click', () => openStats('you'));
+  wireClose('stats-overlay', 'stats-close');
+  document.querySelectorAll('[data-stats-tab]').forEach((b) => {
+    b.addEventListener('click', () => showStatsTab(b.dataset.statsTab));
+  });
+  document.querySelectorAll('[data-board]').forEach((b) => {
+    b.addEventListener('click', () => loadBoard(b.dataset.board));
+  });
+
+  // ---------- Visiting a neighbour's village, in the same scene ----------
+  // Their village is swapped in for yours, read-only. While it is out, every
+  // path that would spend, refund, earn or publish is blocked (visitLocked, tick,
+  // saveVillage and the snapshot pushes), so nothing of theirs is saved or paid.
+  function visitLocked() {
+    if (!visiting) return false;
+    toast("You're visiting. Head home to build or spend.", true);
+    return true;
+  }
+  function clearBuildingSprites() {
+    for (const sp of bSprites.values()) { if (sp && sp.destroy) sp.destroy(); }
+    for (const lb of bLabels.values()) { if (lb && lb.destroy) lb.destroy(); }
+    bSprites.clear(); bLabels.clear();
+  }
+  // Draw everything from a village object. Sprites are keyed by building id, so
+  // they are cleared on every swap: a neighbour's id must not reuse ours.
+  function showVillage(v) {
+    village = v;
+    clearBuildingSprites();
+    rebuildTileGrid();
+    onBuildingsChanged();
+    refresh();
+  }
+  async function enterVisit(uid, name) {
+    if (!window.firebase) { toast("Visiting needs a connection.", true); return; }
+    let snap;
+    try { snap = await firebase.firestore().collection('village_snapshots').doc(uid).get(); }
+    catch (err) { console.error('[visit] load failed:', err.message || err); toast("Couldn't reach that village right now.", true); return; }
+    if (!snap.exists || snap.data().visitable !== true) { toast('That village is closed to visitors now.', true); return; }
+    loadVisit(uid, snap.data(), name);
+  }
+  // Shows a village from its snapshot. Split from enterVisit so it can be tested
+  // without Firestore (see TycoonTest.loadVisit).
+  function loadVisit(uid, d, name) {
+    stopPlacing();
+    setBrush(null);
+    selectedId = null;
+    if (!visiting) homeVillage = village;
+    visiting = { uid, name: name || d.displayName || 'Anonymous Tycoon' };
+    const b = (Array.isArray(d.buildings) ? d.buildings : [])
+      .filter((s) => s && DEFS[s.key] && Number.isFinite(s.x) && Number.isFinite(s.y))
+      .map((s, i) => ({
+        id: Number.isFinite(s.id) ? s.id : i + 1, key: s.key, x: s.x, y: s.y,
+        status: 'complete', startedAt: 0, completesAt: 0, lastProductionAt: 0, paid: 0,
+      }));
+    const tiles = {};
+    Object.entries(d.tiles || {}).forEach(([k, t]) => { if (TILE_ID_KNOWN.has(t)) tiles[k] = t; });
+    showVillage({ v: 2, nextId: 1, name: visiting.name, b, tiles, paid: {}, founderKit: true });
+    $('visit-bar-text').textContent = `🏘️ Visiting ${visiting.name}`;
+    $('visit-bar').classList.add('open');
+    if (cam) recenter();
+  }
+  function exitVisit() {
+    if (!visiting) return;
+    visiting = null;
+    $('visit-bar').classList.remove('open');
+    closeGiftWindow();
+    const home = homeVillage;
+    homeVillage = null;
+    showVillage(home);
+    if (cam) recenter();
+  }
+  $('visit-home').addEventListener('click', exitVisit);
+  $('visit-gift').addEventListener('click', () => openGiftWindow());
+
+  // ---------- Gifts ----------
+  // A sticker and a note are free. Strubles go through the server: it debits the
+  // sender and holds the amount in a pending gift until the owner collects it.
+  // Until the server and rules for gifts are live, these calls fail and the
+  // window says so.
+  const GIFT_API = location.protocol === 'https:'
+    ? '/arena-api'
+    : 'http://' + (location.hostname || 'localhost') + ':4001';
+  const GIFT_MAX_AMOUNT = 1000;
+  const GIFT_STICKERS = [
+    { id: 'sunflower', emoji: '🌻', label: 'Sunflower' },
+    { id: 'balloon', emoji: '🎈', label: 'Balloon' },
+    { id: 'cake', emoji: '🍰', label: 'Cake' },
+    { id: 'star', emoji: '⭐', label: 'Star' },
+    { id: 'cat', emoji: '🐈', label: 'Cat' },
+    { id: 'letter', emoji: '📮', label: 'Letter' },
+  ];
+  const GIFT_ERRORS = {
+    sign_in: 'Sign in to send gifts.',
+    insufficient: "You don't have that many Strubles.",
+    cap: "They're at their wallet cap, so the gift can't land yet.",
+    limit: "You've already sent a gift today. Try again tomorrow.",
+    not_visitable: 'That village is closed to visitors now.',
+    self: "You can't send a gift to yourself.",
+    blocked_text: "That note has a word we can't send. Try different words.",
+    bad_request: "That gift wasn't valid. Check the amount and note.",
+    not_found: 'That gift is gone.',
+    already_collected: 'That gift was already collected.',
+  };
+  let giftSticker = GIFT_STICKERS[0].id;
+  function setGiftStatus(text) { $('gift-status').textContent = text; }
+  async function giftPost(path, body) {
+    const user = window.CloudSync && CloudSync.currentUser;
+    if (!user) return { ok: false, error: 'sign_in' };
+    try {
+      const res = await fetch(GIFT_API + path, {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + await user.getIdToken(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) return Object.assign({ ok: true }, data);
+      if (res.status === 404) return { ok: false, error: 'not_switched_on' };
+      return { ok: false, error: data.error || 'http_' + res.status };
+    } catch {
+      return { ok: false, error: 'network' };
+    }
+  }
+  function giftErrorText(code) {
+    if (code === 'not_switched_on') return "Gifts aren't switched on yet.";
+    return GIFT_ERRORS[code] || "Something went wrong. Try again.";
+  }
+  function openGiftWindow() {
+    if (!visiting) return;
+    $('gift-title').textContent = `Leave a gift for ${visiting.name}`;
+    $('gift-note').value = '';
+    $('gift-amount').value = '0';
+    setGiftStatus('');
+    renderGiftStickers();
+    $('gift-overlay').classList.add('open');
+  }
+  // Only the sticker row is redrawn on a pick, so a note already typed survives.
+  function renderGiftStickers() {
+    const box = $('gift-stickers');
+    box.innerHTML = '';
+    GIFT_STICKERS.forEach((s) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'gift-sticker' + (s.id === giftSticker ? ' active' : '');
+      b.title = s.label;
+      b.setAttribute('aria-label', s.label);
+      b.textContent = s.emoji;
+      b.addEventListener('click', () => { giftSticker = s.id; renderGiftStickers(); });
+      box.appendChild(b);
+    });
+  }
+  function closeGiftWindow() { $('gift-overlay').classList.remove('open'); }
+  wireClose('gift-overlay', 'gift-close');
+  $('gift-send').addEventListener('click', async () => {
+    if (!visiting) return;
+    const user = window.CloudSync && CloudSync.currentUser;
+    if (!user) { setGiftStatus('Sign in to send gifts.'); return; }
+    const toUid = visiting.uid;
+    if (user.uid === toUid) { setGiftStatus(giftErrorText('self')); return; }
+    const note = $('gift-note').value.trim().slice(0, 140);
+    const amount = Math.floor(Number($('gift-amount').value) || 0);
+    if (amount < 0 || amount > GIFT_MAX_AMOUNT) { setGiftStatus(`Strubles must be between 0 and ${GIFT_MAX_AMOUNT}.`); return; }
+    $('gift-send').disabled = true;
+    setGiftStatus('Sending…');
+    let result;
+    if (amount > 0) {
+      result = await giftPost('/gifts/strubles', { toUid, amount, stickerId: giftSticker, note });
+      if (result.ok) { try { Strubles.refresh(); } catch {} }
+    } else {
+      // A note alone moves no money. The server checks it for blocked words and
+      // writes it to the owner's gift list; clients can't write there directly.
+      result = await giftPost('/gifts/note', { toUid, stickerId: giftSticker, note });
+    }
+    $('gift-send').disabled = false;
+    if (!result.ok) { setGiftStatus(giftErrorText(result.error)); return; }
+    setGiftStatus('Sent! 🎁');
+    $('gift-note').value = '';
+    $('gift-amount').value = '0';
+  });
+
+  // The owner's inbox, inside the bank. Notes are read-only; Strubles gifts
+  // collect into the balance on the server, which checks the wallet cap.
+  function loadGiftInbox() {
+    const box = $('gift-inbox');
+    box.innerHTML = '';
+    const uid = currentUid();
+    if (!uid || !window.firebase) { box.innerHTML = '<p class="bank-note">Sign in to see the gifts your visitors leave.</p>'; return; }
+    firebase.firestore().collection('village_snapshots').doc(uid).collection('gifts')
+      .orderBy('createdAt', 'desc').limit(20).get()
+      .then((snap) => {
+        box.innerHTML = '';
+        if (snap.empty) { box.innerHTML = '<p class="bank-note">No gifts yet.</p>'; return; }
+        snap.docs.forEach((doc) => {
+          const g = doc.data();
+          const row = document.createElement('div');
+          row.className = 'gift-row';
+          const sticker = GIFT_STICKERS.find((s) => s.id === g.stickerId);
+          const mark = document.createElement('div');
+          mark.textContent = sticker ? sticker.emoji : '🎁';
+          const body = document.createElement('div');
+          body.className = 'gift-body';
+          const from = document.createElement('strong');
+          from.textContent = g.fromName || 'Anonymous Tycoon';
+          const note = document.createElement('small');
+          note.textContent = g.note || '';
+          body.append(from, note);
+          row.append(mark, body);
+          if (g.kind === 'strubles') {
+            const amt = document.createElement('div');
+            amt.textContent = `${(g.amount || 0).toLocaleString()} Strubles`;
+            row.appendChild(amt);
+            if (g.status === 'pending') {
+              const btn = document.createElement('button');
+              btn.className = 'btn';
+              btn.type = 'button';
+              btn.textContent = 'Collect';
+              btn.addEventListener('click', () => collectGift(doc.id, btn));
+              row.appendChild(btn);
+            } else {
+              const done = document.createElement('small');
+              done.textContent = 'collected';
+              row.appendChild(done);
+            }
+          }
+          box.appendChild(row);
+        });
+      })
+      .catch((err) => {
+        console.error('[gift] inbox failed:', err.message || err);
+        box.innerHTML = '<p class="bank-note">Couldn\'t load your gifts right now.</p>';
+      });
+  }
+  async function collectGift(giftId, btn) {
+    btn.disabled = true;
+    const result = await giftPost('/gifts/collect', { giftId });
+    if (result.ok) {
+      try { Strubles.refresh(); } catch {}
+      toast(`🎁 Collected ${(result.applied || 0).toLocaleString()} Strubles`);
+      loadGiftInbox();
+      return;
+    }
+    btn.disabled = false;
+    toast(result.error === 'cap' ? 'Make room under your wallet cap first.' : giftErrorText(result.error), true);
+  }
+  $('bank-btn').addEventListener('click', () => { setTimeout(loadGiftInbox, 0); });
 
   // ---------- Building slots ----------
   function renderExpand() {
@@ -2611,15 +3591,18 @@
     $('expand-next-info').textContent = `Next: slot ${BASE_SLOTS + owned + 1} — costs ${expandCostForSlot(owned + 1).toLocaleString()} Strubles.`;
   }
   $('expand-buy').addEventListener('click', () => {
+    if (visitLocked()) return;
     const owned = slotsOwned();
     const cost = expandCostForSlot(owned + 1);
     if (!Strubles.spend(cost)) {
-      alert(`Not enough Strubles for the next slot (need ${cost.toLocaleString()}).`);
+      bankSay(`A slot is ${cost.toLocaleString()}, and I can only take cash I can see in your wallet.`);
       return;
     }
     localStorage.setItem(SLOTS_KEY, String(owned + 1));
     try { window.dispatchEvent(new Event('tycoon:changed')); } catch {}
     renderExpand();
+    renderBank();
+    bankSay(`Slot ${BASE_SLOTS + owned + 1} is yours. Plenty of room for something new.`);
     refresh();
     syncBalance();
   });
@@ -2630,7 +3613,11 @@
   // between strokes (mid-stroke it is deliberately held steady).
   window.addEventListener('strubles:change', () => { if (brushMode && strokeBasis == null) setBrushLabel(); });
   window.addEventListener('storage', (e) => {
-    if (e.key === VILLAGE_KEY) { village = loadVillage(); rebuildTileGrid(); onBuildingsChanged(); refresh(); }
+    if (e.key === VILLAGE_KEY) {
+      // Another tab changed your village. While visiting, keep it aside until you go home.
+      if (visiting) homeVillage = loadVillage();
+      else showVillage(loadVillage());
+    }
     if (e.key === INV_KEY) refresh();
   });
   // Cloud pull reloads the page itself, so no extra reconcile hook is needed.
@@ -2667,11 +3654,13 @@
   });
 
   // ---------- Reconcile loop ----------
+  grantFounderKit();
   if (tick()) saveVillage();
   setInterval(() => {
     if (tick()) saveVillage();
     maybeTriggerEvent();
     refresh();
+    syncVillageName();
   }, 1000);
 
   // ---------- Leaderboard score push ----------
@@ -2683,6 +3672,7 @@
   let leaderboardPushInFlight = false;
   let leaderboardCooldownUntil = 0;
   function maybePushLeaderboardScore(stats) {
+    if (visiting) return;   // a visited village's numbers are not yours to report
     if (!window.CloudSync || !CloudSync.isSignedIn()) return;
     if (Date.now() < leaderboardCooldownUntil) return;
     const key = JSON.stringify(stats);
@@ -2721,10 +3711,18 @@
   const SNAPSHOT_MIN_INTERVAL_MS = 30000;
   let lastSnapshotPush = 0, lastSnapshotKey = null, snapshotPushInFlight = false, snapshotCooldownUntil = 0;
   function maybePushVillageSnapshot(stats) {
+    if (visiting) return;   // never publish a neighbour's village as yours
     if (!window.CloudSync || !CloudSync.isSignedIn()) return;
     if (Date.now() < snapshotCooldownUntil) return;
     const user = CloudSync.currentUser;
     if (!user) return;
+    // Opted out: nothing is published, and any snapshot left from before opt-in
+    // existed (or from an opt-out made while signed out) is taken down.
+    if (!village.visitable) {
+      if (village.visitable === undefined) { village.visitable = false; village.unpublishPending = true; saveVillage(); }
+      if (village.unpublishPending) unpublishVillage();
+      return;
+    }
     const buildings = village.b.map((s) => ({ id: s.id, key: s.key, x: s.x, y: s.y, status: s.status, fireUntil: s.fireUntil || 0 }));
     const payload = { tiles: village.tiles, buildings, ...stats };
     const key = JSON.stringify(payload);
@@ -2734,6 +3732,7 @@
     snapshotPushInFlight = true;
     firebase.firestore().collection('village_snapshots').doc(user.uid).set({
       displayName: user.displayName || 'Anonymous Tycoon',
+      visitable: true,
       tiles: payload.tiles,
       buildings: payload.buildings,
       gdp: Math.round(stats.gdp * 1000) / 1000,
@@ -2742,7 +3741,7 @@
       mood: Math.round(stats.mood),
       specialty: stats.specialty,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    })
+    }, { merge: true })   // merge, so a push never wipes fields set elsewhere (such as the opt-in)
       .then(() => { lastSnapshotKey = key; lastSnapshotPush = Date.now(); })
       .catch((err) => {
         // Same reasoning as the leaderboard push: a missing-rules error
@@ -2767,7 +3766,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // Test hook for the browser suites; only exists in dev mode.
-  if (!TYCOON_DISABLED) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood, triggerFire, triggerCaravan, triggerAudit, estimateGDP };
+  if (!TYCOON_DISABLED && window.IANTOPIA_IS_DEV) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood, triggerFire, triggerCaravan, triggerAudit, estimateGDP, loadVisit, exitVisit, get visiting() { return visiting; }, get homeVillage() { return homeVillage; } };
 })();
 </script>
 </body>

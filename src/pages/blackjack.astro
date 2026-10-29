@@ -4,6 +4,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Iantopia Blackjack</title>
@@ -267,6 +269,9 @@
   .status { margin-top:14px; font-weight:400; font-size:11px; color:#fff; }
 
   .controls { display:flex; gap:10px; margin-top:16px; flex-wrap:wrap; align-items:center; }
+  /* The six round buttons always sit in one row, sharing the width equally. */
+  .actions { display:flex; gap:8px; width:100%; flex-wrap:nowrap; }
+  .actions button { flex:1 1 0; min-width:0; }
   button {
     all:unset; cursor:none; padding:12px 24px; border-radius:0; border:3px solid #333;
     background:#4a6fa5; color:#fff; font-weight:400; font-size:11px;
@@ -367,11 +372,16 @@
     .card-img { width: 32px; height: 32px; }
     .score-display { font-size: 10px; }
     .status { font-size: 9px; }
-    .controls { flex-direction: column; gap: 6px; align-items: stretch; }
+    .controls { flex-direction: column; gap: 10px; align-items: stretch; }
     button { font-size: 8px; padding: 6px 10px; min-height: auto; }
-    .betbox { gap: 3px; }
-    .betbox button { min-width: 36px; min-height: 36px; padding: 4px 6px; }
-    .betbox input { width: 45px; padding: 6px 8px; font-size: 9px; }
+    /* Bet row: centred, with thumb-sized buttons and a readable input. */
+    .betbox { gap: 8px; justify-content: center; }
+    .betbox button { min-width: 48px; min-height: 48px; padding: 4px 6px; font-size: 16px; text-align: center; }
+    .betbox input { width: 96px; min-height: 48px; box-sizing: border-box; padding: 6px 8px; font-size: 11px; text-align: center; }
+    /* Six actions in a 3x2 grid instead of one squeezed row. The buttons use
+       all:unset, which resets box-sizing, so it is set again here. */
+    .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .actions button { box-sizing: border-box; min-height: 48px; padding: 6px 4px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 9px; }
     #earn-panel { flex-direction: column; gap: 6px; margin-top: 8px; padding: 12px; }
     #earn-panel button, #earn-panel a { padding: 8px 12px; font-size: 8px; }
     #strubles-badge { top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); padding: 6px 8px; }
@@ -428,12 +438,14 @@
         <button id="bet-plus">+</button>
       </div>
 
-      <button id="btn-deal"   class="primary">Deal</button>
-      <button id="btn-hit"    class="accent"  disabled>Hit</button>
-      <button id="btn-stand"  class="accent"  disabled>Stand</button>
-      <button id="btn-double" class="accent"  disabled>Double</button>
-      <button id="btn-split"  class="accent"  disabled>Split</button>
-      <button id="btn-restart" class="danger" disabled>Restart</button>
+      <div class="actions">
+        <button id="btn-deal"   class="primary">Deal</button>
+        <button id="btn-hit"    class="accent"  disabled>Hit</button>
+        <button id="btn-stand"  class="accent"  disabled>Stand</button>
+        <button id="btn-double" class="accent"  disabled>Double</button>
+        <button id="btn-split"  class="accent"  disabled>Split</button>
+        <button id="btn-restart" class="danger" disabled>Restart</button>
+      </div>
     </div>
 
     <div class="status" id="status">Welcome! Set a bet and press Deal.</div>
@@ -495,7 +507,7 @@
      on blackjack/lootbox/minesweeper never synced, and returning to home
      would pull the stale pre-visit cloud snapshot right over it. -->
 <script is:inline src="/game-stats.js?v=1"></script>
-<script is:inline src="/cloud-sync.js?v=10"></script>
+<script is:inline src="/cloud-sync.js?v=14"></script>
 <script is:inline src="/music-library.js?v=13"></script>
 <script is:inline src="/music-position.js?v=1"></script>
 <script is:inline src="/background-library.js?v=13"></script>
@@ -504,7 +516,7 @@
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/tycoon-cap.js?v=1"></script>
 <script is:inline src="/tycoon-bank.js?v=2"></script>
-<script is:inline src="/strubles.js?v=3"></script>
+<script is:inline src="/strubles.js?v=6"></script>
 <script is:inline>
   window.PAGE_DEFAULT_BG = { type: 'gif', src: '/video/casino-entrance.gif', position: 'center', label: 'Casino Entrance' };
   // Balatro plays for free on blackjack specifically (its hardcoded resting
@@ -513,7 +525,7 @@
   window.PAGE_FREE_TRACK_KEY = 'balatro';
 </script>
 <script is:inline src="/pickers.js?v=11"></script>
-
+<script is:inline src="/money-rain.js?v=1"></script>
 <script is:inline>
 (() => {
   const suits  = ['♠','♥','♦','♣'];
@@ -524,6 +536,8 @@
   let deck = [];
   let playerHands = [[]];
   let handBets = [0];
+  // One wallet round per hand: the stake that is settled when the hand ends.
+  let handRounds = [];
   let handDone = [false];
   let activeHand = 0;
   let hasSplit = false;
@@ -752,7 +766,7 @@
     const bal = Strubles.get();
     btnDouble.disabled = !(isFirstDecision && bal >= bet);
     const canSplit = isFirstDecision && !hasSplit && playerHands.length === 1 &&
-                      hand[0].v === hand[1].v && bal >= bet;
+                      canSplitPair(hand[0].v, hand[1].v) && bal >= bet;
     btnSplit.disabled = !canSplit;
   }
 
@@ -771,12 +785,13 @@
     updateActiveHighlight();
   }
 
-  function settle(result, bet){
+  // Closes one hand's round with what it pays (0 for a loss).
+  function settle(result, bet, round){
     let payout = 0;
     if (result === 'win') payout = bet * 2;
     else if (result === 'blackjack') payout = Math.floor(bet * 2.5);
     else if (result === 'push') payout = bet;
-    if (payout) Strubles.add(payout);
+    Strubles.settle('blackjack', round, payout);
     try { GameStats.record('blackjack', result === 'push' ? 'push' : 'win', { net: payout - bet }); } catch {}
     syncBalance();
     if (result === 'win' || result === 'blackjack') playRandomSound('chips-stack', 6);
@@ -815,7 +830,9 @@
     const bet = Math.max(1, Math.floor(Number(betInput.value || 0)));
     const bal = Strubles.get();
     if (bet > bal) { statusEl.textContent = "Not enough Strubles for that bet."; return; }
-    if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles."; return; }
+    const round = Strubles.stake('blackjack', bet);
+    if (!round) { statusEl.textContent = "Not enough Strubles."; return; }
+    handRounds = [round];
     syncBalance();
 
     deck = makeDeck();
@@ -851,11 +868,11 @@
       // A dealer 21 built up via hits loses to a natural player blackjack.
       const dealerNatural = dealer.length === 2 && dv === 21;
       if (dealerNatural) {
-        settle('push', bet);
+        settle('push', bet, handRounds[0]);
         playRandomSound('chips-handle', 6);
         endRound('Push (both blackjack).');
       } else {
-        settle('blackjack', bet);
+        settle('blackjack', bet, handRounds[0]);
         celebrateBlackjack();
         endRound('Blackjack! You win 🎉');
       }
@@ -906,7 +923,7 @@
     const hand = playerHands[activeHand];
     if (hand.length !== 2) return;
     const bet = handBets[activeHand];
-    if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles to double down."; return; }
+    if (!Strubles.stake('blackjack', bet, handRounds[activeHand])) { statusEl.textContent = "Not enough Strubles to double down."; return; }
     handBets[activeHand] = bet * 2;
     syncBalance();
     hand.push(drawCard());
@@ -917,12 +934,19 @@
     advanceOrResolve();
   }
 
+  // Any two cards worth ten can be split (10, J, Q, K), not only a matching pair.
+  const TEN_VALUES = new Set(['10', 'J', 'Q', 'K']);
+  function canSplitPair(a, b) {
+    return a === b || (TEN_VALUES.has(a) && TEN_VALUES.has(b));
+  }
   function split(){
     if (!inRound || hasSplit || playerHands.length !== 1) return;
     const hand = playerHands[0];
-    if (hand.length !== 2 || hand[0].v !== hand[1].v) return;
+    if (hand.length !== 2 || !canSplitPair(hand[0].v, hand[1].v)) return;
     const bet = handBets[0];
-    if (!Strubles.spend(bet)) { statusEl.textContent = "Not enough Strubles to split."; return; }
+    const splitRound = Strubles.stake('blackjack', bet);
+    if (!splitRound) { statusEl.textContent = "Not enough Strubles to split."; return; }
+    handRounds[1] = splitRound;
     syncBalance();
 
     const isAceSplit = hand[0].v === 'A';
@@ -977,18 +1001,20 @@
       const bet = handBets[i];
       const tag = hasSplit ? `H${i + 1}: ` : '';
       if (pv > 21) {
+        settle('loss', bet, handRounds[i]);
         try { GameStats.record('blackjack', 'loss', { net: -bet }); } catch {}
         messages.push(`${tag}Bust 💀`);
       } else if (dv > 21) {
-        settle('win', bet); anyWin = true; messages.push(`${tag}Dealer busts — Win 🎉`);
+        settle('win', bet, handRounds[i]); anyWin = true; messages.push(`${tag}Dealer busts — Win 🎉`);
       } else if (dv > pv) {
+        settle('loss', bet, handRounds[i]);
         try { GameStats.record('blackjack', 'loss', { net: -bet }); } catch {}
         messages.push(`${tag}Dealer wins 😔`);
       } else if (dv < pv) {
-        settle('win', bet); anyWin = true; messages.push(`${tag}Win 🎉`);
+        settle('win', bet, handRounds[i]); anyWin = true; messages.push(`${tag}Win 🎉`);
       } else {
         // House rule: ties pay the player instead of pushing.
-        settle('win', bet); anyWin = true; messages.push(`${tag}Push pays out — Win 🎉`);
+        settle('win', bet, handRounds[i]); anyWin = true; messages.push(`${tag}Push pays out — Win 🎉`);
       }
     });
     if (!anyWin) playRandomSound('card-slide', 8);

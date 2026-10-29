@@ -99,7 +99,7 @@ iantopia/
 │   └── collectibles/             # Drinks and the bear; see scripts/build-collectibles.py
 ├── scripts/                      # Build helpers (build-tycoon-assets.py, build-collectibles.py)
 ├── news-pipeline/                # Python news digest (cron on Qasim)
-├── admin-scripts/                # One-off Firestore maintenance scripts
+├── scripts/admin/                # One-off Firestore maintenance scripts
 └── youtube-transcript-app/       # Separate webapp (Astro + FastAPI)
 ```
 
