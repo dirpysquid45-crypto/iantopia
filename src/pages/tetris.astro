@@ -14,13 +14,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/tetris/tetris.css?v=4">
+<link rel="stylesheet" href="/tetris/tetris.css?v=5">
 </head>
 <body>
   <div class="tetris-app">
     <header class="top">
       <a class="back" href="/puzzles">← Puzzles</a>
       <h1>Tetris at Iantopia</h1>
+      <button class="restart" id="restart-btn" type="button">↻ Restart</button>
       <button class="sound" id="sound-btn" type="button" aria-pressed="false" aria-label="Sound on">🔊</button>
 
       <div class="hud" aria-live="off">
@@ -262,6 +263,12 @@
       $('btn-settings-start').addEventListener('click', () => openSettings('start-overlay'));
       $('btn-settings-pause').addEventListener('click', () => openSettings('pause-overlay'));
       $('btn-settings-done').addEventListener('click', closeSettings);
+      // Restart asks first only when a game is in progress, since it throws the score away.
+      $('restart-btn').addEventListener('click', () => {
+        if ((state === 'playing' || state === 'paused') && !confirm('Restart? This game’s score is lost.')) return;
+        controls.releaseAll();
+        newGame();
+      });
 
       // Leaving the tab stops the game, so a phone's lock screen doesn't lose a piece mid-fall.
       document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });

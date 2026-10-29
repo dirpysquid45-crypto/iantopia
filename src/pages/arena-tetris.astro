@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/tetris/tetris.css?v=4">
+<link rel="stylesheet" href="/tetris/tetris.css?v=5">
 <style is:global>
   #banner { position:fixed; top:0; left:0; right:0; z-index:25; background:rgba(180,30,30,.92); color:#fff; font-size:8px; padding:8px; text-align:center; display:none; }
 </style>
@@ -26,6 +26,7 @@
     <header class="top">
       <a class="back" href="/arena">← Arena</a>
       <h1>Tetris at Iantopia</h1>
+      <button class="restart" id="restart-btn" type="button" disabled title="Available once a match is over">↻ New match</button>
       <button class="sound" id="sound-btn" type="button" aria-pressed="false" aria-label="Sound on">🔊</button>
 
       <div class="hud" aria-live="off">
@@ -169,6 +170,7 @@
         show('result', false); show('lobby', true);
         $('status').textContent = msg || '';
         $('btn-find').disabled = false;
+        $('restart-btn').disabled = true;
         oppView.draw(null);
       }
 
@@ -190,6 +192,7 @@
         show('lobby', false); show('result', false);
         setWaiting(false);
         $('status').textContent = '';
+        $('restart-btn').disabled = true;
         last = performance.now();
       }
 
@@ -280,6 +283,8 @@
         $('result-score').textContent = `You ${mine.score} points, ${mine.lines} lines. ${S.opponentName}: ${theirs.score} points, ${theirs.lines} lines. ${reason}${stakeLine}`;
         $('rematch-note').textContent = '';
         $('btn-rematch').disabled = true;
+        // A new match is only offered once this one is over. Leaving mid-match would forfeit.
+        $('restart-btn').disabled = false;
         show('result', true);
       }
 
@@ -412,6 +417,12 @@
         arena.send({ type: 'leave_game' });
         $('btn-find').disabled = false;
         showLobby('');
+      });
+
+      // Quick restart after a finished match: same as Back to lobby, then Find a match.
+      $('restart-btn').addEventListener('click', () => {
+        $('btn-lobby').click();
+        $('btn-find').click();
       });
 
       document.addEventListener('visibilitychange', () => { if (document.hidden) controls.releaseAll(); });

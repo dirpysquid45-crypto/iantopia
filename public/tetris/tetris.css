@@ -68,6 +68,22 @@ button { font-family: inherit; }
 }
 .sound:hover { background: var(--gold); color: #000; }
 
+/* Restart sits in the empty middle of the top row, between the back link and sound. */
+.restart {
+  grid-row: 1;
+  grid-column: 2;
+  min-height: 44px;
+  padding: 0 12px;
+  background: #000;
+  color: var(--gold);
+  border: 2px solid var(--gold);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.restart:hover:not(:disabled) { background: var(--gold); color: #000; }
+.restart:disabled { color: #5c5c5c; border-color: #5c5c5c; cursor: default; }
+
 /* Score line across the top */
 .hud {
   display: flex;
