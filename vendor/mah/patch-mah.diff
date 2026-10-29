@@ -282,8 +282,8 @@ index a49ac035..1b944750 100644
 --- a/src/app/model/music.ts
 +++ b/src/app/model/music.ts
 @@ -1,19 +1,111 @@
-+// Iantopia: the background music cycles through these tracks in order, looping
-+// back to the first, while a game is running. Music is only audible when the
++// Iantopia: the background music plays these tracks in a random order, never the
++// same track twice in a row, while a game is running. Music is only audible when the
 +// music setting is on (game.music.enabled) and the game is being played.
 +const TRACKS = [
 +	// The Avatar's Love is kept in assets/music, but it's an Iantopia unlock now,
@@ -303,7 +303,7 @@ index a49ac035..1b944750 100644
 +	// 0 to 1. Saved between visits, and applied to the track that is playing.
 +	volume: number = Music.savedVolume();
 +	private audio?: HTMLAudioElement;
-+	private index = 0;
++	private index = Math.floor(Math.random() * TRACKS.length);
 +
 +	private static savedVolume(): number {
 +		try {
@@ -392,7 +392,9 @@ index a49ac035..1b944750 100644
 +	}
 +
 +	private next(): void {
-+		this.index = (this.index + 1) % TRACKS.length;
++		// Pick a random track other than the one that just ended.
++		const pick = Math.floor(Math.random() * (TRACKS.length - 1));
++		this.index = pick >= this.index ? pick + 1 : pick;
 +		const audio = this.current();
 +		audio.src = TRACKS[this.index];
 +		if (this.enabled) {
