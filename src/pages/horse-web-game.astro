@@ -189,6 +189,26 @@
     .stage-box p { font-size:11px; line-height:1.85; }
     #sound-hint { font-size:9.5px; }
     #hint { font-size:10px; }
+    /* Give the game the screen: slimmer side padding, a shorter top gap, and
+       a stage that is no longer capped at 380px (it fills what is left of the
+       page, never less than 300px tall). The game scales its whole world to
+       whatever size this ends up (see SCALE in the script). */
+    main { padding:8px 8px 12px; padding-top:calc(60px + env(safe-area-inset-top)); }
+    header { margin-bottom:6px; padding-bottom:6px; }
+    #stats-bar { margin-bottom:8px; padding:6px 8px; font-size:10px; gap:4px 10px; }
+    #game-stage { max-height:none; min-height:300px; }
+    #duck-btn { margin-top:8px; padding:14px 20px; }
+    #hint { margin-top:6px; }
+  }
+  /* Landscape phone: very little height, so the stage takes nearly all of it. */
+  @media (max-height:500px) and (orientation:landscape) {
+    main { padding-top:calc(48px + env(safe-area-inset-top)); }
+    h1 { display:none; }
+    header { margin-bottom:4px; padding-bottom:4px; }
+    #stats-bar { margin-bottom:4px; padding:4px 8px; }
+    #game-stage { min-height:150px; max-height:none; }
+    #duck-btn { margin-top:6px; padding:8px 20px; font-size:12px; }
+    #hint { display:none; }
   }
 </style>
 </head>
@@ -557,22 +577,36 @@
   // same real numbers as everything else instead of an arbitrary multiplier.
   function orbBoostAirtime() { return 2 * (ORB_BOOST_VELOCITY / Math.abs(GRAVITY)); }
 
+  // W and H are the stage size in WORLD units, not screen pixels. Every
+  // size, offset and physics constant in this file is written in those
+  // units (the desktop look: horse 112 wide, ground 46 tall, jump 184 high),
+  // and the canvas transform multiplies the whole world by SCALE when it is
+  // drawn. SCALE is 1 on a desktop-sized stage and drops on a small one, so
+  // the horse, hurdles, ground, coins, jump height and speeds all shrink
+  // together and keep their proportions. Airtime is unchanged by it.
+  const WORLD_MIN_W = 640; // the world is never narrower than this many units
+  const WORLD_MIN_H = 330; // jump apex 184 + horse 89 + room for coins and orbs
+  let SCALE = 1;
   let W = 0, H = 0, groundY = 0;
-  let horseW = 96, horseH = 96 * HORSE_ASPECT;
+  let horseW = 112, horseH = 112 * HORSE_ASPECT;
   let dpr = Math.max(1, window.devicePixelRatio || 1);
 
   function resize() {
-    W = stage.clientWidth;
-    H = stage.clientHeight;
+    const cw = stage.clientWidth;
+    const ch = stage.clientHeight;
+    SCALE = Math.max(0.3, Math.min(1, cw / WORLD_MIN_W, ch / WORLD_MIN_H));
+    W = cw / SCALE;
+    H = ch / SCALE;
     dpr = Math.max(1, window.devicePixelRatio || 1);
-    canvas.width = Math.round(W * dpr);
-    canvas.height = Math.round(H * dpr);
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    canvas.width = Math.round(cw * dpr);
+    canvas.height = Math.round(ch * dpr);
+    ctx.setTransform(dpr * SCALE, 0, 0, dpr * SCALE, 0, 0);
     groundY = H - GROUND_H;
-    horseW = Math.min(112, W * 0.13);
+    horseW = 112;
     horseH = horseW * HORSE_ASPECT;
   }
   window.addEventListener('resize', resize);
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
   resize();
 
   let state = 'idle'; // idle | playing | exploding | over
@@ -872,6 +906,15 @@
 
   // One coin per jump, never a cluster -- a single Struble icon floating
   // over the obstacle that just called for a jump.
+  // A Struble drawn over a hurdle must clear the hurdle's tallest look: the
+  // rock skin after 100 clears is drawn 120+ tall (or 1.8x the hurdle),
+  // taller than the fence, and the coin is drawn COIN_R*5.2 across.
+  const COIN_CLEARANCE = 26;
+  function coinYOverHurdle(h) {
+    const visualH = Math.max(h * 1.8, 120);
+    const minCenterAbove = visualH + COIN_R * 2.6 + COIN_CLEARANCE;
+    return groundY - Math.max(horseH * 1.5, minCenterAbove);
+  }
   function spawnCoin(x, y) {
     const roll = Math.random();
     const value = roll < 0.15 ? 3 : (roll < 0.4 ? 2 : 1);
@@ -993,7 +1036,7 @@
       { tier: 0, weight: 3, build: () => {
         const t = pickHurdleType();
         hurdles.push({ id: nextHurdleId++, x: originX, w: t.w, h: t.h, cleared: false });
-        if (Math.random() < 0.5) spawnCoin(originX + t.w / 2, groundY - horseH * 1.5);
+        if (Math.random() < 0.5) spawnCoin(originX + t.w / 2, coinYOverHurdle(t.h));
         return t.w;
       }},
       { tier: 1, weight: 2, build: () => {
@@ -1769,7 +1812,7 @@
       ctx.save();
       ctx.globalAlpha = 1 - t;
       ctx.fillStyle = '#ffd700';
-      ctx.font = '700 13px "Press Start 2P", monospace';
+      ctx.font = `700 ${Math.round(13 / SCALE)}px "Press Start 2P", monospace`; // 13 screen px at any scale
       ctx.textAlign = 'center';
       ctx.shadowColor = '#000';
       ctx.shadowBlur = 3;
