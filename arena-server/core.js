@@ -7,6 +7,7 @@ const { PlaySessions } = require('./sessions');
 const { Gifts } = require('./gifts');
 const { VillageNames } = require('./village-name');
 const { StrublesBoard } = require('./strubles-board');
+const { Chat } = require('./chat');
 
 const WALLET_BODY_MAX = 16 * 1024;
 const WALLET_OPS_MAX = 50;
@@ -71,6 +72,7 @@ function createServer(options = {}) {
   const wallet = new Wallet(db, manager.balance, { sessions });
   const gifts = new Gifts(db, { balance: manager.balance });
   const villageNames = new VillageNames(db);
+  const chat = new Chat(db);
   // Admin accounts are left off the Strubles board: their balance isn't earned play.
   const strublesBoard = new StrublesBoard(db, {
     isAdminDoc: (uid, data) => adminList.uids.includes(String(uid).toLowerCase())
@@ -174,6 +176,20 @@ function createServer(options = {}) {
     const out = await villageNames.setName({ uid: decoded.uid }, body);
     return sendJson(res, out.status, out.body);
   }
+  // Sending a chat message: POST {text, replyTo?}. Signed in only. The word filter, the rate
+  // limit and the ban check run here, so they apply however the browser sends it.
+  async function handleChatSend(req, res) {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'method' });
+    const decoded = await verifiedToken(req);
+    if (!decoded) return sendJson(res, 401, { error: 'sign_in' });
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch (e) {
+      if (e.message === 'too large') { res.setHeader('Connection', 'close'); return sendJson(res, 413, { error: 'too_large' }); }
+      return sendJson(res, 400, { error: 'bad_json' });
+    }
+    const out = await chat.send({ uid: decoded.uid, name: decoded.name }, body);
+    return sendJson(res, out.status, out.body);
+  }
   // The Strubles leaderboard. Public and read-only: names and balances of the top players.
   async function handleStrublesBoard(req, res) {
     if (req.method !== 'GET') return sendJson(res, 405, { error: 'method' });
@@ -191,6 +207,7 @@ function createServer(options = {}) {
     if (path === '/owner/check') return handleOwnerCheck(req, res);
     if (path === '/leaderboard/strubles') return handleStrublesBoard(req, res);
     if (path === '/village/name') return handleVillageName(req, res);
+    if (path === '/chat/send') return handleChatSend(req, res);
     if (path.startsWith('/gifts/')) {
       if (!GIFT_PATHS.has(path)) return sendJson(res, 404, { error: 'not_found' });
       return handleGifts(req, res, path);

@@ -96,6 +96,14 @@ service cloud.firestore {
       }
     }
 
+    // The site chat. Any signed-in player can read it (the page listens only while the chat is
+    // open). Messages are written by the server (Admin SDK), which applies the word filter, the
+    // rate limit and the ban check, so no browser can write one.
+    match /chat_messages/{id} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     // The economy tracker's daily snapshots. Only the admin can read them, and only with a
     // verified email. The server writes them (Admin SDK), so no client can.
     match /economy_daily/{day} {
