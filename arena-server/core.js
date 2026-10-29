@@ -6,6 +6,7 @@ const { Wallet } = require('./wallet');
 const { PlaySessions } = require('./sessions');
 const { Gifts } = require('./gifts');
 const { VillageNames } = require('./village-name');
+const { StrublesBoard } = require('./strubles-board');
 
 const WALLET_BODY_MAX = 16 * 1024;
 const WALLET_OPS_MAX = 50;
@@ -70,6 +71,11 @@ function createServer(options = {}) {
   const wallet = new Wallet(db, manager.balance, { sessions });
   const gifts = new Gifts(db, { balance: manager.balance });
   const villageNames = new VillageNames(db);
+  // Admin accounts are left off the Strubles board: their balance isn't earned play.
+  const strublesBoard = new StrublesBoard(db, {
+    isAdminDoc: (uid, data) => adminList.uids.includes(String(uid).toLowerCase())
+      || (!!data.email && adminList.emails.includes(String(data.email).toLowerCase())),
+  });
 
   // One HTTP server carries both the game socket (ws) and the wallet routes
   // (/wallet and /wallet/ops). nginx sends /arena-ws/ and /arena-api/ here.
@@ -168,11 +174,22 @@ function createServer(options = {}) {
     const out = await villageNames.setName({ uid: decoded.uid }, body);
     return sendJson(res, out.status, out.body);
   }
+  // The Strubles leaderboard. Public and read-only: names and balances of the top players.
+  async function handleStrublesBoard(req, res) {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'method' });
+    try {
+      return sendJson(res, 200, await strublesBoard.top());
+    } catch (e) {
+      console.error('[leaderboard] strubles board failed:', e.message);
+      return sendJson(res, 503, { error: 'unavailable' });
+    }
+  }
   async function handleWallet(req, res) {
     allowLocalOrigin(req, res);
     if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
     const path = new URL(req.url, 'http://x').pathname;
     if (path === '/owner/check') return handleOwnerCheck(req, res);
+    if (path === '/leaderboard/strubles') return handleStrublesBoard(req, res);
     if (path === '/village/name') return handleVillageName(req, res);
     if (path.startsWith('/gifts/')) {
       if (!GIFT_PATHS.has(path)) return sendJson(res, 404, { error: 'not_found' });
