@@ -96,6 +96,15 @@ service cloud.firestore {
       }
     }
 
+    // The economy tracker's daily snapshots. Only the admin can read them, and only with a
+    // verified email. The server writes them (Admin SDK), so no client can.
+    match /economy_daily/{day} {
+      allow read: if request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() == 'dirpysquid45@gmail.com';
+      allow write: if false;
+    }
+
     // Everything else is closed by default.
     match /{document=**} {
       allow read, write: if false;
