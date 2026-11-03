@@ -1,0 +1,976 @@
+---
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Snoopy Thanksgiving Coaster</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/icons/favicon-16.png" sizes="16x16" type="image/png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<meta name="theme-color" content="#3d2817">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script is:inline src="/pwa.js?v=1" defer></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<!--
+  Snoopy Thanksgiving Coaster: seasonal game available Nov 8+.
+  Canvas-based coaster game with Thanksgiving theme.
+  is:global required for runtime-inserted elements (overlays, buttons).
+-->
+<style is:global>
+  :root {
+    --bg: #2a1810;
+    --panel: #3d2817;
+    --ink: #f5e6d3;
+    --muted: #c9b397;
+    --accent: #d47b3a;
+    --harvest: #c9722d;
+    --pumpkin: #e67e22;
+    --corn: #f4d03f;
+    --turkey: #8b4513;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1a0f0a;
+      --panel: #2a1810;
+      --ink: #faf5f0;
+      --muted: #d4c4b0;
+      --accent: #e67e22;
+      --harvest: #d47b3a;
+      --pumpkin: #e67e22;
+      --corn: #f4d03f;
+      --turkey: #a0522d;
+    }
+  }
+
+  :root[data-theme="light"] {
+    --bg: #3d2817;
+    --panel: #5a3d2a;
+    --ink: #faf5f0;
+    --muted: #c9b397;
+    --accent: #d47b3a;
+    --harvest: #c9722d;
+    --pumpkin: #e67e22;
+    --corn: #f4d03f;
+    --turkey: #8b4513;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+
+  body {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+    cursor: none;
+    position: relative;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Decorative background elements */
+  #bg-decoration {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    background-color: var(--bg);
+    background-image:
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 35px,
+        rgba(230, 126, 34, 0.03) 35px,
+        rgba(230, 126, 34, 0.03) 70px
+      );
+    pointer-events: none;
+  }
+
+  /* Seasonal availability banner */
+  #seasonal-notice {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    background: rgba(0, 0, 0, 0.85);
+    border: 4px solid var(--accent);
+    padding: 24px;
+    border-radius: 8px;
+    z-index: 200;
+    max-width: 90vw;
+  }
+
+  #seasonal-notice h2 {
+    color: var(--pumpkin);
+    font-size: clamp(14px, 4vw, 20px);
+    margin: 0 0 12px 0;
+    text-shadow: 2px 2px 0 #000;
+  }
+
+  #seasonal-notice p {
+    color: var(--ink);
+    font-size: clamp(10px, 2vw, 14px);
+    margin: 0 0 16px 0;
+    line-height: 1.6;
+  }
+
+  #seasonal-notice button {
+    color: #000;
+    background: var(--corn);
+    border: 3px solid #000;
+    padding: 10px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  #seasonal-notice button:hover {
+    background: #fce870;
+  }
+
+  #seasonal-notice[hidden] {
+    display: none;
+  }
+
+  /* Strubles balance badge */
+  #strubles-badge {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top));
+    right: calc(12px + env(safe-area-inset-right));
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #000;
+    padding: 8px 12px;
+    border: 3px solid var(--corn);
+    font-weight: 700;
+    z-index: 20;
+  }
+
+  #strubles-badge img {
+    width: 28px;
+    height: 28px;
+  }
+
+  main {
+    position: relative;
+    z-index: 2;
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 16px 24px 24px;
+    padding-top: calc(80px + env(safe-area-inset-top));
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    border-bottom: 4px solid #000;
+    padding-bottom: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  header a {
+    color: var(--corn);
+    text-decoration: none;
+    border: 3px solid #000;
+    padding: 8px 12px;
+    font-weight: 700;
+    background: #000;
+    transition: background 0.2s;
+    font-size: 10px;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  header a:hover {
+    background: var(--corn);
+    color: #000;
+  }
+
+  header button {
+    color: var(--corn);
+    background: #000;
+    border: 2px solid var(--corn);
+    padding: 4px 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    font-size: 14px;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  header button:hover {
+    background: var(--corn);
+    color: #000;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(12px, 2.4vw, 18px);
+    letter-spacing: 1px;
+    color: var(--corn);
+    font-weight: 400;
+    text-shadow: 2px 2px 0 #000;
+    text-align: center;
+    width: 100%;
+  }
+
+  #stats-bar {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+    gap: 18px;
+    flex-wrap: wrap;
+    background: rgba(0, 0, 0, 0.55);
+    border: 2px solid var(--corn);
+    padding: 8px 14px;
+    margin-bottom: 14px;
+    font-size: 9px;
+    color: #fff;
+  }
+
+  #stats-bar b {
+    color: var(--corn);
+  }
+
+  /* Game canvas stage */
+  #game-stage {
+    position: relative;
+    flex: 1 1 auto;
+    min-height: 200px;
+    max-height: 380px;
+    border: 3px solid #000;
+    outline: 2px solid var(--corn);
+    outline-offset: -2px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #87ceeb 0%, #c9722d 100%);
+    touch-action: none;
+  }
+
+  #game-canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Overlays for start/game-over screens */
+  .stage-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.72);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    overflow-y: auto;
+  }
+
+  .stage-overlay > .stage-box {
+    margin: auto;
+  }
+
+  .stage-overlay[hidden] {
+    display: none;
+  }
+
+  .stage-box h2 {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: var(--corn);
+    text-shadow: 2px 2px 0 #000;
+  }
+
+  .stage-box p {
+    margin: 0 0 16px;
+    font-size: 9px;
+    line-height: 1.9;
+    color: var(--ink);
+  }
+
+  .stage-box b {
+    color: var(--corn);
+  }
+
+  .stage-box .btn {
+    color: #000;
+    background: var(--corn);
+    text-decoration: none;
+    border: 3px solid #000;
+    padding: 10px 18px;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .stage-box .btn:hover {
+    background: #f0a560;
+  }
+
+  /* Leaderboard panel */
+  .top-riders {
+    margin: 0 auto 16px;
+    padding: 10px 14px;
+    max-width: 260px;
+    border: 2px solid rgba(230, 126, 34, 0.45);
+    background: rgba(0, 0, 0, 0.45);
+    text-align: left;
+  }
+
+  .top-riders[hidden] {
+    display: none;
+  }
+
+  .top-riders-title {
+    font-size: 9px;
+    color: var(--corn);
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .top-riders ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: rider;
+  }
+
+  .top-riders li {
+    counter-increment: rider;
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 8px;
+    line-height: 2;
+    color: var(--ink);
+  }
+
+  .top-riders li::before {
+    content: '#' counter(rider);
+    color: var(--corn);
+    width: 22px;
+    flex-shrink: 0;
+  }
+
+  .top-riders li span:nth-child(1) {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .top-riders li.me {
+    color: var(--corn);
+  }
+
+  .top-riders a,
+  .rank-link {
+    display: block;
+    margin-top: 8px;
+    text-align: center;
+    font-size: 8px;
+    color: var(--corn);
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .top-riders a:hover,
+  .rank-link:hover {
+    text-decoration: underline;
+  }
+
+  .rank-link {
+    margin-top: 14px;
+  }
+
+  /* Hint text */
+  #hint {
+    flex: 0 0 auto;
+    text-align: center;
+    font-size: 8px;
+    color: var(--muted);
+    margin-top: 10px;
+    line-height: 1.8;
+  }
+
+  /* Control button */
+  #action-btn {
+    display: block;
+    width: 100%;
+    max-width: 360px;
+    margin: 12px auto 0;
+    padding: 16px 20px;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    font-family: inherit;
+    color: #000;
+    background: var(--corn);
+    border: 3px solid #000;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  #action-btn:hover {
+    background: #f0a560;
+  }
+
+  #action-btn:active {
+    transform: scale(0.97);
+  }
+
+  /* Share/Leaderboard buttons */
+  .share-buttons {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+
+  .share-buttons button {
+    background: #000;
+    border: 2px solid var(--corn);
+    color: var(--corn);
+    padding: 6px 12px;
+    font-size: 10px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .share-buttons button:hover {
+    background: var(--corn);
+    color: #000;
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    h1 {
+      font-size: clamp(13px, 4vw, 18px);
+    }
+
+    header a,
+    header button {
+      font-size: 12px;
+      padding: 8px 10px;
+    }
+
+    #stats-bar {
+      font-size: 11px;
+      gap: 12px;
+      padding: 9px 12px;
+    }
+
+    .stage-box h2 {
+      font-size: 16px;
+    }
+
+    .stage-box p {
+      font-size: 11px;
+      line-height: 1.85;
+    }
+
+    #hint {
+      font-size: 10px;
+    }
+
+    main {
+      padding: 8px 8px 12px;
+      padding-top: calc(60px + env(safe-area-inset-top));
+    }
+
+    header {
+      margin-bottom: 6px;
+      padding-bottom: 6px;
+    }
+
+    #stats-bar {
+      margin-bottom: 8px;
+      padding: 6px 8px;
+      font-size: 10px;
+      gap: 4px 10px;
+    }
+
+    #game-stage {
+      max-height: none;
+      min-height: 300px;
+    }
+
+    #action-btn {
+      margin-top: 8px;
+      padding: 14px 20px;
+    }
+
+    #hint {
+      margin-top: 6px;
+    }
+  }
+
+  /* Landscape phone: minimal height */
+  @media (max-height: 500px) and (orientation: landscape) {
+    main {
+      padding-top: calc(48px + env(safe-area-inset-top));
+    }
+
+    h1 {
+      display: none;
+    }
+
+    header {
+      margin-bottom: 4px;
+      padding-bottom: 4px;
+    }
+
+    #stats-bar {
+      margin-bottom: 4px;
+      padding: 4px 8px;
+    }
+
+    #game-stage {
+      min-height: 150px;
+      max-height: none;
+    }
+
+    #action-btn {
+      margin-top: 6px;
+      padding: 8px 20px;
+      font-size: 12px;
+    }
+
+    #hint {
+      display: none;
+    }
+  }
+
+  /* Decorative Thanksgiving elements */
+  .decoration {
+    position: absolute;
+    pointer-events: none;
+    font-size: clamp(20px, 5vw, 60px);
+  }
+
+  .pumpkin {
+    color: var(--pumpkin);
+    opacity: 0.15;
+  }
+
+  .turkey {
+    color: var(--turkey);
+    opacity: 0.15;
+  }
+
+  .corn {
+    color: var(--corn);
+    opacity: 0.12;
+  }
+</style>
+</head>
+<body>
+  <div id="bg-decoration"></div>
+
+  <!-- Seasonal availability notice -->
+  <div id="seasonal-notice" hidden>
+    <h2>🦃 Season Not Yet Open 🦃</h2>
+    <p>Snoopy's Thanksgiving Coaster is available November 8 through Thanksgiving!</p>
+    <button onclick="window.location.href='/'">← Back to Iantopia</button>
+  </div>
+
+  <div id="strubles-badge">
+    <img src="/strubles.png" alt="Struble">
+    <span id="bal">0</span>
+  </div>
+
+  <main>
+    <header>
+      <a href="/" title="Back to Iantopia">← Home</a>
+      <h1>THANKSGIVING COASTER</h1>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <a id="ranks-link" href="/leaderboard?board=thanksgiving" title="Thanksgiving leaderboard" style="padding:4px 8px; font-size:14px;">🏆</a>
+        <button id="share-btn" title="Share score">📤</button>
+      </div>
+    </header>
+
+    <div id="stats-bar">
+      <span>Distance: <b id="stat-distance">0</b>m</span>
+      <span>Best: <b id="stat-best">0</b>m</span>
+      <span>Strubles: <b id="stat-earned">0</b></span>
+    </div>
+
+    <div id="game-stage">
+      <canvas id="game-canvas"></canvas>
+
+      <!-- Start overlay -->
+      <div class="stage-overlay" id="start-overlay">
+        <div class="stage-box">
+          <h2>🦃 Thanksgiving Coaster 🎃</h2>
+          <p>Guide Snoopy through a Thanksgiving-themed coaster ride! Tap to jump, avoid obstacles, and collect rewards.<br>
+          The faster you go, the more Strubles you earn. Can you set the new record?</p>
+          <div class="top-riders" id="top-riders" hidden>
+            <div class="top-riders-title">🏆 Top Scores</div>
+            <ol id="top-riders-list"></ol>
+            <a href="/leaderboard?board=thanksgiving">Full leaderboard →</a>
+          </div>
+          <button class="btn" id="start-btn" type="button">▶ Start Coaster</button>
+          <p style="font-size:8px; color:var(--muted); margin:8px 0 0;">
+            🔇 Tap to unmute sound.
+          </p>
+        </div>
+      </div>
+
+      <!-- Game over overlay -->
+      <div class="stage-overlay" id="gameover-overlay" hidden>
+        <div class="stage-box">
+          <h2 id="gameover-title">Coaster Stopped!</h2>
+          <p>Distance: <b id="final-distance">0</b>m<br>
+          Strubles earned: <b id="final-earned">0</b><br>
+          Personal best: <b id="final-best">0</b>m</p>
+          <p id="cap-warning" style="color:#ff6b6b; font-size:8px; display:none; margin:8px 0 0;">
+            ⚠️ Wallet cap reached! Upgrade your Bank on /tycoon to continue earning.
+          </p>
+          <button class="btn" id="restart-btn" type="button">↻ Try Again</button>
+          <a class="rank-link" href="/leaderboard?board=thanksgiving">🏆 See Rankings</a>
+        </div>
+      </div>
+    </div>
+
+    <button id="action-btn" type="button" title="Primary action">JUMP!</button>
+
+    <div class="share-buttons" id="share-buttons" style="display:none;">
+      <button id="share-score-btn" type="button">📤 Share Score</button>
+      <button id="leaderboard-btn" type="button">🏆 Leaderboard</button>
+    </div>
+
+    <div id="hint">Ready to ride? Tap Start to begin!</div>
+  </main>
+
+  <!-- Firebase and shared game infrastructure -->
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script is:inline src="/game-stats.js?v=1"></script>
+  <script is:inline src="/cloud-sync.js?v=14"></script>
+  <script is:inline src="/tycoon-cap.js?v=1"></script>
+  <script is:inline src="/tycoon-bank.js?v=2"></script>
+  <script is:inline src="/strubles.js?v=6"></script>
+  <script is:inline src="/cursor-library.js?v=4"></script>
+  <script is:inline src="/cursor.js?v=3"></script>
+
+  <!-- Game engine scripts -->
+  <script is:inline src="/snoopy-thanksgiving-adapter.js?v=1"></script>
+
+  <script is:inline>
+  (function () {
+    const $ = (id) => document.getElementById(id);
+
+    // ========== Seasonal Logic ==========
+    // Show notice and block game if not Nov 8 through Thanksgiving
+    function checkSeasonalAvailability() {
+      const now = new Date();
+      const month = now.getMonth() + 1; // 1-12
+      const day = now.getDate();
+
+      // Available: Nov 8 (11/8) through Thanksgiving (4th Thursday of Nov, ~11/28)
+      // For simplicity: Nov 8-30
+      const isAvailable = (month === 11 && day >= 8) || false;
+
+      if (!isAvailable) {
+        $('seasonal-notice').hidden = false;
+        // Hide the main game content
+        $('strubles-badge').style.display = 'none';
+        document.querySelector('main').style.display = 'none';
+        return false;
+      }
+      return true;
+    }
+
+    if (!checkSeasonalAvailability()) {
+      // Exit early if season not active
+      console.warn('Snoopy Thanksgiving Coaster is only available Nov 8-30');
+      return;
+    }
+
+    // ========== Balance Sync ==========
+    function syncBalance() {
+      try {
+        $('bal').textContent = Strubles.get().toLocaleString();
+      } catch (e) {
+        console.warn('[thanksgiving] Balance sync failed:', e);
+      }
+    }
+    syncBalance();
+    window.addEventListener('strubles:change', syncBalance);
+
+    // ========== UI References ==========
+    const stage = $('game-stage');
+    const canvas = $('game-canvas');
+    const startOverlay = $('start-overlay');
+    const gameoverOverlay = $('gameover-overlay');
+    const startBtn = $('start-btn');
+    const restartBtn = $('restart-btn');
+    const actionBtn = $('action-btn');
+    const shareBtn = $('share-btn');
+    const shareScoreBtn = $('share-score-btn');
+    const leaderboardBtn = $('leaderboard-btn');
+
+    // ========== Game State ==========
+    const BEST_KEY = 'thanksgiving_coaster_best_v1';
+    let state = 'idle'; // idle | playing | over
+    let distance = 0;
+    let earned = 0;
+    let best = parseInt(localStorage.getItem(BEST_KEY), 10) || 0;
+    $('stat-best').textContent = best.toLocaleString();
+
+    // ========== Score Display ==========
+    function updateStats() {
+      $('stat-distance').textContent = Math.floor(distance).toLocaleString();
+      $('stat-earned').textContent = earned.toLocaleString();
+    }
+
+    // ========== Game Start ==========
+    function beginRun() {
+      if (state === 'playing') return;
+      state = 'playing';
+      distance = 0;
+      earned = 0;
+      startOverlay.hidden = true;
+      gameoverOverlay.hidden = true;
+      updateStats();
+
+      // Trigger game engine start
+      if (window.ThanksgivingCoaster) {
+        window.ThanksgivingCoaster.start();
+      }
+    }
+
+    // ========== Game Over ==========
+    function endGame(finalDistance, strubles) {
+      state = 'over';
+      distance = finalDistance;
+      earned = strubles;
+
+      // Update personal best
+      if (distance > best) {
+        best = distance;
+        localStorage.setItem(BEST_KEY, String(best));
+        try {
+          pushThanksgivingScore(best);
+        } catch (e) {
+          console.warn('[thanksgiving] Score push failed:', e);
+        }
+      }
+
+      $('final-distance').textContent = Math.floor(distance).toLocaleString();
+      $('final-earned').textContent = earned.toLocaleString();
+      $('final-best').textContent = best.toLocaleString();
+      $('stat-best').textContent = best.toLocaleString();
+
+      // Check wallet cap
+      const finalBal = Strubles.get();
+      const cap = (window.TycoonBank && window.TycoonBank.currentCap()) || Infinity;
+      const capWarning = $('cap-warning');
+      if (earned > 0 && finalBal >= cap) {
+        capWarning.style.display = 'block';
+      } else {
+        capWarning.style.display = 'none';
+      }
+
+      gameoverOverlay.hidden = false;
+      $('share-buttons').style.display = 'flex';
+    }
+
+    // ========== Leaderboard Integration ==========
+    let pushInFlight = false;
+    let pushQueued = null;
+
+    function pushThanksgivingScore(value) {
+      if (!window.CloudSync || !CloudSync.isSignedIn()) return;
+      const user = CloudSync.currentUser;
+      if (!user) return;
+      if (pushInFlight) {
+        pushQueued = Math.max(pushQueued || 0, value);
+        return;
+      }
+      pushInFlight = true;
+      const db = firebase.firestore();
+      const ref = db.collection('thanksgiving_coaster_leaderboard').doc(user.uid);
+      db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        const stored = snap.exists ? Number(snap.data().best) || 0 : 0;
+        if (Math.round(value) <= stored) return;
+        tx.set(ref, {
+          displayName: user.displayName || 'Anonymous Rider',
+          best: Math.round(value),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true });
+      })
+        .catch((err) => console.error('[thanksgiving-leaderboard] push failed:', err))
+        .finally(() => {
+          pushInFlight = false;
+          if (pushQueued != null) {
+            const v = pushQueued;
+            pushQueued = null;
+            pushThanksgivingScore(v);
+          }
+        });
+    }
+
+    function backfillThanksgivingBest() {
+      if (best > 0) pushThanksgivingScore(best);
+    }
+
+    function loadTopRiders() {
+      if (!window.firebase || !firebase.firestore) return;
+      firebase.firestore().collection('thanksgiving_coaster_leaderboard')
+        .orderBy('best', 'desc').limit(5).get()
+        .then((snap) => {
+          if (snap.empty) return;
+          const me = window.CloudSync && CloudSync.currentUser ? CloudSync.currentUser.uid : null;
+          const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+          $('top-riders-list').innerHTML = snap.docs.map((d) => {
+            const v = d.data();
+            return `<li class="${d.id === me ? 'me' : ''}"><span>${esc(v.displayName || 'Anonymous Rider')}</span><span>${Number(v.best || 0).toLocaleString()}m</span></li>`;
+          }).join('');
+          $('top-riders').hidden = false;
+        })
+        .catch(() => {});
+    }
+
+    window.addEventListener('cloudsync:authchanged', (e) => {
+      if (e.detail && e.detail.user) {
+        backfillThanksgivingBest();
+        loadTopRiders();
+      }
+    });
+    setTimeout(() => {
+      if (window.CloudSync && CloudSync.isSignedIn()) {
+        backfillThanksgivingBest();
+      }
+      loadTopRiders();
+    }, 1500);
+
+    // ========== Button Events ==========
+    startBtn.addEventListener('click', beginRun);
+    restartBtn.addEventListener('click', () => {
+      state = 'idle';
+      startOverlay.hidden = false;
+      gameoverOverlay.hidden = true;
+      $('share-buttons').style.display = 'none';
+      if (window.ThanksgivingCoaster) {
+        window.ThanksgivingCoaster.reset();
+      }
+    });
+
+    actionBtn.addEventListener('click', () => {
+      if (state === 'idle') {
+        beginRun();
+      } else if (state === 'playing' && window.ThanksgivingCoaster) {
+        window.ThanksgivingCoaster.jump();
+      }
+    });
+
+    shareBtn.addEventListener('click', () => {
+      const text = `I scored ${Math.floor(distance)}m in Snoopy's Thanksgiving Coaster! 🦃🎃`;
+      if (navigator.share) {
+        navigator.share({
+          title: 'Thanksgiving Coaster',
+          text: text,
+          url: window.location.href,
+        }).catch(() => {});
+      } else {
+        // Fallback: copy to clipboard
+        navigator.clipboard.writeText(text).then(() => {
+          alert('Score copied to clipboard!');
+        }).catch(() => {});
+      }
+    });
+
+    shareScoreBtn.addEventListener('click', () => {
+      shareBtn.click();
+    });
+
+    leaderboardBtn.addEventListener('click', () => {
+      window.location.href = '/leaderboard?board=thanksgiving';
+    });
+
+    // ========== Expose Game Interface ==========
+    // The game engine will call these to update game state
+    window.ThanksgivingCoasterUI = {
+      updateDistance: (d) => {
+        distance = d;
+        $('stat-distance').textContent = Math.floor(d).toLocaleString();
+      },
+      updateEarned: (e) => {
+        earned = e;
+        $('stat-earned').textContent = e.toLocaleString();
+      },
+      gameOver: (finalDistance, strubles) => {
+        endGame(finalDistance, strubles);
+      },
+      getDistance: () => distance,
+      getEarned: () => earned,
+    };
+
+    // ========== Keyboard Support ==========
+    window.addEventListener('keydown', (e) => {
+      if (state === 'idle' && (e.code === 'Space' || e.code === 'ArrowUp')) {
+        e.preventDefault();
+        beginRun();
+      } else if (state === 'playing' && (e.code === 'Space' || e.code === 'ArrowUp')) {
+        e.preventDefault();
+        if (window.ThanksgivingCoaster) {
+          window.ThanksgivingCoaster.jump();
+        }
+      }
+    });
+
+    // ========== Initial Render ==========
+    updateStats();
+    startOverlay.hidden = false;
+    gameoverOverlay.hidden = true;
+  })();
+  </script>
+</body>
+</html>
