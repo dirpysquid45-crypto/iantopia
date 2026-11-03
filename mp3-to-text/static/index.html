@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MP3 to TXT</title>
+  <style>
+    :root {
+      --bg: #f5f5f2; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66;
+      --line: #d9d9d3; --accent: #2b6cb0; --accent-ink: #ffffff;
+      --ok: #2f7d4f; --err: #b03a2e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #161614; --panel: #201f1c; --ink: #ecebe6; --muted: #9b9a93;
+        --line: #3a3934; --accent: #6aa6e8; --accent-ink: #0c1a2b;
+        --ok: #6cc38e; --err: #f08c80;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg: #161614; --panel: #201f1c; --ink: #ecebe6; --muted: #9b9a93;
+      --line: #3a3934; --accent: #6aa6e8; --accent-ink: #0c1a2b;
+      --ok: #6cc38e; --err: #f08c80;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; min-height: 100vh; background: var(--bg); color: var(--ink);
+      font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+    h1 { font-size: 1.6rem; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 24px; }
+
+    .drop {
+      border: 2px dashed var(--line); border-radius: 14px; background: var(--panel);
+      padding: 40px 20px; text-align: center; cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
+    .drop strong { display: block; font-size: 1.1rem; margin-bottom: 6px; }
+    .drop small { color: var(--muted); }
+    .drop:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+    input[type="file"] { display: none; }
+
+    .row { display: flex; gap: 12px; align-items: center; margin: 16px 0; flex-wrap: wrap; }
+    label { color: var(--muted); font-size: .95rem; }
+    select {
+      font: inherit; color: var(--ink); background: var(--panel);
+      border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px;
+    }
+
+    .list { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+    .item {
+      background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px;
+    }
+    .item-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+    .name { font-weight: 600; word-break: break-all; }
+    .status { font-size: .9rem; color: var(--muted); }
+    .status.ok { color: var(--ok); }
+    .status.err { color: var(--err); }
+    .text {
+      margin-top: 10px; white-space: pre-wrap; word-wrap: break-word; max-height: 260px;
+      overflow: auto; font-size: .95rem; border-top: 1px solid var(--line); padding-top: 10px;
+    }
+    button {
+      font: inherit; border: 0; border-radius: 8px; padding: 7px 14px; cursor: pointer;
+      background: var(--accent); color: var(--accent-ink);
+    }
+    button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+    button:disabled { opacity: .5; cursor: default; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .toolbar { display: flex; justify-content: flex-end; margin-top: 12px; }
+    [hidden] { display: none !important; }
+    .hint { color: var(--muted); font-size: .85rem; margin-top: 24px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>MP3 to TXT</h1>
+  <p class="sub">Drop audio files here. Each one becomes a plain-text transcript you can download.</p>
+
+  <div id="drop" class="drop" tabindex="0" role="button" aria-label="Choose or drop audio files">
+    <strong>Drop MP3 files here</strong>
+    <small>or click to choose files &middot; MP3, WAV, M4A, OGG, FLAC &middot; up to 500 MB each</small>
+  </div>
+  <input id="picker" type="file" multiple accept=".mp3,.wav,.m4a,.ogg,.flac,audio/*">
+
+  <div class="row">
+    <label for="lang">Spoken language</label>
+    <select id="lang">
+      <option value="">Auto-detect</option>
+      <option value="en">English</option>
+      <option value="de">German</option>
+      <option value="es">Spanish</option>
+      <option value="fr">French</option>
+      <option value="it">Italian</option>
+      <option value="pt">Portuguese</option>
+      <option value="nl">Dutch</option>
+      <option value="ru">Russian</option>
+      <option value="ja">Japanese</option>
+      <option value="zh">Chinese</option>
+    </select>
+  </div>
+
+  <div id="list" class="list"></div>
+  <div id="toolbar" class="toolbar" hidden>
+    <button id="clear" class="ghost" type="button">Clear list</button>
+  </div>
+
+  <p class="hint">Transcription runs on this computer. The first run downloads the speech model, which can take a minute.</p>
+</main>
+
+<script>
+(() => {
+  const drop = document.getElementById("drop");
+  const picker = document.getElementById("picker");
+  const langSel = document.getElementById("lang");
+  const list = document.getElementById("list");
+  const toolbar = document.getElementById("toolbar");
+  const clearBtn = document.getElementById("clear");
+
+  const ALLOWED = /\.(mp3|wav|m4a|ogg|flac)$/i;
+  const jobs = [];          // { file, el, text, filename, status }
+  let queue = Promise.resolve();
+
+  function h(tag, props = {}, ...children) {
+    const el = document.createElement(tag);
+    Object.assign(el, props);
+    for (const c of children) el.append(c);
+    return el;
+  }
+
+  function addFiles(fileList) {
+    const files = [...fileList];
+    const accepted = files.filter(f => ALLOWED.test(f.name));
+    const rejected = files.length - accepted.length;
+    for (const file of accepted) enqueue(file);
+    if (rejected) alert(`${rejected} file(s) skipped: only MP3, WAV, M4A, OGG and FLAC are supported.`);
+  }
+
+  function enqueue(file) {
+    const status = h("span", { className: "status", textContent: "Waiting..." });
+    const actions = h("div", { className: "actions" });
+    const body = h("div", { className: "text", hidden: true });
+    const el = h("div", { className: "item" },
+      h("div", { className: "item-head" },
+        h("span", { className: "name", textContent: file.name }),
+        status),
+      actions,
+      body);
+    list.prepend(el);
+    toolbar.hidden = false;
+
+    const job = { file, el, status, actions, body, text: "", filename: file.name.replace(/\.[^.]+$/, "") };
+    jobs.push(job);
+    queue = queue.then(() => run(job));
+  }
+
+  async function run(job) {
+    job.status.textContent = "Transcribing...";
+    const form = new FormData();
+    form.append("file", job.file, job.file.name);
+    form.append("language", langSel.value);
+    try {
+      const res = await fetch("/api/transcribe", { method: "POST", body: form });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || `Server error ${res.status}`);
+
+      job.text = data.text || "(no speech detected)";
+      job.filename = data.filename || job.filename;
+      const mins = data.duration ? ` · ${(data.duration / 60).toFixed(1)} min` : "";
+      const lang = data.language ? ` · ${data.language}` : "";
+      job.status.className = "status ok";
+      job.status.textContent = `Done${lang}${mins}`;
+      job.body.textContent = job.text;
+      job.body.hidden = false;
+
+      job.actions.append(
+        h("button", { type: "button", textContent: "Download .txt", onclick: () => download(job) }),
+        h("button", { type: "button", className: "ghost", textContent: "Copy", onclick: () => copy(job) }),
+      );
+    } catch (err) {
+      job.status.className = "status err";
+      job.status.textContent = `Failed: ${err.message}`;
+    }
+  }
+
+  function download(job) {
+    const blob = new Blob([job.text + "\n"], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = h("a", { href: url, download: `${job.filename}.txt` });
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function copy(job) {
+    try { await navigator.clipboard.writeText(job.text); job.status.textContent = "Copied to clipboard"; }
+    catch { job.status.textContent = "Copy failed - select the text instead"; }
+  }
+
+  clearBtn.addEventListener("click", () => {
+    if (jobs.some(j => j.status.textContent === "Transcribing..." || j.status.textContent === "Waiting...")) {
+      if (!confirm("Some files are still processing. Clear the list anyway?")) return;
+    }
+    jobs.length = 0;
+    list.replaceChildren();
+    toolbar.hidden = true;
+  });
+
+  // Drag and drop
+  ["dragenter", "dragover"].forEach(evt => drop.addEventListener(evt, e => {
+    e.preventDefault(); drop.classList.add("over");
+  }));
+  ["dragleave", "drop"].forEach(evt => drop.addEventListener(evt, e => {
+    e.preventDefault(); drop.classList.remove("over");
+  }));
+  drop.addEventListener("drop", e => addFiles(e.dataTransfer.files));
+
+  // Click / keyboard to pick files
+  drop.addEventListener("click", () => picker.click());
+  drop.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); picker.click(); }
+  });
+  picker.addEventListener("change", () => { addFiles(picker.files); picker.value = ""; });
+
+  // Stop the browser from opening a file if it's dropped outside the zone.
+  window.addEventListener("dragover", e => e.preventDefault());
+  window.addEventListener("drop", e => e.preventDefault());
+})();
+</script>
+</body>
+</html>
