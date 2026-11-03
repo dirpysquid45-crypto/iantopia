@@ -726,11 +726,11 @@
       return true;
     }
 
-    if (!checkSeasonalAvailability()) {
-      // Exit early if season not active
-      console.warn('Snoopy Thanksgiving Coaster is only available Nov 8-30');
-      return;
-    }
+    // Seasonal check disabled - game available year-round
+    // if (!checkSeasonalAvailability()) {
+    //   console.warn('Snoopy Thanksgiving Coaster is only available Nov 8-30');
+    //   return;
+    // }
 
     // ========== Balance Sync ==========
     function syncBalance() {
