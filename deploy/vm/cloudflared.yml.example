@@ -1,0 +1,11 @@
+# Copy to /etc/cloudflared/config.yml on the VM and fill in the tunnel ID.
+# The tunnel is created in the Cloudflare dashboard (Zero Trust → Networks →
+# Tunnels). Its credentials file lands in /etc/cloudflared/<TUNNEL_ID>.json.
+tunnel: <TUNNEL_ID>
+credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
+ingress:
+  - hostname: iantopia.com
+    service: http://localhost:80
+  - hostname: www.iantopia.com
+    service: http://localhost:80
+  - service: http_status:404
