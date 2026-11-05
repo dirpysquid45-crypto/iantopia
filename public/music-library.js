@@ -41,6 +41,8 @@ window.MUSIC_LIBRARY = {
   // for October, the same no-persistent-write way it resolves the
   // halloween_theme background -- see background-library.js's comment.
   ghost_house:         { label: 'Ghost House',                      src: '/audio/music/ghost-house.mp3' },
+  // Seasonal, November -- resolved the same no-write way as ghost_house.
+  thanksgiving_reprise: { label: 'Thanksgiving Theme (Reprise)',    src: '/audio/music/thanksgiving-reprise.mp3' },
 
   // --- Arena-only free defaults ---
   // koronba has no shop entry (Arena Battleship's page-only free

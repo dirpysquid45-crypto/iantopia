@@ -2,6 +2,7 @@ const BlackjackGame = require('./blackjack');
 const { BattleshipGame } = require('./battleship');
 const { PongGame } = require('./pong');
 const BalanceManager = require('./balance');
+const { TurkeyManager } = require('./turkey');
 
 const GAME_TYPES = new Set(['blackjack', 'battleship', 'pong']);
 const MAX_BET = 1000000;
@@ -13,6 +14,7 @@ class Manager {
     this.auth = auth;
     this.opts = opts;                                // { timing } overrides, used by tests
     this.balance = opts.balance || new BalanceManager(db);
+    this.turkey = opts.turkey || new TurkeyManager(db, this.balance);
     this.connections = new Map(); // sessionId -> { userId, ws, guest, name }
     this.queue = [];              // open lobbies
     this.tables = new Map();      // tableId -> game
@@ -93,6 +95,22 @@ class Manager {
   }
 
   // ---- messages ----------------------------------------------------------
+  async turkeyClaim(userId, ws) {
+    try {
+      this.sendTo(ws, { type: 'turkey_claimed', ...(await this.turkey.claimPardon(userId)) });
+    } catch (e) {
+      this.fail(ws, e.message, 'turkey');
+    }
+  }
+
+  async turkeyConvert(userId, ws, msg) {
+    try {
+      this.sendTo(ws, { type: 'turkey_converted', ...(await this.turkey.convertCorn(userId, msg.corn)) });
+    } catch (e) {
+      this.fail(ws, e.message, 'turkey');
+    }
+  }
+
   async handleMessage(userId, sessionId, msg) {
     const conn = this.connections.get(sessionId);
     if (!conn || !msg || typeof msg.type !== 'string') return;
@@ -107,6 +125,10 @@ class Manager {
         return this.leaveQueue(sessionId);
       case 'ping':
         return this.sendTo(ws, { type: 'pong' });
+      case 'turkey_claim':
+        return this.turkeyClaim(userId, ws);
+      case 'turkey_convert':
+        return this.turkeyConvert(userId, ws, msg);
       case 'suggest':
         return this.suggest(userId, conn, msg);
       case 'suggestions_list':

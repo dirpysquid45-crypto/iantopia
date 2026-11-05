@@ -54,6 +54,10 @@ window.BACKGROUND_LIBRARY = {
   // October — the seasonal music default is resolved the same no-write way
   // as the background, so November 1st reverts both with nothing to clean up.
   halloween_theme:  { label: '🎃 Halloween Theme',  type: 'gif',   src: '/video/halloween-theme.gif', position: 'center', theme: 'theme-halloween' },
+  // Seasonal, same shape as halloween_theme above: index.astro resolves it as
+  // the home page's default for all of November (isThanksgivingSeason()), with
+  // no comboTrack for the same reason -- the track default is resolved there.
+  thanksgiving_theme: { label: '🦃 Thanksgiving Theme', type: 'gif', src: '/video/thanksgiving-theme.gif', position: 'center', theme: 'theme-thanksgiving' },
   // Unlike every other comboTrack, Orb of Dreamers is ALSO separately
   // unlockable/selectable (see case-data.js's mus_orb) -- owning just the
   // background still gets you the auto-switch on pick, same as always.

@@ -1098,8 +1098,9 @@
       box-shadow: 0 0 40px rgba(94,23,168,.65), 0 0 80px rgba(94,23,168,.4), inset 0 0 30px rgba(94,23,168,.3);
     }
     /* The clickable word "Haunted" in the title. */
-    .haunted-word { cursor: pointer; border-radius: 2px; transition: text-shadow .2s; }
+    .haunted-word, .thankful-word { cursor: pointer; border-radius: 2px; transition: text-shadow .2s; }
     .haunted-word:hover, .haunted-word:focus-visible { text-shadow: 0 0 14px rgba(255,111,0,.9); outline: none; }
+    .thankful-word:hover, .thankful-word:focus-visible { text-shadow: 0 0 14px rgba(255,170,60,.9); outline: none; }
     /* Crawling spider: a large spider that walks straight across the whole
        screen, over the UI, and is gone again. It starts and ends fully off
        screen, so it never pops in or gets cut off at an edge. Decorative only
@@ -1167,6 +1168,114 @@
       border-style: solid; border-width: 3px; border-color: #ff6f00;
       color: #ffb74d; text-shadow: 0 0 6px rgba(255,111,0,.9);
       box-shadow: 0 0 20px rgba(255,111,0,.5), 0 0 40px rgba(94,23,168,.3);
+    }
+
+    /* ---------- Thanksgiving (seasonal default for all of November — see
+       isThanksgivingSeason()/getActiveBgKey()/getActiveTrackKey()). Same
+       body.theme-X pattern as Halloween above. The Snoopy GIF is the
+       background; the leaves photo is the skin on every button and the
+       countdown, under a brown tint so the labels stay readable, and the
+       tint/border cycle pumpkin / cranberry / harvest gold the way
+       Halloween's buttons cycle three colours. */
+    body.theme-thanksgiving {
+      background-image: url('/video/thanksgiving-theme.gif');
+      background-position: center;
+    }
+    body.theme-thanksgiving h1 {
+      color: #ffb347;
+      -webkit-text-stroke: 1.5px #4a1f06;
+      paint-order: stroke fill;
+      animation: titleScale 0.8s ease-out;
+      text-shadow: 0 0 10px rgba(255,140,26,.55), 0 0 22px rgba(200,60,30,.3), 2px 2px 0 #2b1407;
+    }
+    /* Only the word Thankful slowly warms and cools in colour; the rest of the title stays put. */
+    body.theme-thanksgiving .thankful-word {
+      animation: thankfulPulse 6s ease-in-out infinite;
+    }
+    @keyframes thankfulPulse {
+      0%, 100% { color: #ffb347; }
+      50% { color: #ffe08a; }
+    }
+    /* The Haunted ghost sway and trailing copy are switched off for the calm title. */
+    body.theme-thanksgiving .ghost-title { animation: none; }
+    body.theme-thanksgiving .ghost-title h1::before { display: none; }
+    body.theme-thanksgiving .flip-card {
+      filter: drop-shadow(0 0 26px rgba(255,140,26,.8)) drop-shadow(0 0 52px rgba(200,60,30,.4));
+    }
+    body.theme-thanksgiving .flip-card img {
+      box-shadow: 0 0 40px rgba(255,140,26,.65), 0 0 80px rgba(200,60,30,.35), inset 0 0 30px rgba(255,170,60,.25);
+    }
+    /* Drifting leaves: a big patch of them crosses the whole screen, left to
+       right, over the UI, and is gone again. Starts and ends fully off
+       screen. Decorative only (pointer-events off, hidden from assistive
+       tech); Thanksgiving theme only. The JavaScript above drives it. */
+    #leaf-crawler { display: none; }
+    body.theme-thanksgiving #leaf-crawler {
+      display: block; position: fixed; left: 0; top: 0; z-index: 9000;
+      width: max(100vw, 100vh); pointer-events: none; opacity: 0;
+      will-change: transform;
+    }
+    body.theme-thanksgiving #leaf-crawler img { display: block; width: 100%; height: auto; }
+    /* Leaves skin: every menu button plus the small top-bar buttons. */
+    body.theme-thanksgiving a.big,
+    body.theme-thanksgiving button.big,
+    body.theme-thanksgiving #inv-btn, body.theme-thanksgiving #bg-btn,
+    body.theme-thanksgiving #cursor-btn, body.theme-thanksgiving #account-btn,
+    body.theme-thanksgiving #patch-btn, body.theme-thanksgiving #suggest-btn,
+    body.theme-thanksgiving #now-playing, body.theme-thanksgiving #ending-link {
+      --tg-tint: rgba(74,31,6,.55);
+      --tg-glow: rgba(255,170,60,.7);
+      background-color: #6b3a12;
+      background-image: linear-gradient(var(--tg-tint), var(--tg-tint)), url('/assets/decorations/leaves-texture.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-style: solid; border-width: 3px; border-color: #ffc24a;
+      color: #fff3d6;
+      text-shadow: 0 0 6px rgba(43,20,7,.95), 1px 1px 0 #2b1407, 2px 2px 0 rgba(43,20,7,.6);
+      box-shadow: 0 10px 24px rgba(255,140,26,.3);
+    }
+    /* The stack-drop intro replays whenever the hover animation is cleared,
+       so it's switched off once the intro has finished. Hover then just
+       eases up and back down through the button's own transition. */
+    body.theme-thanksgiving.intro-done .button-grid > .big { animation: none; }
+    body.theme-thanksgiving a.big:hover,
+    body.theme-thanksgiving button.big:hover:not(:disabled),
+    body.theme-thanksgiving #inv-btn:hover, body.theme-thanksgiving #bg-btn:hover,
+    body.theme-thanksgiving #cursor-btn:hover, body.theme-thanksgiving #account-btn:hover,
+    body.theme-thanksgiving #patch-btn:hover, body.theme-thanksgiving #suggest-btn:hover,
+    body.theme-thanksgiving #now-playing:hover, body.theme-thanksgiving #ending-link:hover {
+      filter: brightness(1.18);
+      box-shadow: 0 0 30px var(--tg-glow);
+    }
+    body.theme-thanksgiving a.big.neon-gamble, body.theme-thanksgiving a.big.neon-arena,
+    body.theme-thanksgiving button.big.neon-daily, body.theme-thanksgiving a.big.neon-tycoon {
+      --tg-tint: rgba(84,34,4,.55); --tg-glow: rgba(255,140,26,.75);
+      border-color: #ff8c1a; box-shadow: 0 10px 24px rgba(255,140,26,.35);
+    }
+    body.theme-thanksgiving a.big.neon-mines, body.theme-thanksgiving a.big.neon-shop,
+    body.theme-thanksgiving a.big.neon-yt {
+      --tg-tint: rgba(92,14,10,.6); --tg-glow: rgba(214,69,47,.75);
+      border-color: #d6452f; box-shadow: 0 10px 24px rgba(214,69,47,.35);
+    }
+    body.theme-thanksgiving a.big.neon-horse, body.theme-thanksgiving a.big.neon-news,
+    body.theme-thanksgiving a.big.neon-never {
+      --tg-tint: rgba(70,48,6,.55); --tg-glow: rgba(255,207,74,.7);
+      border-color: #ffcf4a; box-shadow: 0 10px 24px rgba(255,207,74,.3);
+    }
+    body.theme-thanksgiving a.big.neon-tycoon.disabled {
+      border-color: #555; box-shadow: none; text-shadow: none;
+    }
+    body.theme-thanksgiving #topia-timer {
+      background-color: #6b3a12;
+      background-image: linear-gradient(rgba(74,31,6,.58), rgba(74,31,6,.58)), url('/assets/decorations/leaves-texture.jpg');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      border-style: solid; border-width: 3px; border-color: #ffc24a;
+      color: #fff3d6;
+      text-shadow: 0 0 6px rgba(43,20,7,.95), 1px 1px 0 #2b1407;
+      box-shadow: 0 0 20px rgba(255,160,40,.55), 0 0 40px rgba(200,60,30,.3);
     }
 
     /* ---------- Daily struble reel ---------- */
@@ -1635,19 +1744,30 @@
        its own date check that could quietly drift out of sync. -->
   <script is:inline>
     window.isHalloweenSeason = function () { return new Date().getMonth() === 9; };
+    // Same idea for Thanksgiving: all of November.
+    window.isThanksgivingSeason = function () { return new Date().getMonth() === 10; };
     // One-time reset for the 2026 Halloween season: clears any background or
     // track someone picked before October, so the seasonal default actually
     // shows for them. The flag makes it run once per browser; picks made
-    // after this stick as usual.
+    // after this stick as usual. Thanksgiving gets its own flag and the same
+    // treatment for November.
     (function () {
       try {
-        const FLAG = 'halloween_default_reset_2026_v1';
-        if (!window.isHalloweenSeason() || localStorage.getItem(FLAG)) return;
+        const season = window.isHalloweenSeason() ? 'halloween_default_reset_2026_v1'
+          : window.isThanksgivingSeason() ? 'thanksgiving_default_reset_2026_v1' : null;
+        if (!season || localStorage.getItem(season)) return;
         localStorage.removeItem('home_active_bg_v1');
         localStorage.removeItem('home_active_track_v1');
-        localStorage.setItem(FLAG, '1');
+        localStorage.setItem(season, '1');
       } catch {}
     })();
+    // Theme class goes on before first paint so the page doesn't flash the
+    // default look; applyBackground() further down removes it again if this
+    // visitor explicitly picked some other background.
+    if (window.isThanksgivingSeason()) {
+      document.body.classList.add('theme-thanksgiving');
+      setTimeout(() => document.body.classList.add('intro-done'), 1500);
+    }
   </script>
   <div id="sakura-overlay" aria-hidden="true"></div>
   <div id="halloween-gift-toast" role="status" aria-live="polite"></div>
@@ -1693,6 +1813,41 @@
         }, 20000 + Math.random() * 35000);
       }
       schedule();
+    })();
+  </script>
+  <div id="leaf-crawler" aria-hidden="true"><img src="/assets/decorations/leaves-crawl.gif" alt="" /></div>
+  <script is:inline>
+    // Thanksgiving's version of the spider: a big patch of falling leaves
+    // drifts across the whole screen, left to right, over the UI, at a random
+    // height, now and then (every 20 to 55 seconds, with the first one a few
+    // seconds after load so it's seen). Starts and ends fully off screen. Only
+    // during the Thanksgiving theme, and never for people who asked their
+    // system for reduced motion.
+    (function () {
+      const el = document.getElementById('leaf-crawler');
+      if (!el) return;
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let running = false;
+      function drift() {
+        running = true;
+        const w = el.offsetWidth || 600, h = el.offsetHeight || 600;
+        const vw = window.innerWidth, vh = window.innerHeight;
+        const y = Math.round((vh - h) * Math.random());
+        el.style.opacity = '1';
+        const anim = el.animate([
+          { transform: `translate(${-w - 4}px, ${y}px)` },
+          { transform: `translate(${vw + 4}px, ${y}px)` },
+        ], { duration: 7000 + Math.random() * 3000, easing: 'linear', fill: 'forwards' });
+        anim.onfinish = () => { el.style.opacity = '0'; anim.cancel(); running = false; };
+      }
+      function schedule(delay) {
+        if (reduced) return;
+        setTimeout(() => {
+          if (document.body.classList.contains('theme-thanksgiving') && !running) drift();
+          schedule(20000 + Math.random() * 35000);
+        }, delay);
+      }
+      schedule(4000);
     })();
   </script>
   <!-- Free Halloween gift: everyone gets exactly one jack-o'-lantern, the
@@ -1757,6 +1912,13 @@
         });
       }
 
+      if (window.isThanksgivingSeason()) {
+        document.querySelectorAll('#flip-card img').forEach((img) => {
+          img.src = '/video/thanksgiving-center.gif';
+          img.alt = 'Snoopy wishbone';
+        });
+      }
+
       const NORMAL_SPEED = 360 / 4000; // deg/ms -- matches the old 4s-per-rotation
       const FAST_SPEED = 360 / 400;    // deg/ms -- matches the old 0.4s-per-rotation
       const HOLD_MS = 500;             // how long to stay at full speed after a click
@@ -1806,6 +1968,7 @@
       imageContainer.addEventListener('click', () => {
         boostSpin();
         if (halloween) setTimeout(() => { location.href = '/scary-maze'; }, 650); // let the flip actually play out first
+        if (window.isThanksgivingSeason()) setTimeout(() => { location.href = '/turkey'; }, 650);
       });
       imageContainer.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -1817,6 +1980,23 @@
   </script>
 
   <div class="ghost-title"><h1 data-ghost="Haunted Iantopia"><span class="haunted-word" role="button" tabindex="0" title="Click for the spooky theme">Haunted</span> I<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span>ntopi<span class="letter-a"><span class="letter-a-plain">a</span><span class="letter-a-creeper"></span></span></h1></div>
+
+  <script is:inline>
+    // November: the title reads "Thankful Iantopia", and the word is the
+    // Thanksgiving click-to-theme button in place of Haunted's.
+    if (window.isThanksgivingSeason()) {
+      const h1 = document.querySelector('.ghost-title h1');
+      const word = h1 && h1.querySelector('.haunted-word');
+      if (word) {
+        word.replaceWith(Object.assign(document.createElement('span'), {
+          className: 'thankful-word', role: 'button', tabIndex: 0,
+          title: 'Click for the Thanksgiving theme', textContent: 'Thankful',
+        }));
+        h1.setAttribute('data-ghost', 'Thankful Iantopia');
+        document.title = 'Thankful Iantopia';
+      }
+    }
+  </script>
 
   <div class="button-grid">
     <a class="big neon-gamble" href="/blackjack">🎲 Gamburing</a>
@@ -1980,11 +2160,11 @@
   <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script is:inline src="/game-stats.js?v=1"></script>
 <script is:inline src="/cloud-sync.js?v=10"></script>
-  <script is:inline src="/music-library.js?v=13"></script>
+  <script is:inline src="/music-library.js?v=14"></script>
   <script is:inline src="/music-position.js?v=1"></script>
-  <script is:inline src="/background-library.js?v=13"></script>
+  <script is:inline src="/background-library.js?v=14"></script>
   <script is:inline src="/pickers.js?v=11"></script>
-  <script is:inline src="/cursor-library.js?v=4"></script>
+  <script is:inline src="/cursor-library.js?v=5"></script>
   <script is:inline src="/patch-notes.js?v=18"></script>
 
   <!-- Timer Script -->
@@ -2181,6 +2361,8 @@
       // getActiveBgKey() -- November 1st reverts to HOME_THEME with nothing
       // in localStorage to clean up.
       const HALLOWEEN_THEME = { label: '🎃 Ghost House', src: '/audio/music/ghost-house.mp3' };
+      // November's equivalent, resolved the same way by isThanksgivingSeason().
+      const THANKSGIVING_THEME = { label: '🦃 Thanksgiving Theme (Reprise)', src: '/audio/music/thanksgiving-reprise.mp3' };
       // isHalloweenSeason() itself is defined once, right after <body> opens.
 
       // Kept separate from other pages on purpose — each page's music/bg
@@ -2190,7 +2372,7 @@
       // would silently revert to a stale value).
       const ACTIVE_TRACK_KEY = 'home_active_track_v1';
       const INV_KEY = 'strubles_inventory_v1';
-      const LIBRARY = Object.assign({}, window.MUSIC_LIBRARY, { default: HOME_THEME, halloween: HALLOWEEN_THEME });
+      const LIBRARY = Object.assign({}, window.MUSIC_LIBRARY, { default: HOME_THEME, halloween: HALLOWEEN_THEME, thanksgiving: THANKSGIVING_THEME });
 
       function loadInventory() {
         try {
@@ -2205,7 +2387,8 @@
         // No explicit pick saved: Ghost House for all of October, Home
         // Theme otherwise -- resolved fresh on every load, nothing written
         // to localStorage, so this never needs manually turning off.
-        return window.isHalloweenSeason() ? 'halloween' : 'default';
+        if (window.isHalloweenSeason()) return 'halloween';
+        return window.isThanksgivingSeason() ? 'thanksgiving' : 'default';
       }
 
       let audioEnabled = true;
@@ -2584,7 +2767,10 @@
         // for all of October, Taipei otherwise -- see getActiveTrackKey()
         // above for why this resolves fresh each load instead of writing a
         // choice.
-        return (window.isHalloweenSeason() && BG_LIBRARY.halloween_theme) ? 'halloween_theme' : 'default';
+        if (window.isHalloweenSeason() && BG_LIBRARY.halloween_theme) return 'halloween_theme';
+        // Same for November: the Snoopy Thanksgiving background and its theme.
+        if (window.isThanksgivingSeason() && BG_LIBRARY.thanksgiving_theme) return 'thanksgiving_theme';
+        return 'default';
       }
       // Same fix as every other page's pickers.js already has: without this,
       // the video restarted from 0:00 on every trip back to the homescreen
@@ -2611,6 +2797,26 @@
         word.addEventListener('click', goSpooky);
         word.addEventListener('keydown', (e) => {
           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goSpooky(); }
+        });
+      })();
+
+      // Same as Haunted above, for "Thankful" in November: one-way switch to
+      // the Thanksgiving background, saved like any other pick.
+      (function () {
+        const word = document.querySelector('.thankful-word');
+        if (!word) return;
+        const goThanksgiving = () => {
+          if (document.body.classList.contains('theme-thanksgiving')) return;
+          try { localStorage.setItem(ACTIVE_BG_KEY, 'thanksgiving_theme'); } catch {}
+          applyBackground('thanksgiving_theme');
+          activeTrackKey = 'thanksgiving';
+          try { localStorage.setItem(ACTIVE_TRACK_KEY, activeTrackKey); } catch {}
+          applyActiveTrack(true);
+          window.dispatchEvent(new CustomEvent('active-track:changed', { detail: { key: activeTrackKey } }));
+        };
+        word.addEventListener('click', goThanksgiving);
+        word.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goThanksgiving(); }
         });
       })();
 

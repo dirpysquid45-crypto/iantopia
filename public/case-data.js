@@ -98,6 +98,7 @@ window.CASE_ITEMS = {
   bg_taipei_n: { label: 'Background: Taipei Nightlife',   tier: 'exceedingly_rare', emoji: '🌃',                            type: 'background_unlock', key: 'taipei_nightlife' },
   alt_ending:  { label: 'Alternate Ending',               tier: 'exceedingly_rare', emoji: '🎬',                            type: 'unlock_page', path: '/alternate-ending' },
   cur_struble: { label: 'Cursor: Struble Coin',           tier: 'exceedingly_rare', img: '/strubles.png',                  type: 'cursor_unlock', key: 'struble_coin' },
+  cur_turkey:  { label: 'Cursor: Turkey', tier: 'restricted', img: '/cursors/turkey-point.png', type: 'cursor_unlock', key: 'turkey', grantOnly: true },
   cur_hamood:  { label: 'Cursor: Hamood Habibi',          tier: 'exceedingly_rare', img: '/cursors/hamood-point.png',      type: 'cursor_unlock', key: 'hamood_habibi' },
 
   // ---------- Horse Game Collectibles ----------
@@ -198,7 +199,7 @@ const ALL_IDS = Object.keys(window.CASE_ITEMS).filter((id) => !window.CASE_ITEMS
 // every other case's "everything"/"everything at this tier+" pools are
 // built from this instead of ALL_IDS, so a building can never turn up in
 // Starter or Vault just because it happens to fit their tier odds.
-const GENERAL_IDS = ALL_IDS.filter((id) => window.CASE_ITEMS[id].type !== 'building_unlock');
+const GENERAL_IDS = ALL_IDS.filter((id) => window.CASE_ITEMS[id].type !== 'building_unlock' && !window.CASE_ITEMS[id].grantOnly);
 const idsByType = (...types) => GENERAL_IDS.filter((id) => types.includes(window.CASE_ITEMS[id].type));
 const idsFromTier = (minTier) => {
   const min = window.CASE_RARITY_ORDER.indexOf(minTier);

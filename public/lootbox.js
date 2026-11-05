@@ -417,7 +417,7 @@
   }
 
   // Cosmetics, plus the glowing display collectibles (building / terrain / drink figures).
-  const isShopItem = (item) => SHOP_TYPES.includes(item.type) || (item.type === 'item' && !!item.collectible);
+  const isShopItem = (item) => !item.grantOnly && (SHOP_TYPES.includes(item.type) || (item.type === 'item' && !!item.collectible));
 
   function getShopListings() {
     const I = window.CASE_ITEMS || {};

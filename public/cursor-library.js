@@ -38,6 +38,11 @@ window.CURSOR_LIBRARY = {
       '/audio/sfx/hamood-3.mp3',
     ],
   },
+  turkey: {
+    label: 'Turkey',
+    point: '/cursors/turkey-point.png',
+    interact: '/cursors/turkey-interact.png',
+  },
   horse: {
     label: 'Horse',
     point: '/cursors/horse-point.png',

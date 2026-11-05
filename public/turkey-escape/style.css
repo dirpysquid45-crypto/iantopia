@@ -1,0 +1,23 @@
+/* The game fills the screen; the page itself never scrolls, zooms or selects text. */
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: linear-gradient(rgba(20, 12, 8, 0.45), rgba(20, 12, 8, 0.45)), #2b1d14 url('img/revenge-turkey.gif') center / cover no-repeat;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  position: fixed;
+  inset: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+canvas {
+  cursor: url(cursors/turkey.png) 8 8, auto;
+}
