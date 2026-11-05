@@ -19,3 +19,8 @@ public/news-data/*.json
 # Large source art for My Iantopia; the build script writes the small web
 # versions into public/tycoon (see scripts/build-tycoon-assets.py).
 art-source/tycoon/
+
+# Local-only source media and private data (not for the public repo)
+art-source/music-sources/
+art-source/video-sources/
+scripts/admin/backups/
