@@ -22,7 +22,7 @@ import requests
 from common import write_json, OUTPUT_DIR
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
-MODEL = "qwen2.5:7b"
+MODEL = "llama3.2:3b"
 # Generous on purpose: this is a once-daily batch job on a CPU-only host,
 # not a live request, and a cold model load (first call after Ollama has
 # been idle) is slower than steady-state inference.
@@ -87,7 +87,13 @@ def call_ollama(context: str) -> str:
         timeout=TIMEOUT,
     )
     response.raise_for_status()
-    return response.json()["response"].strip()
+    text = response.json()["response"].strip()
+    # Small models often open with an echo of the request ("Here is a summary ... :").
+    # Drop that first line when it is one, so the digest starts with the news itself.
+    first, sep, rest = text.partition("\n")
+    if sep and first.lower().startswith(("here is", "here's", "sure", "below is")):
+        text = rest.strip()
+    return text
 
 
 def main() -> None:

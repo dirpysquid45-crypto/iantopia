@@ -296,7 +296,7 @@
           // per-tier DUPLICATE_REFUND table every other type uses.
           result.duplicate = true;
           result.refund = Math.round((caseCost || 0) * 0.1);
-          if (result.refund) Strubles.add(result.refund);
+          if (result.refund) Strubles.add(result.refund, 'refund');
         } else {
           inv.buildings.push(key);
           state.inv = inv;
@@ -314,7 +314,7 @@
         // table the duplicate-refund fallback below uses instead of the
         // item's own (much bigger) face amount.
         const amount = isFullyComplete() ? (POST_COMPLETION_PAYOUT[item.tier] || 0) : (item.amount || 0);
-        Strubles.add(amount);
+        Strubles.add(amount, undefined, 'lootbox');
         result.unlocked = true;
         break;
       }
@@ -384,7 +384,7 @@
     if (result.duplicate) {
       const refundTable = isFullyComplete() ? POST_COMPLETION_PAYOUT : DUPLICATE_REFUND;
       result.refund = refundTable[item.tier] || 0;
-      if (result.refund) Strubles.add(result.refund);
+      if (result.refund) Strubles.add(result.refund, 'refund');
     }
     return result;
   }
@@ -417,7 +417,9 @@
   }
 
   // Cosmetics, plus the glowing display collectibles (building / terrain / drink figures).
-  const isShopItem = (item) => SHOP_TYPES.includes(item.type) || (item.type === 'item' && !!item.collectible);
+  // Tycoon building collectibles are not for sale: buildings are sold in Real
+  // Estate, so listing their collectible copies in the shop doubled them up.
+  const isShopItem = (item) => !item.buildingCollectible && (SHOP_TYPES.includes(item.type) || (item.type === 'item' && !!item.collectible));
 
   function getShopListings() {
     const I = window.CASE_ITEMS || {};
@@ -448,21 +450,13 @@
   }
 
   // --- Real Estate: buildings for sale, kept apart from the cosmetics above.
-  // Priced far above what the same building costs to win from a case on
-  // average (each is 1 of 11 drops, so a specific one takes many 2,000-Struble
-  // opens), by design: this is the guaranteed-but-expensive route, and a
-  // Strubles sink for players who have already got everything else. The
-  // cheapest tier is deliberately under the base 20,000 wallet cap so it is
-  // buyable from the start -- the Bank is in that tier, because raising the cap
-  // needs one, and a cap-gated purchase that gates the cap would be a deadlock.
-  const REAL_ESTATE_PRICE = {
-    mil_spec: 15000,
-    restricted: 30000,
-    classified: 65000,
-    covert: 110000,
-    exceedingly_rare: 200000,
-  };
-  const realEstatePrice = (item) => REAL_ESTATE_PRICE[item.tier] || 0;
+  // The guaranteed route to a building, and a Strubles sink for players who
+  // already have most of the set. Prices are the base for a first copy and rise
+  // with each copy owned (see tycoon-economy.js). The cheapest tier sits under the
+  // base 20,000 wallet cap so it is buyable from the start -- the Bank is in that
+  // tier, because raising the cap needs one, and a cap-gated purchase that gates
+  // the cap would be a deadlock.
+  const realEstatePrice = (item, owned) => window.TycoonEconomy.realEstatePrice(item.tier, owned);
   const buildingsOwned = (key) => state.inv.buildings.filter((k) => k === key).length;
 
   function getRealEstateListings() {
@@ -472,7 +466,7 @@
       .map((id) => {
         const item = I[id];
         const owned = buildingsOwned(item.key || id);
-        return Object.assign({ id, price: realEstatePrice(item), count: owned, max: MAX_BUILDING_COPIES, maxed: owned >= MAX_BUILDING_COPIES }, item);
+        return Object.assign({ id, price: realEstatePrice(item, owned), count: owned, max: MAX_BUILDING_COPIES, maxed: owned >= MAX_BUILDING_COPIES }, item);
       });
   }
 
@@ -489,7 +483,7 @@
     if (buildingsOwned(key) >= MAX_BUILDING_COPIES) {
       return { ok: false, message: `You already own the maximum (${MAX_BUILDING_COPIES}) of those.` };
     }
-    const price = realEstatePrice(item);
+    const price = realEstatePrice(item, buildingsOwned(key));
     if (!Strubles.spend(price)) {
       return { ok: false, message: `Not enough Strubles (need ${price.toLocaleString()}).` };
     }
@@ -513,6 +507,23 @@
   function emptyStats() {
     return { opened: 0, spent: 0, refunded: 0, duplicates: 0, byTier: {}, best: null, firstOpenAt: null };
   }
+  // The first PITY_OPENS opens always give a building from the mil-spec or
+  // restricted tier, so a new player is not handed cosmetics and Strubles for
+  // their first 2,000 spent. Returns null once that is over, or if the case has
+  // no such building left to give.
+  const PITY_OPENS = 2;
+  function pityBuildingId(def) {
+    if ((getStats().opened || 0) >= PITY_OPENS) return null;
+    const I = window.CASE_ITEMS || {};
+    const pool = def.items.filter((id) => {
+      const item = I[id];
+      return item && !item.archived && item.type === 'building_unlock' &&
+        (item.tier === 'mil_spec' || item.tier === 'restricted') &&
+        buildingsOwned(item.key || id) < MAX_BUILDING_COPIES;
+    });
+    return pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
+  }
+
   function getStats() {
     const s = loadJSON(STATS_KEY, null);
     return (s && typeof s === 'object') ? Object.assign(emptyStats(), s) : emptyStats();
@@ -557,7 +568,7 @@
     if (!cases[caseKey]) return { ok: false, message: 'You don\'t own that case.' };
 
     const I = window.CASE_ITEMS || {};
-    const winnerId = rollItemId(def);
+    const winnerId = pityBuildingId(def) || rollItemId(def);
     const item = I[winnerId];
     if (!item) return { ok: false, message: 'Case is misconfigured.' };
 

@@ -58,6 +58,15 @@ class ArenaGame {
     if (Number.isFinite(balance)) this.send(i, { type: 'balance_update', balance });
   }
 
+  // Pays a player's winnings or money back, and reports what was actually credited.
+  // The id keeps a retry from paying twice; `paid` is false if the credit never landed.
+  async payPlayer(i, amount, reason) {
+    const meta = { game: this.gameType, table: this.tableId, player: i, reason, id: `${this.tableId}:${reason}:${i}` };
+    const r = await this.balance.payOut(this.players[i].userId, amount, meta);
+    if (r.balance !== null) this.pushBalance(i, r.balance);
+    return r;
+  }
+
   // ----- stakes -----
   // Records which players have actually been charged, so that if the second
   // charge fails the first can be handed back instead of silently kept.
@@ -72,8 +81,9 @@ class ArenaGame {
   async refundCharged() {
     for (let i = 0; i < 2; i++) {
       if (!this.charged[i]) continue;
-      try { this.pushBalance(i, await this.balance.refundBet(this.players[i].userId, this.bet)); }
-      catch (e) { console.error('[refund] failed for', this.players[i].userId, e.message); }
+      const meta = { game: this.gameType, table: this.tableId, player: i, reason: 'stake', id: `${this.tableId}:refund:${i}` };
+      const r = await this.balance.refundStake(this.players[i].userId, this.bet, meta);
+      if (r.balance !== null) this.pushBalance(i, r.balance);
       this.charged[i] = false;
     }
   }

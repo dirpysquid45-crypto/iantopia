@@ -1,0 +1,10 @@
+[Unit]
+Description=Iantopia news pipeline (ingest, cluster, stocks, geopolitical)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/srv/iantopia/repo/news-pipeline
+ExecStart=/srv/iantopia/repo/news-pipeline/run_pipeline.sh

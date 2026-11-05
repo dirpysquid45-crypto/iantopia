@@ -2,7 +2,7 @@
 """
 Geopolitical briefing aggregator for The Iantopia Times.
 
-Pulls from Politico (EU), Reuters (World), and Institute for the Study of War.
+Pulls from the live feeds in FEEDS (Politico EU, Atlantic Council, Lowy Institute, BBC World).
 Classifies stories into regions and tags with status (breaking/developing/scheduled).
 Outputs to ../public/news-data/geopolitical.json
 """
@@ -130,62 +130,20 @@ REGION_ICONS = {
 }
 
 # RSS feeds organized by regional expertise + general news
+# Only feeds that answered with entries when last checked (2026-10-28). The others
+# returned 403, 404, or no connection, and are left out rather than retried each run.
 FEEDS = {
     # Policy & Strategy (pan-regional analysis)
-    'Politico': ['https://www.politico.eu/feed/', 'https://www.politico.com/rss/politics.xml'],
-    'Council on Foreign Relations': [
-        'https://www.cfr.org/rss/publication',
-        'https://www.cfr.org/feed.xml'
-    ],
-    'Brookings Institution': [
-        'https://www.brookings.edu/feed/',
-        'https://www.brookings.edu/feed/?post_type=articles'
-    ],
-    'CSIS': [
-        'https://www.csis.org/rss/latest',
-        'https://www.csis.org/commentary/all'
-    ],
+    'Politico': ['https://www.politico.eu/feed/'],
 
     # Europe-focused & transatlantic strategy
     'Atlantic Council': ['https://www.atlanticcouncil.org/feed/'],
-    'European Council on Foreign Relations': [
-        'https://ecfr.eu/feed/',
-        'https://ecfr.eu/rss/'
-    ],
-    'Chatham House': [
-        'https://chathamhouse.org/feed',
-        'https://www.chathamhouse.org/publications'
-    ],
 
     # Indo-Pacific & Asia strategy
-    'Lowy Institute': [
-        'https://www.lowyinstitute.org/the-interpreter/feed',
-        'https://www.lowyinstitute.org/publications/feed'
-    ],
-    'Observer Research Foundation': [
-        'https://www.orfonline.org/feed/',
-        'https://www.orfonline.org/'
-    ],
-
-    # Conflict & security analysis
-    'International Crisis Group': [
-        'https://www.crisisgroup.org/feed',
-        'https://www.crisisgroup.org/alerts'
-    ],
-    'Rand Corporation': [
-        'https://www.rand.org/news.html',
-        'https://www.rand.org/research.html'
-    ],
+    'Lowy Institute': ['https://www.lowyinstitute.org/the-interpreter/feed'],
 
     # Traditional wire services
-    'Reuters': [
-        'https://feeds.reuters.com/reuters/worldNews',
-        'https://feeds.reuters.com/reuters/businessNews'
-    ],
-    'BBC News': [
-        'http://feeds.bbc.co.uk/news/world/rss.xml',
-        'http://feeds.bbc.co.uk/news/rss.xml'
-    ]
+    'BBC News': ['https://feeds.bbci.co.uk/news/world/rss.xml'],
 }
 
 # ISW key sources (manual fallback since no RSS)
@@ -236,7 +194,7 @@ def pull_feeds():
     """Pull and parse RSS feeds."""
     stories_by_region = {region: [] for region in REGIONS.keys()}
 
-    # Pull Politico and Reuters
+    # Pull every live feed in FEEDS
     for source_name, feed_urls in FEEDS.items():
         print(f'Pulling {source_name}...', file=sys.stderr)
 
@@ -290,126 +248,12 @@ def pull_feeds():
     return stories_by_region
 
 
-DEMO_STORIES = {
-    'USA': [
-        {
-            'source': 'Politico',
-            'title': 'US foreign policy shifts amid domestic political transitions',
-            'summary': 'American strategic priorities reshape alliances, trade relationships, and global military posture.',
-            'link': 'https://www.politico.com',
-            'status': 'breaking'
-        },
-        {
-            'source': 'CSIS',
-            'title': 'American technological competition and supply chain security',
-            'summary': 'US prioritizes semiconductor manufacturing, AI development, and critical technology independence.',
-            'link': 'https://www.csis.org',
-            'status': 'developing'
-        }
-    ],
-    'Russia & Central Asia': [
-        {
-            'source': 'CSIS',
-            'title': 'Russia energy geopolitics and Central Asian strategic partnerships',
-            'summary': 'Regional power dynamics shaped by energy resources, infrastructure projects, and competing great-power influence.',
-            'link': 'https://www.csis.org',
-            'status': 'developing'
-        }
-    ],
-    'East Asia & China': [
-        {
-            'source': 'Lowy Institute',
-            'title': 'Taiwan strait dynamics and regional military posture',
-            'summary': 'Cross-strait tensions and allied security responses amid changing regional balance.',
-            'link': 'https://www.lowyinstitute.org',
-            'status': 'developing'
-        }
-    ],
-    'South & Southeast Asia': [
-        {
-            'source': 'Observer Research Foundation',
-            'title': 'ASEAN and Indo-Pacific strategic partnerships',
-            'summary': 'Regional nation-building and multilateral frameworks amid great power competition.',
-            'link': 'https://www.orfonline.org',
-            'status': 'developing'
-        }
-    ],
-    'Horn of Africa': [
-        {
-            'source': 'International Crisis Group',
-            'title': 'Horn of Africa security and economic integration',
-            'summary': 'Regional stability initiatives amid transnational threats and currency pressures.',
-            'link': 'https://www.crisisgroup.org',
-            'status': 'developing'
-        }
-    ],
-    'West Africa': [
-        {
-            'source': 'Brookings Institution',
-            'title': 'West African economic integration and political stability',
-            'summary': 'ECOWAS efforts to strengthen regional trade and address security challenges.',
-            'link': 'https://www.brookings.edu',
-            'status': 'developing'
-        }
-    ],
-    'Central & Southern Africa': [
-        {
-            'source': 'Institute for the Study of War',
-            'title': 'Central Africa conflict dynamics and humanitarian impact',
-            'summary': 'Ongoing security operations and regional implications in DRC, Uganda, and surrounding territories.',
-            'link': 'https://www.understandingwar.org',
-            'status': 'developing'
-        }
-    ],
-    'North America': [
-        {
-            'source': 'Council on Foreign Relations',
-            'title': 'North American security and trade cooperation',
-            'summary': 'USMCA implementation and trilateral defense coordination among US, Canada, and Mexico.',
-            'link': 'https://www.cfr.org',
-            'status': 'developing'
-        }
-    ],
-    'Central America': [
-        {
-            'source': 'International Crisis Group',
-            'title': 'Central American migration and security challenges',
-            'summary': 'Regional responses to transnational crime, gang violence, and humanitarian pressures.',
-            'link': 'https://www.crisisgroup.org',
-            'status': 'developing'
-        }
-    ],
-    'South America': [
-        {
-            'source': 'CSIS',
-            'title': 'South American governance and economic integration',
-            'summary': 'Regional development initiatives and BRICS positioning amid global economic realignment.',
-            'link': 'https://www.csis.org',
-            'status': 'developing'
-        }
-    ],
-    'Caribbean': [
-        {
-            'source': 'Rand Corporation',
-            'title': 'Caribbean resilience and development priorities',
-            'summary': 'Island economies address climate impacts, energy security, and tourism-dependent growth models.',
-            'link': 'https://www.rand.org',
-            'status': 'developing'
-        }
-    ]
-}
-
-
 def build_output(stories_by_region):
     """Build the final JSON structure."""
     regions = []
 
     for region_name in REGIONS.keys():
         stories = stories_by_region.get(region_name, [])
-
-        # Add demo stories if region has no live coverage
-        if not stories and region_name in DEMO_STORIES:
-            stories = DEMO_STORIES[region_name]
 
         # Limit to 3-5 stories per region, prioritize breaking > developing > scheduled
         stories.sort(key=lambda s: (
@@ -428,7 +272,7 @@ def build_output(stories_by_region):
     output = {
         'regions': regions,
         'last_updated': datetime.now().isoformat() + 'Z',
-        'note': 'Geopolitical briefing from Politico (EU), Reuters (World), and Institute for the Study of War analysis.'
+        'note': 'Geopolitical briefing from ' + ', '.join(FEEDS.keys()) + ' (live feeds only).'
     }
 
     return output

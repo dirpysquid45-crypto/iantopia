@@ -4,6 +4,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 <title>???</title>
@@ -75,6 +77,9 @@
     gap:18px; text-align:center; padding:20px;
   }
   #result-screen.show { display:flex; }
+  /* The pointer is hidden while the dot is picked up. It must be back on the result screen. */
+  #result-screen, #result-screen * { cursor:default; }
+  #result-screen a { cursor:pointer; }
   #result-screen h1 { font-size:clamp(16px,4vw,24px); color:var(--green); text-shadow:0 0 16px rgba(57,255,20,.7); margin:0; }
   #result-screen .reward {
     display:flex; flex-direction:column; align-items:center; gap:10px;
@@ -134,8 +139,12 @@
     [0.68, 0.20], [0.90, 0.20], [0.90, 0.06], [0.50, 0.06],
   ];
   const START_WIDTH = 46, END_WIDTH = 15; // the corridor narrows toward the end, like the original
+  // Corridors are capped at this share of the board. The legs are spaced in
+  // proportion to the board, so a fixed pixel width let neighbouring corridors
+  // overlap on phones, which opened a shortcut from the start to the finish.
+  const WIDTH_CAP_FRAC = 0.045;
 
-  let W = 0, H = 0, PAD = 0;
+  let W = 0, H = 0, PAD = 0, WIDTH_CAP = 0;
   let path = [];       // WAYPOINTS scaled to pixels
   let segLen = [];      // length of each segment
   let totalLen = 0, cumLen = [];
@@ -147,6 +156,7 @@
     const side = Math.min(window.innerWidth, window.innerHeight) * 0.88;
     W = side; H = side;
     PAD = side * 0.06;
+    WIDTH_CAP = side * WIDTH_CAP_FRAC;
     canvas.width = W * dpr; canvas.height = H * dpr;
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -164,7 +174,7 @@
   // narrowing from START_WIDTH to END_WIDTH, not a sudden drop.
   function widthAt(d) {
     const t = Math.max(0, Math.min(1, d / totalLen));
-    return START_WIDTH + (END_WIDTH - START_WIDTH) * t;
+    return Math.min(WIDTH_CAP, START_WIDTH + (END_WIDTH - START_WIDTH) * t);
   }
 
   function draw() {
@@ -213,9 +223,13 @@
   // actually moves. The cursor can't jump across the maze to the end.
   let playing = false, over = false, hasStarted = false;
   let dotX = 0, dotY = 0, lastTouchX = 0, lastTouchY = 0;
+  // How far along the corridor the dot has really got. It only moves forward
+  // in small steps, so a jump across skipped legs does not count as progress.
+  let progress = 0;
 
   function resetDot() {
     dotX = path[0][0]; dotY = path[0][1];
+    progress = 0;
   }
 
   function localPos(e) {
@@ -236,14 +250,17 @@
     for (let i = 1; i <= steps; i++) {
       dotX += dx / steps; dotY += dy / steps;
       if (!inCorridor(dotX, dotY)) { caught(); return; }
+      const here = nearest(dotX, dotY).len;
+      if (here >= progress - 40 && here <= progress + 80) progress = Math.max(progress, here);
     }
     const end = path[path.length - 1];
-    if (Math.hypot(dotX - end[0], dotY - end[1]) < 16) win();
+    if (progress >= totalLen - 30 && Math.hypot(dotX - end[0], dotY - end[1]) < 16) win();
   }
 
   function caught() {
     over = true; playing = false;
     if (document.pointerLockElement) document.exitPointerLock();
+    document.body.style.cursor = 'default';
     jumpscare.classList.add('show');
     try { sfxScream.currentTime = 0; sfxScream.volume = 0.85; sfxScream.play().catch(() => {}); } catch {}
     setTimeout(() => { location.href = '/'; }, 1900);
@@ -252,6 +269,7 @@
   function win() {
     over = true; playing = false;
     if (document.pointerLockElement) document.exitPointerLock();
+    document.body.style.cursor = 'default';
     grantJobApplication();
     showConfetti();
     try { sfxCheer.currentTime = 0; sfxCheer.volume = 0.8; sfxCheer.play().catch(() => {}); } catch {}
@@ -298,11 +316,11 @@
   });
 
   document.addEventListener('pointerlockchange', () => {
-    if (over) return;
     const locked = document.pointerLockElement === canvas;
+    document.body.style.cursor = locked && !over ? 'none' : 'default';
+    if (over) return;
     playing = locked;
     if (locked) hasStarted = true;
-    document.body.style.cursor = locked ? 'none' : 'default';
     hud.textContent = locked
       ? "Esc pauses. Don't touch the black walls."
       : (hasStarted ? 'Click the red square to resume.' : 'Click the red square to pick it up.');

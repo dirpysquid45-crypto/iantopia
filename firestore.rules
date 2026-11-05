@@ -7,35 +7,77 @@ rules_version = '2';
 // Deploy with:  firebase deploy --only firestore:rules
 // or paste this file into Firebase console > Firestore > Rules.
 //
-// Trust model: clients still write their own documents directly (the game
-// has no server-side validation for these yet). These rules stop anyone
-// from writing someone else's document, and keep private data private.
+// Trust model: players write their own save data directly, but the Strubles
+// balance and anything that moves money is written only by the arena server
+// (arena-server/wallet.js), so a browser can't change a balance. These rules
+// stop anyone from writing someone else's document, and keep private data private.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     // Each player's own save data. Only the owner reads or writes it.
+    // The wallet is server-owned: the balance, the claims and the gain record are
+    // written only by the arena server (Admin SDK), so a browser can't write them
+    // or change them. Everything else in the save is the player's own.
     match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      function serverOwned(k) {
+        return request.resource.data.get(k, null) == resource.data.get(k, null);
+      }
+      function noServerFields(d) {
+        return !('strubles_balance_v1' in d) && !('wallet_claims' in d) && !('wallet_seen' in d)
+          && !('strubles_last_gain_v1' in d) && !('wallet_last_op' in d) && !('wallet_rounds' in d) && !('wallet_budget' in d) && !('paid_ids_v1' in d) && !('balance_reset_at' in d) && !('ban_until' in d)
+          && !('cheat_warning_at' in d) && !('admin_warning' in d) && !('gift_day' in d) && !('village_name' in d);
+      }
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time)
+        && request.resource.size() < 200000
+        && noServerFields(request.resource.data);
+      allow update: if request.auth != null && request.auth.uid == uid
+        && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time)
+        && request.resource.size() < 200000
+        && serverOwned('strubles_balance_v1') && serverOwned('wallet_claims') && serverOwned('wallet_seen')
+        && serverOwned('strubles_last_gain_v1') && serverOwned('wallet_last_op') && serverOwned('wallet_rounds') && serverOwned('wallet_budget') && serverOwned('paid_ids_v1') && serverOwned('balance_reset_at') && serverOwned('ban_until')
+        && serverOwned('cheat_warning_at') && serverOwned('admin_warning') && serverOwned('gift_day') && serverOwned('village_name');
     }
 
     // Public boards: anyone can read, only the owner writes their own row.
+    // Field shapes are checked, and values must be plausible ranges. A
+    // cheater can still post any value inside those ranges.
     match /leaderboard/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time)
+        && request.resource.data.gdp is number && request.resource.data.gdp >= 0
+        && request.resource.data.efficiency is number && request.resource.data.efficiency >= 0
+        && request.resource.data.buildings is number && request.resource.data.buildings >= 0 && request.resource.data.buildings <= 1000
+        && request.resource.data.population is number && request.resource.data.population >= 0 && request.resource.data.population <= 1000000
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 40;
     }
     match /minesweeper_leaderboard/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time)
+        && request.resource.data.displayName is string && request.resource.data.displayName.size() <= 40;
+    }
+
+    // Bans are written only by the server (Admin SDK bypasses these rules).
+    // Clients may never read or write them, so a ban can't be lifted from
+    // the browser.
+    match /bans/{uid} {
+      allow read, write: if false;
     }
     match /horse_leaderboard/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow write: if request.auth != null && request.auth.uid == uid
+        && !(exists(/databases/$(database)/documents/bans/$(request.auth.uid)) && get(/databases/$(database)/documents/bans/$(request.auth.uid)).data.until > request.time);
     }
 
-    // Village snapshots back the public visit page, so they're readable by
-    // anyone. Only the owner can publish or change their village.
+    // Village snapshots back the public visit page. A village is readable by visitors
+    // only while its owner has opted in (visitable == true). Only the owner can publish
+    // or change their village.
     match /village_snapshots/{uid} {
-      allow read: if true;
+      allow read: if (resource != null && resource.data.visitable == true)
+        || (request.auth != null && request.auth.uid == uid);
       allow write: if request.auth != null && request.auth.uid == uid;
 
       // Likes: anyone signed in can like a village once, as themselves.
@@ -45,6 +87,30 @@ service cloud.firestore {
         allow create: if request.auth != null && request.auth.uid == likerUid;
         allow update, delete: if false;
       }
+
+      // Gifts and notes into the village. The server writes them (Admin SDK bypasses
+      // these rules), so a browser can't create any. The owner can read their own inbox.
+      match /gifts/{giftId} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+        allow create, update, delete: if false;
+      }
+    }
+
+    // The site chat. Any signed-in player can read it (the page listens only while the chat is
+    // open). Messages are written by the server (Admin SDK), which applies the word filter, the
+    // rate limit and the ban check, so no browser can write one.
+    match /chat_messages/{id} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // The economy tracker's daily snapshots. Only the admin can read them, and only with a
+    // verified email. The server writes them (Admin SDK), so no client can.
+    match /economy_daily/{day} {
+      allow read: if request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() == 'dirpysquid45@gmail.com';
+      allow write: if false;
     }
 
     // Everything else is closed by default.

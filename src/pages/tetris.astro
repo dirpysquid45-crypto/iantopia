@@ -1,0 +1,288 @@
+---
+---
+<!doctype html>
+<html lang="en">
+<head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<title>Tetris at Iantopia</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<meta name="theme-color" content="#050608">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/tetris/tetris.css?v=7">
+</head>
+<body>
+  <div class="tetris-app">
+    <header class="top">
+      <a class="back" href="/puzzles">← Puzzles</a>
+      <h1>Tetris at Iantopia</h1>
+      <button class="restart" id="restart-btn" type="button">↻ Restart</button>
+      <button class="sound" id="sound-btn" type="button" aria-pressed="false" aria-label="Sound on">🔊</button>
+
+      <div class="hud" aria-live="off">
+        <div class="stat"><small>SCORE</small><b id="score">0</b></div>
+        <div class="stat"><small>LINES</small><b id="lines">0</b></div>
+        <div class="stat"><small>LEVEL</small><b id="level">1</b></div>
+        <div class="stat"><small>BEST</small><b id="best">0</b></div>
+      </div>
+    </header>
+
+    <div class="main">
+      <div class="side">
+        <div class="box holdbox" id="hold-box"><span>HOLD</span><canvas id="hold-canvas" aria-label="Held piece"></canvas></div>
+      </div>
+
+      <div class="stage" id="stage">
+        <canvas id="board" role="img" aria-label="Your board"></canvas>
+
+        <div class="overlay show" id="start-overlay" role="dialog" aria-labelledby="start-title">
+          <h2 id="start-title">TETRIS</h2>
+          <p class="touch-only">Touch: tap the board to rotate, drag sideways to move, swipe down fast to slam (slower to soft drop), tap HOLD to hold.</p>
+          <p>Keyboard keys can be changed in Settings.</p>
+          <button class="btn" id="btn-start" type="button">Start</button>
+          <button class="btn" id="btn-settings-start" type="button">Settings</button>
+          <p class="credit">Rules from Tetrigo (GPL-3.0). Piece colours from Flatris (MIT). Sounds: PC / Computer, Tetris Zone.</p>
+        </div>
+
+        <div class="overlay" id="pause-overlay" role="dialog" aria-labelledby="pause-title">
+          <h2 id="pause-title">PAUSED</h2>
+          <button class="btn" id="btn-resume" type="button">Resume</button>
+          <button class="btn" id="btn-settings-pause" type="button">Settings</button>
+        </div>
+
+        <div class="overlay" id="over-overlay" role="dialog" aria-labelledby="over-title">
+          <h2 id="over-title">GAME OVER</h2>
+          <p id="over-text"></p>
+          <p id="over-pay" class="winline"></p>
+          <button class="btn" id="btn-again" type="button">Play again</button>
+        </div>
+
+      </div>
+
+      <div class="side">
+        <div class="box next"><span>NEXT</span><canvas id="next-canvas" aria-label="Upcoming pieces"></canvas></div>
+      </div>
+    </div>
+
+    <div class="pad" role="group" aria-label="Touch controls">
+      <div class="pad-row">
+        <button type="button" class="key left" data-action="left" aria-label="Move left"><span class="icon">◀</span><span class="cap">LEFT</span><span class="hint" data-hint="left"></span></button>
+        <button type="button" class="key right" data-action="right" aria-label="Move right"><span class="icon">▶</span><span class="cap">RIGHT</span><span class="hint" data-hint="right"></span></button>
+        <button type="button" class="key rotccw" data-action="rotccw" aria-label="Rotate counter-clockwise"><span class="icon">⟲</span><span class="cap">ROTATE</span><span class="hint" data-hint="rotccw"></span></button>
+        <button type="button" class="key rotcw" data-action="rotcw" aria-label="Rotate clockwise"><span class="icon">⟳</span><span class="cap">ROTATE</span><span class="hint" data-hint="rotcw"></span></button>
+      </div>
+      <div class="pad-row">
+        <button type="button" class="key soft" data-action="soft" aria-label="Soft drop, hold to fall faster"><span class="icon">▼</span><span class="cap">SOFT</span><span class="hint" data-hint="soft"></span></button>
+        <button type="button" class="key hard" data-action="hard" aria-label="Slam, hard drop"><span class="icon">⤓</span><span class="cap">SLAM</span><span class="hint" data-hint="hard"></span></button>
+        <button type="button" class="key hold" data-action="hold" aria-label="Hold piece"><span class="icon">⬒</span><span class="cap">HOLD</span><span class="hint" data-hint="hold"></span></button>
+        <button type="button" class="key pause" data-action="pause" aria-label="Pause"><span class="icon">❚❚</span><span class="cap">PAUSE</span><span class="hint" data-hint="pause"></span></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay settings" id="settings-overlay" role="dialog" aria-labelledby="settings-title">
+      <div class="settings-panel">
+        <h2 id="settings-title">SETTINGS</h2>
+        <div id="settings-body"></div>
+        <button class="btn" id="btn-settings-done" type="button">Done</button>
+      </div>
+    </div>
+
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script is:inline src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script is:inline src="/game-stats.js?v=1"></script>
+  <script is:inline src="/cloud-sync.js?v=14"></script>
+  <script is:inline src="/tycoon-cap.js?v=1"></script>
+  <script is:inline src="/tycoon-bank.js?v=2"></script>
+  <script is:inline src="/strubles.js?v=6"></script>
+  <script is:inline src="/tetris/engine.js?v=5"></script>
+  <script is:inline src="/tetris/view.js?v=2"></script>
+  <script is:inline src="/tetris/keys.js?v=2"></script>
+  <script is:inline src="/tetris/controls.js?v=5"></script>
+  <script is:inline src="/tetris/sfx.js?v=1"></script>
+  <script is:inline>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const BEST_KEY = 'tetris_best_v1';
+      const E = window.TetrisEngine;
+      const SFX = window.TetrisSound;
+
+      const boardView = TetrisView.createBoard($('board'));
+      const holdView = TetrisView.createPreview($('hold-canvas'));
+      const nextView = TetrisView.createPreview($('next-canvas'));
+
+      let board = null;
+      let state = 'ready';      // ready | playing | paused | over | settings
+      let returnTo = 'start-overlay';   // the overlay to come back to from Settings
+      let last = performance.now();
+
+      function loadBest() { try { return Number(localStorage.getItem(BEST_KEY)) || 0; } catch { return 0; } }
+      function saveBest(n) { try { localStorage.setItem(BEST_KEY, String(n)); } catch {} }
+      let best = loadBest();
+      $('best').textContent = best;
+
+      function show(id, on) { $(id).classList.toggle('show', on); }
+      function hideAll() { ['start-overlay', 'pause-overlay', 'over-overlay', 'settings-overlay'].forEach((id) => show(id, false)); }
+
+      function syncSoundButton() {
+        const muted = SFX.isMuted();
+        $('sound-btn').textContent = muted ? '🔇' : '🔊';
+        $('sound-btn').setAttribute('aria-pressed', String(muted));
+        $('sound-btn').setAttribute('aria-label', muted ? 'Sound off' : 'Sound on');
+      }
+      $('sound-btn').addEventListener('click', () => {
+        const muted = SFX.toggleMute();
+        syncSoundButton();
+        if (!muted && state === 'playing') SFX.startMusic();
+      });
+      syncSoundButton();
+
+      // Engine events go to the sound and to the row flashes.
+      function onEngineEvent(name, data) {
+        if (name === 'clear') boardView.flash(data);
+        SFX.onEngineEvent(name, data);
+      }
+
+      function newGame() {
+        board = new E.Board({ seed: Math.floor(Math.random() * 2147483647) + 1, onEvent: onEngineEvent });
+        state = 'playing';
+        hideAll();
+        SFX.play('start');
+        SFX.startMusic();
+      }
+
+      function pause() {
+        if (state !== 'playing') return;
+        state = 'paused';
+        controls.releaseAll();
+        SFX.stopMusic();
+        show('pause-overlay', true);
+        $('btn-resume').focus();
+      }
+      function resume() {
+        if (state !== 'paused') return;
+        state = 'playing';
+        hideAll();
+        SFX.startMusic();
+        last = performance.now();
+      }
+
+      // Settings can be opened from the start and pause screens. Closing it returns there.
+      function openSettings(from) {
+        returnTo = from;
+        if (state === 'playing') SFX.stopMusic();
+        controls.releaseAll();
+        state = 'settings';   // game keys are ignored until the panel closes
+        hideAll();
+        show('settings-overlay', true);
+        $('btn-settings-done').focus();
+      }
+      function closeSettings() {
+        show('settings-overlay', false);
+        if (!board) { show('start-overlay', true); state = 'ready'; return; }
+        if (returnTo === 'pause-overlay') { show('pause-overlay', true); state = 'paused'; $('btn-resume').focus(); }
+        else { show('start-overlay', true); state = 'ready'; }
+      }
+      TetrisKeys.mountSettings($('settings-body'));
+
+      function gameOver() {
+        state = 'over';
+        controls.releaseAll();
+        SFX.stopMusic();
+        const s = board.score;
+        if (s > best) { best = s; saveBest(best); $('best').textContent = best; }
+        $('over-text').textContent = `Score ${s}, ${board.lines} lines, level ${board.level}.`;
+        // Strubles for the Tetris play. The server applies the per-game and daily caps.
+        $('over-pay').textContent = board.rewardPoints > 0 ? 'Counting Strubles…' : '';
+        if (board.rewardPoints > 0) {
+          Strubles.tetris(board.rewardPoints, (applied) => {
+            $('over-pay').textContent = applied > 0
+              ? `+${applied} Strubles`
+              : 'No Strubles this time: sign in to earn, or the daily Tetris pay is used up.';
+          });
+        }
+        show('over-overlay', true);
+        $('btn-again').focus();
+      }
+
+      function onAction(name, via) {
+        if (state === 'paused') { if (name === 'pause') resume(); return; }
+        if (state !== 'playing' || !board) return;
+        switch (name) {
+          case 'left': if (board.move(-1)) SFX.play('move'); break;
+          case 'right': if (board.move(1)) SFX.play('move'); break;
+          case 'rotcw': SFX.play(board.rotate(true) ? 'rotate' : 'rotatefail'); break;
+          case 'rotccw': SFX.play(board.rotate(false) ? 'rotate' : 'rotatefail'); break;
+          case 'hard': board.hardDrop(); break;
+          case 'hold':
+            if (board.holdPiece()) SFX.play('hold');
+            else if (via === 'tap') { SFX.play('rotatefail'); controls.denied($('hold-box')); }   // already held this piece
+            break;
+          case 'pause': pause(); return;
+          default: break;
+        }
+        if (board.over) gameOver();
+      }
+
+      const controls = TetrisControls.attach({
+        pad: document.querySelector('.pad'),
+        zone: document.querySelector('.main'),
+        board: $('board'),
+        holdBox: $('hold-box'),
+        onAction,
+        onSoft: (on) => {
+          if (!board || state !== 'playing') return;
+          board.setSoftDrop(on);
+          if (on) SFX.play('softdrop', 0.35);
+        },
+      });
+
+      function render() {
+        if (!board) return;
+        boardView.draw(board, TetrisKeys.look());
+        holdView.draw(board.held ? [board.held] : []);
+        nextView.draw(board.preview());
+        $('score').textContent = board.score;
+        $('lines').textContent = board.lines;
+        $('level').textContent = board.level;
+      }
+
+      function frame(now) {
+        const dt = (now - last) / 1000;
+        last = now;
+        if (state === 'playing' && board) {
+          board.tick(dt);
+          if (board.over) gameOver();
+        }
+        render();
+        requestAnimationFrame(frame);
+      }
+
+      $('btn-start').addEventListener('click', () => { newGame(); });
+      $('btn-resume').addEventListener('click', resume);
+      $('btn-again').addEventListener('click', () => { newGame(); });
+      $('btn-settings-start').addEventListener('click', () => openSettings('start-overlay'));
+      $('btn-settings-pause').addEventListener('click', () => openSettings('pause-overlay'));
+      $('btn-settings-done').addEventListener('click', closeSettings);
+      // Restart asks first only when a game is in progress, since it throws the score away.
+      $('restart-btn').addEventListener('click', () => {
+        if ((state === 'playing' || state === 'paused') && !confirm('Restart? This game’s score is lost.')) return;
+        controls.releaseAll();
+        newGame();
+      });
+
+      // Leaving the tab stops the game, so a phone's lock screen doesn't lose a piece mid-fall.
+      document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+      requestAnimationFrame((t) => { last = t; render(); requestAnimationFrame(frame); });
+      $('btn-start').focus();
+    })();
+  </script>
+</body>
+</html>

@@ -3,12 +3,14 @@
 <!doctype html>
 <html lang="en">
 <head>
+<link rel="stylesheet" href="/lowfx.css?v=2">
+<script is:inline src="/lowfx.js?v=2"></script>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Puzzles</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
-<link rel="stylesheet" href="/card-stack.css?v=3">
+<link rel="stylesheet" href="/card-stack.css?v=5">
 <meta name="theme-color" content="#000000">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,11 +18,22 @@
 <style is:global>
   :root { --gold:#ffd700; --muted:#9aa3b5; }
   * { box-sizing:border-box; }
-  html, body { margin:0; min-height:100%; background:#000; color:#f2f2f2; }
+  html, body { margin:0; min-height:100%; background-color:#000; color:#f2f2f2; }
+  /* The puzzle GIF behind the page. It scrolls with the page (not fixed), so the
+     top can always be scrolled into view. */
+  body { background-image:url('/video/puzzle-background.gif'); background-size:cover; background-position:center; background-attachment:scroll; }
   body { font-family:'Press Start 2P', ui-monospace, monospace; padding:72px 16px 24px; min-height:100dvh; display:flex; flex-direction:column; justify-content:safe center; }
   a.back { position:fixed; top:12px; left:12px; color:var(--gold); border:2px solid var(--gold); background:#000; padding:8px 10px; font-size:9px; text-decoration:none; }
-  h1 { margin:0 0 6px; text-align:center; font-size:clamp(14px, 3.4vw, 20px); color:var(--gold); text-shadow:0 0 14px rgba(255,215,0,.5); }
-  .sub { text-align:center; font-size:9px; color:var(--muted); margin:0 0 28px; line-height:1.8; }
+  @media (max-width:768px) {
+    a.back { top:calc(10px + env(safe-area-inset-top)); left:calc(10px + env(safe-area-inset-left)); min-height:44px; box-sizing:border-box; padding:12px 14px; font-size:12px; }
+  }
+  /* The title box holds the heading and its subtext. It fades and drops in once, then its outline glows softly. */
+  .title-box { width:min(100%, 520px); margin:0 auto 28px; padding:12px 18px; background:#000; border:3px solid #fff; text-align:center; animation:titleIn .7s cubic-bezier(.2,.8,.2,1) both, titleGlow 3.2s ease-in-out .7s infinite alternate; }
+  @keyframes titleIn { from { opacity:0; transform:translateY(-14px) scale(.96); } to { opacity:1; transform:none; } }
+  @keyframes titleGlow { from { box-shadow:0 0 0 rgba(255,255,255,0); } to { box-shadow:0 0 18px rgba(255,255,255,.35); } }
+  @media (prefers-reduced-motion: reduce) { .title-box { animation:none; } }
+  h1 { margin:0 0 8px; text-align:center; font-size:clamp(14px, 3.4vw, 20px); color:var(--gold); text-shadow:0 0 14px rgba(255,215,0,.5); }
+  .sub { text-align:center; font-size:9px; color:var(--muted); margin:0; line-height:1.8; }
   .cards { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:18px; max-width:880px; margin:0 auto; }
   .card { border:3px solid var(--gold); background:rgba(0,0,0,.6); padding:20px; text-align:center; }
   .card h2 { margin:0 0 12px; font-size:13px; color:var(--gold); }
@@ -30,13 +43,19 @@
   .card.new { border-color:#39ff14; }
   .card.new h2 { color:#39ff14; }
   .card.new a { background:#39ff14; }
+  .card.tetris { border-color:#3d7bff; }
+  .card.tetris h2 { color:#3d7bff; }
+  .card.tetris a { background:#3d7bff; }
+  .card.tetris a:hover { background:#6b9dff; }
   .credit { text-align:center; font-size:8px; color:#5d6577; margin:28px 0 0; }
 </style>
 </head>
 <body>
   <a class="back" href="/">← Iantopia</a>
-  <h1>🧩 PUZZLES</h1>
-  <p class="sub">Brain teasers and games of skill. Some pay Strubles.</p>
+  <div class="title-box">
+    <h1>🧩 PUZZLES</h1>
+    <p class="sub">Brain teasers and games of skill. Some pay Strubles.</p>
+  </div>
   <div class="card-stack" style="--stack-h: 200px">
     <div class="card stack-card" style="--i: 0">
       <h2>💣 Minesweeper</h2>
@@ -48,8 +67,35 @@
       <p>Match the free tiles until the board is clear. Solve a board to earn Strubles, up to 10 boards a day.</p>
       <a href="/solitaire">Play Now</a>
     </div>
+    <div class="card stack-card new tetris" style="--i: 2">
+      <h2>🧱 Tetris</h2>
+      <p>Stack the falling blocks and clear lines. Hold a piece, rotate with the touch buttons or the keys. Solo, no Strubles.</p>
+      <a href="/tetris">Play Now</a>
+    </div>
   </div>
   <p class="credit">Mahjong Solitaire engine: mah by ffalt, MIT License.</p>
 <script is:inline src="/card-stack.js?v=1"></script>
+  <!-- The puzzles' music: Hotel Lounge, looping. Browsers wait for a tap before
+       they play sound, so it starts on the first click or key press. -->
+  <audio id="puzzle-music" src="/audio/music/hotel.mp3" loop preload="auto"></audio>
+  <button id="puzzle-sound" type="button" aria-label="Toggle music" title="Toggle music" style="position:fixed; top:12px; right:12px; z-index:20; background:#000; border:2px solid var(--gold); color:var(--gold); padding:6px 10px; font-size:12px; cursor:pointer;">🔊</button>
+  <script is:inline>
+    (function () {
+      const music = document.getElementById('puzzle-music');
+      const btn = document.getElementById('puzzle-sound');
+      const KEY = 'puzzle_music_v1';
+      let on = localStorage.getItem(KEY) !== 'off';
+      music.volume = 0.35;
+      function apply() {
+        btn.textContent = on ? '🔊' : '🔇';
+        if (on) music.play().catch(() => {}); else music.pause();
+      }
+      btn.addEventListener('click', () => { on = !on; localStorage.setItem(KEY, on ? 'on' : 'off'); apply(); });
+      const start = () => { if (on) apply(); window.removeEventListener('pointerdown', start); window.removeEventListener('keydown', start); };
+      window.addEventListener('pointerdown', start);
+      window.addEventListener('keydown', start);
+      apply();
+    })();
+  </script>
 </body>
 </html>

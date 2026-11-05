@@ -1,9 +1,12 @@
 const BlackjackGame = require('./blackjack');
 const { BattleshipGame } = require('./battleship');
-const { PongGame } = require('./pong');
+const { AirHockeyGame, MODES: AIRHOCKEY_MODES } = require('./airhockey');
+const { TetrisGame } = require('./tetris');
 const BalanceManager = require('./balance');
 
-const GAME_TYPES = new Set(['blackjack', 'battleship', 'pong']);
+const GAME_TYPES = new Set(['blackjack', 'battleship', 'airhockey', 'tetris']);
+// Games with no stakes: nothing can be lost or won, so a bet is refused.
+const FRIENDLY_ONLY = new Set(['airhockey']);
 const MAX_BET = 1000000;
 const SUGGESTION_STATUSES = new Set(['new', 'public', 'archived']);
 
@@ -13,9 +16,97 @@ class Manager {
     this.auth = auth;
     this.opts = opts;                                // { timing } overrides, used by tests
     this.balance = opts.balance || new BalanceManager(db);
+    this.sessions = opts.sessions || null;           // PlaySessions, for the admin's play report
     this.connections = new Map(); // sessionId -> { userId, ws, guest, name }
     this.queue = [];              // open lobbies
     this.tables = new Map();      // tableId -> game
+    // Account watch (accounts.js): live feed + admin actions. Optional, so
+    // tests that don't need it stay unchanged.
+    this.accounts = opts.accounts || null;
+    if (this.accounts) this.accounts.subscribe((ev) => this.broadcastAdmins({ type: 'account_event', event: ev }));
+  }
+
+  broadcastAdmins(msg) {
+    for (const { ws, admin } of this.connections.values()) if (admin) this.sendTo(ws, msg);
+  }
+
+  // Admin-only live feed of account changes and punishments.
+  accountFeed(conn) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    if (!this.accounts) return this.fail(conn.ws, 'Account watch is not running', 'unavailable');
+    this.sendTo(conn.ws, { type: 'account_feed', events: this.accounts.feed });
+  }
+
+  // Sends the current player list to the admins who have it open. The list is
+  // large, so nobody is sent it unless they asked for it.
+  async broadcastPlayers() {
+    if (!this.accounts) return;
+    const players = await this.accounts.listPlayers();
+    for (const conn of this.connections.values()) {
+      if (conn.admin && conn.wantsPlayers) this.sendTo(conn.ws, { type: 'account_list', players });
+    }
+  }
+
+  // Admin-only list of every account (name, email, balance, status).
+  async accountList(conn) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    if (!this.accounts) return this.fail(conn.ws, 'Account watch is not running', 'unavailable');
+    conn.wantsPlayers = true;
+    try {
+      const players = await this.accounts.listPlayers();
+      this.sendTo(conn.ws, { type: 'account_list', players });
+    } catch (e) {
+      console.error('[accounts] list failed:', e.message);
+      this.fail(conn.ws, 'Could not load players', 'unavailable');
+    }
+  }
+
+  // Admin actions on one account: reset, ban (hours), unban.
+  async accountAction(conn, msg) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    if (!this.accounts) return this.fail(conn.ws, 'Account watch is not running', 'unavailable');
+    // Gift to everyone is the one action that isn't about a single account.
+    if (msg.action === 'gift_all') {
+      try {
+        const result = await this.accounts.giftAll(Number(msg.amount), msg.note);
+        this.broadcastPlayers().catch((e) => console.error('[accounts] refresh failed:', e.message));
+        return this.sendTo(conn.ws, { type: 'gift_all_done', count: result.count, total: result.total });
+      } catch (e) {
+        console.error('[accounts] gift to everyone failed:', e.message);
+        return this.fail(conn.ws, e.message, 'refused');
+      }
+    }
+    const uid = typeof msg.uid === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(msg.uid) ? msg.uid : null;
+    if (!uid) return this.fail(conn.ws, 'Bad request', 'bad_request');
+    try {
+      if (msg.action === 'reset') await this.accounts.reset(uid);
+      else if (msg.action === 'ban') {
+        const hours = Math.min(Math.max(Math.floor(Number(msg.hours) || 24), 1), 24 * 30);
+        await this.accounts.ban(uid, hours, { reason: 'admin' });
+      } else if (msg.action === 'unban') await this.accounts.unban(uid);
+      else if (msg.action === 'unwarn') await this.accounts.unwarn(uid);
+      else if (msg.action === 'restore') await this.accounts.restore(uid);
+      else if (msg.action === 'backup') await this.accounts.backup(uid, 'admin_backup');
+      else if (msg.action === 'set_balance') await this.accounts.setBalance(uid, Number(msg.amount));
+      else if (msg.action === 'gift') await this.accounts.gift(uid, Number(msg.amount), msg.note);
+      else if (msg.action === 'warn') {
+        const text = typeof msg.text === 'string' ? msg.text.replace(/[<>&"]/g, '').trim().slice(0, 200) : '';
+        if (!text) return this.fail(conn.ws, 'Write the warning first', 'bad_request');
+        await this.accounts.warn(uid, text);
+      }
+      else if (msg.action === 'rename') {
+        // Display names: 1 to 40 characters, with HTML characters removed.
+        const name = typeof msg.name === 'string' ? msg.name.replace(/[<>&"]/g, '').trim().slice(0, 40) : '';
+        if (!name) return this.fail(conn.ws, 'Enter a name first', 'bad_request');
+        await this.accounts.setName(uid, name);
+      }
+      else return this.fail(conn.ws, 'Bad request', 'bad_request');
+      // Every admin page shows the new status straight away, not on refresh.
+      this.broadcastPlayers().catch((e) => console.error('[accounts] refresh failed:', e.message));
+    } catch (e) {
+      console.error('[accounts] action failed:', e.message);
+      return this.fail(conn.ws, e.message, 'refused');
+    }
   }
 
   // ---- lookups -----------------------------------------------------------
@@ -100,7 +191,7 @@ class Manager {
 
     switch (msg.type) {
       case 'join_queue':
-        return this.joinQueue(userId, sessionId, msg.bet, msg.gameType || 'blackjack', ws);
+        return this.joinQueue(userId, sessionId, msg.bet, msg.gameType || 'blackjack', ws, msg.mode);
       case 'match_bet':
         return this.matchBet(userId, sessionId, msg.queueId, ws);
       case 'leave_queue':
@@ -117,9 +208,22 @@ class Manager {
         return this.deleteSuggestion(conn, msg);
       case 'suggestions_public':
         return this.publicSuggestions(conn);
+      case 'account_feed':
+        return this.accountFeed(conn);
+      case 'account_action':
+        return this.accountAction(conn, msg);
+      case 'account_list':
+        return this.accountList(conn);
+      case 'payouts_list':
+        return this.payoutsList(conn);
+      case 'sessions_list':
+        return this.sessionsList(conn, msg);
+      case 'payout_resolve':
+        return this.payoutResolve(conn, msg);
       case 'action': {
         const game = this.tableBySession(sessionId);
-        if (game) await game.handleAction(sessionId, msg.action, { x: msg.x, y: msg.y });
+        // The whole message goes through: air hockey reads x and y, Tetris reads its rows.
+        if (game) await game.handleAction(sessionId, msg.action, msg);
         return;
       }
       case 'place_ships': {
@@ -174,6 +278,37 @@ class Manager {
 
   // The dev's inbox: newest first, admins only (checked against the verified
   // token at login, never against anything the client says).
+  // Admin: the payouts that never landed, and paying one by hand.
+  async payoutsList(conn) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    this.sendTo(conn.ws, { type: 'payouts_list', items: await this.balance.listFailedPayouts() });
+  }
+
+  // Admin-only play report: which game pages were played, and for how long, over the last week.
+  async sessionsList(conn, msg) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    if (!this.sessions) return this.fail(conn.ws, 'Play sessions are not recorded', 'unavailable');
+    const days = Math.min(90, Math.max(1, Math.floor(Number(msg && msg.days)) || 7));
+    try {
+      this.sendTo(conn.ws, { type: 'sessions', ...(await this.sessions.summary(days)) });
+    } catch (e) {
+      console.error('[sessions] report failed:', e.message);
+      this.fail(conn.ws, 'Could not load the play report', 'unavailable');
+    }
+  }
+
+  async payoutResolve(conn, msg) {
+    if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
+    const docId = typeof msg.id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(msg.id) ? msg.id : null;
+    if (!docId) return this.fail(conn.ws, 'Bad request', 'bad_request');
+    try {
+      await this.balance.resolveFailedPayout(docId, conn.userId || 'admin');
+    } catch (e) {
+      return this.fail(conn.ws, e.message, 'refused');
+    }
+    this.broadcastAdmins({ type: 'payouts_list', items: await this.balance.listFailedPayouts() });
+  }
+
   async listSuggestions(conn) {
     if (!conn.admin) return this.fail(conn.ws, 'Not allowed', 'forbidden');
     try {
@@ -254,7 +389,7 @@ class Manager {
     return null;
   }
 
-  async joinQueue(userId, sessionId, bet, gameType, ws) {
+  async joinQueue(userId, sessionId, bet, gameType, ws, mode) {
     const conn = this.connections.get(sessionId);
     if (!conn) return;
     if (!GAME_TYPES.has(gameType)) return this.fail(ws, 'Unknown game');
@@ -262,12 +397,15 @@ class Manager {
     // negative bet was accepted (it passed `balance < bet`) and then "deducted"
     // as a credit, which matched against itself or an accomplice minted money.
     if (!Number.isSafeInteger(bet) || bet < 0 || bet > MAX_BET) return this.fail(ws, 'Invalid bet');
-    // Pong is a friendly game only: nothing is staked, so nothing can be lost or won.
-    if (gameType === 'pong' && bet !== 0) return this.fail(ws, 'Pong is friendly only');
+    // Air hockey is friendly only: nothing is staked, so nothing can be lost or won. Tetris can be staked.
+    if (FRIENDLY_ONLY.has(gameType) && bet !== 0) return this.fail(ws, 'That game is friendly only');
+    // Air hockey players must pick the same mode to be matched.
+    const airMode = gameType === 'airhockey' ? (AIRHOCKEY_MODES.has(mode) ? mode : 'score7') : null;
     const stake = this.stakeError(conn, bet);
     if (stake) return this.fail(ws, stake, 'guest_stake');
 
     if (bet > 0) {
+      if (await BalanceManager.isBanned(this.db, userId, Date.now())) return this.fail(ws, 'This account is under a ban', 'banned');
       let balance;
       try { balance = await this.balance.getBalance(userId); }
       catch (e) { return this.fail(ws, 'Could not check your balance'); }
@@ -281,11 +419,11 @@ class Manager {
 
     const entry = {
       queueId: Math.random().toString(36).slice(2, 10), userId, sessionId, bet, gameType, ws,
-      name: conn.name, guest: conn.guest,
+      name: conn.name, guest: conn.guest, mode: airMode,
     };
     // Match against ANY compatible waiting lobby, not just the first two in the
     // queue: a mismatched pair at the front used to block everyone behind it.
-    const partner = this.queue.find((q) => q.bet === bet && q.gameType === gameType && q.userId !== userId);
+    const partner = this.queue.find((q) => q.bet === bet && q.gameType === gameType && q.mode === airMode && q.userId !== userId);
     if (partner) {
       this.queue = this.queue.filter((q) => q !== partner);
       this.sendTo(ws, { type: 'status', status: 'matched' });
@@ -313,6 +451,7 @@ class Manager {
     if (target.userId === userId) return this.fail(ws, "You can't match your own lobby");
     const stake = this.stakeError(conn, target.bet);
     if (stake) return this.fail(ws, stake, 'guest_stake');
+    if (target.bet > 0 && await BalanceManager.isBanned(this.db, userId, Date.now())) return this.fail(ws, 'This account is under a ban', 'banned');
     if (target.bet > 0) {
       let balance;
       try { balance = await this.balance.getBalance(userId); }
@@ -328,7 +467,7 @@ class Manager {
     this.queue.splice(idx, 1);
     this.broadcastLobbies();
     this.launch(target, {
-      userId, sessionId, bet: target.bet, gameType: target.gameType, ws, name: conn.name, guest: conn.guest,
+      userId, sessionId, bet: target.bet, gameType: target.gameType, ws, name: conn.name, guest: conn.guest, mode: target.mode,
     });
   }
 
@@ -349,9 +488,11 @@ class Manager {
     const opts = { timing: this.opts.timing, db: this.db, makeDeck: this.opts.makeDeck };
     const game = a.gameType === 'battleship'
       ? new BattleshipGame(tableId, a, b, this.balance, opts)
-      : a.gameType === 'pong'
-        ? new PongGame(tableId, a, b, this.balance, opts)
-        : new BlackjackGame(tableId, a, b, this.balance, opts);
+      : a.gameType === 'airhockey'
+        ? new AirHockeyGame(tableId, a, b, this.balance, Object.assign({ mode: a.mode }, opts))
+        : a.gameType === 'tetris'
+          ? new TetrisGame(tableId, a, b, this.balance, opts)
+          : new BlackjackGame(tableId, a, b, this.balance, opts);
     game.closeTable = () => this.tables.delete(tableId);
     this.tables.set(tableId, game);
     try {

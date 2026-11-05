@@ -190,8 +190,8 @@ test('a guest id never reaches Firestore, even if a game tried', async () => {
   const t = await startServer();
   assert.equal(await t.manager.balance.deductBet('guest_abc', 0), null);
   await assert.rejects(() => t.manager.balance.deductBet('guest_abc', 10), /Guests cannot stake/);
-  assert.equal(await t.manager.balance.creditPayout('guest_abc', 10), null);
-  assert.equal(await t.manager.balance.refundBet('guest_abc', 10), null);
+  assert.equal((await t.manager.balance.creditPayout('guest_abc', 10)).balance, null);
+  assert.equal((await t.manager.balance.refundBet('guest_abc', 10)).balance, null);
   assert.equal(await t.manager.balance.getBalance('guest_abc'), 0);
   assert.equal(t.db.docs.size, 0);
 });

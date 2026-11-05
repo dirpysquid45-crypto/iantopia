@@ -1,0 +1,186 @@
+/* Iantopia: the house look for Mahjong. Black panels with a gold outline and
+   white pixel text, like the other Iantopia games. Appended to the built
+   stylesheet (public/mah/styles-*.css). The !important rules are needed because
+   the game's own component styles sit in the JS bundle with higher specificity. */
+
+html, body, app-root {
+	--dialog-background-color: #000 !important;
+	--dialog-background-color-hover: #111 !important;
+	--dialog-border-color: #ffd700 !important;
+	--dialog-border-color-hover: #ffd700 !important;
+	--dialog-border-color-selected: #ffd700 !important;
+	--dialog-headline-color: #ffd700 !important;
+	--dialog-text-color: #fff !important;
+	--dialog-background-text-color: #ffd700 !important;
+	--main-content-text-color: #fff !important;
+	--main-content-text-color-muted: #b8b8b8 !important;
+	--main-content-link-color: #ffd700 !important;
+	--main-content-link-hover-color: #fff !important;
+	--text-highlight-color: #ffd700 !important;
+	--text-disabled-color: #5c5c5c !important;
+	--text-fail-color: #ff7a6e !important;
+	--close-color: #ffd700 !important;
+	--close-color-hover: #fff !important;
+	--input-text-color: #ffd700 !important;
+	--input-background-color: #000 !important;
+	--input-background-color-hover: #111 !important;
+	--input-border-color: #ffd700 !important;
+	--focus-ring-color: #ffd700 !important;
+	--overlay-popup-shadow: 0 0 0 3px #000, 0 0 0 6px rgba(255, 215, 0, .35) !important;
+}
+
+/* Popups */
+.overlay .overlay-popup {
+	outline-color: #ffd700 !important;
+	background-color: #000 !important;
+	border: 2px solid #ffd700 !important;
+	border-radius: 0 !important;
+	box-shadow: 0 0 0 3px #000, 0 0 0 6px rgba(255, 215, 0, .35) !important;
+}
+.overlay-popup, .overlay-popup * {
+	color: #fff !important;
+	text-shadow: none !important;
+}
+.overlay-popup h1, .overlay-popup h2, .overlay-popup h3, .overlay-popup .headline {
+	color: #ffd700 !important;
+}
+
+/* Panels inside popups */
+.overlay-popup .daily-main,
+.overlay-popup .daily-stats,
+.overlay-popup .daily-calendar,
+.overlay-popup .daily-scores,
+.overlay-popup .fact,
+.overlay-popup .streak,
+.overlay-popup .newgame-tabs,
+.overlay-popup .calendar-day,
+.overlay-popup .score-row {
+	background-color: #000 !important;
+	border: 1px solid rgba(255, 215, 0, .45) !important;
+	border-radius: 0 !important;
+}
+.overlay-popup .calendar-day.today,
+.overlay-popup .score-row.current {
+	border-color: #ffd700 !important;
+	background-color: #1a1500 !important;
+}
+.overlay-popup .daily-preview {
+	border: 2px solid #ffd700 !important;
+	border-radius: 0 !important;
+}
+.overlay-popup .tab-dot {
+	background-color: #ffd700 !important;
+}
+.overlay-popup .fact,
+.overlay-popup .daily-main p {
+	color: #fff !important;
+}
+
+/* Buttons: gold outline, inverts to gold fill on hover, like the other games */
+.overlay-popup button,
+.overlay-popup .button,
+.tutorial-btn-primary,
+.tutorial-btn-skip {
+	background-color: #000 !important;
+	border: 2px solid #ffd700 !important;
+	border-radius: 0 !important;
+	color: #fff !important;
+	font-family: inherit;
+}
+.overlay-popup button:hover:not(:disabled),
+.overlay-popup button.active,
+.overlay-popup button[aria-selected="true"],
+.overlay-popup button:hover:not(:disabled) *,
+.overlay-popup button.active *,
+.overlay-popup button[aria-selected="true"] *,
+.tutorial-btn-primary:hover,
+.tutorial-btn-skip:hover {
+	background-color: #ffd700 !important;
+	color: #000 !important;
+}
+.overlay-popup button:disabled,
+.overlay-popup button:disabled * {
+	color: #5c5c5c !important;
+	border-color: #5c5c5c !important;
+}
+.overlay-popup .daily-play {
+	border-color: #ffd700 !important;
+}
+
+/* Inputs */
+.overlay-popup input[type=text],
+.overlay-popup input[type=number],
+.overlay-popup input[type=search],
+.overlay-popup select,
+.overlay-popup textarea {
+	background-color: #000 !important;
+	color: #ffd700 !important;
+	border: 2px solid #ffd700 !important;
+	border-radius: 0 !important;
+}
+
+/* Top and bottom bars: black bars with a gold rule, white text, no white glow */
+app-controls-top,
+app-controls-bottom,
+app-stats-bar,
+.controls-top,
+.controls-bottom {
+	background: #000 !important;
+	border-color: #ffd700 !important;
+}
+app-controls-top *,
+app-controls-bottom *,
+app-stats-bar *,
+.controls-top *,
+.controls-bottom * {
+	color: #fff !important;
+	text-shadow: none !important;
+}
+app-controls-top button:hover:not(:disabled),
+app-controls-bottom button:hover:not(:disabled) {
+	color: #ffd700 !important;
+}
+app-controls-top button:disabled,
+app-controls-bottom button:disabled,
+app-controls-top button:disabled *,
+app-controls-bottom button:disabled * {
+	color: #5c5c5c !important;
+}
+
+/* Daily challenge bar above the board, and fieldsets in settings */
+app-challenge-hud.challenge-hud {
+	background: #000 !important;
+	border-bottom: 2px solid #ffd700 !important;
+}
+app-challenge-hud.challenge-hud * {
+	color: #fff !important;
+	text-shadow: none !important;
+}
+.overlay-popup fieldset {
+	border: 1px solid rgba(255, 215, 0, .45) !important;
+	border-radius: 0 !important;
+}
+
+/* Volume slider: gold track and thumb on black */
+input.music-volume {
+	background: transparent !important;
+	accent-color: #ffd700 !important;
+}
+
+/* "Back to Puzzles" link: hidden. The Iantopia page around the game (solitaire.astro)
+   already has a "← Puzzles" button in its header, so there is only one. */
+a.mah-back {
+	display: none !important;
+}
+
+/* Welcome panel: plain black with the gold outline, not the wood sign.
+   The tutorial host element had a slate-blue border around the panel. */
+app-tutorial {
+	border: 0 !important;
+	outline: none !important;
+}
+app-tutorial .tutorial-welcome {
+	background: #000 !important;
+	border: 2px solid #ffd700 !important;
+	border-radius: 0 !important;
+}
