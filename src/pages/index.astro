@@ -1743,7 +1743,8 @@
        (all of October), reused everywhere instead of each place computing
        its own date check that could quietly drift out of sync. -->
   <script is:inline>
-    window.isHalloweenSeason = function () { return new Date().getMonth() === 9; };
+    // Halloween is archived (tag archive/halloween-2026) and switches back on in October 2027.
+    window.isHalloweenSeason = function () { const d = new Date(); return d.getFullYear() === 2027 && d.getMonth() === 9; };
     // Same idea for Thanksgiving: all of November.
     window.isThanksgivingSeason = function () { return new Date().getMonth() === 10; };
     // One-time reset for the 2026 Halloween season: clears any background or
@@ -1753,8 +1754,9 @@
     // treatment for November.
     (function () {
       try {
-        const season = window.isHalloweenSeason() ? 'halloween_default_reset_2026_v1'
-          : window.isThanksgivingSeason() ? 'thanksgiving_default_reset_2026_v1' : null;
+        const year = new Date().getFullYear();
+        const season = window.isHalloweenSeason() ? `halloween_default_reset_${year}_v1`
+          : window.isThanksgivingSeason() ? `thanksgiving_default_reset_${year}_v1` : null;
         if (!season || localStorage.getItem(season)) return;
         localStorage.removeItem('home_active_bg_v1');
         localStorage.removeItem('home_active_track_v1');
@@ -1862,7 +1864,7 @@
   <script is:inline>
     (() => {
       if (!window.isHalloweenSeason()) return;
-      const FLAG_KEY = 'halloween_gift_2026_v1';
+      const FLAG_KEY = `halloween_gift_${new Date().getFullYear()}_v1`;
       try { if (localStorage.getItem(FLAG_KEY)) return; } catch { return; }
       try {
         const raw = localStorage.getItem('strubles_inventory_v1');
