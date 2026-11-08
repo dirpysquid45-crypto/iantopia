@@ -61,6 +61,18 @@ export function text(scene, x, y, str, size = 28, opts = {}) {
   return t;
 }
 
+// Like text(), but the font shrinks until the words fit a box (w by h), so a line never spills
+// out of the speech bubble or panel it sits in.
+export function fitText(scene, x, y, str, maxSize, box, opts = {}) {
+  let size = maxSize;
+  const t = text(scene, x, y, str, size, opts);
+  while ((t.width > box.w || t.height > box.h) && size > 12) {
+    size -= 2;
+    t.setFontSize(`${size}px`);
+  }
+  return t;
+}
+
 export function floatText(scene, x, y, words, colour = "#ffe066", size = 30) {
   const t = text(scene, x, y, words, size, { color: colour }).setDepth(9000);
   scene.tweens.add({ targets: t, y: y - 70, alpha: 0, duration: 900, ease: "Cubic.easeOut", onComplete: () => t.destroy() });

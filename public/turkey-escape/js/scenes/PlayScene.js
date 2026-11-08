@@ -7,7 +7,7 @@ import * as audio from "../audio.js";
 import * as store from "../storage.js";
 import { CORN_CHANCE, DAYS, KINDS, POINTS, POWERS, REVIVE_COST, STUMBLE_MS, TURBO, forTouch } from "../rules.js";
 import { sized } from "../textures.js";
-import { H, W, button, fingerAt, floatText, inside, setupCamera, text } from "../ui.js";
+import { H, W, button, fingerAt, fitText, floatText, inside, setupCamera, text } from "../ui.js";
 
 // The view: a road running off to the horizon. z is how far ahead of the turkey something is,
 // in steps; perspective(z) is how big it looks there (1 right beside the turkey).
@@ -45,6 +45,7 @@ export class PlayScene extends Phaser.Scene {
 
     this.run = { day: 0, score: 0, corn: 0, ...run };
     this.dayStart = this.run.score;
+    this.reviveUI = null; // the scene object is reused on revive, so a stale prompt must not swallow taps
     this.powerT = { pumpkin: 0, sneakers: 0, magnet: 0 }; // seconds left of each power-up
     this.touch = typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse)").matches;
     this.rules = this.touch ? forTouch(DAYS[this.run.day]) : DAYS[this.run.day];
@@ -57,7 +58,8 @@ export class PlayScene extends Phaser.Scene {
     this.jumpT = 0;          // seconds into a jump (0 = on the ground)
     this.ducking = false;    // the finger (or down arrow) is holding the duck
     this.duckPointer = null; // which finger is holding it
-    this.pumpkinArmed = false; // a pumpkin is waiting to pop on the next bump
+    this.pumpkinCharges = 0; // pumpkins waiting to pop on the next bumps
+    this.graceT = 0;         // seconds after a pumpkin blast when bumps don't count
     this.duckFrom = -Infinity;
     this.lastStumble = -Infinity;
     this.close = 1;          // how close the farmer is, 0 (gone) to 1 (right behind)
@@ -205,7 +207,7 @@ export class PlayScene extends Phaser.Scene {
     if (!free.length) return;
     // at most one power-up, and not one that's already going
     const power = Phaser.Utils.Array.Shuffle(Object.keys(POWERS))
-      .find((name) => this.powerT[name] <= 0 && Math.random() < POWERS[name].chance[r.boss ? "boss" : "normal"]);
+      .find((name) => Math.random() < POWERS[name].chance[r.boss ? "boss" : "normal"]);
     if (power) {
       this.addThing(power, free[0], at);
     } else if (Math.random() < CORN_CHANCE) {
@@ -394,11 +396,10 @@ export class PlayScene extends Phaser.Scene {
         audio.play("corn");
         this.tweens.add({ targets: this.cornText, scale: 1.25, duration: 80, yoyo: true });
       } else {
-        // one at a time: a new power-up replaces the one going
-        for (const name in this.powerT) this.powerT[name] = 0;
-        this.powerT[t.kind] = POWERS[t.kind].seconds;
+        // power-ups stack: each pickup adds its time, and every pumpkin is one more charge
+        this.powerT[t.kind] += POWERS[t.kind].seconds;
+        if (t.kind === "pumpkin") this.pumpkinCharges += 1;
         audio.play(t.kind === "pumpkin" ? "pumpkin" : t.kind);
-        this.pumpkinArmed = t.kind === "pumpkin";
         this.time.delayedCall(250, () => audio.say("turkey-" + t.kind));
         floatText(this, this.turkey.x, this.turkey.y - 150, POWERS[t.kind].says, "#ffb347", 30);
       }
@@ -452,16 +453,16 @@ export class PlayScene extends Phaser.Scene {
   }
 
   hit(t) {
-    if (this.pumpkinArmed) {
-      this.pumpkinArmed = false;
+    if (this.pumpkinCharges > 0) {
+      this.pumpkinCharges -= 1;
       this.pop(t);
       this.blast();
-      this.powerT.pumpkin = PUMPKIN_GRACE;
+      this.graceT = PUMPKIN_GRACE;
       floatText(this, this.turkey.x, this.turkey.y - 150, "POP!", "#ffb347", 30);
       this.cameras.main.shake(150, 0.006);
       return;
     }
-    if (this.powerT.pumpkin > 0) {
+    if (this.graceT > 0) {
       this.pop(t);
       audio.play("shield");
       floatText(this, this.turkey.x, this.turkey.y - 150, "PHEW!", "#ffb347", 28);
@@ -540,7 +541,7 @@ export class PlayScene extends Phaser.Scene {
     const bw = W - 80;
     bubble.fillStyle(0xffffff).fillRoundedRect(-bw / 2, -85, bw, 170, 30).fillTriangle(-30, 81, 30, 81, 10, 135);
     bubble.lineStyle(6, 0x2b1d14).strokeRoundedRect(-bw / 2, -85, bw, 170, 30);
-    const words = text(this, W / 2, 275, said, 40, { color: "#c4561d", stroke: "#ffffff", strokeThickness: 2 }).setDepth(5002);
+    const words = fitText(this, W / 2, 275, said, 40, { w: bw - 50, h: 130 }, { color: "#c4561d", stroke: "#ffffff", strokeThickness: 2 }).setDepth(5002);
     bubble.setScale(0);
     words.setScale(0);
     this.tweens.add({ targets: [bubble, words], scale: 1, duration: 350, delay: 350, ease: "Back.easeOut" });
@@ -602,6 +603,8 @@ export class PlayScene extends Phaser.Scene {
           this.turkey.setVisible(false);
           this.turkeyShadow.setVisible(false);
           for (const name in this.powerT) this.powerT[name] = 0;
+          this.pumpkinCharges = 0;
+          this.graceT = 0;
           this.movePowers(0, this.turkey.x);
           audio.play("caught");
           text(this, W / 2, 440, "CAUGHT!", 72, { color: "#ff9e9e", strokeThickness: 10 }).setDepth(5000);
@@ -631,6 +634,7 @@ export class PlayScene extends Phaser.Scene {
 
   // Starts the same day again, from the score it began with and the corn left after paying.
   revive() {
+    this.reviveUI = null;
     audio.play("gobble");
     this.scene.start("Day", { day: this.run.day, score: this.dayStart, corn: this.run.corn - REVIVE_COST });
   }
@@ -669,6 +673,8 @@ export class PlayScene extends Phaser.Scene {
 
   // The power-ups count down and show on the turkey. They blink when time's nearly up.
   movePowers(dt, x) {
+    this.graceT = Math.max(0, this.graceT - dt);
+    if (this.powerT.pumpkin <= 0) this.pumpkinCharges = 0;
     const on = {};
     for (const name in this.powerT) {
       this.powerT[name] = Math.max(0, this.powerT[name] - dt);
