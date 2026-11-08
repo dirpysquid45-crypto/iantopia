@@ -27,14 +27,6 @@ const PUMPKIN_REACH = 45; // how far ahead, in steps, the pumpkin blast clears
 const PUMPKIN_GRACE = 2;  // seconds after a blast when bumps don't count
 const REVIVE_BUTTON = { x: W / 2 - 170, y: 640, w: 340, h: 84 };
 const GIVE_UP = { x: W / 2 - 170, y: 750, w: 340, h: 70 };
-// The on-screen buttons for touch screens, under the track. A press acts at once; DUCK lasts while held.
-const PAD_Y = 826;
-const PAD_KEYS = [
-  { dir: "left", r: { x: 16, y: PAD_Y, w: 118, h: 112 }, words: "◀", colour: 0x3a7bd5 },
-  { dir: "up", r: { x: 144, y: PAD_Y, w: 118, h: 112 }, words: "JUMP", colour: 0x2a9d3a },
-  { dir: "down", r: { x: 272, y: PAD_Y, w: 118, h: 112 }, words: "DUCK", colour: 0xe07a1f },
-  { dir: "right", r: { x: 400, y: PAD_Y, w: 118, h: 112 }, words: "▶", colour: 0x3a7bd5 },
-];
 
 const perspective = (z) => NEAR / (NEAR + Math.max(z, -NEAR + 0.5));
 const groundY = (s) => HORIZON + (GROUND_Y - HORIZON) * s;
@@ -94,7 +86,6 @@ export class PlayScene extends Phaser.Scene {
     this.hint = text(this, W / 2, 560, "", 40, { color: "#ffe066", strokeThickness: 8 }).setDepth(5000);
 
     this.listen();
-    if (this.touch) this.drawPad();
     const away = () => document.hidden && this.pause();
     document.addEventListener("visibilitychange", away);
     this.events.once("shutdown", () => document.removeEventListener("visibilitychange", away));
@@ -105,14 +96,6 @@ export class PlayScene extends Phaser.Scene {
   }
 
   // ---- input ----
-
-  drawPad() {
-    for (const k of PAD_KEYS) {
-      const btn = button(this, k.r, k.colour, k.words, 30);
-      btn.g.setDepth(4000);
-      btn.label.setDepth(4001);
-    }
-  }
 
   listen() {
     let touch = null;
@@ -125,12 +108,6 @@ export class PlayScene extends Phaser.Scene {
         return;
       }
       if (inside(at.x, at.y, PAUSE)) return this.pause();
-      const key = this.touch ? PAD_KEYS.find((k) => inside(at.x, at.y, k.r)) : null;
-      if (key) {
-        if (key.dir === "down") this.duckPointer = p.id;
-        this.act(key.dir);
-        return;
-      }
       touch = { id: p.id, start: at, used: false };
     });
     // A swipe counts as soon as the finger has moved far enough, without waiting for it to lift.
