@@ -22,6 +22,7 @@
       <a class="back" href="/puzzles">← Puzzles</a>
       <h1>Tetris at Iantopia</h1>
       <button class="restart" id="restart-btn" type="button">↻ Restart</button>
+      <button class="restart" id="pause-btn" type="button">❚❚ Pause</button>
       <button class="sound" id="sound-btn" type="button" aria-pressed="false" aria-label="Sound on">🔊</button>
 
       <div class="hud" aria-live="off">
@@ -69,21 +70,7 @@
       </div>
     </div>
 
-    <div class="pad" role="group" aria-label="Touch controls">
-      <div class="pad-row">
-        <button type="button" class="key left" data-action="left" aria-label="Move left"><span class="icon">◀</span><span class="cap">LEFT</span><span class="hint" data-hint="left"></span></button>
-        <button type="button" class="key right" data-action="right" aria-label="Move right"><span class="icon">▶</span><span class="cap">RIGHT</span><span class="hint" data-hint="right"></span></button>
-        <button type="button" class="key rotccw" data-action="rotccw" aria-label="Rotate counter-clockwise"><span class="icon">⟲</span><span class="cap">ROTATE</span><span class="hint" data-hint="rotccw"></span></button>
-        <button type="button" class="key rotcw" data-action="rotcw" aria-label="Rotate clockwise"><span class="icon">⟳</span><span class="cap">ROTATE</span><span class="hint" data-hint="rotcw"></span></button>
       </div>
-      <div class="pad-row">
-        <button type="button" class="key soft" data-action="soft" aria-label="Soft drop, hold to fall faster"><span class="icon">▼</span><span class="cap">SOFT</span><span class="hint" data-hint="soft"></span></button>
-        <button type="button" class="key hard" data-action="hard" aria-label="Slam, hard drop"><span class="icon">⤓</span><span class="cap">SLAM</span><span class="hint" data-hint="hard"></span></button>
-        <button type="button" class="key hold" data-action="hold" aria-label="Hold piece"><span class="icon">⬒</span><span class="cap">HOLD</span><span class="hint" data-hint="hold"></span></button>
-        <button type="button" class="key pause" data-action="pause" aria-label="Pause"><span class="icon">❚❚</span><span class="cap">PAUSE</span><span class="hint" data-hint="pause"></span></button>
-      </div>
-    </div>
-  </div>
 
   <div class="overlay settings" id="settings-overlay" role="dialog" aria-labelledby="settings-title">
       <div class="settings-panel">
@@ -271,6 +258,7 @@
       $('btn-settings-pause').addEventListener('click', () => openSettings('pause-overlay'));
       $('btn-settings-done').addEventListener('click', closeSettings);
       // Restart asks first only when a game is in progress, since it throws the score away.
+      $('pause-btn').addEventListener('click', () => pause());
       $('restart-btn').addEventListener('click', () => {
         if ((state === 'playing' || state === 'paused') && !confirm('Restart? This game’s score is lost.')) return;
         controls.releaseAll();
