@@ -102,7 +102,10 @@ docker compose -f "$REPO/deploy/vm/docker-compose.arena.yml" up -d --build
 # --- News job --------------------------------------------------------------------
 python3 -m venv "$REPO/news-pipeline/.venv"
 "$REPO/news-pipeline/.venv/bin/pip" install -q -r "$REPO/news-pipeline/requirements.txt"
-sudo cp "$REPO/deploy/vm/iantopia-news.service" "$REPO/deploy/vm/iantopia-news.timer" /etc/systemd/system/
+# The unit runs as whoever runs this script. A hard-coded user here once made
+# every timer run fail with status 217/USER.
+sed "s/__SERVICE_USER__/$USER/" "$REPO/deploy/vm/iantopia-news.service" | sudo tee /etc/systemd/system/iantopia-news.service >/dev/null
+sudo cp "$REPO/deploy/vm/iantopia-news.timer" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now iantopia-news.timer
 

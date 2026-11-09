@@ -28,8 +28,9 @@ from email.utils import parsedate_to_datetime
 from typing import Optional
 
 import feedparser
+import requests
 
-from common import write_json
+from common import fetch_bytes, write_json
 
 FEEDS = [
     {"url": "http://feeds.bbci.co.uk/news/world/rss.xml", "source": "BBC News", "category": "news"},
@@ -63,7 +64,11 @@ def parse_published(entry) -> Optional[str]:
 
 
 def fetch_feed(feed: dict) -> list:
-    parsed = feedparser.parse(feed["url"], agent="IantopiaNewsBot/1.0 (+https://iantopia.com; honest RSS reader)")
+    try:
+        parsed = feedparser.parse(fetch_bytes(feed["url"]))
+    except requests.RequestException as exc:
+        print(f"[ingest] {feed['source']}: fetch failed ({exc})", file=sys.stderr)
+        return []
     if parsed.bozo and not parsed.entries:
         print(f"[ingest] {feed['source']}: failed to parse ({parsed.bozo_exception})", file=sys.stderr)
         return []

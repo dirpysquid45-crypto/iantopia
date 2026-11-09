@@ -1,15 +1,28 @@
 """Shared helpers for every pipeline stage: where output lands, how it's
-written. Each stage writes straight to public/news-data/ -- that's the
-same folder Astro copies verbatim into dist/ on every build, so a cron
-job updating these files is enough to serve fresh data with no rebuild,
-no extra service, and no new listening port.
+written, and how feeds are fetched. Each stage writes straight to
+public/news-data/ -- that's the same folder Astro copies verbatim into
+dist/ on every build, so a cron job updating these files is enough to serve
+fresh data with no rebuild, no extra service, and no new listening port.
 """
 import json
 import sys
 from pathlib import Path
 
+import requests
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 OUTPUT_DIR = REPO_ROOT / "public" / "news-data"
+
+USER_AGENT = "IantopiaNewsBot/1.0 (+https://iantopia.com; honest RSS reader)"
+# feedparser.parse(url) has no timeout, so one slow outlet could hang the whole
+# timer run. Fetch with requests instead, with a hard limit per request.
+FETCH_TIMEOUT = 20
+
+
+def fetch_bytes(url: str) -> bytes:
+    response = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=FETCH_TIMEOUT)
+    response.raise_for_status()
+    return response.content
 
 
 def write_json(filename: str, data: dict, keep_if_empty=()) -> Path:

@@ -5,6 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=ubuntu
+User=__SERVICE_USER__
 WorkingDirectory=/srv/iantopia/repo/news-pipeline
 ExecStart=/srv/iantopia/repo/news-pipeline/run_pipeline.sh

@@ -2,9 +2,10 @@
 Description=Run the Iantopia news pipeline twice daily
 
 [Timer]
-# The VM's clock is UTC: 10:00 and 22:00 UTC is 6am and 6pm EDT.
-OnCalendar=*-*-* 10:00:00
-OnCalendar=*-*-* 22:00:00
+# 6am and 6pm Eastern. The zone name lets systemd follow daylight saving time;
+# a fixed UTC hour drifts by an hour twice a year.
+OnCalendar=*-*-* 06:00:00 America/New_York
+OnCalendar=*-*-* 18:00:00 America/New_York
 RandomizedDelaySec=300
 Persistent=true
 
