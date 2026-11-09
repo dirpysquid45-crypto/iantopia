@@ -9,9 +9,18 @@ from pathlib import Path
 from unittest import mock
 
 import common
+import digest
 import geopolitical
 import ingest
 from cluster import build_clusters, tokenize
+
+
+class DigestNumbers(unittest.TestCase):
+    def test_figure_from_the_headlines_is_allowed(self):
+        self.assertEqual(digest.unsupported_numbers("16 people died", "Turkey blast kills at least 16 people"), [])
+
+    def test_invented_figure_is_flagged(self):
+        self.assertEqual(digest.unsupported_numbers("Pew counts 2.5 million", "Pew Research on midterm polls"), ["2.5"])
 
 
 class ClassifyRegion(unittest.TestCase):

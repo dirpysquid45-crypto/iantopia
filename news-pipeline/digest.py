@@ -14,6 +14,7 @@ instead of crashing the pipeline -- ingest/cluster/stock stages are
 independently useful even without a digest paragraph.
 """
 import json
+import re
 import sys
 from datetime import datetime, timezone
 
@@ -23,6 +24,7 @@ from common import write_json, OUTPUT_DIR
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 MODEL = "llama3.2:3b"
+NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)*")
 # Generous on purpose: this is a once-daily batch job on a CPU-only host,
 # not a live request, and a cold model load (first call after Ollama has
 # been idle) is slower than steady-state inference.
@@ -73,6 +75,14 @@ def render_context(clusters_data: dict, headlines_data: dict) -> str:
         for item in research:
             lines.append(f"- {item['title']}: {item['summary'][:200]}")
     return "\n".join(lines)
+
+
+def unsupported_numbers(text: str, context: str) -> list:
+    """Numbers in the digest that don't appear anywhere in the context it was
+    written from. A figure that's in the headlines is fine; one that isn't is
+    the model making it up."""
+    given = set(NUMBER_RE.findall(context))
+    return [n for n in NUMBER_RE.findall(text) if n not in given]
 
 
 def call_ollama(context: str) -> str:
@@ -127,6 +137,16 @@ def main() -> None:
         text, available = None, False
         note = f"Ollama did not respond within {TIMEOUT}s."
         print(f"[digest] {note}", file=sys.stderr)
+
+    if available:
+        unsupported = unsupported_numbers(text, context)
+        if unsupported:
+            # The small model sometimes states a figure no headline gives.
+            # Withhold the digest rather than publish an invented number; the
+            # last good digest stays in place (see keep_if_empty below).
+            text, available = None, False
+            note = f"Digest withheld: it gave figures not in today's headlines ({', '.join(unsupported)})."
+            print(f"[digest] {note}", file=sys.stderr)
 
     output = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
