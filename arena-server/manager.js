@@ -4,7 +4,8 @@ const { PongGame } = require('./pong');
 const BalanceManager = require('./balance');
 const { TurkeyManager } = require('./turkey');
 
-const GAME_TYPES = new Set(['blackjack', 'battleship', 'pong']);
+const GAME_TYPES = new Set(['blackjack', 'battleship', 'pong', 'tetris']);
+const { TetrisGame } = require('./tetris');
 const MAX_BET = 1000000;
 const SUGGESTION_STATUSES = new Set(['new', 'public', 'archived']);
 
@@ -373,7 +374,9 @@ class Manager {
       ? new BattleshipGame(tableId, a, b, this.balance, opts)
       : a.gameType === 'pong'
         ? new PongGame(tableId, a, b, this.balance, opts)
-        : new BlackjackGame(tableId, a, b, this.balance, opts);
+        : a.gameType === 'tetris'
+          ? new TetrisGame(tableId, a, b, this.balance, opts)
+          : new BlackjackGame(tableId, a, b, this.balance, opts);
     game.closeTable = () => this.tables.delete(tableId);
     this.tables.set(tableId, game);
     try {

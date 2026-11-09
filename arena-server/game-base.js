@@ -20,6 +20,8 @@ const DEFAULT_TIMING = {
   rematchMs: 30000,  // how long the rematch prompt stays open
 };
 
+const BalanceManager = require('./balance');
+
 class ArenaGame {
   constructor(tableId, playerA, playerB, balanceManager, opts = {}) {
     this.tableId = tableId;
@@ -56,6 +58,21 @@ class ArenaGame {
   // out. Friendly games and guests have no balance, so there is nothing to send.
   pushBalance(i, balance) {
     if (Number.isFinite(balance)) this.send(i, { type: 'balance_update', balance });
+  }
+
+  // Pays a player their winnings and reports what was actually credited (the wallet cap can cut
+  // it short). Friendly games and guests have no balance, so nothing is paid.
+  async payPlayer(i, amount) {
+    if (!amount || this.friendly || BalanceManager.isGuestId(this.players[i].userId)) return { applied: 0, paid: true };
+    const userId = this.players[i].userId;
+    const before = await this.balance.getBalance(userId);
+    try {
+      const next = await this.balance.creditPayout(userId, amount);
+      this.pushBalance(i, next);
+      return { applied: Math.max(0, next - before), paid: true };
+    } catch (e) {
+      return { applied: 0, paid: false };
+    }
   }
 
   // ----- stakes -----
