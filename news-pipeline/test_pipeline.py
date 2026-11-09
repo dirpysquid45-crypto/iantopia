@@ -10,6 +10,7 @@ from unittest import mock
 
 import common
 import digest
+import guards
 import geopolitical
 import ingest
 from cluster import build_clusters, tokenize
@@ -85,3 +86,67 @@ class WriteJson(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+CONTEXT = """STORIES COVERED BY MULTIPLE OUTLETS TODAY:
+- Iran nuclear talks resume
+  [BBC News] Iran and envoys resume nuclear talks in Geneva: "we are close to a deal" says minister Araghchi: 40 delegates.
+  [NPR] Envoys meet in Geneva as talks resume.
+OTHER HEADLINES TODAY:
+- [Al Jazeera] Gaza aid convoy halted at border.
+"""
+KNOWN = ["BBC News", "NPR", "Al Jazeera", "Wall Street Journal", "Reuters"]
+
+
+class Guards(unittest.TestCase):
+    def test_a_correct_digest_passes(self):
+        text = "BBC News reports Iran and envoys resume nuclear talks in Geneva. NPR notes envoys met there."
+        self.assertEqual(guards.check_digest(text, CONTEXT, KNOWN, digest.unsupported_numbers), [])
+
+    def test_an_outlet_that_did_not_report_the_story_is_flagged(self):
+        text = "Reuters reports Iran and envoys resume nuclear talks in Geneva."
+        problems = guards.check_digest(text, CONTEXT, KNOWN, digest.unsupported_numbers)
+        self.assertTrue(any("Reuters" in p for p in problems))
+
+    def test_an_invented_quote_is_flagged(self):
+        text = "BBC News reports Iran says \"the deal is done\" in Geneva."
+        self.assertEqual(guards.unsupported_quotes(text, CONTEXT), ["the deal is done"])
+
+    def test_a_real_quote_is_allowed(self):
+        text = "BBC News reports \"we are close to a deal\" in Geneva."
+        self.assertEqual(guards.unsupported_quotes(text, CONTEXT), [])
+
+    def test_a_name_not_in_the_headlines_is_flagged(self):
+        text = "BBC News reports Iran and envoys resume talks. Minister Zarif joined them."
+        self.assertIn("Zarif", guards.unsupported_names(text, CONTEXT))
+
+    def test_a_name_from_the_headlines_is_allowed(self):
+        text = "BBC News reports the minister Araghchi spoke in Geneva."
+        self.assertEqual(guards.unsupported_names(text, CONTEXT), [])
+
+    def test_a_sentence_opening_word_is_not_a_name(self):
+        text = "Envoys met in Geneva. Talks continue."
+        self.assertEqual(guards.unsupported_names(text, CONTEXT), [])
+
+    def test_markdown_is_flagged(self):
+        problems = guards.check_digest("## Today\n- item", CONTEXT, KNOWN, digest.unsupported_numbers)
+        self.assertTrue(any("formatting" in p for p in problems))
+
+    def test_a_bad_digest_falls_back_to_the_headlines(self):
+        clusters = {"clusters": [{"title": "Iran", "items": [
+            {"source": "BBC News", "title": "Iran and envoys resume talks"}]}],
+            "unclustered": [{"source": "Al Jazeera", "title": "Gaza aid halted"}]}
+        out = guards.headline_fallback(clusters, {})
+        self.assertIn("BBC News: Iran and envoys resume talks.", out)
+        self.assertIn("Al Jazeera: Gaza aid halted.", out)
+        self.assertNotIn("Reuters", out)
+
+
+class Pairings(unittest.TestCase):
+    def test_outlet_credited_with_its_own_story_passes(self):
+        text = "BBC News reports Iran and envoys resume nuclear talks in Geneva."
+        self.assertEqual(guards.unsupported_pairings(text, CONTEXT, KNOWN), [])
+
+    def test_outlet_credited_with_someone_elses_story_is_flagged(self):
+        text = "BBC News reports Russia threatens new sanctions on Japan."
+        self.assertEqual(len(guards.unsupported_pairings(text, CONTEXT, KNOWN)), 1)

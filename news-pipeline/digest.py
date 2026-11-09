@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 import requests
 
 from common import write_json, OUTPUT_DIR
+import guards
+from ingest import FEEDS
 
 OLLAMA_URL = "http://127.0.0.1:11434/api/generate"
 MODEL = "llama3.2:3b"
@@ -139,14 +141,14 @@ def main() -> None:
         print(f"[digest] {note}", file=sys.stderr)
 
     if available:
-        unsupported = unsupported_numbers(text, context)
-        if unsupported:
-            # The small model sometimes states a figure no headline gives.
-            # Withhold the digest rather than publish an invented number; the
-            # last good digest stays in place (see keep_if_empty below).
-            text, available = None, False
-            note = f"Digest withheld: it gave figures not in today's headlines ({', '.join(unsupported)})."
+        # Every check runs on every run. If the model's text fails any of them,
+        # the digest shows the headlines as their outlets reported them instead.
+        known_outlets = sorted({f["source"] for f in FEEDS})
+        problems = guards.check_digest(text, context, known_outlets, unsupported_numbers)
+        if problems:
+            note = "Summary replaced with the headlines as reported: " + "; ".join(problems) + "."
             print(f"[digest] {note}", file=sys.stderr)
+            text = guards.headline_fallback(clusters_data, headlines_data)
 
     output = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
