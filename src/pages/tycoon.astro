@@ -408,6 +408,7 @@
       <span title="Gross output of every road-connected building, adjusted for mood and specialty. Ranked on the GDP leaderboard.">GDP: <b id="stat-production">0</b>/min</span>
       <span title="GDP per standing building — rewards a lean, well-run village over a sprawling one. Ranked on the Efficiency leaderboard.">Efficiency: <b id="stat-efficiency">0</b>/bldg</span>
       <span title="Click to rename your village." style="cursor:pointer;">Village: <b id="stat-name">My Village</b></span>
+      <span id="next-goal-row" title="Early goals pay a one-time bonus each, in order.">Next: <b id="next-goal">—</b></span>
       <span id="stat-specialty-row" title="A majority of your zoned tiles in one type gives buildings of that type a production bonus, up to +25% fully committed." style="display:none;">Specialty: <b id="stat-specialty">—</b></span>
       <span id="stat-jobs-row" title="Villagers with a job commute to it on a 9-5 schedule. A workday that's actually staffed lifts village mood a little." style="display:none;">Jobs: <b id="stat-jobs">0</b></span>
       <span>Buildings: <b id="stat-placed">0/5</b></span>
@@ -971,11 +972,11 @@
   const buildingCount = () => village.b.filter((s) => s.status === 'building').length;
 
   // ---------- Economy tick ----------
-  // The freeze bounds PAYOUT, not the passage of time. Returning early for
-  // everything meant a building never left 'building' once its timer ran
-  // out: it rendered at 100% forever, still counted against the 3 concurrent
-  // builds, and after three of them no further building could be started at
-  // all. Construction now always settles; only earning is gated.
+  // Construction always settles, and so does earning. The tick only queues
+  // what the player should see (finished builds, per-building earnings); the
+  // reconcile loop draws it.
+  const pendingCelebrations = [];   // buildings that finished on this tick
+  const gainPending = new Map();    // building id -> Strubles earned since the last float
   function tick() {
     if (visiting) return false;   // no earnings from a neighbour's buildings
     const now = Date.now();
@@ -987,6 +988,7 @@
       if (!def) return;
       if (slot.status === 'building' && now >= slot.completesAt) {
         slot.status = 'complete';
+        pendingCelebrations.push(slot);
         village.completedEver = (village.completedEver || 0) + 1;
         slot.lastProductionAt = slot.completesAt;
         slot.lastTaxAt = slot.completesAt;
@@ -1006,6 +1008,9 @@
           const gain = Math.floor(elapsedMin * eff);
           if (gain > 0) {
             earned += gain;
+            // Only ordinary per-second ticks get a float. A catch-up after a
+            // long absence would print one enormous number over every building.
+            if (elapsedMin <= 1) gainPending.set(slot.id, (gainPending.get(slot.id) || 0) + gain);
             slot.lastProductionAt += (gain / eff) * 60000;
             changed = true;
           }
@@ -2011,6 +2016,11 @@
     const efficiency = doneCount ? gdp / doneCount : 0;
     $('stat-production').textContent = Math.floor(gdp);
     $('stat-efficiency').textContent = efficiency.toFixed(1);
+    checkGoals({
+      homes: village.b.filter((s) => s.status === 'complete' && DEFS[s.key] && DEFS[s.key].zone === 'residential').length,
+      finished: doneCount,
+      gdp,
+    });
     $('stat-specialty-row').style.display = specialty ? '' : 'none';
     if (specialty) {
       const icon = { residential: '🏘️', commercial: '🏬', industrial: '🏭' }[specialty.type];
@@ -3637,11 +3647,83 @@
     if (audioEnabled) tryPlayTheme(); else themeMusic.pause();
   });
 
+  // ---------- Feedback: finished builds, earnings floats, the next goal ----------
+  const slotCentre = (s) => { const f = foot(s.key); return { x: s.x * T + (f.w * T) / 2, y: s.y * T }; };
+  function floatText(x, y, text, color) {
+    const t = scene.add.text(x, y, text, { fontFamily: 'monospace', fontSize: '10px', color, stroke: '#000000', strokeThickness: 3 })
+      .setOrigin(0.5, 1).setDepth(200);
+    scene.tweens.add({ targets: t, y: y - 36, alpha: 0, duration: 1400, ease: 'Cubic.easeOut', onComplete: () => t.destroy() });
+  }
+  function celebrateFinishes(now) {
+    if (!scene) return;
+    while (pendingCelebrations.length) {
+      const s = pendingCelebrations.shift();
+      // Only a build that finished just now gets a fanfare. One that finished
+      // while you were away is simply there when you come back.
+      if (now - s.completesAt > 5000) continue;
+      toast(`🏗️ ${DEFS[s.key] ? DEFS[s.key].label : 'Building'} is finished!`);
+      const sp = bSprites.get(s.id);
+      if (sp) {
+        const base = sp.scaleX;
+        scene.tweens.add({ targets: sp, scaleX: base * 1.12, scaleY: base * 1.12, duration: 150, yoyo: true, ease: 'Sine.easeInOut' });
+      }
+      const c = slotCentre(s);
+      floatText(c.x, c.y - 4, '✨ DONE', '#ffd700');
+    }
+  }
+  // Up to six floats every three seconds, the biggest earners first. More than
+  // that and the village turns into a wall of numbers.
+  let lastFloatAt = 0;
+  function flushGainFloats(now) {
+    if (!scene || now - lastFloatAt < 3000) return;
+    lastFloatAt = now;
+    [...gainPending.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).forEach(([id, amount]) => {
+      const s = village.b.find((b) => b.id === id);
+      if (!s || amount < 1) return;
+      const c = slotCentre(s);
+      floatText(c.x, c.y - 4, '+' + Math.floor(amount).toLocaleString(), '#7cfc7c');
+    });
+    gainPending.clear();
+  }
+
+  // Early goals, in order. Each pays once, when reached. Only the next one is
+  // checked, so the list reads as a path rather than a menu.
+  const GOALS = [
+    { id: 'road',    text: 'Lay your first road',    reward: 200,  done: (v) => Object.values(v.tiles).includes('road') },
+    { id: 'home',    text: 'Finish your first home', reward: 300,  done: (v, st) => st.homes >= 1 },
+    { id: 'three',   text: 'Finish 3 buildings',     reward: 500,  done: (v, st) => st.finished >= 3 },
+    { id: 'gdp100',  text: 'Reach 100 GDP/min',      reward: 800,  done: (v, st) => st.gdp >= 100 },
+    { id: 'five',    text: 'Finish 5 buildings',     reward: 1000, done: (v, st) => st.finished >= 5 },
+    { id: 'gdp1000', text: 'Reach 1,000 GDP/min',    reward: 3000, done: (v, st) => st.gdp >= 1000 },
+  ];
+  function checkGoals(st) {
+    if (visiting) return;
+    village.goalsDone = village.goalsDone || [];
+    if (!village.goalsSeeded) {
+      // Goals a village already meets when this ships are marked done, not paid.
+      // Otherwise an established village would collect every early reward at once.
+      village.goalsDone = GOALS.filter((g) => g.done(village, st)).map((g) => g.id);
+      village.goalsSeeded = true;
+      saveVillage();
+    }
+    let next;
+    while ((next = GOALS.find((g) => !village.goalsDone.includes(g.id))) && next.done(village, st)) {
+      village.goalsDone.push(next.id);
+      try { Strubles.add(next.reward, undefined, 'tycoon'); } catch {}
+      toast(`🎯 ${next.text}: +${next.reward.toLocaleString()} Strubles`);
+      saveVillage();
+    }
+    const upcoming = GOALS.find((g) => !village.goalsDone.includes(g.id));
+    $('next-goal').textContent = upcoming ? `${upcoming.text} (+${upcoming.reward.toLocaleString()})` : 'all early goals done';
+  }
+
   // ---------- Reconcile loop ----------
   grantFounderKit();
   if (tick()) saveVillage();
   setInterval(() => {
     if (tick()) saveVillage();
+    celebrateFinishes(Date.now());
+    flushGainFloats(Date.now());
     maybeTriggerEvent();
     refresh();
     syncVillageName();
