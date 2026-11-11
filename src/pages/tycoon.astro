@@ -404,10 +404,6 @@
       </div>
     </header>
 
-    <div id="out-of-order-banner" style="background:rgba(180,30,30,0.9); border:2px solid #ff4444; color:#fff; padding:12px 16px; margin-bottom:14px; text-align:center; font-weight:700; letter-spacing:0.5px; display:none; font-size:9px; line-height:1.8;">
-      🚧 Village economy is paused while it's being rebuilt. To test it, run in console:<br><code style="background:#000; padding:4px 8px; border-radius:2px;">localStorage.setItem('tycoon_dev_mode','true'); location.reload();</code>
-    </div>
-
     <div id="stats-bar">
       <span title="Gross output of every road-connected building, adjusted for mood and specialty. Ranked on the GDP leaderboard.">GDP: <b id="stat-production">0</b>/min</span>
       <span title="GDP per standing building — rewards a lean, well-run village over a sprawling one. Ranked on the Efficiency leaderboard.">Efficiency: <b id="stat-efficiency">0</b>/bldg</span>
@@ -760,9 +756,6 @@
     Strubles.profitTracked = true;
   }
 
-  const TYCOON_DISABLED = !localStorage.getItem('tycoon_dev_mode');
-  $('out-of-order-banner').style.display = TYCOON_DISABLED ? 'block' : 'none';
-
   // ---------- Constants / data ----------
   const T = TycoonArt.T;        // pixels per tile (world units)
   const MAP = 16;               // map is MAP x MAP tiles
@@ -1000,15 +993,7 @@
         slot.taxDebt = slot.taxDebt || 0;
         changed = true;
       }
-      if (slot.status === 'complete' && TYCOON_DISABLED) {
-        // Keep the clocks pinned while frozen, so lifting the freeze doesn't
-        // pay out everything that "accrued" with the economy switched off.
-        if (now - slot.lastProductionAt > 60000) {
-          slot.lastProductionAt = now;
-          slot.lastTaxAt = now;
-          changed = true;
-        }
-      } else if (slot.status === 'complete') {
+      if (slot.status === 'complete') {
         if (slot.lastTaxAt == null) { slot.lastTaxAt = now; slot.taxDebt = 0; changed = true; }
         const eff = productionFor(slot, mood, specialty);
         if (eff <= 0) {
@@ -1037,7 +1022,6 @@
       }
     });
     localStorage.setItem(LAST_SEEN_KEY, String(now));
-    if (TYCOON_DISABLED) return changed;
     if (earned > 0) {
       try { Strubles.add(earned, undefined, 'tycoon'); } catch {}
       village.lifetimeEarned = (village.lifetimeEarned || 0) + earned;
@@ -1352,7 +1336,7 @@
   }
 
   function maybeTriggerEvent() {
-    if (TYCOON_DISABLED || visiting) return;   // a caravan pays on the size of the village on screen
+    if (visiting) return;   // a caravan pays on the size of the village on screen
     if (!village.b.some((s) => s.status === 'complete')) return;
     if (Math.random() >= EVENT_CHANCE_PER_SEC) return;
     const table = [
@@ -3766,7 +3750,7 @@
   if (window.initPickers) setTimeout(window.initPickers, 100);
 
   // Test hook for the browser suites; only exists in dev mode.
-  if (!TYCOON_DISABLED && window.IANTOPIA_IS_DEV) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood, triggerFire, triggerCaravan, triggerAudit, estimateGDP, loadVisit, exitVisit, get visiting() { return visiting; }, get homeVillage() { return homeVillage; } };
+  if (window.IANTOPIA_IS_DEV) window.TycoonTest = { villagers, get village() { return village; }, foodStats, housingTotal, insideCount, homeCount, planRect, get cam() { return cam; }, T, MAP, tileFromPointer, setBrush, tileCost, gameHour, parkPull, workPull, setClockHour(h) { clockShiftMs = ((h / 24) * DAY_REAL_MS - (Date.now() % DAY_REAL_MS) + DAY_REAL_MS) % DAY_REAL_MS; }, get parkJoy() { return parkJoy; }, computeSpecialty, isWorkplace, jobCount, computeStaffing, isRoadConnected, productionFor, computeMood, triggerFire, triggerCaravan, triggerAudit, estimateGDP, loadVisit, exitVisit, get visiting() { return visiting; }, get homeVillage() { return homeVillage; } };
 })();
 </script>
 </body>
