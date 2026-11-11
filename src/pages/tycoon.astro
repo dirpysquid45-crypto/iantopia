@@ -486,6 +486,7 @@
       <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
         <button class="btn" id="manage-bank" type="button" style="display:none;">🏦 Open Bank</button>
         <button class="btn" id="manage-firefight" type="button" style="display:none;">🚒 Put it out</button>
+        <button class="btn" id="manage-rush" type="button" style="display:none;">👷 Rush the crew</button>
         <button class="btn" id="manage-move" type="button">✋ Move</button>
         <button class="btn" id="manage-remove" type="button">🗑️ Remove</button>
       </div>
@@ -700,6 +701,8 @@
 <script is:inline src="/cursor.js?v=3"></script>
 <script is:inline src="/tycoon-cap.js?v=2"></script>
 <script is:inline src="/tycoon-economy.js?v=1"></script>
+<script is:inline src="/tycoon-minigames.js?v=1"></script>
+<script is:inline src="/tycoon-minigame-ui.js?v=1"></script>
 <script is:inline src="/tycoon-bank.js?v=2"></script>
 <script is:inline src="/strubles.js?v=6"></script>
 <script is:inline>
@@ -1298,6 +1301,20 @@
   const FIRE_DURATION_MS = 90 * 1000;
   const FIRE_REPAIR_RATE = 0.1;  // Strubles to put one out early, as a fraction of the building's cost
 
+  // Mini-games (public/tycoon-minigames.js for the rules, tycoon-minigame-ui.js for the screens).
+  // One at a time: a second game waits, so two overlays never stack or pay twice.
+  const MG = window.TycoonMinigames || {};
+  let minigameOpen = false;
+  function playMinigame(game, onDone, fallback) {
+    if (minigameOpen || !window.TycoonMinigame) {
+      if (fallback) onDone(fallback);
+      else toast('Finish what you are doing first.', true);
+      return;
+    }
+    minigameOpen = true;
+    game((result) => { minigameOpen = false; onDone(result); });
+  }
+
   function estimateGDP() {
     const m = computeMood(), specialty = computeSpecialty();
     let total = 0;
@@ -1321,33 +1338,68 @@
     return true;
   }
 
+  // The caravan pays part of its bonus at once; catching crates pays the rest.
+  // Ignoring the game still pays the upfront part, so the game is a bonus, not a gate.
+  const CARAVAN_CRATES = 12;
   function triggerCaravan() {
     const bonus = Math.round(Math.max(150, estimateGDP() * (2 + Math.random() * 3)));
-    try { Strubles.add(bonus, undefined, 'tycoon'); } catch {}
-    toast(`🚚 A trade caravan passed through! +${bonus.toLocaleString()} Strubles`);
+    const now = MG.caravanSplit(bonus, 0, CARAVAN_CRATES).now;
+    try { Strubles.add(now, undefined, 'tycoon'); } catch {}
+    toast(`🚚 A trade caravan passed through! +${now.toLocaleString()} Strubles. Catch the crates for more.`);
+    playMinigame(TycoonMinigame.caravan, (r) => {
+      const { later } = MG.caravanSplit(bonus, r.catches, r.total);
+      if (later > 0) { try { Strubles.add(later, undefined, 'tycoon'); } catch {} }
+      toast(`🚚 ${r.catches} of ${r.total} crates caught, +${later.toLocaleString()} more Strubles.`);
+    }, { catches: 0, total: CARAVAN_CRATES });
     return true;
   }
 
   // Only fires if the village is actually neglecting upkeep — bad luck
   // doesn't invent debt that wasn't there, it just makes existing debt worse.
+  // The audit doubles the debt unless you match the stamped forms in time.
   function triggerAudit() {
-    const debtors = village.b.filter((s) => s.status === 'complete' && s.taxDebt > 0);
-    if (!debtors.length) return false;
-    let added = 0;
-    debtors.forEach((s) => { added += s.taxDebt; s.taxDebt *= 2; });
-    toast(`📋 Tax audit — neglected buildings now owe ${Math.floor(added).toLocaleString()} more.`, true);
-    saveVillage();
+    if (!village.b.some((s) => s.status === 'complete' && s.taxDebt > 0)) return false;
+    toast('📋 Tax audit! Find the stamped forms to keep the debt down.', true);
+    playMinigame(TycoonMinigame.audit, (r) => {
+      let added = 0;
+      // Read the debtors again: the player may have paid some while the forms were on screen.
+      village.b.forEach((s) => {
+        if (s.status !== 'complete' || !(s.taxDebt > 0)) return;
+        const extra = MG.auditAddedDebt(s.taxDebt, r.score);
+        s.taxDebt += extra;
+        added += extra;
+      });
+      toast(added > 0
+        ? `📋 Audit: neglected buildings now owe ${Math.floor(added).toLocaleString()} more.`
+        : '📋 Audit passed. Nothing added.', added > 0);
+      saveVillage();
+    }, { score: 0 });
+    return true;
+  }
+
+  // A traffic jam: route the commute. Solving it makes the next building go up
+  // in half the time. Ignoring it changes nothing.
+  function triggerJam() {
+    if (village.b.filter((s) => s.status === 'complete').length < 2) return false;
+    playMinigame(TycoonMinigame.pipe, (r) => {
+      if (!r.solved) { toast('🚗 The jam cleared on its own.'); return; }
+      village.buildBoostLeft = 1;
+      saveVillage();
+      toast('🚗 Jam cleared! Your next building goes up in half the time.');
+    }, { solved: false });
     return true;
   }
 
   function maybeTriggerEvent() {
     if (visiting) return;   // a caravan pays on the size of the village on screen
+    if (minigameOpen) return;   // one event at a time, and never on top of a game
     if (!village.b.some((s) => s.status === 'complete')) return;
     if (Math.random() >= EVENT_CHANCE_PER_SEC) return;
     const table = [
       { run: triggerFire, weight: countZones('water') > 0 ? 1 : 2 },
       { run: triggerCaravan, weight: 2 },
       { run: triggerAudit, weight: 1, eligible: () => village.b.some((s) => s.status === 'complete' && s.taxDebt > 0) },
+      { run: triggerJam, weight: 1, eligible: () => village.b.filter((s) => s.status === 'complete').length >= 2 },
     ].filter((e) => !e.eligible || e.eligible());
     if (!table.length) return;
     const total = table.reduce((a, e) => a + e.weight, 0);
@@ -2421,10 +2473,13 @@
         onBuildingsChanged();
         return reverseMoney(Number.isFinite(cur.paid) ? cur.paid : def.cost);
       });
+      // A solved traffic jam halves the time for this one building only.
+      const buildTime = E.buildMinutes(def.buildMinutes, village.completedEver) * 60000 * MG.buildTimeFactor(village.buildBoostLeft || 0);
+      village.buildBoostLeft = 0;
       village.b.push({
         id: village.nextId++, key, x: tx, y: ty,
         status: 'building', startedAt: now,
-        completesAt: now + E.buildMinutes(def.buildMinutes, village.completedEver) * 60000,
+        completesAt: now + buildTime,
         lastProductionAt: now,
         paid: permit,             // permit paid, refunded if the building is removed
       });
@@ -2841,7 +2896,8 @@
     $('manage-bank').style.display = def.special === 'bank' && s.status === 'complete' ? '' : 'none';
     const fireCost = Math.round(def.cost * FIRE_REPAIR_RATE);
     $('manage-firefight').style.display = onFire ? '' : 'none';
-    $('manage-firefight').textContent = `🚒 Put it out (${fireCost.toLocaleString()})`;
+    $('manage-firefight').textContent = `🚒 Put it out (${fireCost.toLocaleString()}, less if you fight it)`;
+    $('manage-rush').style.display = s.status === 'building' && !s.rushed ? '' : 'none';
     manageOverlay.classList.add('open');
   }
   // Residents / who is inside, and food, for the manage panel.
@@ -2910,23 +2966,43 @@
     if (visitLocked()) return;
     const s = bById.get(manageId);
     if (!s || !(s.fireUntil > Date.now())) return;
-    const def = DEFS[s.key];
-    const cost = Math.round(def.cost * FIRE_REPAIR_RATE);
-    if (!Strubles.spend(cost)) { toast(`Need ${cost.toLocaleString()} Strubles`, true); return; }
-    const previousUntil = s.fireUntil;
-    s.fireUntil = 0;
-    pushUndo(`put out fire at ${def.label}`, () => {
+    // Fighting the fire lowers the price; skipping the game pays the full one.
+    playMinigame(TycoonMinigame.fireFight, (r) => {
       const cur = bById.get(s.id);
-      if (!cur) return 'That building is gone';
-      const err = reverseMoney(cost);
-      if (err) return err;
-      cur.fireUntil = previousUntil;
-      return null;
+      if (!cur || !(cur.fireUntil > Date.now())) return;   // burnt out or removed while you played
+      const def = DEFS[cur.key];
+      const cost = MG.fireFightCost(Math.round(def.cost * FIRE_REPAIR_RATE), r.hits, r.rounds);
+      if (!Strubles.spend(cost)) { toast(`Need ${cost.toLocaleString()} Strubles`, true); return; }
+      const previousUntil = cur.fireUntil;
+      cur.fireUntil = 0;
+      pushUndo(`put out fire at ${def.label}`, () => {
+        const again = bById.get(cur.id);
+        if (!again) return 'That building is gone';
+        const err = reverseMoney(cost);
+        if (err) return err;
+        again.fireUntil = previousUntil;
+        return null;
+      });
+      saveVillage();
+      closeManage();
+      refresh();
+      toast(`🚒 Fire out at the ${def.label} for ${cost.toLocaleString()} Strubles.`);
+    }, { hits: 0, rounds: 4 });
+  });
+  $('manage-rush').addEventListener('click', () => {
+    if (visitLocked()) return;
+    const s = bById.get(manageId);
+    if (!s || s.status !== 'building' || s.rushed) return;
+    playMinigame(TycoonMinigame.rush, (r) => {
+      const cur = bById.get(s.id);
+      if (!cur || cur.status !== 'building') return;   // finished or removed while you played
+      cur.completesAt = Date.now() + MG.rushRemainingMs(Math.max(0, cur.completesAt - Date.now()), r.hits);
+      cur.rushed = true;
+      saveVillage();
+      closeManage();
+      refresh();
+      toast(r.hits ? `👷 The crew sped up by ${r.hits * 10}%.` : '👷 The crew carries on at its own pace.');
     });
-    saveVillage();
-    closeManage();
-    refresh();
-    toast(`🚒 Fire out at the ${def.label}.`);
   });
   document.querySelectorAll('#manage-overlay, #manage-close').forEach((el) => {
     el.addEventListener('click', (e) => {
