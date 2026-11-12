@@ -66,6 +66,13 @@ sudo mkdir -p "$APP" "$SECRETS"
 sudo chown -R "$USER":"$USER" "$APP"
 chmod 700 "$SECRETS"
 chmod 600 "$SECRETS"/* 2>/dev/null || true
+# The arena container runs as uid 1001 (the nodejs user in arena-server/Dockerfile)
+# and must read the key. The chmod above locks it to this login user, so the
+# container died on EACCES. Hand the key to 1001 and make it read-only.
+if [ -f "$SECRETS/service-account-key.json" ]; then
+  sudo chown 1001:1001 "$SECRETS/service-account-key.json"
+  sudo chmod 400 "$SECRETS/service-account-key.json"
+fi
 
 # --- Code ----------------------------------------------------------------------
 if [ -d "$REPO/.git" ]; then
