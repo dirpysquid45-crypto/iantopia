@@ -401,6 +401,7 @@
         <button id="now-playing" title="Music options">🎵</button>
         <button id="bg-btn" title="Change background">🖼️</button>
         <button id="cursor-btn" title="Change cursor">🖱️</button>
+        <button id="tester-btn" title="Test controls (owner only)" style="display:none;">🧪</button>
       </div>
     </header>
 
@@ -473,6 +474,27 @@
         <button class="btn" id="place-close" type="button">Close</button>
       </div>
       <div id="place-list"></div>
+    </div>
+  </div>
+
+  <!-- Test controls: shown only to the owner, after the server confirms it (see checkTester). -->
+  <div class="overlay" id="tester-overlay">
+    <div class="modal">
+      <h2>🧪 Test controls</h2>
+      <p><small>Owner only. These change this village, not anyone else's. A village that has used them stays off the leaderboards and the visit list.</small></p>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin:8px 0;">
+        <button class="btn" data-skip="3600000" type="button">Skip 1 hour</button>
+        <button class="btn" data-skip="86400000" type="button">Skip 1 day</button>
+        <button class="btn" data-skip="259200000" type="button">Skip 3 days</button>
+        <button class="btn" id="tester-finish" type="button">Finish every build</button>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin:8px 0;">
+        <button class="btn" data-event="fire" type="button">🔥 Fire</button>
+        <button class="btn" data-event="caravan" type="button">🚚 Caravan</button>
+        <button class="btn" data-event="audit" type="button">📋 Audit</button>
+        <button class="btn" data-event="jam" type="button">🚗 Jam</button>
+      </div>
+      <div style="margin-top:12px;"><button class="btn" id="tester-close" type="button">Close</button></div>
     </div>
   </div>
 
@@ -3797,10 +3819,62 @@
     $('next-goal').textContent = upcoming ? `${upcoming.text} (+${upcoming.reward.toLocaleString()})` : 'all early goals done';
   }
 
+  // ---------- Test controls (owner only) ----------
+  // The owner's identity is checked by the server (GET /owner/check, verified
+  // token). The page never holds the address. The controls only change this
+  // village, and any use marks it as a test village (see village.testing).
+  let testerChecked = false;
+  async function checkTester() {
+    testerChecked = true;
+    try {
+      const token = await CloudSync.currentUser.getIdToken();
+      const res = await fetch(GIFT_API + '/owner/check', { headers: { Authorization: 'Bearer ' + token } });
+      if (res.ok) $('tester-btn').style.display = '';
+    } catch {}
+  }
+  function markTesting() { village.testing = true; }
+  function skipTime(ms) {
+    if (visiting) { toast('Head home before testing.', true); return; }
+    markTesting();
+    // Moving the stored clocks back is the same as time passing: the tick then
+    // settles construction, upkeep and production for the whole gap.
+    village.b.forEach((s) => ['startedAt', 'completesAt', 'lastProductionAt', 'lastTaxAt', 'fireUntil'].forEach((k) => {
+      if (typeof s[k] === 'number' && s[k] > 0) s[k] -= ms;
+    }));
+    const seen = Number(localStorage.getItem(LAST_SEEN_KEY) || 0);
+    if (seen) localStorage.setItem(LAST_SEEN_KEY, String(seen - ms));
+    tick();
+    saveVillage();
+    refresh();
+    toast(`🧪 Skipped ${fmtDuration(ms)}.`);
+  }
+  function finishBuilds() {
+    if (visiting) { toast('Head home before testing.', true); return; }
+    markTesting();
+    village.b.forEach((s) => { if (s.status === 'building') s.completesAt = Date.now() - 1; });
+    tick();
+    saveVillage();
+    refresh();
+    toast('🧪 Every build is finished.');
+  }
+  const TEST_EVENTS = { fire: triggerFire, caravan: triggerCaravan, audit: triggerAudit, jam: triggerJam };
+  function runTestEvent(name) {
+    if (visiting) { toast('Head home before testing.', true); return; }
+    markTesting();
+    if (TEST_EVENTS[name]() === false) toast('That event needs a finished building, or a debt, first.', true);
+    saveVillage();
+  }
+  $('tester-btn').addEventListener('click', () => $('tester-overlay').classList.add('open'));
+  $('tester-close').addEventListener('click', () => $('tester-overlay').classList.remove('open'));
+  $('tester-finish').addEventListener('click', finishBuilds);
+  document.querySelectorAll('#tester-overlay [data-skip]').forEach((b) => b.addEventListener('click', () => skipTime(Number(b.dataset.skip))));
+  document.querySelectorAll('#tester-overlay [data-event]').forEach((b) => b.addEventListener('click', () => runTestEvent(b.dataset.event)));
+
   // ---------- Reconcile loop ----------
   grantFounderKit();
   if (tick()) saveVillage();
   setInterval(() => {
+    if (!testerChecked && window.CloudSync && CloudSync.currentUser) checkTester();
     if (tick()) saveVillage();
     celebrateFinishes(Date.now());
     flushGainFloats(Date.now());
@@ -3819,6 +3893,7 @@
   let leaderboardCooldownUntil = 0;
   function maybePushLeaderboardScore(stats) {
     if (visiting) return;   // a visited village's numbers are not yours to report
+    if (village.testing) return;   // test-control numbers are not real play
     if (!window.CloudSync || !CloudSync.isSignedIn()) return;
     if (Date.now() < leaderboardCooldownUntil) return;
     const key = JSON.stringify(stats);
@@ -3858,6 +3933,7 @@
   let lastSnapshotPush = 0, lastSnapshotKey = null, snapshotPushInFlight = false, snapshotCooldownUntil = 0;
   function maybePushVillageSnapshot(stats) {
     if (visiting) return;   // never publish a neighbour's village as yours
+    if (village.testing) return;   // a test village is not published to the visit list
     if (!window.CloudSync || !CloudSync.isSignedIn()) return;
     if (Date.now() < snapshotCooldownUntil) return;
     const user = CloudSync.currentUser;
