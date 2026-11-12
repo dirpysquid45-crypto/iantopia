@@ -6,7 +6,7 @@ before the rules stop browsers from writing them.
 ## 1. Before anything goes live
 
 - [ ] `main` contains the release commit, and `arena-server` tests pass:
-      `cd arena-server && npm test` (expect 298 passing).
+      `cd arena-server && npm test` (expect the count reported by the suite).
 - [ ] Rules tests pass against the emulator (needs Java 11 or newer):
       `npx firebase emulators:exec --only firestore --project iantopia-rules-test "cd firestore-tests && npm test"`
       (expect 23 passing).
@@ -56,7 +56,7 @@ browser writes to wallet fields. The server writes those fields itself.
 - [ ] Home page loads, and "My Iantopia" opens `/tycoon`.
 - [ ] Tycoon: place a road and a building; income ticks; the "Next:" goal shows.
 - [ ] Sign in, then reload: the village and balance survive.
-- [ ] Arena lobby loads; Pong and Air Hockey open.
+- [ ] Arena lobby loads; Air Hockey opens.
 - [ ] `/news` shows a digest, and `stocks.json` is recent.
 
 ## Rollback

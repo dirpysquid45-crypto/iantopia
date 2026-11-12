@@ -1,12 +1,11 @@
 const BlackjackGame = require('./blackjack');
 const { BattleshipGame } = require('./battleship');
 const { AirHockeyGame, MODES: AIRHOCKEY_MODES } = require('./airhockey');
-const { PongGame } = require('./pong');
 const { TetrisGame } = require('./tetris');
 const BalanceManager = require('./balance');
 const { TurkeyManager } = require('./turkey');
 
-const GAME_TYPES = new Set(['blackjack', 'battleship', 'airhockey', 'pong', 'tetris']);
+const GAME_TYPES = new Set(['blackjack', 'battleship', 'airhockey', 'tetris']);
 // Games with no stakes: nothing can be lost or won, so a bet is refused.
 const FRIENDLY_ONLY = new Set(['airhockey']);
 const MAX_BET = 1000000;
@@ -513,8 +512,6 @@ class Manager {
       ? new BattleshipGame(tableId, a, b, this.balance, opts)
       : a.gameType === 'airhockey'
         ? new AirHockeyGame(tableId, a, b, this.balance, Object.assign({ mode: a.mode }, opts))
-        : a.gameType === 'pong'
-          ? new PongGame(tableId, a, b, this.balance, opts)
         : a.gameType === 'tetris'
           ? new TetrisGame(tableId, a, b, this.balance, opts)
           : new BlackjackGame(tableId, a, b, this.balance, opts);
