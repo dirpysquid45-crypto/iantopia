@@ -90,3 +90,12 @@ test('each bank level past 3 costs at most 70% of the level below, and stays aff
     prevCap = Cap.capForLevel(n);
   }
 });
+
+test('offline earnings stop at three days, and short gaps are untouched', () => {
+  assert.equal(E.OFFLINE_EARNING_CAP_MINUTES, 3 * 24 * 60);
+  assert.equal(E.capOfflineMinutes(0), 0);
+  assert.equal(E.capOfflineMinutes(90), 90);
+  assert.equal(E.capOfflineMinutes(E.OFFLINE_EARNING_CAP_MINUTES), E.OFFLINE_EARNING_CAP_MINUTES);
+  assert.equal(E.capOfflineMinutes(60 * 24 * 300), E.OFFLINE_EARNING_CAP_MINUTES);
+  assert.equal(E.capOfflineMinutes(-5), 0);
+});

@@ -85,17 +85,27 @@
     return 1 + UPKEEP_GROWTH * Math.max(0, (placedCount || 0) - UPKEEP_FREE_BUILDINGS);
   }
 
+  // Production earned while the game is closed stops at three days. Without a
+  // cap, a player back after months would collect months of output at once.
+  // Upkeep is not capped: neglect should still bite.
+  const OFFLINE_EARNING_CAP_MINUTES = 3 * 24 * 60;
+  function capOfflineMinutes(elapsedMinutes) {
+    return Math.min(Math.max(0, elapsedMinutes || 0), OFFLINE_EARNING_CAP_MINUTES);
+  }
+
   return {
     PERMIT_FREE_BUILDINGS,
     SLOT_BASE_COST,
     ROOKIE_LIFETIME_EARN,
     FAST_BUILDS,
     REAL_ESTATE_BASE,
+    OFFLINE_EARNING_CAP_MINUTES,
     permitCost,
     slotCost,
     realEstatePrice,
     rookieMultiplier,
     buildMinutes,
     upkeepMultiplier,
+    capOfflineMinutes,
   };
 });
