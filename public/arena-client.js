@@ -62,6 +62,9 @@ window.ArenaClient = (function () {
     let replaced = false;
     let lastHeard = 0;
     let retryTimer = null, pingTimer = null, pongTimer = null;
+    // How long a ping may go unanswered. A page on a slow link can have a large
+    // message queued ahead of the pong, so it can ask for longer.
+    const pongMs = opts.pongMs || 8000;
 
     function setState(next) {
       if (state === next) return;
@@ -82,7 +85,7 @@ window.ArenaClient = (function () {
         if (sock.readyState !== 1) return;
         try { sock.send(JSON.stringify({ type: 'ping' })); } catch { return; }
         clearTimeout(pongTimer);
-        pongTimer = setTimeout(() => { try { sock.close(); } catch {} }, 8000);
+        pongTimer = setTimeout(() => { try { sock.close(); } catch {} }, pongMs);
       }, 15000);
     }
 

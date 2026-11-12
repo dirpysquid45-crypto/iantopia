@@ -60,19 +60,13 @@ class ArenaGame {
     if (Number.isFinite(balance)) this.send(i, { type: 'balance_update', balance });
   }
 
-  // Pays a player their winnings and reports what was actually credited (the wallet cap can cut
-  // it short). Friendly games and guests have no balance, so nothing is paid.
-  async payPlayer(i, amount) {
-    if (!amount || this.friendly || BalanceManager.isGuestId(this.players[i].userId)) return { applied: 0, paid: true };
-    const userId = this.players[i].userId;
-    const before = await this.balance.getBalance(userId);
-    try {
-      const next = await this.balance.creditPayout(userId, amount);
-      this.pushBalance(i, next);
-      return { applied: Math.max(0, next - before), paid: true };
-    } catch (e) {
-      return { applied: 0, paid: false };
-    }
+  // Pays a player's winnings or money back, and reports what was actually credited.
+  // The id keeps a retry from paying twice; `paid` is false if the credit never landed.
+  async payPlayer(i, amount, reason) {
+    const meta = { game: this.gameType, table: this.tableId, player: i, reason, id: `${this.tableId}:${reason}:${i}` };
+    const r = await this.balance.payOut(this.players[i].userId, amount, meta);
+    if (r.balance !== null) this.pushBalance(i, r.balance);
+    return r;
   }
 
   // ----- stakes -----
@@ -89,8 +83,9 @@ class ArenaGame {
   async refundCharged() {
     for (let i = 0; i < 2; i++) {
       if (!this.charged[i]) continue;
-      try { this.pushBalance(i, await this.balance.refundBet(this.players[i].userId, this.bet)); }
-      catch (e) { console.error('[refund] failed for', this.players[i].userId, e.message); }
+      const meta = { game: this.gameType, table: this.tableId, player: i, reason: 'stake', id: `${this.tableId}:refund:${i}` };
+      const r = await this.balance.refundStake(this.players[i].userId, this.bet, meta);
+      if (r.balance !== null) this.pushBalance(i, r.balance);
       this.charged[i] = false;
     }
   }

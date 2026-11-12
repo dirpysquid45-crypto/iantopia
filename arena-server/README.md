@@ -17,7 +17,7 @@ Server listens on `ws://localhost:4001` in dev.
 
 ### Production Deployment on Qasim
 
-1. **Generate Firebase service account key** (same as admin-scripts):
+1. **Generate Firebase service account key** (same as scripts/admin):
    - Firebase Console → iantopia project → Project Settings → Service Accounts
    - Generate new private key
    - Save as `arena-server/service-account-key.json`

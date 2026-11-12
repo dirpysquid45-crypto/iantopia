@@ -1,6 +1,17 @@
+const http = require('http');
 const WebSocket = require('ws');
 const Manager = require('./manager');
 const RateLimit = require('./rate-limit');
+const { Wallet } = require('./wallet');
+const { PlaySessions } = require('./sessions');
+const { Gifts } = require('./gifts');
+const { VillageNames } = require('./village-name');
+const { StrublesBoard } = require('./strubles-board');
+const { Chat } = require('./chat');
+
+const WALLET_BODY_MAX = 16 * 1024;
+const WALLET_OPS_MAX = 50;
+const GIFT_PATHS = new Set(['/gifts/strubles', '/gifts/collect', '/gifts/note']);
 
 // Addresses that can only be our own reverse proxy / docker network.
 function isPrivateAddress(addr) {
@@ -40,17 +51,189 @@ function isAdminToken(decoded, admins) {
   // An email only counts if Google has verified it.
   return !!decoded.email && decoded.email_verified !== false && admins.emails.includes(String(decoded.email).toLowerCase());
 }
+// The owner's dev endpoint: only a verified sign-in with the owner's email. OWNER_EMAIL
+// is compared lowercased. If it is not set, nobody is the owner.
+function isOwnerToken(decoded, ownerEmail) {
+  if (!decoded || !ownerEmail || decoded.email_verified !== true) return false;
+  return String(decoded.email || '').toLowerCase() === ownerEmail;
+}
 
 function createServer(options = {}) {
   const {
     port = 4001, host, db, auth, timing, rate, quiet = false, makeDeck,
-    authTimeoutMs = 10000, heartbeatMs = 25000, admins,
+    authTimeoutMs = 10000, heartbeatMs = 25000, admins, accounts,
   } = options;
   const adminList = admins || adminsFromEnv(process.env);
+  const ownerEmail = String(options.ownerEmail !== undefined ? options.ownerEmail : (process.env.OWNER_EMAIL || '')).trim().toLowerCase();
   const log = quiet ? () => {} : (...a) => console.log(...a);
 
-  const wss = new WebSocket.Server({ port, host, clientTracking: false, maxPayload: 16 * 1024 });
-  const manager = new Manager(db, auth, { timing, makeDeck });
+  const sessions = new PlaySessions(db);
+  const manager = new Manager(db, auth, { timing, makeDeck, accounts, sessions });
+  const wallet = new Wallet(db, manager.balance, { sessions });
+  const gifts = new Gifts(db, { balance: manager.balance });
+  const villageNames = new VillageNames(db);
+  const chat = new Chat(db);
+  // Admin accounts are left off the Strubles board: their balance isn't earned play.
+  const strublesBoard = new StrublesBoard(db, {
+    isAdminDoc: (uid, data) => adminList.uids.includes(String(uid).toLowerCase())
+      || (!!data.email && adminList.emails.includes(String(data.email).toLowerCase())),
+  });
+
+  // One HTTP server carries both the game socket (ws) and the wallet routes
+  // (/wallet and /wallet/ops). nginx sends /arena-ws/ and /arena-api/ here.
+  const httpServer = http.createServer((req, res) => {
+    handleWallet(req, res).catch(() => { if (!res.headersSent) sendJson(res, 500, { error: 'server' }); });
+  });
+  const wss = new WebSocket.Server({ server: httpServer, clientTracking: false, maxPayload: 16 * 1024 });
+  httpServer.on('listening', () => wss.emit('listening'));
+  httpServer.listen(port, host);
+
+  function sendJson(res, status, body) {
+    res.statusCode = status;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify(body));
+  }
+  function bearer(req) {
+    const h = String(req.headers.authorization || '');
+    return h.startsWith('Bearer ') ? h.slice(7) : null;
+  }
+  // The verified sign-in token, or null. Gifts need its name, so it is kept whole.
+  async function verifiedToken(req) {
+    const token = bearer(req);
+    if (!token) return null;
+    try { return await auth.verifyIdToken(token); } catch { return null; }
+  }
+  // Only a signed-in account has a wallet. Guests keep their own local currency.
+  async function signedInUid(req) {
+    const token = bearer(req);
+    if (!token) return null;
+    try { return (await auth.verifyIdToken(token)).uid; } catch { return null; }
+  }
+  function readBody(req) {
+    return new Promise((resolve, reject) => {
+      let size = 0;
+      let tooLarge = false;
+      const chunks = [];
+      req.on('data', (c) => {
+        size += c.length;
+        // Keep reading and drop the bytes, so the 413 reply can still be sent.
+        if (size > WALLET_BODY_MAX) { if (!tooLarge) { tooLarge = true; reject(new Error('too large')); } return; }
+        chunks.push(c);
+      });
+      req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+      req.on('error', reject);
+    });
+  }
+  // Local development only: the page and the arena are on different ports there, so
+  // the browser needs CORS. Production is same-origin through nginx, so no origin
+  // other than this machine is ever allowed.
+  const LOCAL_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+  function allowLocalOrigin(req, res) {
+    const origin = String(req.headers.origin || '');
+    if (!LOCAL_ORIGIN.test(origin)) return;
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  }
+  // Owner-only: a verified sign-in with the owner's email. Everyone else gets a 403, so
+  // the endpoint tells nobody but the owner anything.
+  async function handleOwnerCheck(req, res) {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'method' });
+    let decoded = null;
+    const token = bearer(req);
+    if (token) { try { decoded = await auth.verifyIdToken(token); } catch {} }
+    if (!isOwnerToken(decoded, ownerEmail)) return sendJson(res, 403, { error: 'not_owner' });
+    return sendJson(res, 200, { owner: true });
+  }
+  // Gifts: a Strubles gift, a collect, or a free note. The sender is the verified token.
+  async function handleGifts(req, res, path) {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'method' });
+    const decoded = await verifiedToken(req);
+    if (!decoded) return sendJson(res, 401, { error: 'sign_in' });
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch (e) {
+      if (e.message === 'too large') { res.setHeader('Connection', 'close'); return sendJson(res, 413, { error: 'too_large' }); }
+      return sendJson(res, 400, { error: 'bad_json' });
+    }
+    const who = { uid: decoded.uid, name: decoded.name };
+    const out = path === '/gifts/strubles' ? await gifts.sendStrubles(who, body)
+      : path === '/gifts/collect' ? await gifts.collect(who, body)
+        : await gifts.sendNote(who, body);
+    return sendJson(res, out.status, out.body);
+  }
+  // Naming a village: POST {name}. The word filter runs on the server, so the name is
+  // checked however the browser sends it.
+  async function handleVillageName(req, res) {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'method' });
+    const decoded = await verifiedToken(req);
+    if (!decoded) return sendJson(res, 401, { error: 'sign_in' });
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch (e) {
+      if (e.message === 'too large') { res.setHeader('Connection', 'close'); return sendJson(res, 413, { error: 'too_large' }); }
+      return sendJson(res, 400, { error: 'bad_json' });
+    }
+    const out = await villageNames.setName({ uid: decoded.uid }, body);
+    return sendJson(res, out.status, out.body);
+  }
+  // Sending a chat message: POST {text, replyTo?}. Signed in only. The word filter, the rate
+  // limit and the ban check run here, so they apply however the browser sends it.
+  async function handleChatSend(req, res) {
+    if (req.method !== 'POST') return sendJson(res, 405, { error: 'method' });
+    const decoded = await verifiedToken(req);
+    if (!decoded) return sendJson(res, 401, { error: 'sign_in' });
+    let body;
+    try { body = JSON.parse(await readBody(req)); } catch (e) {
+      if (e.message === 'too large') { res.setHeader('Connection', 'close'); return sendJson(res, 413, { error: 'too_large' }); }
+      return sendJson(res, 400, { error: 'bad_json' });
+    }
+    const out = await chat.send({ uid: decoded.uid, name: decoded.name }, body);
+    return sendJson(res, out.status, out.body);
+  }
+  // The Strubles leaderboard. Public and read-only: names and balances of the top players.
+  async function handleStrublesBoard(req, res) {
+    if (req.method !== 'GET') return sendJson(res, 405, { error: 'method' });
+    try {
+      return sendJson(res, 200, await strublesBoard.top());
+    } catch (e) {
+      console.error('[leaderboard] strubles board failed:', e.message);
+      return sendJson(res, 503, { error: 'unavailable' });
+    }
+  }
+  async function handleWallet(req, res) {
+    allowLocalOrigin(req, res);
+    if (req.method === 'OPTIONS') { res.statusCode = 204; return res.end(); }
+    const path = new URL(req.url, 'http://x').pathname;
+    if (path === '/owner/check') return handleOwnerCheck(req, res);
+    if (path === '/leaderboard/strubles') return handleStrublesBoard(req, res);
+    if (path === '/village/name') return handleVillageName(req, res);
+    if (path === '/chat/send') return handleChatSend(req, res);
+    if (path.startsWith('/gifts/')) {
+      if (!GIFT_PATHS.has(path)) return sendJson(res, 404, { error: 'not_found' });
+      return handleGifts(req, res, path);
+    }
+    if (path !== '/wallet' && path !== '/wallet/ops') return sendJson(res, 404, { error: 'not_found' });
+    const uid = await signedInUid(req);
+    if (!uid) return sendJson(res, 401, { error: 'sign_in' });
+    if (path === '/wallet' && req.method === 'GET') {
+      return sendJson(res, 200, await wallet.read(uid));
+    }
+    if (path === '/wallet/ops' && req.method === 'POST') {
+      let body;
+      let raw;
+      try { raw = await readBody(req); } catch (e) {
+        if (e.message === 'too large') { res.setHeader('Connection', 'close'); return sendJson(res, 413, { error: 'too_large' }); }
+        return sendJson(res, 400, { error: 'bad_json' });
+      }
+      try { body = JSON.parse(raw); } catch { return sendJson(res, 400, { error: 'bad_json' }); }
+      const ops = body && Array.isArray(body.ops) ? body.ops : null;
+      if (!ops || ops.length < 1 || ops.length > WALLET_OPS_MAX) return sendJson(res, 400, { error: 'bad_ops' });
+      const results = await wallet.applyBatch(uid, ops);
+      const last = results.length ? results[results.length - 1] : null;
+      return sendJson(res, 200, { results, balance: last && last.balance !== undefined ? last.balance : null });
+    }
+    return sendJson(res, 405, { error: 'method' });
+  }
   const rateLimit = new RateLimit(rate);
   const sockets = new Set();
 
@@ -149,14 +332,17 @@ function createServer(options = {}) {
 
   return {
     wss, manager,
-    address: () => wss.address(),
+    address: () => httpServer.address(),
     close: () => new Promise((resolve) => {
       clearInterval(heartbeat);
       manager.shutdown();
       for (const ws of sockets) { try { ws.terminate(); } catch {} }
-      wss.close(() => resolve());
+      wss.close(() => {
+        httpServer.closeAllConnections && httpServer.closeAllConnections();
+        httpServer.close(() => resolve());
+      });
     }),
   };
 }
 
-module.exports = { createServer, clientIp, isPrivateAddress, cleanName };
+module.exports = { createServer, clientIp, isPrivateAddress, cleanName, isOwnerToken };

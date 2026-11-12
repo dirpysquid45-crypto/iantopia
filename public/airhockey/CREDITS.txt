@@ -1,0 +1,4 @@
+Air hockey table and pieces: art from "Air Hockey" by Matheus Amazonas Cabral de Andrade
+(lazysquirrellabs/airhockey on GitHub), Creative Commons Attribution 4.0 International
+(CC BY 4.0). Resized for the web. Rules were ported from the MIT-licensed code in the same
+repository.

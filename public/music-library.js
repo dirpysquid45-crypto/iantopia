@@ -44,6 +44,12 @@ window.MUSIC_LIBRARY = {
   // Seasonal, November -- resolved the same no-write way as ghost_house.
   thanksgiving_reprise: { label: 'Thanksgiving Theme (Reprise)',    src: '/audio/music/thanksgiving-reprise.mp3' },
 
+  tian_tian_yue:       { label: 'Tian Tian Yue Yuan – Jackie Chan & Chen Si Si', src: '/audio/music/tian-tian-yue.mp3' },
+  sacred_pool_of_tears: { label: 'Sacred Pool of Tears',              src: '/audio/music/sacred-pool-of-tears.mp3' },
+  oogway_ascends:      { label: 'Oogway Ascends',                    src: '/audio/music/oogway-ascends.mp3' },
+  han_palace:          { label: 'Spring Morning in the Han Palace',  src: '/audio/music/han-palace.mp3' },
+  avatars_love:        { label: "The Avatar's Love",                 src: '/audio/music/avatars-love.mp3' },
+
   // --- Arena-only free defaults ---
   // koronba has no shop entry (Arena Battleship's page-only free
   // default, via PAGE_FREE_TRACK_KEY); yadakk mirrors it as Arena's hub

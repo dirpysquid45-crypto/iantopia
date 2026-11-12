@@ -34,7 +34,9 @@
   // *_theme_pos_v1 keys (exact mid-track playback position).
   const SYNC_KEYS = [
     'strubles_inventory_v1',
-    'strubles_balance_v1',
+    // strubles_balance_v1 and strubles_last_gain_v1 are not synced from the browser:
+    // the server's wallet writes them (see arena-server/wallet.js), and the rules refuse
+    // a browser write that touches them.
     'strubles_cases_v1',
     'strubles_case_history_v1',
     'strubles_case_stats_v1',
@@ -122,6 +124,86 @@
   const auth = firebase.auth();
   const db = firebase.firestore();
 
+  // A banned account sees a full-screen red notice on every page until the ban
+  // ends. The server sets ban_until on the record; this listens to it live, so
+  // a ban or an unban takes effect without a reload.
+  let banUnsub = null;
+  let resetSeen = null;
+  function watchBan(user) {
+    if (banUnsub) { banUnsub(); banUnsub = null; }
+    resetSeen = null;
+    if (!user) { showBan(null); return; }
+    banUnsub = db.collection('users').doc(user.uid).onSnapshot((snap) => {
+      const d = snap.exists ? snap.data() : {};
+      // The server resets a balance on a cheat strike, a ban or an admin reset,
+      // and stamps balance_reset_at. A tab still holding the old balance must
+      // take the server's value now, or its next save pushes the old one back.
+      const resetAt = d.balance_reset_at ? d.balance_reset_at.toMillis() : null;
+      if (resetSeen !== null && resetAt !== null && resetAt !== resetSeen) {
+        pullFromCloud(user.uid).catch((err) => console.error('[cloud-sync] pull after reset failed:', err));
+        if (window.Strubles && window.Strubles.refresh) window.Strubles.refresh();
+      }
+      resetSeen = resetAt;
+      const until = d.ban_until ? d.ban_until.toDate() : null;
+      showBan(until && until > new Date() ? until : null);
+      // An admin warning stays until the player dismisses it.
+      const warning = d.admin_warning && d.admin_warning.id !== d.admin_warning_dismissed ? d.admin_warning : null;
+      showWarning(warning, user.uid);
+    }, () => { showBan(null); showWarning(null); });
+  }
+  function showBan(until) {
+    let el = document.getElementById('ianto-ban-screen');
+    // The admin pages stay usable, so an admin who is banned can still unban.
+    if (location.pathname.startsWith('/admin-')) until = null;
+    if (!until) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'ianto-ban-screen';
+      el.setAttribute('role', 'alertdialog');
+      el.setAttribute('aria-modal', 'true');
+      el.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:#b00000;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;font-family:"Press Start 2P",ui-monospace,monospace;';
+      el.innerHTML = '<div style="font-size:clamp(28px,8vw,56px);letter-spacing:4px;margin-bottom:24px;">BANNED</div>' +
+        '<div style="font-size:clamp(9px,2.2vw,12px);line-height:2;max-width:520px;">Your account is suspended for suspicious activity.</div>' +
+        '<div id="ianto-ban-until" style="font-size:clamp(8px,2vw,11px);line-height:2;margin-top:18px;"></div>';
+      document.body.appendChild(el);
+    }
+    el.querySelector('#ianto-ban-until').textContent = 'Until ' + until.toLocaleString();
+  }
+
+  // An admin's warning: a yellow bar across the top until it's dismissed. It
+  // doesn't block the page.
+  function showWarning(w, uid) {
+    let el = document.getElementById('ianto-warning');
+    if (!w) { if (el) el.remove(); return; }
+    if (el && el.dataset.id === w.id) return;
+    if (el) el.remove();
+    el = document.createElement('div');
+    el.id = 'ianto-warning';
+    el.dataset.id = w.id;
+    el.setAttribute('role', 'alert');
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483646;background:#ffd23a;color:#000;display:flex;gap:12px;align-items:center;justify-content:center;padding:10px 14px;font-family:"Press Start 2P",ui-monospace,monospace;font-size:10px;line-height:1.8;text-align:center;';
+    const text = document.createElement('span');
+    text.textContent = 'WARNING FROM THE ADMIN: ' + w.text;
+    const ok = document.createElement('button');
+    ok.type = 'button';
+    ok.textContent = 'OK';
+    ok.style.cssText = 'background:#000;color:#ffd23a;border:2px solid #000;padding:6px 10px;font:inherit;cursor:pointer;flex:0 0 auto;';
+    ok.addEventListener('click', () => {
+      db.collection('users').doc(uid).set({ admin_warning_dismissed: w.id }, { merge: true })
+        .catch((err) => console.error('[cloud-sync] could not dismiss warning:', err.message || err));
+      el.remove();
+    });
+    el.append(text, ok);
+    document.body.appendChild(el);
+  }
+
+  // The account's sign-in email and display name, stored on the user's record
+  // next to their game data so they can be looked up by name. The record is
+  // readable only by its owner (see firestore.rules).
+  function profileFields(user) {
+    return { email: user.email || null, displayName: user.displayName || null };
+  }
+
   let currentUser = null;
   let applyingRemote = false; // guards against syncing our own just-applied data straight back up
   let pushTimer = null;
@@ -176,7 +258,7 @@
     } else {
       // First-ever sign-in: don't wipe out progress the user already built
       // up anonymously — that becomes their first cloud save instead.
-      await db.collection('users').doc(uid).set(snapshotLocalState());
+      await db.collection('users').doc(uid).set({ ...snapshotLocalState(), ...profileFields(currentUser) });
     }
   }
 
@@ -196,7 +278,7 @@
     if (!currentUser || applyingRemote || !reconciled) return;
     clearTimeout(pushTimer);
     const doPush = () => {
-      db.collection('users').doc(currentUser.uid).set(snapshotLocalState(), { merge: true }).catch((err) => {
+      db.collection('users').doc(currentUser.uid).set({ ...snapshotLocalState(), ...profileFields(currentUser) }, { merge: true }).catch((err) => {
         console.error('[cloud-sync] push failed:', err);
       });
     };
@@ -226,6 +308,13 @@
     // Set BEFORE the pull, not after — applyRemoteState()'s reload re-enters
     // this same handler on the next load, and the flag has to already be
     // set by then or it'd pull-and-potentially-reload every time forever.
+    watchBan(user);
+    // Keep the email and display name on the record current, even when nothing
+    // else has changed (a name or email change, or a first sign-in).
+    if (user) {
+      db.collection('users').doc(user.uid).set(profileFields(user), { merge: true })
+        .catch((err) => console.error('[cloud-sync] profile write failed:', err.message || err));
+    }
     if (user && !sessionStorage.getItem(RECONCILE_KEY)) {
       try { sessionStorage.setItem(RECONCILE_KEY, '1'); } catch {}
       // A failed pull still lets pushes resume (the old behaviour), so an

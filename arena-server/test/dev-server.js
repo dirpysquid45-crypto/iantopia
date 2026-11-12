@@ -15,7 +15,10 @@ const server = createServer({ port: PORT, db, auth: FakeAuth, timing, quiet: !pr
 
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // Local pages only. The seed endpoint below can write any balance, so it
+  // must never answer a cross-origin page.
+  const origin = req.headers.origin || '';
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) res.setHeader('Access-Control-Allow-Origin', origin);
   res.setHeader('Content-Type', 'application/json');
   if (url.pathname === '/seed') {
     db.seed(url.searchParams.get('uid'), { strubles_balance_v1: String(url.searchParams.get('balance') || 0) });

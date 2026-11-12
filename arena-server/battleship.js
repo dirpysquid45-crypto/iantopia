@@ -243,17 +243,15 @@ class BattleshipGame extends ArenaGame {
     const pot = this.bet * 2;
     const raked = this.friendly ? 0 : Math.floor(pot * this.rake);
     const payout = this.friendly ? 0 : pot - raked;
+    // Paid first, so the result only ever reports what the balance really got.
+    const won = payout > 0 ? await this.payPlayer(winnerIndex, payout, 'win') : { applied: 0, paid: true };
     const results = [{ result: 'loss', payout: 0 }, { result: 'loss', payout: 0 }];
-    results[winnerIndex] = { result: 'win', payout };
+    results[winnerIndex] = { result: 'win', payout: won.applied, ...(won.paid ? {} : { unpaid: true }) };
     // Kept so a resync during the result/rematch window (e.g. a phone that
     // locked right as the game ended) can rebuild the exact same result
     // screen the client already renders from a live game_result.
     this.lastReason = reason;
     this.lastResults = results;
-    if (payout > 0) {
-      try { this.pushBalance(winnerIndex, await this.balance.creditPayout(this.players[winnerIndex].userId, payout)); }
-      catch (e) { console.error('[battleship] payout failed:', e.message); }
-    }
     // Both fleets are revealed now that nothing can be exploited with them, so
     // the loser can see where the ships they never found were hiding.
     this.broadcast({ type: 'game_result', results, reason, friendly: this.friendly, fleets: this.shipPlacements });

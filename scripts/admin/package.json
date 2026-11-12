@@ -1,5 +1,5 @@
 {
-  "name": "iantopia-admin-scripts",
+  "name": "iantopia-scripts/admin",
   "private": true,
   "version": "1.0.0",
   "description": "One-off / occasional scripts run with elevated (service-account) Firestore access -- never part of the deployed Astro site, isolated exactly like news-pipeline/ isolates its own Python deps.",
