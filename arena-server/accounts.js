@@ -256,6 +256,12 @@ class AccountWatch {
   // Records a strike in a transaction, so two snapshots can't count twice.
   async punish(uid, info) {
     if (await this.isAdmin(uid)) return;
+    // AUTO_PUNISH=off stops the automatic reset and ban. The suspicion still goes to the
+    // admin feed, so nothing is hidden; nothing is taken away from the player.
+    if (process.env.AUTO_PUNISH === 'off') {
+      this.emit({ kind: 'punish', action: 'flag', uid, name: info.name, reason: info.reason || 'over_cap', detected: info.reason || 'over_cap', from: info.balance, page: info.page || null, perMinute: info.perMinute, streak: info.streak });
+      return;
+    }
     const now = this.now();
     const ref = this.db.collection('cheat_strikes').doc(uid);
     const count = await this.db.runTransaction(async (tx) => {

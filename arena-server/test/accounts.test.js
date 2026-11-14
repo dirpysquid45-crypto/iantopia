@@ -313,3 +313,21 @@ test('gift to everyone is refused before anything changes when the total is over
   await assert.rejects(() => watch.giftAll(1000000, 'too much'), /over the 5000000 limit/);
   for (const uid of uids) assert.equal(db.docs.get(`users/${uid}`).strubles_balance_v1, '0', 'nothing was changed');
 });
+
+test('AUTO_PUNISH=off logs a suspicion but never resets or bans the account', async () => {
+  const before = process.env.AUTO_PUNISH;
+  process.env.AUTO_PUNISH = 'off';
+  try {
+    const { save, events, tick, db } = setup();
+    await save('u9', 100);
+    let bal = 100;
+    for (let i = 0; i < 4; i++) { bal += 2000; tick(5000); await save('u9', bal, { amount: 2000, page: '/blackjack' }); }
+    const flag = events.find((e) => e.kind === 'punish' && e.action === 'flag');
+    assert.ok(flag, 'the suspicion is still in the feed');
+    assert.equal(flag.detected, 'rate');
+    assert.equal(events.some((e) => e.action === 'reset' || e.action === 'ban'), false, 'nothing is reset or banned');
+    assert.equal(db.docs.has('bans/u9'), false, 'no ban record is written');
+  } finally {
+    if (before === undefined) delete process.env.AUTO_PUNISH; else process.env.AUTO_PUNISH = before;
+  }
+});
