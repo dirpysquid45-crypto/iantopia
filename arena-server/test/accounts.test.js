@@ -69,17 +69,16 @@ function setup(now = Date.now(), options = {}) {
   return { watch, db, events, tick, save };
 }
 
-test('a balance above the wallet cap is flagged, and the first offence resets it to 100', async () => {
+test('a balance above the wallet cap is flagged, and nothing is taken away', async () => {
   const { save, events, db } = setup();
   await save('u1', 100);
   await save('u1', 1000000, { amount: 999900, page: '/minesweeper' });
-  const punish = events.find((e) => e.kind === 'punish');
-  assert.equal(punish.action, 'reset');
-  assert.equal(punish.detected, 'over_cap');
-  assert.equal(punish.page, '/minesweeper', 'the page is logged with the strike');
-  assert.equal(db.docs.get('users/u1').strubles_balance_v1, '100');
+  const flag = events.find((e) => e.kind === 'punish');
+  assert.equal(flag.action, 'flag');
+  assert.equal(flag.detected, 'over_cap');
+  assert.equal(flag.page, '/minesweeper', 'the page is logged with the flag');
+  assert.equal(db.docs.has('users/u1') && db.docs.get('users/u1').strubles_balance_v1 !== undefined && db.docs.get('users/u1').strubles_balance_v1 !== '100', false, 'the balance is not reset');
 });
-
 test('gains that add up past the per-minute limit are flagged as a rate cheat', async () => {
   const { save, events, tick } = setup();
   await save('u2', 100);
@@ -121,38 +120,29 @@ test('a loss between wins restarts the streak', async () => {
   assert.equal(events.filter((e) => e.kind === 'punish').length, 0);
 });
 
-test('a second offence within the window bans the account and records the page', async () => {
+test('repeated offences are only flagged: no reset, no ban, no wipe', async () => {
   const { save, events, db } = setup();
   await save('u6', 100);
   await save('u6', 1000000, { amount: 999900, page: '/lootbox' });
   await save('u6', 100);
   await save('u6', 1000000, { amount: 999900, page: '/lootbox' });
-  const ban = events.find((e) => e.kind === 'punish' && e.action === 'ban');
-  assert.ok(ban, 'the ban was recorded');
-  assert.equal(ban.page, '/lootbox');
-  assert.ok(db.docs.get('bans/u6'), 'a ban record exists, which the rules check');
-  assert.ok(db.docs.get('users/u6').ban_until, 'the account shows its ban time');
+  assert.equal(events.filter((e) => e.kind === 'punish' && e.action === 'flag').length >= 1, true, 'each suspicion is in the feed');
+  assert.equal(events.some((e) => e.action === 'ban' || e.action === 'reset'), false, 'nothing is banned or reset');
+  assert.equal(db.docs.has('bans/u6'), false, 'no ban record is written');
 });
-
-test('the ban terms are the configured hours and reset balance, not the defaults', async () => {
+test('an admin ban uses the configured hours and leaves the balance alone', async () => {
   const t = Date.now();
-  const { save, db } = setup(t, { banHours: 2, banReset: '250' });
-  await save('u9', 100);
-  await save('u9', 1000000, { amount: 999900, page: '/lootbox' });
-  await save('u9', 100);
-  await save('u9', 1000000, { amount: 999900, page: '/lootbox' });
-  assert.equal(db.docs.get('users/u9').strubles_balance_v1, '250', 'reset to the configured balance');
+  const { watch, db, save } = setup(t, { banHours: 2 });
+  await save('u9', 5000);
+  await watch.ban('u9', 2, { reason: 'admin' });
+  assert.equal(db.docs.get('users/u9').strubles_balance_v1, undefined, 'the ban writes no balance, so nothing is reset');
   assert.equal(db.docs.get('bans/u9').until.getTime(), t + 2 * 3600 * 1000, 'banned for the configured hours');
 });
-
 test('a bad ban term stops the watch from starting', () => {
   const base = { db: fakeDb(), auth: {}, balance: { capFromData: () => 0 }, log: { error() {} } };
   assert.throws(() => new AccountWatch({ ...base, banHours: 0 }), /BAN_HOURS/);
   assert.throws(() => new AccountWatch({ ...base, banHours: NaN }), /BAN_HOURS/);
-  assert.throws(() => new AccountWatch({ ...base, banReset: '-5' }), /BAN_RESET_BALANCE/);
-  assert.throws(() => new AccountWatch({ ...base, banReset: '12.5' }), /BAN_RESET_BALANCE/);
 });
-
 test('the per-minute rate is the net change, so wins that losses cancel out are not flagged', async () => {
   const { save, events, tick } = setup();
   await save('u8', 100);
@@ -222,12 +212,12 @@ test('unwarn clears the warning and the strike history, and leaves the ban alone
   assert.equal(db.docs.has('cheat_strikes/u2'), false);
 });
 
-test('restore releases a ban and puts back the balance and bank level from before the ban', async () => {
+test('restore releases a ban and keeps the balance and bank level', async () => {
   const { watch, db, save } = setup();
   await db.collection('users').doc('u3').set({ strubles_balance_v1: '5000', tycoon_bank_level_v1: '3' }, { merge: true });
   await save('u3', 5000);
   await watch.ban('u3', 24, { reason: 'admin' });
-  assert.equal(db.docs.get('users/u3').strubles_balance_v1, '100', 'the ban reset the balance');
+  assert.equal(db.docs.get('users/u3').strubles_balance_v1, '5000', 'the ban leaves the balance alone');
   await watch.restore('u3');
   assert.equal(db.docs.get('users/u3').strubles_balance_v1, '5000');
   assert.equal(db.docs.get('users/u3').tycoon_bank_level_v1, '3');
@@ -243,14 +233,14 @@ test('a refund of money the player just paid is not flagged, even when it is ove
   assert.equal(events.filter((e) => e.kind === 'punish').length, 0, 'no strike, no reset');
 });
 
-test('a refund bigger than what was paid is judged as a win, so it can still be flagged', async () => {
+test('a refund bigger than what was paid is flagged, not applied as a reset', async () => {
   const { db, events, save } = setup();
   await save('u6', 15000);
   await save('u6', 5000);                                    // paid 10,000
   await save('u6', 28000, { amount: 23000, kind: 'refund' }); // claims 23,000 back
-  assert.ok(events.some((e) => e.kind === 'punish' && (e.reason === 'cheat_first_offence' || e.detected === 'rate')), 'flagged as a rate cheat');
+  assert.ok(events.some((e) => e.kind === 'punish' && e.action === 'flag'), 'flagged');
+  assert.equal(db.docs.has('users/u6') && db.docs.get('users/u6').strubles_balance_v1 === '100', false, 'the balance is not reset');
 });
-
 test('a stake the server refunds (failed match) is matched to its save and not flagged', async () => {
   const BalanceManager = require('../balance');
   const { events, save } = setup();

@@ -19,9 +19,6 @@ const STARTING_BALANCE = '100';
 const STRIKE_WINDOW_MS = 7 * 24 * 3600 * 1000;
 const BAN_HOURS = 24;                 // the default; BAN_HOURS in server.js overrides it
 const FEED_MAX = 300;
-// Resetting the cap: the wallet cap comes from the bank level and the village's
-// buildings (see balance.js capFromData), so a reset clears both.
-const CAP_RESET = { tycoon_bank_level_v1: '0', tycoon_village_v2: JSON.stringify({ v: 2, nextId: 1, name: 'My Village', b: [], tiles: {}, paid: {} }) };
 const ARCHIVE_LOG = 'account_log';        // every feed event, kept forever
 const ARCHIVE_BACKUP = 'account_backups'; // record copies taken before a change
 // Plausibility limits. The NET change in a balance may rise by at most
@@ -42,7 +39,6 @@ const SERVER_REFUND_WINDOW_MS = 30 * 1000;
 // An admin's own balance change is not a cheat, whatever the amount. The watch
 // lets through the save that matches it, for this long after it is made.
 const ADMIN_SET_GRACE_MS = 2 * 60 * 1000;
-const LEADERBOARDS = ['leaderboard', 'minesweeper_leaderboard', 'horse_leaderboard'];
 
 // Limits for admin gifts. One account can get up to GIFT_MAX at a time; one gift to
 // everyone can total at most GIFT_ALL_MAX_TOTAL.
@@ -54,13 +50,11 @@ function cleanNote(note) {
 }
 
 class AccountWatch {
-  constructor({ db, auth, balance, admins = { uids: [], emails: [] }, now = () => Date.now(), log = console, banHours = BAN_HOURS, banReset = STARTING_BALANCE }) {
+  constructor({ db, auth, balance, admins = { uids: [], emails: [] }, now = () => Date.now(), log = console, banHours = BAN_HOURS }) {
     // The ban terms are set by BAN_HOURS and BAN_RESET_BALANCE (see server.js). A bad value
     // stops the server at startup, rather than banning with the wrong terms.
     if (!(Number.isFinite(banHours) && banHours > 0)) throw new Error('BAN_HOURS must be a positive number');
-    if (!/^\d+$/.test(String(banReset))) throw new Error('BAN_RESET_BALANCE must be a whole number of Strubles');
     this.banHours = banHours;
-    this.banReset = String(banReset);
     this.db = db;
     this.admins = admins;         // the admin list (ADMIN_UIDS / ADMIN_EMAILS), never banned
     this.auth = auth;
@@ -253,46 +247,24 @@ class AccountWatch {
     } catch { return false; }
   }
 
-  // Records a strike in a transaction, so two snapshots can't count twice.
+  // A suspicion is logged to the admin feed and nothing else. Progress is never taken
+  // away automatically: an automatic reset or ban wiped real players' villages and
+  // leaderboard rows on a false positive. A person decides what to do with a flag.
   async punish(uid, info) {
     if (await this.isAdmin(uid)) return;
-    // AUTO_PUNISH=off stops the automatic reset and ban. The suspicion still goes to the
-    // admin feed, so nothing is hidden; nothing is taken away from the player.
-    if (process.env.AUTO_PUNISH === 'off') {
-      this.emit({ kind: 'punish', action: 'flag', uid, name: info.name, reason: info.reason || 'over_cap', detected: info.reason || 'over_cap', from: info.balance ?? null, page: info.page || null, perMinute: info.perMinute ?? null, streak: info.streak ?? null });
-      return;
-    }
-    const now = this.now();
-    const ref = this.db.collection('cheat_strikes').doc(uid);
-    const count = await this.db.runTransaction(async (tx) => {
-      const snap = await tx.get(ref);
-      const old = snap.exists ? (snap.data().at || []) : [];
-      const recent = old.filter((t) => now - t < STRIKE_WINDOW_MS);
-      recent.push(now);
-      tx.set(ref, { at: recent });
-      return recent.length;
-    });
-    const detail = { page: info.page || null, detected: info.reason || 'over_cap', streak: info.streak, perMinute: info.perMinute };
-    if (count >= 2) {
-      await this.ban(uid, this.banHours, { reason: 'cheat_second_offence', ...info, strikes: count, ...detail });
-      return;
-    }
-    await this.backup(uid, 'before_cheat_reset');
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, cheat_warning_at: new Date(now), balance_reset_at: new Date(now) }, { merge: true });
-    this.emit({ kind: 'punish', action: 'reset', uid, name: info.name, reason: 'cheat_first_offence', from: info.balance, strikes: count, ...detail });
+    this.emit({ kind: 'punish', action: 'flag', uid, name: info.name, reason: info.reason || 'over_cap', detected: info.reason || 'over_cap', from: info.balance ?? null, page: info.page || null, perMinute: info.perMinute ?? null, streak: info.streak ?? null });
   }
 
-  // Bans an account and resets its balance. Used for second offences and by
-  // the admin panel. Also removes the account's leaderboard rows.
+  // A ban only blocks the wallet until the ban time. It leaves the balance, the village,
+  // the bank level and the leaderboard rows exactly as they are.
   async ban(uid, hours, info = {}) {
     if (await this.isAdmin(uid)) throw new Error('admin accounts cannot be banned');
     await this.backup(uid, 'before_ban');
     const until = new Date(this.now() + hours * 3600 * 1000);
     await this.db.collection('bans').doc(uid).set({ until, reason: info.reason || 'admin', at: new Date(this.now()) });
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: this.banReset, ban_until: until, balance_reset_at: new Date(this.now()), ...CAP_RESET }, { merge: true });
-    for (const col of LEADERBOARDS) await this.db.collection(col).doc(uid).delete();
+    await this.db.collection('users').doc(uid).set({ ban_until: until }, { merge: true });
     const name = info.name || await this.labelFor(uid);
-    this.emit({ kind: 'punish', action: 'ban', uid, name, until: until.toISOString(), reason: info.reason || 'admin', from: info.balance, strikes: info.strikes, page: info.page || null, detected: info.detected || null });
+    this.emit({ kind: 'punish', action: 'ban', uid, name, until: until.toISOString(), reason: info.reason || 'admin', from: info.balance, page: info.page || null, detected: info.detected || null });
   }
 
   async balanceNow(uid) {
@@ -372,10 +344,9 @@ class AccountWatch {
     return { count, total: amount * count };
   }
 
-  async reset(uid) {
-    await this.backup(uid, 'before_admin_reset');
-    await this.db.collection('users').doc(uid).set({ strubles_balance_v1: STARTING_BALANCE, balance_reset_at: new Date(this.now()), ...CAP_RESET }, { merge: true });
-    this.emit({ kind: 'punish', action: 'reset', uid, name: await this.labelFor(uid), reason: 'admin' });
+  // Disabled: a reset cleared the player's balance, village and bank level.
+  async reset() {
+    throw new Error('Resetting an account is disabled: it removes the player\'s progress');
   }
 
   // Sets the account's sign-in display name, so it shows in Firebase's Users tab.

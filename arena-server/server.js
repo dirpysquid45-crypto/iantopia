@@ -22,7 +22,6 @@ const accounts = new AccountWatch({
   db, auth: admin.auth(), balance: new BalanceManager(db),
   admins: { uids: listFromEnv(process.env.ADMIN_UIDS), emails: listFromEnv(process.env.ADMIN_EMAILS) },
   banHours: process.env.BAN_HOURS ? Number(process.env.BAN_HOURS) : undefined,
-  banReset: process.env.BAN_RESET_BALANCE ? process.env.BAN_RESET_BALANCE : undefined,
 }).start();
 // The owner's dev endpoint (/owner/check) answers only the verified owner's email.
 const server = createServer({ port: PORT, db, auth: admin.auth(), accounts, ownerEmail: process.env.OWNER_EMAIL || '' });
