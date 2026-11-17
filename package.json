@@ -10,5 +10,8 @@
   "dependencies": {
     "astro": "^4.15.0",
     "sharp": "^0.35.3"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.34.2"
   }
 }
