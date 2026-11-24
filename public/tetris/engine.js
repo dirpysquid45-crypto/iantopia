@@ -61,7 +61,7 @@
   var LINE_POINTS = { 1: 100, 2: 300, 3: 500, 4: 800 };
   // Strubles earned per clear, before the combo and level multipliers. The page
   // turns the total into Strubles at game over (see rewards.js for the caps).
-  var LINE_REWARD = { 1: 0, 2: 1, 3: 2, 4: 5 };
+  var LINE_REWARD = { 1: 2, 2: 5, 3: 10, 4: 25 };
 
   // Fall time per row in seconds. Same curve as Tetrigo's Fall.
   function fallInterval(level) {

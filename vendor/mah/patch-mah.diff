@@ -116,7 +116,7 @@ index 1550972f..051152fb 100644
  	readonly showStartScreen = computed(() => this.game.isIdle() && !this.game.message() && !this.anyDialogVisible());
  	readonly dailyView = signal(false);
  	readonly dailyUnplayed = computed(() => this.dailyEnabled() && !this.dailyService.todayResult());
-+	readonly layoutLocked = computed(() => this.dailyEnabled() && this.dailyService.todayResult()?.won !== true);
++	readonly layoutLocked = computed(() => this.dailyEnabled() && !this.dailyService.todayResult());
  	readonly blackout = computed(() => this.game.challenge()?.id === CHALLENGE_CODES.CHALLENGE_BLACKOUT);
  	readonly concealed = computed(() => this.game.isPaused() && (this.game.challenge()?.hasTimeLimit ?? false));
  	private readonly injector = inject(Injector);
